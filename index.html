@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bomberman Roguelike v1.0</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div id="app-wrapper">
+        <div id="game-container">
+            <canvas id="gameCanvas" width="600" height="600"></canvas>
+            
+            <!-- HUD overlay -->
+            <div id="ui-layer">
+                <div class="flex flex-col gap-1.5">
+                    <div class="flex gap-1.5">
+                        <div class="stat-badge text-red-400">❤️ <span id="ui-health">3</span></div>
+                        <div class="stat-badge text-cyan-300 hidden" id="ui-shield-badge">🛡️ <span id="ui-shield">SI</span></div>
+                        <div class="stat-badge text-yellow-300">⭐ <span id="ui-score">0</span></div>
+                    </div>
+                    <div class="stat-badge text-purple-300 w-fit">🚩 NIVEL <span id="ui-level">1</span></div>
+                </div>
+                
+                <div class="flex flex-col items-end gap-1.5">
+                    <div class="flex gap-1.5">
+                        <button id="btn-pause" class="stat-badge hud-button" type="button" aria-label="Pausar juego">II</button>
+                        <div class="stat-badge text-amber-400">💣 <span id="ui-bombs">1</span></div>
+                        <div class="stat-badge text-orange-400">🔥 <span id="ui-range">1</span></div>
+                        <div class="stat-badge text-emerald-400">👟 <span id="ui-speed">3</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Start Screen -->
+            <div id="start-screen" class="screen">
+                <div class="text-4xl mb-2">💣💥</div>
+                <h1 class="text-xl md:text-2xl mb-1 text-yellow-400 pixel-font tracking-wider">BOMBERMAN</h1>
+                <h2 class="text-xs md:text-sm mb-4 pixel-font text-blue-400">ROGUELIKE EXPANSION</h2>
+                
+                <div class="text-left mb-4 space-y-2 p-3 bg-slate-900/90 rounded-xl border border-slate-700 text-xs text-slate-300 max-w-xs">
+                    <p>🏃 <strong>Explora:</strong> Cámara enfocada y mapas grandes.</p>
+                    <p>💣 <strong>Destruye:</strong> Bloques para hallar la salida 🚪.</p>
+                    <p>👾 <strong>Enemigos:</strong> Rastreros 🔴, Voladores 🔵, Especiales 🟢.</p>
+                    <p>🛡️ <strong>Powerups:</strong> Bombas, Fuego, Botas y Escudos.</p>
+                    <p>⌨️ <strong>PC:</strong> WASD/Flechas + Espacio/Z. P o Escape pausa.</p>
+                </div>
+                <button id="btn-start" class="btn-pixel">COMENZAR RUN</button>
+            </div>
+
+            <!-- Pause Screen -->
+            <div id="pause-screen" class="screen hidden">
+                <div class="text-4xl mb-2">II</div>
+                <h1 class="text-2xl mb-2 text-cyan-400 pixel-font">PAUSA</h1>
+                <p class="text-xs text-slate-300 mb-1">Pulsa P, Escape o el botón para continuar.</p>
+                <button id="btn-resume" class="btn-pixel">CONTINUAR</button>
+            </div>
+
+            <!-- Game Over Screen -->
+            <div id="game-over-screen" class="screen hidden">
+                <div class="text-4xl mb-2">💀</div>
+                <h1 class="text-2xl mb-2 text-red-500 pixel-font">GAME OVER</h1>
+                <p class="text-xs text-slate-300 mb-1">Nivel alcanzado: <span id="go-level" class="text-yellow-400 font-bold">1</span></p>
+                <p class="text-xs text-slate-300 mb-1">Puntaje total: <span id="go-score" class="text-cyan-400 font-bold">0</span></p>
+                <p class="text-xs text-slate-400 mb-5">Récord: <span id="go-best" class="text-yellow-400 font-bold">0</span></p>
+                <button id="btn-restart" class="btn-pixel">REINTENTAR</button>
+            </div>
+            
+            <!-- Level Complete Screen -->
+            <div id="level-complete-screen" class="screen hidden">
+                <div class="text-4xl mb-2">🌟</div>
+                <h1 class="text-lg mb-1 text-green-400 pixel-font">¡NIVEL COMPLETADO!</h1>
+                <p class="text-xs text-slate-300 mb-4">Escoge una ventaja para la siguiente área:</p>
+                <div id="upgrade-options" class="flex gap-2 flex-wrap justify-center"></div>
+            </div>
+        </div>
+        
+        <!-- Mobile Joystick & Bomb controls -->
+        <div id="mobile-controls">
+            <div id="joystick-zone">
+                <div id="joystick-knob"></div>
+            </div>
+            <div class="bomb-btn" id="btn-bomb-mobile">💣</div>
+        </div>
+    </div>
+    <script src="game.js" defer></script>
+</body>
+</html>

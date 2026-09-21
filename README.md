@@ -1,45 +1,28 @@
-# Bomberman Roguelike v1.0
+# Bomberman Roguelike — v1.0
 
-Juego web estático desarrollado con HTML, CSS y JavaScript Canvas.
+Versión GitHub-ready con lavado de cara orientado a **roguelike**.
+
+## Estructura
+- `index.html` — interfaz y canvas.
+- `styles.css` — estilo visual retro/dark roguelike.
+- `game.js` — lógica completa del juego.
+
+## Identidad roguelike
+- Runs identificadas y persistentes.
+- Profundidad en lugar de simple “nivel”.
+- Progresión mediante mejoras entre áreas.
+- Presentación visual oscura, compacta y de arcade.
+- Mapas procedurales y muerte/reintento como núcleo de la partida.
+- Best score persistente.
+- Compatible con PC y controles táctiles.
 
 ## Ejecutar
-
-Abrir `index.html` en un navegador moderno.
-
-## GitHub Pages
-
-1. Subir `index.html`, `styles.css` y `game.js` al repositorio.
-2. En **Settings → Pages**, seleccionar la rama y la carpeta raíz.
-3. Guardar y esperar el despliegue.
+Abrir `index.html` directamente o publicarlo en GitHub Pages. No requiere Node ni backend.
 
 ## Controles
+- WASD / flechas: mover
+- Espacio / botón 💣: bomba
+- P / Escape: pausa
 
-- PC: WASD o flechas.
-- Bomba: Espacio o Z.
-- Pausa: P o Escape.
-- Móvil: joystick virtual + botón de bomba.
-
-## Características v1.0
-
-- Mapas procedurales de tamaño creciente.
-- Paredes indestructibles y bloques destructibles.
-- Bombas con rango configurable.
-- Reacción en cadena entre bombas.
-- Explosiones con daño al jugador y enemigos.
-- Tres tipos de enemigos.
-- Power-ups de bomba, fuego, velocidad, vida y escudo.
-- Salida oculta que se desbloquea al destruir su bloque.
-- Progresión roguelike mediante mejoras entre niveles.
-- Cámara con seguimiento suave.
-- Minimapa.
-- Partículas, textos flotantes y screen shake.
-- Controles táctiles y teclado.
-- Pausa.
-- Récord persistente mediante `localStorage`.
-- Sin backend ni build step.
-
-## Dependencias externas
-
-- Google Fonts: Press Start 2P e Inter.
-
-El juego no necesita Node.js, npm ni servidor para funcionar.
+## GitHub Pages
+Subir estos archivos al repositorio y configurar Pages para servir desde la rama/carpeta donde esté `index.html`.

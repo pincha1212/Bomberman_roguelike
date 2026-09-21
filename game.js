@@ -29,8 +29,6 @@ const canvas = document.getElementById('gameCanvas');
 
         let gameState = {
             isPlaying: false,
-            isPaused: false,
-            bestScore: Number(localStorage.getItem('bomberman-best-score') || 0),
             level: 1,
             score: 0,
             gridWidth: 17,
@@ -49,8 +47,7 @@ const canvas = document.getElementById('gameCanvas');
             camera: { x: 0, y: 0, targetX: 0, targetY: 0 },
             shakeTimer: 0,
             shakeIntensity: 0,
-            animFrame: 0,
-            loopStarted: false
+            animFrame: 0
         };
 
         let player = {
@@ -86,14 +83,14 @@ const canvas = document.getElementById('gameCanvas');
             if (!zone || !knob) return;
 
             const maxRadius = 35;
-            let activePointerId = null;
+            let joyActive = false;
             let joyCenterX = 0;
             let joyCenterY = 0;
 
             const updateJoyPosition = (clientX, clientY) => {
                 let dx = clientX - joyCenterX;
                 let dy = clientY - joyCenterY;
-                const distance = Math.hypot(dx, dy);
+                let distance = Math.sqrt(dx * dx + dy * dy);
 
                 if (distance > maxRadius) {
                     dx = (dx / distance) * maxRadius;
@@ -104,6 +101,7 @@ const canvas = document.getElementById('gameCanvas');
 
                 let normalizedX = dx / maxRadius;
                 let normalizedY = dy / maxRadius;
+                
                 if (Math.abs(normalizedX) < 0.2) normalizedX = 0;
                 if (Math.abs(normalizedY) < 0.2) normalizedY = 0;
 
@@ -111,43 +109,51 @@ const canvas = document.getElementById('gameCanvas');
                 gameState.touchControls.y = normalizedY;
             };
 
+            const start = (e) => {
+                e.preventDefault();
+                joyActive = true;
+                const rect = zone.getBoundingClientRect();
+                joyCenterX = rect.left + rect.width / 2;
+                joyCenterY = rect.top + rect.height / 2;
+                const touch = e.type === 'touchstart' ? e.touches[0] : e;
+                updateJoyPosition(touch.clientX, touch.clientY);
+            };
+
+            const move = (e) => {
+                if (!joyActive) return;
+                e.preventDefault();
+                const touch = e.type === 'touchmove' ? e.touches[0] : e;
+                updateJoyPosition(touch.clientX, touch.clientY);
+            };
+
             const end = (e) => {
-                if (activePointerId !== null && e && e.pointerId !== activePointerId) return;
-                activePointerId = null;
-                knob.style.transform = 'translate(0px, 0px)';
+                joyActive = false;
+                knob.style.transform = `translate(0px, 0px)`;
                 gameState.touchControls.x = 0;
                 gameState.touchControls.y = 0;
             };
 
-            zone.addEventListener('pointerdown', (e) => {
-                e.preventDefault();
-                activePointerId = e.pointerId;
-                zone.setPointerCapture?.(e.pointerId);
-                const rect = zone.getBoundingClientRect();
-                joyCenterX = rect.left + rect.width / 2;
-                joyCenterY = rect.top + rect.height / 2;
-                updateJoyPosition(e.clientX, e.clientY);
-            });
-
-            zone.addEventListener('pointermove', (e) => {
-                if (e.pointerId !== activePointerId) return;
-                e.preventDefault();
-                updateJoyPosition(e.clientX, e.clientY);
-            });
-
-            zone.addEventListener('pointerup', end);
-            zone.addEventListener('pointercancel', end);
-            zone.addEventListener('lostpointercapture', end);
+            zone.addEventListener('touchstart', start, { passive: false });
+            zone.addEventListener('touchmove', move, { passive: false });
+            zone.addEventListener('touchend', end, { passive: false });
+            zone.addEventListener('touchcancel', end, { passive: false });
+            
+            zone.addEventListener('mousedown', start);
+            window.addEventListener('mousemove', move);
+            window.addEventListener('mouseup', end);
         };
+
         setupJoystick();
         
         const setupBombButton = () => {
             const bombBtn = document.getElementById('btn-bomb-mobile');
-            if (!bombBtn) return;
-            bombBtn.addEventListener('pointerdown', (e) => {
+            if(!bombBtn) return;
+            const triggerBomb = (e) => {
                 e.preventDefault();
-                if (gameState.isPlaying) placeBomb();
-            });
+                if(gameState.isPlaying) placeBomb();
+            };
+            bombBtn.addEventListener('touchstart', triggerBomb, {passive: false});
+            bombBtn.addEventListener('mousedown', triggerBomb);
         };
         setupBombButton();
 
@@ -219,26 +225,15 @@ const canvas = document.getElementById('gameCanvas');
 
         function spawnEnemies() {
             const count = Math.min(3 + Math.floor(gameState.level * 1.5), 12);
-            const candidates = [];
-
-            for (let y = 1; y < gameState.gridHeight - 1; y++) {
-                for (let x = 1; x < gameState.gridWidth - 1; x++) {
-                    if (gameState.grid[y][x] === TYPES.EMPTY && (x > 4 || y > 4)) {
-                        candidates.push({ x, y });
-                    }
-                }
-            }
-
-            for (let i = candidates.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-            }
-
-            const actualCount = Math.min(count, candidates.length);
-            for (let i = 0; i < actualCount; i++) {
-                const { x, y } = candidates[i];
-
-                const rand = Math.random();
+            for (let i = 0; i < count; i++) {
+                let x, y;
+                do {
+                    x = Math.floor(Math.random() * (gameState.gridWidth - 2)) + 1;
+                    y = Math.floor(Math.random() * (gameState.gridHeight - 2)) + 1;
+                } while (gameState.grid[y][x] !== TYPES.EMPTY || (x <= 4 && y <= 4));
+                
+                // Enemy type selection
+                let rand = Math.random();
                 let type = ENEMY_TYPES.RASTRERO;
                 if (gameState.level >= 2 && rand > 0.6) type = ENEMY_TYPES.VOLADOR;
                 if (gameState.level >= 3 && rand > 0.85) type = ENEMY_TYPES.ESPECIAL;
@@ -248,10 +243,10 @@ const canvas = document.getElementById('gameCanvas');
                     y: y * TILE_SIZE + TILE_SIZE / 2,
                     width: TILE_SIZE * 0.75,
                     height: TILE_SIZE * 0.75,
-                    type,
+                    type: type,
                     vx: type.speed * (Math.random() < 0.5 ? 1 : -1),
                     vy: 0,
-                    changeTimer: 30 + Math.random() * 50
+                    changeTimer: Math.random() * 100
                 });
             }
         }
@@ -424,20 +419,11 @@ const canvas = document.getElementById('gameCanvas');
             cells.forEach(c => {
                 gameState.explosions.push({ x: c.x, y: c.y, timer: 450 });
             });
-
-            // Chain reaction: any bomb reached by the blast detonates immediately.
-            for (let i = gameState.bombs.length - 1; i >= 0; i--) {
-                const other = gameState.bombs[i];
-                if (cells.some(c => c.x === other.x && c.y === other.y)) {
-                    explodeBomb(i);
-                }
-            }
-
             updateUI();
         }
 
         function update(dt) {
-            if (!gameState.isPlaying || gameState.isPaused) return;
+            if (!gameState.isPlaying) return;
             gameState.animFrame++;
 
             // Shake countdown
@@ -469,8 +455,7 @@ const canvas = document.getElementById('gameCanvas');
 
             player.isMoving = false;
             if (dx !== 0 || dy !== 0) {
-                const moveScale = Math.min(dt / 16.6667, 2.5);
-                tryMovePlayer(dx * player.speed * moveScale, dy * player.speed * moveScale);
+                tryMovePlayer(dx * player.speed, dy * player.speed);
             }
 
             if (player.isMoving) {
@@ -564,12 +549,11 @@ const canvas = document.getElementById('gameCanvas');
                     }
                 }
 
-                const enemyScale = Math.min(dt / 16.6667, 2.5);
-                e.x += e.vx * enemyScale;
+                e.x += e.vx;
                 if (isSolid(Math.floor(e.x / TILE_SIZE), Math.floor(e.y / TILE_SIZE), e.type.canFly)) {
                     e.x -= e.vx; e.vx *= -1;
                 }
-                e.y += e.vy * enemyScale;
+                e.y += e.vy;
                 if (isSolid(Math.floor(e.x / TILE_SIZE), Math.floor(e.y / TILE_SIZE), e.type.canFly)) {
                     e.y -= e.vy; e.vy *= -1;
                 }
@@ -606,20 +590,18 @@ const canvas = document.getElementById('gameCanvas');
             // Update Particles
             for (let i = gameState.particles.length - 1; i >= 0; i--) {
                 let p = gameState.particles[i];
-                const fx = Math.min(dt / 16.6667, 2.5);
-                p.x += p.vx * fx;
-                p.y += p.vy * fx;
-                p.life -= fx;
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 1;
                 if (p.life <= 0) gameState.particles.splice(i, 1);
             }
 
             // Update Floaters
             for (let i = gameState.floaters.length - 1; i >= 0; i--) {
                 let f = gameState.floaters[i];
-                const fx = Math.min(dt / 16.6667, 2.5);
-                f.y -= 0.8 * fx;
-                f.opacity -= 0.02 * fx;
-                f.life -= fx;
+                f.y -= 0.8;
+                f.opacity -= 0.02;
+                f.life -= 1;
                 if (f.life <= 0) gameState.floaters.splice(i, 1);
             }
 
@@ -1074,8 +1056,6 @@ const canvas = document.getElementById('gameCanvas');
 
             if (gameState.isPlaying) {
                 requestAnimationFrame(gameLoop);
-            } else {
-                gameState.loopStarted = false;
             }
         }
 
@@ -1095,26 +1075,13 @@ const canvas = document.getElementById('gameCanvas');
             }
         }
 
-        function setPaused(paused) {
-            if (!gameState.isPlaying) return;
-            gameState.isPaused = paused;
-            document.getElementById('pause-screen').classList.toggle('hidden', !paused);
-            if (!paused) gameState.lastTime = performance.now();
-        }
-
-        function togglePause() {
-            setPaused(!gameState.isPaused);
-        }
-
         function startGame() {
             document.getElementById('start-screen').classList.add('hidden');
             document.getElementById('game-over-screen').classList.add('hidden');
             document.getElementById('level-complete-screen').classList.add('hidden');
-            document.getElementById('pause-screen').classList.add('hidden');
             
             gameState.level = 1;
             gameState.score = 0;
-            gameState.isPaused = false;
             player.health = 3;
             player.maxBombs = 1;
             player.bombRange = 1;
@@ -1124,10 +1091,7 @@ const canvas = document.getElementById('gameCanvas');
             initLevel();
             gameState.isPlaying = true;
             gameState.lastTime = performance.now();
-            if (!gameState.loopStarted) {
-                gameState.loopStarted = true;
-                requestAnimationFrame(gameLoop);
-            }
+            requestAnimationFrame(gameLoop);
         }
 
         function completeLevel() {
@@ -1156,10 +1120,7 @@ const canvas = document.getElementById('gameCanvas');
                     initLevel();
                     gameState.isPlaying = true;
                     gameState.lastTime = performance.now();
-                    if (!gameState.loopStarted) {
-                        gameState.loopStarted = true;
-                        requestAnimationFrame(gameLoop);
-                    }
+                    requestAnimationFrame(gameLoop);
                 };
                 options.appendChild(card);
             });
@@ -1170,26 +1131,37 @@ const canvas = document.getElementById('gameCanvas');
             gameState.isPlaying = false;
             document.getElementById('go-level').innerText = gameState.level;
             document.getElementById('go-score').innerText = gameState.score;
-            gameState.bestScore = Math.max(gameState.bestScore, gameState.score);
-            localStorage.setItem('bomberman-best-score', String(gameState.bestScore));
-            document.getElementById('go-best').innerText = gameState.bestScore;
             document.getElementById('game-over-screen').classList.remove('hidden');
         }
 
         document.getElementById('btn-start').addEventListener('click', startGame);
         document.getElementById('btn-restart').addEventListener('click', startGame);
 
-        // Controls
-        document.getElementById('btn-pause').addEventListener('click', togglePause);
-        document.getElementById('btn-resume').addEventListener('click', () => setPaused(false));
-        window.addEventListener('keydown', (e) => {
-            if (e.code === 'Escape' || e.code === 'KeyP') {
-                e.preventDefault();
-                togglePause();
-            }
-        });
-
         // Initial setup
-        document.getElementById('go-best').innerText = gameState.bestScore;
         initLevel();
         draw();
+
+        // Roguelike presentation layer: run identity + depth banner.
+        const runBanner = document.getElementById('run-banner');
+        let rogueRun = Number(localStorage.getItem('bombermanRogueRun') || 0);
+        const originalStartGame = typeof startGame === 'function' ? startGame : null;
+        function updateRogueBanner() {
+            const depth = (typeof gameState !== 'undefined' && gameState.level) ? gameState.level : 1;
+            if (runBanner) runBanner.textContent = `RUN ${String(rogueRun).padStart(2,'0')} · DEPTH ${String(depth).padStart(2,'0')}`;
+        }
+        if (runBanner) {
+            const observer = new MutationObserver(updateRogueBanner);
+            const levelNode = document.getElementById('ui-level');
+            if (levelNode) observer.observe(levelNode, {childList:true,subtree:true,characterData:true});
+            updateRogueBanner();
+        }
+        document.getElementById('btn-start')?.addEventListener('click', () => {
+            rogueRun++;
+            localStorage.setItem('bombermanRogueRun', rogueRun);
+            updateRogueBanner();
+        });
+        document.getElementById('btn-restart')?.addEventListener('click', () => {
+            rogueRun++;
+            localStorage.setItem('bombermanRogueRun', rogueRun);
+            updateRogueBanner();
+        });

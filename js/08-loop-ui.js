@@ -69,6 +69,7 @@
 
         function startGame() {
             document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('main-menu')?.classList.add('run-active');
             document.getElementById('game-over-screen').classList.add('hidden');
             document.getElementById('level-complete-screen').classList.add('hidden');
             document.getElementById('pause-screen')?.classList.add('hidden');

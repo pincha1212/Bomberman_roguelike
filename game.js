@@ -23,20 +23,20 @@ function showRoomIntro(){
     sfx('click');
 }
 function renderImmersion(){
-    const danger=document.getElementById('danger-indicator');
+    const danger=UI['danger-indicator'];
     if(!danger) return;
     const nearestBomb=gameState.bombs.some(b=>Math.abs(b.x-Math.floor((player.x+player.width/2)/TILE_SIZE))+Math.abs(b.y-Math.floor((player.y+player.height/2)/TILE_SIZE))<=2 && b.timer<900);
     const pressureDanger = gameState.roomTime < 15000 || gameState.threatLevel >= 2;
     danger.textContent = pressureDanger ? `⚠ PRESIÓN ${gameState.threatLevel}` : 'PELIGRO';
     danger.classList.toggle('hidden', (!nearestBomb && !pressureDanger) || gameState.paused);
-    const vignette=document.getElementById('immersion-vignette');
+    const vignette=UI['immersion-vignette'];
     if(vignette){
         const low=player.health<=1, pulse=low ? (0.28+Math.sin(gameState.animFrame*.08)*.12) : .08;
         vignette.style.background=`radial-gradient(circle at 50% 48%, transparent 25%, rgba(2,6,23,${pulse}) 62%, rgba(2,6,23,${low?.62:.38}) 100%)`;
     }
 }
 function drawAmbientDust(){
-    const count=24;
+    const count=perf.lowQuality ? 8 : 24;
     for(let i=0;i<count;i++){
         const seed=(i*97)%1000;
         const x=((seed*3.71+gameState.animFrame*.09*(i%3+1))%(canvas.width+80))-40;
@@ -51,7 +51,7 @@ function drawLighting(){
     const grad=ctx.createRadialGradient(player.x+player.width/2-gameState.camera.x,player.y+player.height/2-gameState.camera.y,35,player.x+player.width/2-gameState.camera.x,player.y+player.height/2-gameState.camera.y,240);
     grad.addColorStop(0,'rgba(0,0,0,0)'); grad.addColorStop(.65,'rgba(0,0,0,.12)'); grad.addColorStop(1,'rgba(0,0,0,.52)');
     ctx.fillStyle=grad; ctx.fillRect(0,0,canvas.width,canvas.height);
-    gameState.bombs.forEach(b=>{
+    if (!perf.lowQuality || gameState.animFrame % 2 === 0) gameState.bombs.forEach(b=>{
         const x=(b.x+.5)*TILE_SIZE-gameState.camera.x, y=(b.y+.5)*TILE_SIZE-gameState.camera.y;
         const radius=75+Math.sin(gameState.animFrame*.3)*8;
         const g=ctx.createRadialGradient(x,y,4,x,y,radius); g.addColorStop(0,'rgba(255,170,50,.20)'); g.addColorStop(1,'rgba(255,80,20,0)');
@@ -62,6 +62,53 @@ function drawLighting(){
 
 const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d', { alpha: false });
+
+// V3.2.1 PERFORMANCE LAYER
+const perf = {
+    lowQuality: false,
+    slowFrames: 0,
+    fastFrames: 0,
+    frameCount: 0,
+    lastUi: 0
+};
+// V3.2.2 LARGE SUPPORT LAYER
+// Optimiza entidades grandes y evita que los efectos escalen sin control.
+const largeSupport = {
+    maxBossProjectiles: 34,
+    maxEnemies: 22,
+    particleBudget: 150,
+    shadowEffects: true,
+    lastBossDraw: 0
+};
+
+function clampLargeEntities(){
+    if(gameState.bossProjectiles.length > largeSupport.maxBossProjectiles){
+        gameState.bossProjectiles.splice(0, gameState.bossProjectiles.length - largeSupport.maxBossProjectiles);
+    }
+    if(gameState.enemies.length > largeSupport.maxEnemies){
+        gameState.enemies.length = largeSupport.maxEnemies;
+    }
+    if(gameState.particles.length > largeSupport.particleBudget){
+        gameState.particles.splice(0, gameState.particles.length - largeSupport.particleBudget);
+    }
+}
+
+function drawLargeBossShadow(b){
+    if(!largeSupport.shadowEffects || perf.lowQuality) return;
+    ctx.save();
+    ctx.fillStyle='rgba(0,0,0,.42)';
+    ctx.beginPath();
+    ctx.ellipse(b.x,b.y+b.height*.44,b.width*.46,Math.max(7,b.height*.10),0,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+}
+
+const UI = {};
+[
+    'ui-health','ui-score','ui-level','ui-bombs','ui-range','ui-speed','ui-coins','ui-relics',
+    'ui-timer','ui-threat','ui-shield-badge','boss-hud','boss-bar','boss-phase','room-banner',
+    'run-banner','relic-strip','danger-indicator','immersion-vignette'
+].forEach(id => UI[id] = document.getElementById(id));
 
         // World and Zoom settings
         const TILE_SIZE = 48; // Zoomed-in tile size for retro feel
@@ -506,12 +553,12 @@ const canvas = document.getElementById('gameCanvas');
             const dy = player.y + player.height / 2 - b.y;
             const len = Math.hypot(dx, dy) || 1;
             const speed = 2.8 + b.phase * 0.35;
-            gameState.bossProjectiles.push({x:b.x, y:b.y, vx:dx/len*speed, vy:dy/len*speed, life:4200, radius:9, kind:'orb'});
+            if(gameState.bossProjectiles.length < largeSupport.maxBossProjectiles) gameState.bossProjectiles.push({x:b.x, y:b.y, vx:dx/len*speed, vy:dy/len*speed, life:4200, radius:9, kind:'orb'});
             if (b.phase >= 2) {
                 const spread = 0.16;
                 for (const angle of [-spread, spread]) {
                     const c=Math.cos(angle), q=Math.sin(angle);
-                    gameState.bossProjectiles.push({x:b.x, y:b.y, vx:(dx/len*c-dy/len*q)*speed*.92, vy:(dx/len*q+dy/len*c)*speed*.92, life:3900, radius:7, kind:'orb'});
+                    if(gameState.bossProjectiles.length < largeSupport.maxBossProjectiles) gameState.bossProjectiles.push({x:b.x, y:b.y, vx:(dx/len*c-dy/len*q)*speed*.92, vy:(dx/len*q+dy/len*c)*speed*.92, life:3900, radius:7, kind:'orb'});
                 }
             }
             sfx('alarm');
@@ -524,7 +571,7 @@ const canvas = document.getElementById('gameCanvas');
             const speed=2.0+b.phase*.35;
             for(let i=0;i<count;i++){
                 const a=(Math.PI*2/count)*i;
-                gameState.bossProjectiles.push({x:b.x,y:b.y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,life:3000,radius:8,kind:'wave'});
+                if(gameState.bossProjectiles.length < largeSupport.maxBossProjectiles) gameState.bossProjectiles.push({x:b.x,y:b.y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,life:3000,radius:8,kind:'wave'});
             }
             addFloatingText('¡OLA DE CHOQUE!', b.x, b.y-b.height*.55, '#c084fc');
             triggerScreenShake(5,220);
@@ -551,7 +598,7 @@ const canvas = document.getElementById('gameCanvas');
                 if(d>=4 && d<10 && !gameState.enemies.some(e=>Math.floor(e.x/TILE_SIZE)===x && Math.floor(e.y/TILE_SIZE)===y)) candidates.push({x,y,d});
             }
             candidates.sort((a,z)=>z.d-a.d);
-            const count=Math.min(2,candidates.length);
+            const count=Math.min(2,candidates.length, Math.max(0,largeSupport.maxEnemies-gameState.enemies.length));
             for(let i=0;i<count;i++) {
                 const c=candidates[i], type=i%2===0?ENEMY_TYPES.RASTRERO:ENEMY_TYPES.VOLADOR;
                 const sp=type.speed*gameState.roomType.enemySpeedMult*(1+gameState.threatLevel*.04)*1.15;
@@ -606,6 +653,7 @@ const canvas = document.getElementById('gameCanvas');
 
         function drawBoss() {
             const b=gameState.boss; if(!b || b.defeated) return;
+            drawLargeBossShadow(b);
             ctx.save();
             const pulse=1+Math.sin(gameState.animFrame*.10)*.035;
             const rage=b.phase===3;
@@ -635,7 +683,8 @@ const canvas = document.getElementById('gameCanvas');
             if(b.charging){ctx.strokeStyle='#fef08a';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,b.width*.58,0,Math.PI*2);ctx.stroke();}
             ctx.restore();
             gameState.bossProjectiles.forEach(p=>{
-                ctx.fillStyle=p.kind==='wave'?'#f0abfc':'#c084fc';ctx.shadowBlur=p.kind==='wave'?16:12;ctx.shadowColor=ctx.fillStyle;
+                ctx.fillStyle=p.kind==='wave'?'#f0abfc':'#c084fc';
+                if(!perf.lowQuality){ctx.shadowBlur=p.kind==='wave'?16:12;ctx.shadowColor=ctx.fillStyle;} else {ctx.shadowBlur=0;}
                 ctx.beginPath();ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
             });
         }
@@ -761,6 +810,8 @@ const canvas = document.getElementById('gameCanvas');
         }
 
         function addParticles(x, y, color, count = 8) {
+            const room = Math.max(0, largeSupport.particleBudget - gameState.particles.length);
+            count = Math.min(count, room, perf.lowQuality ? 5 : count);
             for (let i = 0; i < count; i++) {
                 let angle = Math.random() * Math.PI * 2;
                 let speed = 1 + Math.random() * 3;
@@ -906,6 +957,7 @@ const canvas = document.getElementById('gameCanvas');
         }
 
         function update(dt) {
+            clampLargeEntities();
             if (!gameState.isPlaying || gameState.paused) return;
             gameState.animFrame++;
             renderImmersion();
@@ -961,6 +1013,10 @@ const canvas = document.getElementById('gameCanvas');
             
             gameState.camera.targetX = pxCenter - canvas.width / 2;
             gameState.camera.targetY = pyCenter - canvas.height / 2;
+            if(gameState.boss && !gameState.boss.defeated){
+                gameState.camera.targetX += (gameState.boss.x - pxCenter) * 0.08;
+                gameState.camera.targetY += (gameState.boss.y - pyCenter) * 0.08;
+            }
 
             // Clamp camera boundaries
             const maxCamX = gameState.gridWidth * TILE_SIZE - canvas.width;
@@ -1036,7 +1092,7 @@ const canvas = document.getElementById('gameCanvas');
             // Update Enemies
             gameState.enemies.forEach(e => {
                 e.changeTimer -= dt * 0.1;
-                if (e.changeTimer <= 0 || Math.random() < 0.02) {
+                if (e.changeTimer <= 0) {
                     e.changeTimer = 30 + Math.random() * 50;
                     if (Math.random() < 0.5) {
                         e.vx = e.type.speed * gameState.roomType.enemySpeedMult * (1 + gameState.threatLevel * 0.04) * (Math.random() < 0.5 ? 1 : -1);
@@ -1587,6 +1643,21 @@ const canvas = document.getElementById('gameCanvas');
             gameState.lastTime = timestamp;
             if (dt > 100) dt = 16;
 
+            // Adapt visual effects to the device without changing gameplay speed.
+            perf.frameCount++;
+            if (dt > 26) {
+                perf.slowFrames++;
+                perf.fastFrames = 0;
+            } else if (dt < 18) {
+                perf.fastFrames++;
+                perf.slowFrames = Math.max(0, perf.slowFrames - 1);
+            } else {
+                perf.slowFrames = Math.max(0, perf.slowFrames - 1);
+                perf.fastFrames = Math.max(0, perf.fastFrames - 1);
+            }
+            if (perf.slowFrames >= 20) perf.lowQuality = true;
+            if (perf.fastFrames >= 120) perf.lowQuality = false;
+
             update(dt);
             draw();
 
@@ -1595,47 +1666,43 @@ const canvas = document.getElementById('gameCanvas');
             }
         }
 
-        function updateUI() {
-            document.getElementById('ui-health').innerText = player.health;
-            document.getElementById('ui-score').innerText = gameState.score;
-            document.getElementById('ui-level').innerText = gameState.level;
-            document.getElementById('ui-bombs').innerText = player.maxBombs;
-            document.getElementById('ui-range').innerText = player.bombRange;
-            document.getElementById('ui-speed').innerText = (player.speed - 2).toFixed(1);
-            document.getElementById('ui-coins').innerText = gameState.coins;
-            document.getElementById('ui-relics').innerText = gameState.relics.length;
-            const timerNode = document.getElementById('ui-timer');
-            if (timerNode) timerNode.innerText = `${Math.max(0, Math.ceil(gameState.roomTime / 1000))}s`;
-            const threatNode = document.getElementById('ui-threat');
-            if (threatNode) threatNode.innerText = gameState.threatLevel;
+        function updateUI(force = false) {
+            const now = performance.now();
+            // DOM writes are expensive on mobile/low-end hardware; HUD does not need 60 updates/sec.
+            if (!force && now - perf.lastUi < 100) return;
+            perf.lastUi = now;
 
-            const shieldBadge = document.getElementById('ui-shield-badge');
-            shieldBadge.classList.toggle('hidden', !player.hasShield);
+            UI['ui-health'].innerText = player.health;
+            UI['ui-score'].innerText = gameState.score;
+            UI['ui-level'].innerText = gameState.level;
+            UI['ui-bombs'].innerText = player.maxBombs;
+            UI['ui-range'].innerText = player.bombRange;
+            UI['ui-speed'].innerText = (player.speed - 2).toFixed(1);
+            UI['ui-coins'].innerText = gameState.coins;
+            UI['ui-relics'].innerText = gameState.relics.length;
+            if (UI['ui-timer']) UI['ui-timer'].innerText = `${Math.max(0, Math.ceil(gameState.roomTime / 1000))}s`;
+            if (UI['ui-threat']) UI['ui-threat'].innerText = gameState.threatLevel;
 
-            const bossHud = document.getElementById('boss-hud');
-            const bossBar = document.getElementById('boss-bar');
-            const bossPhase = document.getElementById('boss-phase');
-            if (bossHud && bossBar && bossPhase) {
-                const b = gameState.boss;
-                const visible = !!b && !b.defeated;
-                bossHud.classList.toggle('hidden', !visible);
-                if (visible) {
-                    bossBar.style.width = `${Math.max(0, b.hp / b.maxHp * 100)}%`;
-                    bossPhase.textContent = `FASE ${b.phase}`;
-                }
+            if (UI['ui-shield-badge']) UI['ui-shield-badge'].classList.toggle('hidden', !player.hasShield);
+
+            const b = gameState.boss;
+            const visible = !!b && !b.defeated;
+            if (UI['boss-hud']) UI['boss-hud'].classList.toggle('hidden', !visible);
+            if (visible) {
+                if (UI['boss-bar']) UI['boss-bar'].style.width = `${Math.max(0, b.hp / b.maxHp * 100)}%`;
+                if (UI['boss-phase']) UI['boss-phase'].textContent = `FASE ${b.phase}`;
             }
 
-            const roomNode = document.getElementById('room-banner');
-            if (roomNode) {
-                roomNode.textContent = `${gameState.roomType.icon} ${gameState.roomType.name} · ${gameState.roomType.subtitle}`;
-                roomNode.style.setProperty('--room-accent', gameState.roomType.color);
+            if (UI['room-banner']) {
+                UI['room-banner'].textContent = `${gameState.roomType.icon} ${gameState.roomType.name} · ${gameState.roomType.subtitle}`;
+                UI['room-banner'].style.setProperty('--room-accent', gameState.roomType.color);
             }
             updateRoguePresentation();
-            const strip = document.getElementById('relic-strip'); if (strip) strip.innerHTML = gameState.relics.map(r => `<span class="relic-chip" title="${r.desc}">${r.icon} ${r.name}</span>`).join('');
+            if (UI['relic-strip']) UI['relic-strip'].innerHTML = gameState.relics.map(r => `<span class="relic-chip" title="${r.desc}">${r.icon} ${r.name}</span>`).join('');
         }
 
         function updateRoguePresentation() {
-            const runNode = document.getElementById('run-banner');
+            const runNode = UI['run-banner'];
             if (runNode) runNode.textContent = `RUN ${String(gameState.runNumber || 1).padStart(2, '0')} · DEPTH ${String(gameState.level).padStart(2, '0')}`;
         }
 

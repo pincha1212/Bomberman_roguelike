@@ -140,3 +140,12 @@ Los scripts se cargan en ese orden desde `index.html`. No se usa bundler ni Node
 - La cámara se reinicia correctamente al comenzar una nueva profundidad.
 - Se añade `js/09-camera.js` como módulo independiente para facilitar futuras auditorías.
 - No modifica el movimiento cardinal asistido ni las colisiones.
+
+
+## v3.8 — Bomb Reset Fix
+
+- Corregido el bloqueo de bombas después de morir y reiniciar la partida.
+- `initLevel()` ahora sincroniza `player.bombsPlaced` con el reinicio del array de bombas.
+- El jugador vuelve a disponer de su cupo completo de bombas al comenzar una nueva run.
+- La misma corrección también evita conservar un contador de bombas usado al pasar a otra profundidad.
+- No se modifica el movimiento, daño, trampas, cámara, bosses ni la interfaz.

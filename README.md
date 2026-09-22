@@ -1,4 +1,14 @@
-# Bomberman Roguelike v3.2 — Large Boss Edition
+# Bomberman Roguelike v3.2.2.1 — Large Boss Edition
+
+## v3.2.1 — Optimization Update
+
+- HUD/DOM updates throttled to reduce layout work.
+- Adaptive visual quality for slower devices.
+- Particle cap to prevent effect spikes during explosions and boss fights.
+- Reduced expensive lighting work on low-performance frames.
+- Enemy direction decisions now use their existing timer instead of a per-frame random roll.
+- Gameplay timing and movement speed remain frame-rate independent.
+
 
 Build estático para GitHub Pages.
 
@@ -21,3 +31,11 @@ Build estático para GitHub Pages.
 
 ## Ejecutar
 Abrí `index.html` directamente o publicá la carpeta en GitHub Pages.
+
+
+## v3.2.2 — Large Support Update
+- Soporte optimizado para bosses grandes y muchas entidades simultáneas.
+- Límite seguro de proyectiles, enemigos y partículas para evitar saturación.
+- Sombras y efectos del boss adaptativos según rendimiento.
+- Cámara con ligero seguimiento del boss durante combates grandes.
+- Conserva el movimiento libre y las mecánicas de v3.2.1.

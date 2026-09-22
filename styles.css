@@ -267,3 +267,22 @@ body { background: radial-gradient(circle at center, #111827 0%, #05070c 70%); }
 @keyframes roomReveal { 0%{opacity:0; transform:translate(-50%,-50%) scale(1.08); filter:blur(6px)} 20%,75%{opacity:1; transform:translate(-50%,-50%) scale(1); filter:blur(0)} 100%{opacity:0; transform:translate(-50%,-50%) scale(.96)} }
 @keyframes dangerPulse { from{opacity:.35} to{opacity:1} }
 @media(max-width:600px){ #room-intro .room-name{font-size:11px}.room-sub{font-size:.6rem}.relic-chip{font-size:5px} }
+
+/* V3.0 — THREAT & HAZARDS */
+#ui-timer { min-width: 28px; display:inline-block; text-align:center; }
+#ui-threat { min-width: 14px; display:inline-block; text-align:center; }
+#danger-indicator { letter-spacing:.12em; }
+@keyframes threatFlash { 0%,100%{filter:brightness(1)} 50%{filter:brightness(1.8)} }
+#ui-timer { transition:color .2s ease, transform .2s ease; }
+
+
+/* V3.2 — LARGE BOSS EDITION */
+.boss-hud{position:absolute;left:50%;top:58px;transform:translateX(-50%);width:min(430px,72%);z-index:14;pointer-events:none;padding:7px 10px 9px;border:2px solid rgba(244,63,94,.65);border-radius:10px;background:rgba(15,23,42,.88);box-shadow:0 0 24px rgba(244,63,94,.18)}
+.boss-hud-top{display:flex;justify-content:space-between;gap:10px;font:9px "Press Start 2P",monospace;color:#fecdd3;margin-bottom:6px;letter-spacing:.04em}
+.boss-bar-track{height:12px;border-radius:999px;background:#1e293b;overflow:hidden;border:1px solid rgba(255,255,255,.12)}
+.boss-bar{height:100%;width:100%;background:linear-gradient(90deg,#7f1d1d,#ef4444,#fda4af);box-shadow:0 0 12px rgba(244,63,94,.65);transition:width .12s linear}
+@media(max-width:640px){.boss-hud{top:72px;width:58%;padding:6px 8px}.boss-hud-top{font-size:7px}.boss-bar-track{height:9px}}
+
+/* V3.2 colossal boss presentation */
+.boss-hud{box-shadow:0 0 32px rgba(244,63,94,.30),inset 0 0 18px rgba(124,58,237,.12);}
+@keyframes bossAlertPulse{0%,100%{box-shadow:0 0 22px rgba(244,63,94,.25)}50%{box-shadow:0 0 42px rgba(244,63,94,.55)}}

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOMBERMAN // DESCENT — Roguelike v1.1</title>
+    <title>BOMBERMAN // DESCENT — Roguelike v3.1</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -18,6 +18,7 @@
             <div id="immersion-vignette"></div>
             <div id="room-intro" class="hidden"></div>
             <div id="danger-indicator" class="hidden">PELIGRO</div>
+            <div id="boss-hud" class="boss-hud hidden"><div class="boss-hud-top"><span>☠ COLOSO</span><span id="boss-phase">FASE 1</span></div><div class="boss-bar-track"><div id="boss-bar" class="boss-bar"></div></div></div>
             
             <!-- HUD overlay -->
             <div id="ui-layer">
@@ -28,7 +29,7 @@
                         <div class="stat-badge text-yellow-300">⭐ <span id="ui-score">0</span></div>
                         <div class="stat-badge text-amber-300">¢ <span id="ui-coins">0</span></div>
                     </div>
-                    <div class="stat-badge text-purple-300 w-fit">🚩 PROFUNDIDAD <span id="ui-level">1</span></div>
+                    <div class="flex gap-1.5 flex-wrap"><div class="stat-badge text-purple-300 w-fit">🚩 PROFUNDIDAD <span id="ui-level">1</span></div><div class="stat-badge text-red-300">⏱ <span id="ui-timer">80s</span></div><div class="stat-badge text-rose-300">☠ <span id="ui-threat">0</span></div></div>
                 </div>
                 
                 <div class="flex flex-col items-end gap-1.5">
@@ -51,6 +52,8 @@
                     <p>◆ <strong>RUNS:</strong> Cada partida genera una progresión distinta.</p>
                     <p>✦ <strong>LOOT:</strong> Rompé bloques y conseguí monedas, powerups y reliquias.</p>
                     <p>☠ <strong>SALAS:</strong> Élite, Tesoro, Maldita y Santuario cambian las reglas.</p>
+                    <p>⚠ <strong>PELIGROS:</strong> Trampas, presión creciente y refuerzos pueden encerrarte.</p>
+                    <p>☠ <strong>JEFES:</strong> Cada 5 profundidades aparece un guardián con fases, proyectiles y refuerzos.</p>
                     <p>↻ <strong>RECOMPENSAS:</strong> Elegí 1 mejora o hacé reroll por monedas.</p>
                 </div>
                 <button id="btn-start" class="btn-pixel">INICIAR RUN</button>

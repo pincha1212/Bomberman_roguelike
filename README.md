@@ -1,37 +1,23 @@
-# BOMBERMAN // DESCENT — Roguelike v2.0
+# Bomberman Roguelike v3.2 — Large Boss Edition
 
-Versión 2.0 enfocada en **inmersión**, sin backend ni Node. Preparada para GitHub Pages.
+Build estático para GitHub Pages.
 
-## Qué cambia en v2.0
-
-- Presentación de run más cinematográfica: entrada de cada profundidad y tipo de sala.
-- Iluminación dinámica alrededor del jugador y de las bombas.
-- Viñeta ambiental y oscurecimiento progresivo cuando la vida está baja.
-- Partículas ambientales de polvo para dar profundidad al escenario.
-- Indicador de peligro cuando una bomba cercana está a punto de detonar.
-- Feedback sonoro procedural mediante Web Audio API: bomba, explosión, daño, pickup, salida y UI.
-- La música no es necesaria ni depende de archivos externos: el audio se genera localmente en el navegador.
-- Barra visual de reliquias activas durante las recompensas.
-- Se conserva la economía, salas especiales, reliquias, rerolls y progresión roguelike de v1.1.
-- Sigue funcionando en PC y controles táctiles.
-
-## Archivos
-
-- `index.html` — estructura de la interfaz.
-- `styles.css` — presentación y efectos visuales.
-- `game.js` — lógica completa del juego.
-
-## Ejecutar
-
-Abrir `index.html` directamente en un navegador moderno o publicarlo mediante GitHub Pages.
+## Qué cambia
+- Bosses colosales de más de 2 casillas de ancho.
+- Mucha más vida y tres fases reales.
+- Proyectiles dirigidos con patrones más agresivos.
+- Olas radiales de proyectiles.
+- Carga contra el jugador en fases 2 y 3.
+- Refuerzos durante el combate.
+- Aura, armadura, núcleo, corona y efectos visuales del Coloso.
+- Arena de jefe despejada y salida bloqueada hasta derrotarlo.
+- Movimiento libre del jugador conservado: la cuadrícula sigue siendo solo para colisiones del mapa.
 
 ## Controles
-
 - WASD / flechas: mover
-- Espacio / Z: colocar bomba
-- P / Esc: pausar
-- Móvil: joystick + botón de bomba
+- Espacio: bomba
+- P / Escape: pausa
+- En móvil: joystick + botón de bomba
 
-## Nota de audio
-
-El navegador requiere una interacción del usuario para habilitar AudioContext. El juego lo inicializa al comenzar la run.
+## Ejecutar
+Abrí `index.html` directamente o publicá la carpeta en GitHub Pages.

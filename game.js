@@ -1,3 +1,65 @@
+// V2.0 IMMERSIVE SYSTEMS
+let audioCtx = null;
+const ambient = { dustTimer: 0, lastFoot: 0, introTimer: 0 };
+function initAudio(){
+    if(audioCtx) return;
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { audioCtx = null; }
+}
+function sfx(type){
+    if(!audioCtx) return;
+    const now=audioCtx.currentTime, o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    const presets={bomb:[70,.08,'square'],boom:[55,.28,'sawtooth'],pickup:[520,.10,'sine'],hurt:[110,.18,'square'],exit:[330,.35,'triangle'],click:[220,.05,'square'],trap:[90,.22,'sawtooth'],alarm:[180,.16,'square'],boss:[62,.5,'sawtooth'],bossHit:[240,.10,'square'],bossRoar:[48,.65,'sawtooth'],bossCharge:[120,.22,'square'],bossWave:[75,.38,'triangle']};
+    const [freq,dur,wave]=presets[type]||presets.click;
+    o.type=wave; o.frequency.setValueAtTime(freq,now); o.frequency.exponentialRampToValueAtTime(Math.max(35,freq*.55),now+dur);
+    g.gain.setValueAtTime(.0001,now); g.gain.exponentialRampToValueAtTime(.06,now+.008); g.gain.exponentialRampToValueAtTime(.0001,now+dur);
+    o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now+dur+.02);
+}
+function showRoomIntro(){
+    const el=document.getElementById('room-intro'); if(!el) return;
+    const r=gameState.roomType;
+    el.innerHTML=`<div class="room-number">DEPTH ${String(gameState.level).padStart(2,'0')} · RUN ${String(gameState.runNumber).padStart(2,'0')}</div><div class="room-name" style="color:${r.color}">${r.icon} ${r.name}</div><div class="room-sub">${r.subtitle}</div>`;
+    el.classList.remove('hidden');
+    clearTimeout(ambient.introTimer); ambient.introTimer=setTimeout(()=>el.classList.add('hidden'),1800);
+    sfx('click');
+}
+function renderImmersion(){
+    const danger=document.getElementById('danger-indicator');
+    if(!danger) return;
+    const nearestBomb=gameState.bombs.some(b=>Math.abs(b.x-Math.floor((player.x+player.width/2)/TILE_SIZE))+Math.abs(b.y-Math.floor((player.y+player.height/2)/TILE_SIZE))<=2 && b.timer<900);
+    const pressureDanger = gameState.roomTime < 15000 || gameState.threatLevel >= 2;
+    danger.textContent = pressureDanger ? `⚠ PRESIÓN ${gameState.threatLevel}` : 'PELIGRO';
+    danger.classList.toggle('hidden', (!nearestBomb && !pressureDanger) || gameState.paused);
+    const vignette=document.getElementById('immersion-vignette');
+    if(vignette){
+        const low=player.health<=1, pulse=low ? (0.28+Math.sin(gameState.animFrame*.08)*.12) : .08;
+        vignette.style.background=`radial-gradient(circle at 50% 48%, transparent 25%, rgba(2,6,23,${pulse}) 62%, rgba(2,6,23,${low?.62:.38}) 100%)`;
+    }
+}
+function drawAmbientDust(){
+    const count=24;
+    for(let i=0;i<count;i++){
+        const seed=(i*97)%1000;
+        const x=((seed*3.71+gameState.animFrame*.09*(i%3+1))%(canvas.width+80))-40;
+        const y=((seed*1.83+gameState.animFrame*.035*(i%2+1))%(canvas.height+80))-40;
+        const a=.025+(i%4)*.012;
+        ctx.fillStyle=`rgba(226,232,240,${a})`; ctx.fillRect(x,y,1+(i%2),1+(i%2));
+    }
+}
+function drawLighting(){
+    // Localized darkness with soft light around the player and bombs.
+    ctx.save();
+    const grad=ctx.createRadialGradient(player.x+player.width/2-gameState.camera.x,player.y+player.height/2-gameState.camera.y,35,player.x+player.width/2-gameState.camera.x,player.y+player.height/2-gameState.camera.y,240);
+    grad.addColorStop(0,'rgba(0,0,0,0)'); grad.addColorStop(.65,'rgba(0,0,0,.12)'); grad.addColorStop(1,'rgba(0,0,0,.52)');
+    ctx.fillStyle=grad; ctx.fillRect(0,0,canvas.width,canvas.height);
+    gameState.bombs.forEach(b=>{
+        const x=(b.x+.5)*TILE_SIZE-gameState.camera.x, y=(b.y+.5)*TILE_SIZE-gameState.camera.y;
+        const radius=75+Math.sin(gameState.animFrame*.3)*8;
+        const g=ctx.createRadialGradient(x,y,4,x,y,radius); g.addColorStop(0,'rgba(255,170,50,.20)'); g.addColorStop(1,'rgba(255,80,20,0)');
+        ctx.fillStyle=g; ctx.fillRect(x-radius,y-radius,radius*2,radius*2);
+    });
+    ctx.restore();
+}
+
 const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d', { alpha: false });
 
@@ -53,6 +115,11 @@ const canvas = document.getElementById('gameCanvas');
                 blockBonus: -0.02, enemyMult: 0.75, enemySpeedMult: 0.95, dropChance: 0.34,
                 coinMult: 1.1, rewardCoins: 15, color: '#67e8f9'
             }
+            ,BOSS: {
+                id: 'BOSS', name: 'JEFE', subtitle: 'Arena de combate · derrotá al guardián', icon: '☠',
+                blockBonus: -0.18, enemyMult: 0.25, enemySpeedMult: 1.05, dropChance: 0.50,
+                coinMult: 2.5, rewardCoins: 60, color: '#f43f5e'
+            }
         };
 
         const RELICS = [
@@ -91,7 +158,8 @@ const canvas = document.getElementById('gameCanvas');
         function getRoomForDepth(depth) {
             if (depth === 1) return ROOM_TYPES.STANDARD;
             const roll = Math.random();
-            if (depth % 5 === 0) return ROOM_TYPES.SHRINE;
+            if (depth % 5 === 0) return ROOM_TYPES.BOSS;
+            if (depth % 5 === 1 && depth > 1) return ROOM_TYPES.SHRINE;
             if (roll < 0.16) return ROOM_TYPES.ELITE;
             if (roll < 0.34) return ROOM_TYPES.TREASURE;
             if (roll < 0.48) return ROOM_TYPES.CURSED;
@@ -124,6 +192,13 @@ const canvas = document.getElementById('gameCanvas');
             items: [],
             particles: [],
             floaters: [],
+            hazards: [],
+            hazardCooldown: 0,
+            boss: null,
+            bossProjectiles: [],
+            roomTime: 0,
+            threatLevel: 0,
+            nextReinforcement: 20000,
             exitPos: null,
             lastTime: 0,
             keys: {},
@@ -278,6 +353,13 @@ const canvas = document.getElementById('gameCanvas');
             gameState.items = [];
             gameState.particles = [];
             gameState.floaters = [];
+            gameState.hazards = [];
+            gameState.hazardCooldown = 0;
+            gameState.boss = null;
+            gameState.bossProjectiles = [];
+            gameState.roomTime = Math.max(35000, 80000 - gameState.level * 1500);
+            gameState.threatLevel = 0;
+            gameState.nextReinforcement = gameState.roomTime - 18000;
 
             // Spawn player top-left corner
             player.x = TILE_SIZE + (TILE_SIZE - player.width)/2;
@@ -326,15 +408,308 @@ const canvas = document.getElementById('gameCanvas');
                 gameState.grid[gameState.exitPos.y][gameState.exitPos.x] = TYPES.EXIT_OPEN;
             }
 
+            if (gameState.roomType.id === 'BOSS') {
+                setupBossArena();
+            }
+
             if (gameState.roomType.id === 'SHRINE') {
                 player.health = Math.min(player.health + 1, player.maxHealth);
                 player.hasShield = true;
                 addFloatingText('SANTUARIO: +1 VIDA + ESCUDO', player.x, player.y, '#67e8f9');
             }
 
+            generateHazards();
             spawnEnemies();
+            showRoomIntro();
             updateRoguePresentation();
             updateUI();
+        }
+
+        function setupBossArena() {
+            // El jefe necesita espacio real: despejamos una arena central sin tocar las paredes estructurales.
+            const cx = Math.floor(gameState.gridWidth / 2);
+            const cy = Math.floor(gameState.gridHeight / 2);
+            for (let y = cy - 3; y <= cy + 3; y++) {
+                for (let x = cx - 3; x <= cx + 3; x++) {
+                    if (x > 0 && x < gameState.gridWidth - 1 && y > 0 && y < gameState.gridHeight - 1) {
+                        if (!(x % 2 === 0 && y % 2 === 0)) gameState.grid[y][x] = TYPES.EMPTY;
+                    }
+                }
+            }
+            gameState.exitPos = {x: gameState.gridWidth - 2, y: gameState.gridHeight - 2};
+            if (gameState.grid[gameState.exitPos.y][gameState.exitPos.x] === TYPES.WALL) gameState.grid[gameState.exitPos.y][gameState.exitPos.x] = TYPES.EMPTY;
+            gameState.grid[gameState.exitPos.y][gameState.exitPos.x] = TYPES.EXIT_LOCKED;
+            gameState.enemies = [];
+            const maxHp = 28 + gameState.level * 3;
+            gameState.boss = {
+                x: cx * TILE_SIZE + TILE_SIZE / 2,
+                y: cy * TILE_SIZE + TILE_SIZE / 2,
+                width: TILE_SIZE * 2.35,
+                height: TILE_SIZE * 2.35,
+                hp: maxHp,
+                maxHp,
+                phase: 1,
+                vx: 1.05,
+                vy: 0,
+                moveTimer: 0,
+                attackTimer: 1500,
+                summonTimer: 6200,
+                waveTimer: 3200,
+                chargeTimer: 5200,
+                chargeTime: 0,
+                charging: false,
+                chargeVx: 0,
+                chargeVy: 0,
+                invuln: 0,
+                flash: 0,
+                roarTimer: 0,
+                defeated: false
+            };
+            sfx('bossRoar');
+            triggerScreenShake(8, 350);
+            addFloatingText('☠ COLOSO DE LA PROFUNDIDAD', gameState.boss.x, gameState.boss.y - 72, '#f43f5e');
+        }
+
+        function damageBoss(amount = 1) {
+            const b = gameState.boss;
+            if (!b || b.defeated || b.invuln > 0) return;
+            b.hp -= amount;
+            b.invuln = 220;
+            b.flash = 180;
+            gameState.score += 75;
+            sfx('bossHit');
+            triggerScreenShake(3, 100);
+            addFloatingText(`-${amount}`, b.x, b.y - b.height / 2, '#fb7185');
+            if (b.hp <= 0) defeatBoss();
+        }
+
+        function defeatBoss() {
+            const b = gameState.boss;
+            if (!b || b.defeated) return;
+            b.defeated = true;
+            b.hp = 0;
+            gameState.grid[gameState.exitPos.y][gameState.exitPos.x] = TYPES.EXIT_OPEN;
+            gameState.coins += 30;
+            gameState.score += 1500;
+            addParticles(b.x, b.y, '#f43f5e', 55);
+            addFloatingText('☠ JEFE DERROTADO', b.x, b.y - 50, '#facc15');
+            addFloatingText('+30¢  +1500', b.x, b.y + 20, '#fbbf24');
+            sfx('boom');
+            triggerScreenShake(12, 500);
+            updateUI();
+        }
+
+        function bossShoot() {
+            const b = gameState.boss;
+            if (!b || b.defeated) return;
+            const dx = player.x + player.width / 2 - b.x;
+            const dy = player.y + player.height / 2 - b.y;
+            const len = Math.hypot(dx, dy) || 1;
+            const speed = 2.8 + b.phase * 0.35;
+            gameState.bossProjectiles.push({x:b.x, y:b.y, vx:dx/len*speed, vy:dy/len*speed, life:4200, radius:9, kind:'orb'});
+            if (b.phase >= 2) {
+                const spread = 0.16;
+                for (const angle of [-spread, spread]) {
+                    const c=Math.cos(angle), q=Math.sin(angle);
+                    gameState.bossProjectiles.push({x:b.x, y:b.y, vx:(dx/len*c-dy/len*q)*speed*.92, vy:(dx/len*q+dy/len*c)*speed*.92, life:3900, radius:7, kind:'orb'});
+                }
+            }
+            sfx('alarm');
+        }
+
+        function bossShockwave() {
+            const b=gameState.boss;
+            if(!b || b.defeated) return;
+            const count=b.phase>=3?16:(b.phase>=2?12:10);
+            const speed=2.0+b.phase*.35;
+            for(let i=0;i<count;i++){
+                const a=(Math.PI*2/count)*i;
+                gameState.bossProjectiles.push({x:b.x,y:b.y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,life:3000,radius:8,kind:'wave'});
+            }
+            addFloatingText('¡OLA DE CHOQUE!', b.x, b.y-b.height*.55, '#c084fc');
+            triggerScreenShake(5,220);
+            sfx('bossWave');
+        }
+
+        function bossStartCharge() {
+            const b=gameState.boss;
+            if(!b || b.defeated || b.charging) return;
+            const dx=player.x+player.width/2-b.x, dy=player.y+player.height/2-b.y;
+            const len=Math.hypot(dx,dy)||1;
+            b.charging=true; b.chargeTime=950; b.chargeVx=dx/len*(3.2+b.phase*.55); b.chargeVy=dy/len*(3.2+b.phase*.55);
+            sfx('bossCharge'); addFloatingText('¡CARGA!', b.x, b.y-b.height*.55, '#fb7185');
+        }
+
+        function bossSummon() {
+            const b = gameState.boss;
+            if (!b || b.defeated) return;
+            const candidates=[];
+            const bx=Math.floor(b.x/TILE_SIZE), by=Math.floor(b.y/TILE_SIZE);
+            for(let y=1;y<gameState.gridHeight-1;y++) for(let x=1;x<gameState.gridWidth-1;x++) {
+                if(gameState.grid[y][x]!==TYPES.EMPTY) continue;
+                const d=Math.abs(x-bx)+Math.abs(y-by);
+                if(d>=4 && d<10 && !gameState.enemies.some(e=>Math.floor(e.x/TILE_SIZE)===x && Math.floor(e.y/TILE_SIZE)===y)) candidates.push({x,y,d});
+            }
+            candidates.sort((a,z)=>z.d-a.d);
+            const count=Math.min(2,candidates.length);
+            for(let i=0;i<count;i++) {
+                const c=candidates[i], type=i%2===0?ENEMY_TYPES.RASTRERO:ENEMY_TYPES.VOLADOR;
+                const sp=type.speed*gameState.roomType.enemySpeedMult*(1+gameState.threatLevel*.04)*1.15;
+                gameState.enemies.push({x:c.x*TILE_SIZE+TILE_SIZE/2,y:c.y*TILE_SIZE+TILE_SIZE/2,width:TILE_SIZE*.75,height:TILE_SIZE*.75,type,vx:sp,vy:0,baseSpeed:sp,changeTimer:25,elite:true,reinforcement:true});
+            }
+            if(count) addFloatingText('¡REFUERZOS DEL JEFE!', b.x, b.y-55, '#c084fc');
+        }
+
+        function updateBoss(dt) {
+            const b=gameState.boss;
+            if(!b || b.defeated) return;
+            b.invuln=Math.max(0,b.invuln-dt); b.flash=Math.max(0,b.flash-dt); b.roarTimer=Math.max(0,b.roarTimer-dt);
+            b.attackTimer-=dt; b.summonTimer-=dt; b.waveTimer-=dt; b.chargeTimer-=dt; b.moveTimer-=dt;
+            const ratio=b.hp/b.maxHp;
+            b.phase=ratio<=.33?3:(ratio<=.66?2:1);
+            const scale=Math.min(dt/16.6667,2);
+
+            if(b.charging){
+                b.chargeTime-=dt;
+                const nx=b.x+b.chargeVx*scale, ny=b.y+b.chargeVy*scale;
+                if(!rectCollidesSolid(nx-b.width/2,ny-b.height/2,b.width,b.height)) { b.x=nx;b.y=ny; }
+                else { b.charging=false;b.chargeTimer=Math.max(1800,4200-b.phase*500);bossShockwave(); }
+                if(b.chargeTime<=0){b.charging=false;b.chargeTimer=Math.max(1800,4200-b.phase*500);}
+            } else {
+                if(b.moveTimer<=0){
+                    b.moveTimer=760-Math.min(260,b.phase*80);
+                    const dx=player.x+player.width/2-b.x, dy=player.y+player.height/2-b.y;
+                    if(Math.abs(dx)>Math.abs(dy)){b.vx=Math.sign(dx)*(0.8+b.phase*.3);b.vy=0;} else {b.vx=0;b.vy=Math.sign(dy)*(0.8+b.phase*.3);}
+                }
+                const nx=b.x+b.vx*scale, ny=b.y+b.vy*scale;
+                if(!rectCollidesSolid(nx-b.width/2,ny-b.height/2,b.width,b.height)){b.x=nx;b.y=ny;} else {b.vx*=-1;b.vy*=-1;}
+            }
+
+            if(b.attackTimer<=0){ bossShoot(); b.attackTimer=Math.max(700,1700-b.phase*260); }
+            if(b.waveTimer<=0){ bossShockwave(); b.waveTimer=Math.max(2300,4300-b.phase*650); }
+            if(b.summonTimer<=0){ bossSummon(); b.summonTimer=Math.max(3000,6500-b.phase*850); }
+            if(b.chargeTimer<=0 && b.phase>=2){ bossStartCharge(); }
+            if(b.phase===3 && b.roarTimer<=0){ sfx('bossRoar');b.roarTimer=7200;triggerScreenShake(4,180); }
+
+            const hit={left:b.x-b.width*.38,right:b.x+b.width*.38,top:b.y-b.height*.38,bottom:b.y+b.height*.38};
+            const ph={left:player.x+5,right:player.x+player.width-5,top:player.y+5,bottom:player.y+player.height-5};
+            if(!player.isInvincible && checkOverlap(hit,ph)) takeDamage();
+            for(let i=gameState.bossProjectiles.length-1;i>=0;i--){
+                const p=gameState.bossProjectiles[i]; p.x+=p.vx*scale;p.y+=p.vy*scale;p.life-=dt;
+                const gx=Math.floor(p.x/TILE_SIZE),gy=Math.floor(p.y/TILE_SIZE);
+                if(isSolid(gx,gy)){gameState.bossProjectiles.splice(i,1);continue;}
+                const pr={left:p.x-p.radius,right:p.x+p.radius,top:p.y-p.radius,bottom:p.y+p.radius};
+                if(!player.isInvincible && checkOverlap(ph,pr)){takeDamage();gameState.bossProjectiles.splice(i,1);continue;}
+                if(p.life<=0) gameState.bossProjectiles.splice(i,1);
+            }
+        }
+
+        function drawBoss() {
+            const b=gameState.boss; if(!b || b.defeated) return;
+            ctx.save();
+            const pulse=1+Math.sin(gameState.animFrame*.10)*.035;
+            const rage=b.phase===3;
+            ctx.translate(b.x,b.y);ctx.scale(pulse,pulse);
+            ctx.globalAlpha=b.flash>0 ? .55 : 1;
+            const aura=ctx.createRadialGradient(0,0,20,0,0,b.width*.8);
+            aura.addColorStop(0,rage?'rgba(244,63,94,.20)':'rgba(168,85,247,.16)');
+            aura.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=aura;ctx.beginPath();ctx.arc(0,0,b.width*.8,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle='rgba(0,0,0,.58)';ctx.beginPath();ctx.ellipse(0,b.height*.43,b.width*.48,10,0,0,Math.PI*2);ctx.fill();
+            // Massive armored body
+            ctx.fillStyle=rage?'#581c1c':'#312e81';
+            ctx.strokeStyle=rage?'#fb7185':'#a78bfa';ctx.lineWidth=5;
+            ctx.beginPath();ctx.roundRect(-b.width*.43,-b.height*.42,b.width*.86,b.height*.84,18);ctx.fill();ctx.stroke();
+            // Shoulder armor
+            ctx.fillStyle=rage?'#991b1b':'#4c1d95';
+            ctx.beginPath();ctx.arc(-b.width*.40,-b.height*.12,b.width*.22,0,Math.PI*2);ctx.arc(b.width*.40,-b.height*.12,b.width*.22,0,Math.PI*2);ctx.fill();
+            // Face plate
+            ctx.fillStyle='#111827';ctx.fillRect(-b.width*.25,-b.height*.19,b.width*.50,b.height*.30);
+            ctx.fillStyle=rage?'#fda4af':'#e9d5ff';ctx.shadowBlur=14;ctx.shadowColor=ctx.fillStyle;
+            ctx.fillRect(-b.width*.16,-b.height*.10,b.width*.10,7);ctx.fillRect(b.width*.06,-b.height*.10,b.width*.10,7);ctx.shadowBlur=0;
+            // Crown / horns
+            ctx.fillStyle='#facc15';ctx.beginPath();ctx.moveTo(-b.width*.28,-b.height*.38);ctx.lineTo(-b.width*.17,-b.height*.62);ctx.lineTo(-b.width*.04,-b.height*.38);ctx.lineTo(b.width*.08,-b.height*.62);ctx.lineTo(b.width*.25,-b.height*.38);ctx.closePath();ctx.fill();
+            // Core
+            ctx.fillStyle=rage?'#ef4444':'#c084fc';ctx.shadowBlur=18;ctx.shadowColor=ctx.fillStyle;ctx.beginPath();ctx.arc(0,b.height*.15,b.width*.10,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+            // Phase markers
+            ctx.fillStyle='#fef08a';for(let i=0;i<b.phase;i++){ctx.beginPath();ctx.arc(-10+(i-1)*10,b.height*.34,3,0,Math.PI*2);ctx.fill();}
+            if(b.charging){ctx.strokeStyle='#fef08a';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,b.width*.58,0,Math.PI*2);ctx.stroke();}
+            ctx.restore();
+            gameState.bossProjectiles.forEach(p=>{
+                ctx.fillStyle=p.kind==='wave'?'#f0abfc':'#c084fc';ctx.shadowBlur=p.kind==='wave'?16:12;ctx.shadowColor=ctx.fillStyle;
+                ctx.beginPath();ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+            });
+        }
+
+        function generateHazards() {
+            const candidates = [];
+            for (let y = 1; y < gameState.gridHeight - 1; y++) {
+                for (let x = 1; x < gameState.gridWidth - 1; x++) {
+                    if (gameState.grid[y][x] !== TYPES.EMPTY) continue;
+                    if ((x <= 3 && y <= 3) || (gameState.exitPos && gameState.exitPos.x === x && gameState.exitPos.y === y)) continue;
+                    candidates.push({x, y});
+                }
+            }
+            for (let i = candidates.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+            }
+            const count = Math.min(candidates.length, Math.max(2, 2 + Math.floor(gameState.level / 2) + (gameState.roomType.id === 'CURSED' ? 2 : 0)));
+            gameState.hazards = candidates.slice(0, count).map(h => ({ ...h, active: true, cooldown: 0, phase: Math.random() * Math.PI * 2 }));
+        }
+
+        function spawnReinforcement(count = 1) {
+            const candidates = [];
+            const px = Math.floor((player.x + player.width / 2) / TILE_SIZE);
+            const py = Math.floor((player.y + player.height / 2) / TILE_SIZE);
+            for (let y = 1; y < gameState.gridHeight - 1; y++) {
+                for (let x = 1; x < gameState.gridWidth - 1; x++) {
+                    if (gameState.grid[y][x] !== TYPES.EMPTY) continue;
+                    const distance = Math.abs(x - px) + Math.abs(y - py);
+                    if (distance >= 6 && !gameState.enemies.some(e => Math.floor(e.x/TILE_SIZE) === x && Math.floor(e.y/TILE_SIZE) === y)) candidates.push({x,y,distance});
+                }
+            }
+            candidates.sort((a,b) => b.distance - a.distance);
+            for (let i = 0; i < Math.min(count, candidates.length); i++) {
+                const c = candidates[i];
+                const roll = Math.random();
+                let type = ENEMY_TYPES.RASTRERO;
+                if (gameState.level >= 3 && roll > .68) type = ENEMY_TYPES.ESPECIAL;
+                else if (gameState.level >= 2 && roll > .38) type = ENEMY_TYPES.VOLADOR;
+                const speed = type.speed * gameState.roomType.enemySpeedMult * (1 + gameState.threatLevel * .04);
+                gameState.enemies.push({ x:c.x*TILE_SIZE+TILE_SIZE/2, y:c.y*TILE_SIZE+TILE_SIZE/2, width:TILE_SIZE*.75, height:TILE_SIZE*.75, type, vx:speed*(Math.random()<.5?-1:1), vy:0, baseSpeed:speed, changeTimer:15+Math.random()*35, elite:false, reinforcement:true });
+                addFloatingText('REFUERZO', c.x*TILE_SIZE+TILE_SIZE/2, c.y*TILE_SIZE+TILE_SIZE/2, '#fb7185');
+            }
+            if (count > 0) sfx('alarm');
+        }
+
+        function updateRoomThreat(dt) {
+            gameState.roomTime -= dt;
+            gameState.nextReinforcement -= dt;
+            if (gameState.roomType.id === 'BOSS') return;
+            if (gameState.nextReinforcement <= 0) {
+                gameState.threatLevel++;
+                const amount = Math.min(1 + Math.floor(gameState.threatLevel / 2), 3);
+                spawnReinforcement(amount);
+                gameState.nextReinforcement = Math.max(12000, 24000 - gameState.level * 500);
+                triggerScreenShake(3, 140);
+            }
+        }
+
+        function updateHazards(dt) {
+            if (gameState.hazardCooldown > 0) gameState.hazardCooldown -= dt;
+            gameState.hazards.forEach(h => { if (h.cooldown > 0) h.cooldown -= dt; });
+            if (gameState.hazardCooldown > 0 || player.isInvincible) return;
+            const pcx = player.x + player.width / 2, pcy = player.y + player.height / 2;
+            for (const h of gameState.hazards) {
+                const hx = (h.x + .5) * TILE_SIZE, hy = (h.y + .5) * TILE_SIZE;
+                const dx = Math.abs(pcx - hx), dy = Math.abs(pcy - hy);
+                if (dx < TILE_SIZE * .32 && dy < TILE_SIZE * .32 && h.cooldown <= 0) {
+                    h.active = false; h.cooldown = 1800; gameState.hazardCooldown = 500;
+                    addParticles(hx, hy, '#ef4444', 10); addFloatingText('TRAMPA!', pcx, pcy, '#ef4444');
+                    sfx('trap'); takeDamage();
+                    break;
+                }
+            }
         }
 
         function spawnEnemies() {
@@ -407,84 +782,51 @@ const canvas = document.getElementById('gameCanvas');
             return tile === TYPES.WALL || tile === TYPES.BLOCK;
         }
 
+        // V2.1 — Movimiento libre: el personaje NO se alinea ni se "imanta" a una cuadrícula invisible.
+        // La cuadrícula solo define colisiones. El desplazamiento dentro de cada pasillo es continuo.
+        function rectCollidesSolid(x, y, width, height) {
+            const inset = 5;
+            const left = x + inset;
+            const right = x + width - inset;
+            const top = y + inset;
+            const bottom = y + height - inset;
+
+            const minGX = Math.floor(left / TILE_SIZE);
+            const maxGX = Math.floor(right / TILE_SIZE);
+            const minGY = Math.floor(top / TILE_SIZE);
+            const maxGY = Math.floor(bottom / TILE_SIZE);
+
+            for (let gy = minGY; gy <= maxGY; gy++) {
+                for (let gx = minGX; gx <= maxGX; gx++) {
+                    if (isSolid(gx, gy)) return true;
+                }
+            }
+            return false;
+        }
+
+        function moveAxisWithCollision(axis, amount) {
+            if (!amount) return false;
+            const steps = Math.max(1, Math.ceil(Math.abs(amount) / 3));
+            const step = amount / steps;
+            let moved = false;
+
+            for (let i = 0; i < steps; i++) {
+                const nextX = axis === 'x' ? player.x + step : player.x;
+                const nextY = axis === 'y' ? player.y + step : player.y;
+                if (rectCollidesSolid(nextX, nextY, player.width, player.height)) break;
+                player.x = nextX;
+                player.y = nextY;
+                moved = true;
+            }
+            return moved;
+        }
+
         function tryMovePlayer(dx, dy) {
-            let nextX = player.x + dx;
-            let nextY = player.y + dy;
-            // Margen aumentado (de 6 a 10) para hacer que el jugador sea ligeramente más "fino" 
-            // respecto a las paredes, facilitando enormemente la entrada a los pasillos.
-            let margin = 10; 
-
-            let pointsX = [
-                {x: nextX + margin, y: player.y + margin},
-                {x: nextX + player.width - margin, y: player.y + margin},
-                {x: nextX + margin, y: player.y + player.height - margin},
-                {x: nextX + player.width - margin, y: player.y + player.height - margin}
-            ];
-
-            let canMoveX = true;
-            for (let p of pointsX) {
-                if (isSolid(Math.floor(p.x / TILE_SIZE), Math.floor(p.y / TILE_SIZE))) canMoveX = false;
-            }
-
-            let pointsY = [
-                {x: player.x + margin, y: nextY + margin},
-                {x: player.x + player.width - margin, y: nextY + margin},
-                {x: player.x + margin, y: nextY + player.height - margin},
-                {x: player.x + player.width - margin, y: nextY + player.height - margin}
-            ];
-
-            let canMoveY = true;
-            for (let p of pointsY) {
-                if (isSolid(Math.floor(p.x / TILE_SIZE), Math.floor(p.y / TILE_SIZE))) canMoveY = false;
-            }
-
-            if (canMoveX) player.x = nextX;
-            if (canMoveY) player.y = nextY;
-
-            // --- SISTEMA DE DESLIZAMIENTO INTELIGENTE (Corner Cutting Assist) ---
-            // Si el jugador se bloquea al intentar girar, verificamos qué esquina exacta está chocando
-            // y lo deslizamos automáticamente hacia el lado libre para que doble perfecto.
-            let slideSpeed = player.speed * 1.3; // Resbala un poco más rápido de lo que camina
-
-            if (!canMoveX && dx !== 0) {
-                // ¿Estamos chocando con la pared de arriba o la de abajo del pasillo?
-                let hitTop = isSolid(Math.floor((nextX + (dx > 0 ? player.width - margin : margin)) / TILE_SIZE), Math.floor((player.y + margin) / TILE_SIZE));
-                let hitBottom = isSolid(Math.floor((nextX + (dx > 0 ? player.width - margin : margin)) / TILE_SIZE), Math.floor((player.y + player.height - margin) / TILE_SIZE));
-                
-                if (hitTop && !hitBottom) {
-                    player.y += slideSpeed; // Resbala hacia abajo para esquivar la pared superior
-                } else if (!hitTop && hitBottom) {
-                    player.y -= slideSpeed; // Resbala hacia arriba para esquivar la pared inferior
-                } else {
-                    // Respaldo: Atracción magnética al centro si está muy cerca (tolerancia ampliada)
-                    let cellCenterY = Math.floor((player.y + player.height/2)/TILE_SIZE) * TILE_SIZE + TILE_SIZE/2;
-                    let pCenterY = player.y + player.height/2;
-                    if (Math.abs(cellCenterY - pCenterY) < 22 && Math.abs(cellCenterY - pCenterY) > 1) {
-                        player.y += Math.sign(cellCenterY - pCenterY) * slideSpeed;
-                    }
-                }
-            }
-            
-            if (!canMoveY && dy !== 0) {
-                // ¿Estamos chocando con la pared izquierda o derecha del pasillo?
-                let hitLeft = isSolid(Math.floor((player.x + margin) / TILE_SIZE), Math.floor((nextY + (dy > 0 ? player.height - margin : margin)) / TILE_SIZE));
-                let hitRight = isSolid(Math.floor((player.x + player.width - margin) / TILE_SIZE), Math.floor((nextY + (dy > 0 ? player.height - margin : margin)) / TILE_SIZE));
-                
-                if (hitLeft && !hitRight) {
-                    player.x += slideSpeed; // Resbala hacia la derecha
-                } else if (!hitLeft && hitRight) {
-                    player.x -= slideSpeed; // Resbala hacia la izquierda
-                } else {
-                    // Respaldo: Atracción magnética al centro (tolerancia ampliada)
-                    let cellCenterX = Math.floor((player.x + player.width/2)/TILE_SIZE) * TILE_SIZE + TILE_SIZE/2;
-                    let pCenterX = player.x + player.width/2;
-                    if (Math.abs(cellCenterX - pCenterX) < 22 && Math.abs(cellCenterX - pCenterX) > 1) {
-                        player.x += Math.sign(cellCenterX - pCenterX) * slideSpeed;
-                    }
-                }
-            }
-
-            if (canMoveX || canMoveY) player.isMoving = true;
+            // Separar ejes permite deslizarse naturalmente por las paredes y doblar en esquinas.
+            // No existe ningún snap al centro de las celdas.
+            const movedX = moveAxisWithCollision('x', dx);
+            const movedY = moveAxisWithCollision('y', dy);
+            player.isMoving = movedX || movedY;
         }
 
         function placeBomb() {
@@ -495,8 +837,9 @@ const canvas = document.getElementById('gameCanvas');
             if (gameState.bombs.some(b => b.x === gx && b.y === gy)) return;
 
             gameState.bombs.push({
-                x: gx, y: gy, range: player.bombRange, timer: 2000, scalePulse: 1.0
+                x: gx, y: gy, range: player.bombRange, timer: gameState.roomType.id === 'CURSED' ? 1600 : 2000, scalePulse: 1.0
             });
+            sfx('bomb');
             player.bombsPlaced++;
         }
 
@@ -506,6 +849,7 @@ const canvas = document.getElementById('gameCanvas');
             player.bombsPlaced = Math.max(0, player.bombsPlaced - 1);
 
             triggerScreenShake(7, 300);
+            sfx('boom');
             addParticles((bomb.x + 0.5) * TILE_SIZE, (bomb.y + 0.5) * TILE_SIZE, '#f97316', 15);
             if (gameState.relics.some(r => r.id === 'ember_core')) gameState.score += 25;
 
@@ -564,6 +908,10 @@ const canvas = document.getElementById('gameCanvas');
         function update(dt) {
             if (!gameState.isPlaying || gameState.paused) return;
             gameState.animFrame++;
+            renderImmersion();
+            updateRoomThreat(dt);
+            updateHazards(dt);
+            updateBoss(dt);
 
             // Shake countdown
             if (gameState.shakeTimer > 0) {
@@ -660,6 +1008,12 @@ const canvas = document.getElementById('gameCanvas');
                 // Usamos el pHurtbox reducido para ver si el fuego te toca
                 if (!player.isInvincible && checkOverlap(pHurtbox, expRect)) takeDamage();
 
+                if (gameState.boss && !gameState.boss.defeated) {
+                    const b = gameState.boss;
+                    const bossRect = { left:b.x-b.width/2, right:b.x+b.width/2, top:b.y-b.height/2, bottom:b.y+b.height/2 };
+                    if (checkOverlap(bossRect, expRect)) damageBoss(1);
+                }
+
                 for (let j = gameState.enemies.length - 1; j >= 0; j--) {
                     let e = gameState.enemies[j];
                     // El enemigo tiene hitbox completo para que sea fácil matarlo con bombas
@@ -685,11 +1039,11 @@ const canvas = document.getElementById('gameCanvas');
                 if (e.changeTimer <= 0 || Math.random() < 0.02) {
                     e.changeTimer = 30 + Math.random() * 50;
                     if (Math.random() < 0.5) {
-                        e.vx = e.type.speed * (Math.random() < 0.5 ? 1 : -1);
+                        e.vx = e.type.speed * gameState.roomType.enemySpeedMult * (1 + gameState.threatLevel * 0.04) * (Math.random() < 0.5 ? 1 : -1);
                         e.vy = 0;
                     } else {
                         e.vx = 0;
-                        e.vy = e.type.speed * (Math.random() < 0.5 ? 1 : -1);
+                        e.vy = e.type.speed * gameState.roomType.enemySpeedMult * (1 + gameState.threatLevel * 0.04) * (Math.random() < 0.5 ? 1 : -1);
                     }
                 }
 
@@ -732,6 +1086,7 @@ const canvas = document.getElementById('gameCanvas');
                     
                     addParticles((it.x + 0.5) * TILE_SIZE, (it.y + 0.5) * TILE_SIZE, '#ffffff', 10);
                     gameState.items.splice(i, 1);
+                    sfx('pickup');
                     updateUI();
                 }
             }
@@ -756,10 +1111,13 @@ const canvas = document.getElementById('gameCanvas');
                 if (f.life <= 0) gameState.floaters.splice(i, 1);
             }
 
+            updateUI();
+
             // Exit Check
             let pgx = Math.floor((player.x + player.width/2) / TILE_SIZE);
             let pgy = Math.floor((player.y + player.height/2) / TILE_SIZE);
             if (gameState.grid[pgy] && gameState.grid[pgy][pgx] === TYPES.EXIT_OPEN) {
+                sfx('exit');
                 completeLevel();
             }
         }
@@ -769,6 +1127,7 @@ const canvas = document.getElementById('gameCanvas');
         }
 
         function takeDamage() {
+            sfx('hurt');
             if (player.hasShield) {
                 player.hasShield = false;
                 player.isInvincible = true;
@@ -852,6 +1211,9 @@ const canvas = document.getElementById('gameCanvas');
                 drawEnemySprite(e);
             });
 
+            // Draw Boss
+            drawBoss();
+
             // Draw Player Bomberman
             if (!player.isInvincible || Math.floor(gameState.animFrame / 4) % 2 === 0) {
                 drawBombermanSprite(player.x, player.y);
@@ -876,6 +1238,8 @@ const canvas = document.getElementById('gameCanvas');
 
             // Draw Mini-map in top corner
             drawMiniMap();
+            drawAmbientDust();
+            drawLighting();
         }
 
         function drawSteelWall(x, y) {
@@ -1240,9 +1604,26 @@ const canvas = document.getElementById('gameCanvas');
             document.getElementById('ui-speed').innerText = (player.speed - 2).toFixed(1);
             document.getElementById('ui-coins').innerText = gameState.coins;
             document.getElementById('ui-relics').innerText = gameState.relics.length;
+            const timerNode = document.getElementById('ui-timer');
+            if (timerNode) timerNode.innerText = `${Math.max(0, Math.ceil(gameState.roomTime / 1000))}s`;
+            const threatNode = document.getElementById('ui-threat');
+            if (threatNode) threatNode.innerText = gameState.threatLevel;
 
             const shieldBadge = document.getElementById('ui-shield-badge');
             shieldBadge.classList.toggle('hidden', !player.hasShield);
+
+            const bossHud = document.getElementById('boss-hud');
+            const bossBar = document.getElementById('boss-bar');
+            const bossPhase = document.getElementById('boss-phase');
+            if (bossHud && bossBar && bossPhase) {
+                const b = gameState.boss;
+                const visible = !!b && !b.defeated;
+                bossHud.classList.toggle('hidden', !visible);
+                if (visible) {
+                    bossBar.style.width = `${Math.max(0, b.hp / b.maxHp * 100)}%`;
+                    bossPhase.textContent = `FASE ${b.phase}`;
+                }
+            }
 
             const roomNode = document.getElementById('room-banner');
             if (roomNode) {
@@ -1250,6 +1631,7 @@ const canvas = document.getElementById('gameCanvas');
                 roomNode.style.setProperty('--room-accent', gameState.roomType.color);
             }
             updateRoguePresentation();
+            const strip = document.getElementById('relic-strip'); if (strip) strip.innerHTML = gameState.relics.map(r => `<span class="relic-chip" title="${r.desc}">${r.icon} ${r.name}</span>`).join('');
         }
 
         function updateRoguePresentation() {
@@ -1275,6 +1657,10 @@ const canvas = document.getElementById('gameCanvas');
             gameState.rerolls = 1;
             gameState.blocksBroken = 0;
             gameState.totalKills = 0;
+            gameState.hazards = [];
+            gameState.roomTime = 0;
+            gameState.threatLevel = 0;
+            gameState.nextReinforcement = 20000;
             gameState.paused = false;
             player.health = 3;
             player.maxHealth = 5;
@@ -1423,8 +1809,8 @@ const canvas = document.getElementById('gameCanvas');
             document.getElementById('game-over-screen').classList.remove('hidden');
         }
 
-        document.getElementById('btn-start').addEventListener('click', startGame);
-        document.getElementById('btn-restart').addEventListener('click', startGame);
+        document.getElementById('btn-start').addEventListener('click', () => { initAudio(); audioCtx?.resume(); sfx('click'); startGame(); });
+        document.getElementById('btn-restart').addEventListener('click', () => { initAudio(); audioCtx?.resume(); sfx('click'); startGame(); });
         document.getElementById('btn-resume')?.addEventListener('click', togglePause);
 
         // Initial setup

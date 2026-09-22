@@ -1,90 +1,96 @@
-// Bomberman Roguelike v3.10 — Combat, bombs, explosions, damage and gameplay simulation
+// Bomberman Roguelike v3.11 — Combat, bombs, explosions, damage and gameplay simulation
+        function placeBomb() {
+            if (player.bombsPlaced >= player.maxBombs) return false;
+
+            const cell = typeof getBombCellFromPlayer === 'function'
+                ? getBombCellFromPlayer()
+                : {
+                    x: Math.floor((player.x + player.width / 2) / TILE_SIZE),
+                    y: Math.floor((player.y + player.height / 2) / TILE_SIZE)
+                };
+            const gx = cell.x;
+            const gy = cell.y;
+
+            if (typeof isBombAtCell === 'function' ? isBombAtCell(gx, gy) : gameState.bombs.some(b => b.x === gx && b.y === gy)) return false;
+            if (gx < 0 || gy < 0 || gx >= gameState.gridWidth || gy >= gameState.gridHeight) return false;
+
+            const fuseTotal = gameState.roomType.id === 'CURSED' ? 1600 : 2000;
+            gameState.bombs.push({
+                x: gx, y: gy, range: player.bombRange, timer: fuseTotal, fuseTotal,
+                warnBucket: Math.ceil(fuseTotal / 300), scalePulse: 1.0,
+                detonating: false, placedAt: performance.now()
+            });
+            sfx('bomb');
+            if (typeof feedbackBombPlaced === 'function') feedbackBombPlaced(gx, gy);
+            player.bombsPlaced++;
+            updateUI(true);
+            return true;
+        }
+
         function explodeBomb(bombIndex) {
-            const first = gameState.bombs[bombIndex];
-            if (!first) return;
+            let bomb = gameState.bombs[bombIndex];
+            if (!bomb || bomb.detonating) return false;
+            bomb.detonating = true;
+            gameState.bombs.splice(bombIndex, 1);
+            player.bombsPlaced = Math.max(0, player.bombsPlaced - 1);
 
-            const queue = [first];
-            const explosionKeys = new Set();
+            triggerScreenShake(7, 300);
+            sfx('boom');
+            if (typeof feedbackExplosion === 'function') feedbackExplosion(bomb.x, bomb.y);
+            addParticles((bomb.x + 0.5) * TILE_SIZE, (bomb.y + 0.5) * TILE_SIZE, '#f97316', 15);
+            if (gameState.relics.some(r => r.id === 'ember_core')) gameState.score += 25;
 
-            // Consumimos la bomba inicial. Las bombas encadenadas se consumen
-            // al entrar en la cola, evitando detonaciones dobles o recursión.
-            const consumeBomb = (index) => {
-                const bomb = gameState.bombs[index];
-                if (!bomb) return null;
-                gameState.bombs.splice(index, 1);
-                player.bombsPlaced = Math.max(0, player.bombsPlaced - 1);
-                return bomb;
-            };
+            let cells = [{x: bomb.x, y: bomb.y}];
+            const dirs = [{dx: 0, dy: -1}, {dx: 0, dy: 1}, {dx: -1, dy: 0}, {dx: 1, dy: 0}];
 
-            consumeBomb(bombIndex);
-
-            while (queue.length) {
-                const bomb = queue.shift();
-                if (!bomb) continue;
-
-                triggerScreenShake(7, 300);
-                sfx('boom');
-                if (typeof feedbackExplosion === 'function') feedbackExplosion(bomb.x, bomb.y);
-                addParticles((bomb.x + 0.5) * TILE_SIZE, (bomb.y + 0.5) * TILE_SIZE, '#f97316', 15);
-                if (gameState.relics.some(r => r.id === 'ember_core')) gameState.score += 25;
-
-                const cells = [{x: bomb.x, y: bomb.y}];
-                const dirs = [{dx: 0, dy: -1}, {dx: 0, dy: 1}, {dx: -1, dy: 0}, {dx: 1, dy: 0}];
-
-                for (let dir of dirs) {
-                    for (let r = 1; r <= bomb.range; r++) {
-                        let tx = bomb.x + dir.dx * r;
-                        let ty = bomb.y + dir.dy * r;
-                        if (tx < 0 || tx >= gameState.gridWidth || ty < 0 || ty >= gameState.gridHeight) break;
-                        let type = gameState.grid[ty][tx];
-                        if (type === TYPES.WALL) break;
-
-                        cells.push({x: tx, y: ty});
-
-                        if (type === TYPES.BLOCK) {
-                            gameState.grid[ty][tx] = TYPES.EMPTY;
-                            gameState.score += 10;
-                            gameState.blocksBroken++;
-                            const coins = Math.max(1, Math.round((1 + Math.random() * 2) * (1 + gameState.coinBonus) * gameState.roomType.coinMult));
-                            gameState.coins += coins;
-                            addFloatingText(`+10  +${coins}¢`, (tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#fbbf24');
-                            addParticles((tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#b45309', 12);
-
-                            if (gameState.exitPos && gameState.exitPos.x === tx && gameState.exitPos.y === ty) {
-                                gameState.grid[ty][tx] = TYPES.EXIT_OPEN;
-                                addFloatingText('🚪 SALIDA!', (tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#facc15');
-                            } else if (Math.random() < gameState.roomType.dropChance) {
-                                const ps = Object.keys(POWERUPS);
-                                gameState.items.push({ x: tx, y: ty, type: POWERUPS[ps[Math.floor(Math.random() * ps.length)]] });
-                            }
-                            if (getAvailableRelics().length && Math.random() < (gameState.roomType.id === 'TREASURE' ? 0.10 : 0.035)) {
-                                const relicPool = getAvailableRelics();
-                                const relic = relicPool[Math.floor(Math.random() * relicPool.length)];
-                                gameState.items.push({ x: tx, y: ty, type: 'RELIC', relicId: relic.id });
-                            }
-                            break;
+            for (let dir of dirs) {
+                for (let r = 1; r <= bomb.range; r++) {
+                    let tx = bomb.x + dir.dx * r;
+                    let ty = bomb.y + dir.dy * r;
+                    if (tx < 0 || tx >= gameState.gridWidth || ty < 0 || ty >= gameState.gridHeight) break;
+                    let type = gameState.grid[ty][tx];
+                    if (type === TYPES.WALL) break;
+                    
+                    cells.push({x: tx, y: ty});
+                    
+                    if (type === TYPES.BLOCK) {
+                        gameState.grid[ty][tx] = TYPES.EMPTY;
+                        gameState.score += 10;
+                        gameState.blocksBroken++;
+                        const coins = Math.max(1, Math.round((1 + Math.random() * 2) * (1 + gameState.coinBonus) * gameState.roomType.coinMult));
+                        gameState.coins += coins;
+                        addFloatingText(`+10  +${coins}¢`, (tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#fbbf24');
+                        addParticles((tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#b45309', 12);
+                        
+                        if (gameState.exitPos && gameState.exitPos.x === tx && gameState.exitPos.y === ty) {
+                            gameState.grid[ty][tx] = TYPES.EXIT_OPEN;
+                            addFloatingText('🚪 SALIDA!', (tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#facc15');
+                        } else if (Math.random() < gameState.roomType.dropChance) {
+                            const ps = Object.keys(POWERUPS);
+                            gameState.items.push({ x: tx, y: ty, type: POWERUPS[ps[Math.floor(Math.random() * ps.length)]] });
                         }
+                        if (getAvailableRelics().length && Math.random() < (gameState.roomType.id === 'TREASURE' ? 0.10 : 0.035)) {
+                            const relicPool = getAvailableRelics();
+                            const relic = relicPool[Math.floor(Math.random() * relicPool.length)];
+                            gameState.items.push({ x: tx, y: ty, type: 'RELIC', relicId: relic.id });
+                        }
+                        break;
                     }
                 }
-
-                // Reacción en cadena iterativa: se consumen las bombas alcanzadas
-                // antes de continuar con la siguiente onda de la cola.
-                for (let i = gameState.bombs.length - 1; i >= 0; i--) {
-                    const other = gameState.bombs[i];
-                    if (cells.some(c => c.x === other.x && c.y === other.y)) {
-                        const chained = consumeBomb(i);
-                        if (chained) queue.push(chained);
-                    }
-                }
-
-                cells.forEach(c => explosionKeys.add(`${c.x},${c.y}`));
             }
 
-            explosionKeys.forEach(key => {
-                const [x, y] = key.split(',').map(Number);
-                gameState.explosions.push({ x, y, timer: 450 });
+            // Reacción en cadena: cualquier bomba alcanzada detona inmediatamente.
+            const chainedBombs = gameState.bombs.filter(other => cells.some(c => c.x === other.x && c.y === other.y));
+            chainedBombs.forEach(other => {
+                const chainIndex = gameState.bombs.indexOf(other);
+                if (chainIndex >= 0) explodeBomb(chainIndex);
+            });
+
+            cells.forEach(c => {
+                gameState.explosions.push({ x: c.x, y: c.y, timer: 450 });
             });
             updateUI(true);
+            return true;
         }
 
         function update(dt) {
@@ -117,8 +123,20 @@
 
             updateAdaptiveInterface();
 
-            // V3.10: bomb placement, escape state, fuse and warning timing are isolated.
-            updateBombHandling(dt);
+            // Update Bombs
+            for (let i = gameState.bombs.length - 1; i >= 0; i--) {
+                let b = gameState.bombs[i];
+                b.timer -= dt;
+                if (b.timer > 0 && b.timer <= 900) {
+                    const warnBucket = Math.ceil(b.timer / 300);
+                    if (warnBucket !== b.warnBucket) {
+                        b.warnBucket = warnBucket;
+                        sfx('bomb');
+                        if (typeof feedbackBombWarning === 'function') feedbackBombWarning(b.x, b.y);
+                    }
+                }
+                if (b.timer <= 0) explodeBomb(i);
+            }
 
             // Hitbox estándar para recoger objetos (ocupa casi todo el sprite)
             let pRect = { left: player.x, right: player.x + player.width, top: player.y, bottom: player.y + player.height };
@@ -176,41 +194,21 @@
                 if (exp.timer <= 0) gameState.explosions.splice(i, 1);
             }
 
-            // Update Enemies
-            gameState.enemies.forEach(e => {
-                e.changeTimer -= dt * 0.1;
-                if (e.changeTimer <= 0) {
-                    e.changeTimer = 30 + Math.random() * 50;
-                    if (Math.random() < 0.5) {
-                        e.vx = e.type.speed * gameState.roomType.enemySpeedMult * (1 + gameState.threatLevel * 0.04) * (Math.random() < 0.5 ? 1 : -1);
-                        e.vy = 0;
-                    } else {
-                        e.vx = 0;
-                        e.vy = e.type.speed * gameState.roomType.enemySpeedMult * (1 + gameState.threatLevel * 0.04) * (Math.random() < 0.5 ? 1 : -1);
-                    }
-                }
+            // V3.11: IA enemiga modular. Cada enemigo navega por celdas cardinales,
+            // persigue cuando corresponde, evita explosiones/bombas y recupera
+            // rutas cuando queda bloqueado.
+            if (typeof updateEnemiesAI === 'function') updateEnemiesAI(dt);
 
-                const enemyFrameScale = Math.min(dt / 16.6667, 2);
-                e.x += e.vx * enemyFrameScale;
-                if (isSolid(Math.floor(e.x / TILE_SIZE), Math.floor(e.y / TILE_SIZE), e.type.canFly)) {
-                    e.x -= e.vx * enemyFrameScale; e.vx *= -1;
-                }
-                e.y += e.vy * enemyFrameScale;
-                if (isSolid(Math.floor(e.x / TILE_SIZE), Math.floor(e.y / TILE_SIZE), e.type.canFly)) {
-                    e.y -= e.vy * enemyFrameScale; e.vy *= -1;
-                }
-
-                // Hitbox interna del enemigo para dañar al jugador (más pequeña que el visual)
-                let eHitbox = { 
-                    left: e.x - e.width * 0.3, 
-                    right: e.x + e.width * 0.3, 
-                    top: e.y - e.height * 0.3, 
-                    bottom: e.y + e.height * 0.3 
+            // Daño por contacto: la IA y la colisión de combate permanecen separadas.
+            for (const e of gameState.enemies) {
+                let eHitbox = {
+                    left: e.x - e.width * 0.3,
+                    right: e.x + e.width * 0.3,
+                    top: e.y - e.height * 0.3,
+                    bottom: e.y + e.height * 0.3
                 };
-                
-                // Comprobamos la colisión usando las cajas reducidas de ambos
                 if (!player.isInvincible && checkOverlap(pHurtbox, eHitbox)) takeDamage();
-            });
+            }
 
             // Items pickup
             for (let i = gameState.items.length - 1; i >= 0; i--) {

@@ -381,3 +381,356 @@ body { background: radial-gradient(circle at center, #111827 0%, #05070c 70%); }
  #game-container.ui-player-tl #ui-layer > .flex:first-child{bottom:5px;left:5px;}
  #game-container.ui-player-tr #ui-layer > .flex:last-child{bottom:5px;right:5px;}
 }
+
+/* V3.5 — INTERFACE UPDATE
+   El menú principal usa el espacio exterior al canvas en pantallas grandes y
+   se reorganiza automáticamente en tablet y móvil. Durante la partida, el
+   canvas vuelve a ser el foco y ocupa todo el espacio útil disponible. */
+:root{
+    --menu-gap: clamp(12px, 2vw, 28px);
+    --menu-panel-bg: rgba(5, 9, 18, .88);
+    --menu-line: rgba(148,163,184,.20);
+}
+
+html, body{height:100%;}
+body{
+    background:
+        radial-gradient(circle at 50% 42%, rgba(30,41,59,.55) 0%, rgba(5,7,12,.92) 42%, #020409 100%);
+}
+
+#app-wrapper{
+    width:100%;
+    height:100dvh;
+    max-width:none;
+    padding:clamp(8px,2vw,28px);
+}
+
+.main-menu{
+    width:100%;
+    height:100%;
+    min-height:0;
+    display:grid;
+    grid-template-columns:minmax(220px,.75fr) minmax(420px, min(70vh, 700px)) minmax(300px,.9fr);
+    gap:var(--menu-gap);
+    align-items:center;
+    justify-content:center;
+}
+
+#game-container{
+    width:100%;
+    max-width:none;
+    max-height:min(88dvh, 760px);
+    justify-self:center;
+    align-self:center;
+    aspect-ratio:1;
+}
+
+.menu-rail,
+.menu-panel{
+    position:relative;
+    min-width:0;
+    overflow:hidden;
+    border:1px solid var(--menu-line);
+    background:
+        linear-gradient(180deg, rgba(15,23,42,.82), rgba(2,6,23,.94));
+    box-shadow:0 18px 55px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.035);
+    border-radius:8px;
+}
+
+.menu-rail{
+    height:min(76dvh, 650px);
+    padding:clamp(18px,2.5vw,32px);
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+}
+
+.menu-rail::before,
+.menu-panel::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    background:
+        linear-gradient(90deg, transparent 0 92%, rgba(255,209,102,.08) 92% 92.5%, transparent 92.5%),
+        linear-gradient(180deg, transparent 0 88%, rgba(56,232,255,.06) 88% 88.5%, transparent 88.5%);
+    opacity:.7;
+}
+
+.menu-rail-top,
+.menu-panel-head{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    align-items:center;
+    font:7px 'Press Start 2P', monospace;
+    letter-spacing:.08em;
+    color:#64748b;
+    text-transform:uppercase;
+}
+
+.menu-version{color:#fbbf24;}
+
+.menu-rail-content{
+    position:relative;
+    z-index:1;
+}
+
+.menu-mark{
+    width:54px;
+    height:54px;
+    display:grid;
+    place-items:center;
+    border:1px solid rgba(255,209,102,.35);
+    background:rgba(255,209,102,.05);
+    border-radius:6px;
+    font-size:27px;
+    margin-bottom:16px;
+    box-shadow:0 0 28px rgba(255,209,102,.08);
+}
+
+.menu-rail-title{
+    margin:0;
+    color:#f8fafc;
+    font-size:clamp(20px,2.2vw,30px);
+    letter-spacing:.06em;
+}
+
+.menu-rail-subtitle,
+.menu-subtitle{
+    margin:8px 0 0;
+    color:#60a5fa;
+    font-size:7px;
+    letter-spacing:.12em;
+}
+
+.menu-rail-copy{
+    color:#94a3b8;
+    font-size:.88rem;
+    line-height:1.65;
+    max-width:28ch;
+    margin:22px 0 28px;
+}
+
+.menu-feature-list{display:grid;gap:12px;}
+.menu-feature{
+    display:grid;
+    grid-template-columns:28px 1fr;
+    column-gap:10px;
+    row-gap:3px;
+    padding:11px 0;
+    border-top:1px solid rgba(148,163,184,.12);
+}
+.menu-feature span{
+    grid-row:span 2;
+    color:#fbbf24;
+    font:8px 'Press Start 2P', monospace;
+}
+.menu-feature strong{
+    color:#e2e8f0;
+    font:8px 'Press Start 2P', monospace;
+    line-height:1.5;
+}
+.menu-feature small{color:#64748b;font-size:.73rem;line-height:1.4;}
+
+.menu-panel{
+    min-height:min(76dvh, 650px);
+    padding:clamp(18px,2.5vw,32px);
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    isolation:isolate;
+}
+.menu-panel-glow{
+    position:absolute;
+    width:240px;
+    height:240px;
+    right:-95px;
+    top:-95px;
+    border-radius:50%;
+    background:radial-gradient(circle, rgba(255,59,48,.14), transparent 68%);
+    pointer-events:none;
+}
+.menu-status-dot{display:flex;align-items:center;gap:6px;color:#86efac;}
+.menu-status-dot span{width:6px;height:6px;border-radius:50%;background:#4ade80;box-shadow:0 0 10px #4ade80;}
+
+.menu-hero-icon{
+    position:relative;
+    z-index:1;
+    margin-top:5px;
+    font-size:clamp(32px,4vw,52px);
+    letter-spacing:6px;
+    filter:drop-shadow(0 10px 18px rgba(0,0,0,.4));
+}
+.menu-title{
+    position:relative;
+    z-index:1;
+    margin:8px 0 0;
+    color:#f8fafc;
+    font-size:clamp(24px,3vw,38px);
+    letter-spacing:.09em;
+    text-shadow:0 0 26px rgba(255,209,102,.14);
+}
+.menu-panel .menu-subtitle{margin-top:8px;}
+
+.menu-rules{
+    position:relative;
+    z-index:1;
+    display:grid;
+    gap:8px;
+    margin:22px 0 16px;
+}
+.menu-rules > div{
+    display:grid;
+    grid-template-columns:56px 1fr;
+    gap:10px;
+    padding:10px 0;
+    border-top:1px solid rgba(148,163,184,.12);
+}
+.menu-rules b{color:#fbbf24;font:7px 'Press Start 2P',monospace;}
+.menu-rules span{color:#cbd5e1;font-size:.77rem;line-height:1.45;}
+
+.menu-actions{position:relative;z-index:1;}
+.menu-start-button{width:100%;margin-top:4px;padding:17px 20px;font-size:.78rem;}
+.menu-hint{
+    display:flex;
+    flex-wrap:wrap;
+    gap:5px 7px;
+    justify-content:center;
+    align-items:center;
+    margin-top:13px;
+    color:#64748b;
+    font:6px 'Press Start 2P',monospace;
+    line-height:1.7;
+    text-align:center;
+}
+.menu-hint strong{color:#cbd5e1;}
+.menu-footer{
+    position:relative;
+    z-index:1;
+    display:flex;
+    justify-content:center;
+    flex-wrap:wrap;
+    gap:5px 8px;
+    color:#475569;
+    font:5px 'Press Start 2P',monospace;
+    line-height:1.8;
+    text-align:center;
+    letter-spacing:.05em;
+}
+
+/* En run: el menú exterior desaparece y el canvas usa el viewport disponible. */
+.main-menu.run-active{
+    display:block;
+}
+.main-menu.run-active .menu-rail,
+.main-menu.run-active #start-screen{
+    display:none;
+}
+.main-menu.run-active #game-container{
+    width:min(94dvh,94vw,780px);
+    max-height:none;
+    margin:0 auto;
+}
+
+/* El control táctil no ocupa espacio del menú; aparece solamente durante el run. */
+#mobile-controls{display:none;}
+.main-menu.run-active + #mobile-controls{display:none;}
+
+@media (max-width:1200px){
+    .main-menu{
+        grid-template-columns:minmax(0,1fr) minmax(390px, min(62vh,640px));
+    }
+    .menu-rail-left{display:none;}
+}
+
+@media (pointer:coarse), (max-width:900px){
+    .main-menu.run-active + #mobile-controls{
+        display:flex;
+        position:fixed;
+        left:8px;
+        right:8px;
+        bottom:max(8px, env(safe-area-inset-bottom));
+        width:auto;
+        margin:0;
+        z-index:100;
+    }
+}
+
+@media (max-width:820px){
+    #app-wrapper{padding:8px 8px 92px;}
+    .main-menu{
+        height:auto;
+        min-height:calc(100dvh - 100px);
+        grid-template-columns:1fr;
+        gap:10px;
+        align-content:center;
+    }
+    #game-container{
+        width:min(92vw, 62dvh);
+        max-height:62dvh;
+    }
+    .main-menu.run-active #game-container{
+        width:min(94vw, calc(100dvh - 130px));
+        max-height:calc(100dvh - 130px);
+    }
+    .menu-panel{
+        min-height:0;
+        padding:16px 18px;
+        gap:10px;
+    }
+    .menu-hero-icon{font-size:32px;}
+    .menu-title{font-size:24px;}
+    .menu-rules{grid-template-columns:1fr 1fr 1fr;gap:7px;margin:12px 0 8px;}
+    .menu-rules > div{display:block;padding:9px 0;border:1px solid rgba(148,163,184,.10);padding-left:8px;padding-right:8px;}
+    .menu-rules b{display:block;margin-bottom:5px;}
+    .menu-rules span{font-size:.68rem;}
+    .menu-footer{display:none;}
+}
+
+@media (max-width:560px){
+    #app-wrapper{padding:6px 6px 94px;}
+    .main-menu{gap:8px;min-height:calc(100dvh - 100px);}
+    #game-container{width:min(94vw, 46dvh);max-height:46dvh;}
+    .main-menu.run-active #game-container{width:min(94vw, calc(100dvh - 125px));max-height:calc(100dvh - 125px);}
+    .menu-panel{padding:14px;}
+    .menu-panel-head{font-size:6px;}
+    .menu-title{font-size:20px;}
+    .menu-subtitle{font-size:6px;}
+    .menu-rules{grid-template-columns:1fr;gap:0;margin:8px 0;}
+    .menu-rules > div{display:grid;grid-template-columns:54px 1fr;border:0;border-top:1px solid rgba(148,163,184,.10);padding:7px 0;}
+    .menu-rules b{margin:0;}
+    .menu-rules span{font-size:.66rem;}
+    .menu-start-button{padding:14px 16px;font-size:.7rem;}
+}
+
+@media (orientation:landscape) and (max-height:620px){
+    #app-wrapper{padding:5px 10px 8px;}
+    .main-menu{grid-template-columns:minmax(0,1fr) minmax(300px,420px);gap:10px;}
+    .menu-rail-left{display:none;}
+    #game-container{width:min(66dvh,58vw);max-height:92dvh;}
+    .menu-panel{min-height:0;max-height:92dvh;padding:14px 16px;}
+    .menu-hero-icon{font-size:26px;}
+    .menu-title{font-size:20px;}
+    .menu-rules{margin:8px 0;}
+}
+
+/* Estado de menú: el canvas funciona como preview visual y no muestra HUD de partida. */
+.main-menu:not(.run-active) #ui-layer,
+.main-menu:not(.run-active) #run-banner,
+.main-menu:not(.run-active) #room-banner,
+.main-menu:not(.run-active) #boss-hud,
+.main-menu:not(.run-active) #danger-indicator,
+.main-menu:not(.run-active) #immersion-vignette{
+    display:none !important;
+}
+
+/* Durante la run, el área de juego queda centrada en el viewport disponible. */
+.main-menu.run-active{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:100%;
+    min-height:0;
+}
+.main-menu.run-active #game-container{flex:0 0 auto;}

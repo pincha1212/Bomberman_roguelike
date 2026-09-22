@@ -3,92 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOMBERMAN // DESCENT — Roguelike v3.4</title>
+    <title>BOMBERMAN // DESCENT — Roguelike v3.5</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
     <div id="app-wrapper">
-        <div id="game-container">
-            <canvas id="gameCanvas" width="600" height="600"></canvas>
-            <div class="rogue-title">DESCENT // PROCEDURAL RUN</div>
-            <div id="run-banner">RUN 01 · DEPTH 01</div>
-            <div id="room-banner">◆ NORMAL · Sin modificadores</div>
-            <div id="immersion-vignette"></div>
-            <div id="room-intro" class="hidden"></div>
-            <div id="danger-indicator" class="hidden">PELIGRO</div>
-            <div id="boss-hud" class="boss-hud hidden"><div class="boss-hud-top"><span>☠ COLOSO</span><span id="boss-phase">FASE 1</span></div><div class="boss-bar-track"><div id="boss-bar" class="boss-bar"></div></div></div>
-            
-            <!-- HUD overlay -->
-            <div id="ui-layer" aria-label="Interfaz de juego">
-                <div class="flex flex-col gap-1.5">
-                    <div class="flex gap-1.5">
-                        <div class="stat-badge text-red-400">❤️ <span id="ui-health">3</span></div>
-                        <div class="stat-badge text-cyan-300 hidden" id="ui-shield-badge">🛡️ <span id="ui-shield">SI</span></div>
-                        <div class="stat-badge text-yellow-300">⭐ <span id="ui-score">0</span></div>
-                        <div class="stat-badge text-amber-300">¢ <span id="ui-coins">0</span></div>
-                    </div>
-                    <div class="flex gap-1.5 flex-wrap"><div class="stat-badge text-purple-300 w-fit">🚩 PROFUNDIDAD <span id="ui-level">1</span></div><div class="stat-badge text-red-300">⏱ <span id="ui-timer">80s</span></div><div class="stat-badge text-rose-300">☠ <span id="ui-threat">0</span></div></div>
+        <main id="main-menu" class="main-menu" aria-label="Menú principal">
+            <aside class="menu-rail menu-rail-left" aria-label="Resumen de la aventura">
+                <div class="menu-rail-top">
+                    <span class="menu-kicker">BOMBERMAN // DESCENT</span>
+                    <span class="menu-version">v3.5</span>
                 </div>
-                
-                <div class="flex flex-col items-end gap-1.5">
-                    <div class="flex gap-1.5">
-                        <div class="stat-badge text-amber-400">💣 <span id="ui-bombs">1</span></div>
-                        <div class="stat-badge text-orange-400">🔥 <span id="ui-range">1</span></div>
-                        <div class="stat-badge text-emerald-400">👟 <span id="ui-speed">3</span></div>
-                        <div class="stat-badge text-purple-300">✦ <span id="ui-relics">0</span></div>
+                <div class="menu-rail-content">
+                    <div class="menu-mark">💣</div>
+                    <h2 class="menu-rail-title pixel-font">DESCENT</h2>
+                    <p class="menu-rail-subtitle">RUN-BASED ROGUELIKE</p>
+                    <p class="menu-rail-copy">Entrá, rompé el mapa, aprovechá cada apertura y sobreviví a la presión de la sala.</p>
+                    <div class="menu-feature-list">
+                        <div class="menu-feature"><span>01</span><strong>MAPA PROCEDURAL</strong><small>Cada run reorganiza el desafío.</small></div>
+                        <div class="menu-feature"><span>02</span><strong>LOOT Y RELIQUIAS</strong><small>Construí una configuración distinta.</small></div>
+                        <div class="menu-feature"><span>03</span><strong>JEFES Y TRAMPAS</strong><small>Las decisiones importan en cada sala.</small></div>
                     </div>
                 </div>
-            </div>
+            </aside>
 
-            <!-- Start Screen -->
-            <div id="start-screen" class="screen">
-                <div class="text-4xl mb-2">💣💥</div>
-                <h1 class="text-xl md:text-2xl mb-1 text-yellow-400 pixel-font tracking-wider">BOMBERMAN</h1>
-                <h2 class="text-xs md:text-sm mb-4 pixel-font text-blue-400">DESCENT // RUN-BASED ROGUELIKE</h2>
-                
-                <div class="text-left mb-4 space-y-2 p-3 bg-slate-900/90 rounded-xl border border-slate-700 text-xs text-slate-300 max-w-xs">
-                    <p>◆ <strong>RUNS:</strong> Cada partida genera una progresión distinta.</p>
-                    <p>✦ <strong>LOOT:</strong> Rompé bloques y conseguí monedas, powerups y reliquias.</p>
-                    <p>☠ <strong>SALAS:</strong> Élite, Tesoro, Maldita y Santuario cambian las reglas.</p>
-                    <p>⚠ <strong>PELIGROS:</strong> Trampas, presión creciente y refuerzos pueden encerrarte.</p>
-                    <p>☠ <strong>JEFES:</strong> Cada 5 profundidades aparece un guardián con fases, proyectiles y refuerzos.</p>
-                    <p>↻ <strong>RECOMPENSAS:</strong> Elegí 1 mejora o hacé reroll por monedas.</p>
+            <section id="game-container" aria-label="Área de juego">
+                <canvas id="gameCanvas" width="600" height="600"></canvas>
+                <div class="rogue-title">DESCENT // PROCEDURAL RUN</div>
+                <div id="run-banner">RUN 01 · DEPTH 01</div>
+                <div id="room-banner">◆ NORMAL · Sin modificadores</div>
+                <div id="immersion-vignette"></div>
+                <div id="room-intro" class="hidden"></div>
+                <div id="danger-indicator" class="hidden">PELIGRO</div>
+                <div id="boss-hud" class="boss-hud hidden"><div class="boss-hud-top"><span>☠ COLOSO</span><span id="boss-phase">FASE 1</span></div><div class="boss-bar-track"><div id="boss-bar" class="boss-bar"></div></div></div>
+
+                <!-- HUD overlay -->
+                <div id="ui-layer" aria-label="Interfaz de juego">
+                    <div class="flex flex-col gap-1.5">
+                        <div class="flex gap-1.5">
+                            <div class="stat-badge text-red-400">❤️ <span id="ui-health">3</span></div>
+                            <div class="stat-badge text-cyan-300 hidden" id="ui-shield-badge">🛡️ <span id="ui-shield">SI</span></div>
+                            <div class="stat-badge text-yellow-300">⭐ <span id="ui-score">0</span></div>
+                            <div class="stat-badge text-amber-300">¢ <span id="ui-coins">0</span></div>
+                        </div>
+                        <div class="flex gap-1.5 flex-wrap"><div class="stat-badge text-purple-300 w-fit">🚩 PROFUNDIDAD <span id="ui-level">1</span></div><div class="stat-badge text-red-300">⏱ <span id="ui-timer">80s</span></div><div class="stat-badge text-rose-300">☠ <span id="ui-threat">0</span></div></div>
+                    </div>
+
+                    <div class="flex flex-col items-end gap-1.5">
+                        <div class="flex gap-1.5">
+                            <div class="stat-badge text-amber-400">💣 <span id="ui-bombs">1</span></div>
+                            <div class="stat-badge text-orange-400">🔥 <span id="ui-range">1</span></div>
+                            <div class="stat-badge text-emerald-400">👟 <span id="ui-speed">3</span></div>
+                            <div class="stat-badge text-purple-300">✦ <span id="ui-relics">0</span></div>
+                        </div>
+                    </div>
                 </div>
-                <button id="btn-start" class="btn-pixel">INICIAR RUN</button>
-            </div>
 
-            <!-- Game Over Screen -->
-            <div id="game-over-screen" class="screen hidden">
-                <div class="text-4xl mb-2">💀</div>
-                <h1 class="text-2xl mb-2 text-red-500 pixel-font">GAME OVER</h1>
-                <p class="text-xs text-slate-300 mb-1">Profundidad alcanzada: <span id="go-level" class="text-yellow-400 font-bold">1</span></p>
-                <p class="text-xs text-slate-300 mb-1">Puntaje total: <span id="go-score" class="text-cyan-400 font-bold">0</span></p>
-                <p class="text-xs text-slate-300 mb-1">Monedas: <span id="go-coins" class="text-amber-300 font-bold">0</span> · Reliquias: <span id="go-relics" class="text-purple-300 font-bold">0</span></p>
-                <p class="text-xs text-slate-400 mb-5">Mejor profundidad: <span id="go-best" class="text-yellow-300 font-bold">0</span></p>
-                <button id="btn-restart" class="btn-pixel">REINTENTAR</button>
-            </div>
-            
-            <!-- Reward screen -->
-            <div id="level-complete-screen" class="screen hidden">
-                <div class="reward-kicker">RECOMPENSA DE RUN</div>
-                <h1 id="reward-title" class="text-lg mb-1 text-yellow-300 pixel-font">PROFUNDIDAD 01 SUPERADA</h1>
-                <p id="reward-meta" class="text-xs text-slate-300 mb-4">+10 monedas · elegí 1 mejora para la próxima sala</p>
-                <div id="relic-strip" class="relic-strip"></div>
-                <div id="upgrade-options" class="reward-grid"></div>
-                <div id="reward-footer" class="reward-footer"></div>
-            </div>
+                <!-- Game Over Screen -->
+                <div id="game-over-screen" class="screen hidden">
+                    <div class="text-4xl mb-2">💀</div>
+                    <h1 class="text-2xl mb-2 text-red-500 pixel-font">GAME OVER</h1>
+                    <p class="text-xs text-slate-300 mb-1">Profundidad alcanzada: <span id="go-level" class="text-yellow-400 font-bold">1</span></p>
+                    <p class="text-xs text-slate-300 mb-1">Puntaje total: <span id="go-score" class="text-cyan-400 font-bold">0</span></p>
+                    <p class="text-xs text-slate-300 mb-1">Monedas: <span id="go-coins" class="text-amber-300 font-bold">0</span> · Reliquias: <span id="go-relics" class="text-purple-300 font-bold">0</span></p>
+                    <p class="text-xs text-slate-400 mb-5">Mejor profundidad: <span id="go-best" class="text-yellow-300 font-bold">0</span></p>
+                    <button id="btn-restart" class="btn-pixel">REINTENTAR</button>
+                </div>
 
-            <!-- Pause -->
-            <div id="pause-screen" class="screen hidden">
-                <div class="reward-kicker">RUN PAUSADA</div>
-                <h1 class="text-xl mb-3 text-cyan-300 pixel-font">PAUSA</h1>
-                <button id="btn-resume" class="btn-pixel">CONTINUAR</button>
-            </div>
-        </div>
-        
-        <!-- Mobile Joystick & Bomb controls -->
+                <!-- Reward screen -->
+                <div id="level-complete-screen" class="screen hidden">
+                    <div class="reward-kicker">RECOMPENSA DE RUN</div>
+                    <h1 id="reward-title" class="text-lg mb-1 text-yellow-300 pixel-font">PROFUNDIDAD 01 SUPERADA</h1>
+                    <p id="reward-meta" class="text-xs text-slate-300 mb-4">+10 monedas · elegí 1 mejora para la próxima sala</p>
+                    <div id="relic-strip" class="relic-strip"></div>
+                    <div id="upgrade-options" class="reward-grid"></div>
+                    <div id="reward-footer" class="reward-footer"></div>
+                </div>
+
+                <!-- Pause -->
+                <div id="pause-screen" class="screen hidden">
+                    <div class="reward-kicker">RUN PAUSADA</div>
+                    <h1 class="text-xl mb-3 text-cyan-300 pixel-font">PAUSA</h1>
+                    <button id="btn-resume" class="btn-pixel">CONTINUAR</button>
+                </div>
+            </section>
+
+            <aside id="start-screen" class="menu-panel" aria-label="Iniciar partida">
+                <div class="menu-panel-glow"></div>
+                <div class="menu-panel-head">
+                    <span class="menu-kicker">NUEVA PARTIDA</span>
+                    <span class="menu-status-dot"><span></span> READY</span>
+                </div>
+                <div class="menu-hero-icon">💣💥</div>
+                <h1 class="menu-title pixel-font">BOMBERMAN</h1>
+                <h2 class="menu-subtitle pixel-font">DESCENT // RUN-BASED</h2>
+                <div class="menu-rules">
+                    <div><b>RUNS</b><span>Cada partida genera una progresión distinta.</span></div>
+                    <div><b>LOOT</b><span>Monedas, powerups y reliquias para construir tu run.</span></div>
+                    <div><b>RIESGO</b><span>Trampas, presión, refuerzos y jefes te obligan a moverte.</span></div>
+                </div>
+                <div class="menu-actions">
+                    <button id="btn-start" class="btn-pixel menu-start-button">INICIAR RUN</button>
+                    <div class="menu-hint"><span>TECLADO</span><strong>WASD / ↑↓←→</strong><span>· BOMBA</span><strong>ESPACIO</strong></div>
+                </div>
+                <div class="menu-footer"><span>PROCEDURAL COMBAT</span><span>•</span><span>ADAPTIVE MOTION</span><span>•</span><span>DEEPER EVERY RUN</span></div>
+            </aside>
+        </main>
+
+    <!-- Mobile Joystick & Bomb controls -->
         <div id="mobile-controls">
             <div id="joystick-zone">
                 <div id="joystick-knob"></div>
@@ -97,7 +121,7 @@
         </div>
     </div>
 
-    <!-- v3.4 modular JavaScript: keep this order. Each file owns one gameplay area. -->
+    <!-- v3.5 modular JavaScript: keep this order. Each file owns one gameplay area. -->
     <script src="js/01-core.js"></script>
     <script src="js/02-input.js"></script>
     <script src="js/03-world.js"></script>

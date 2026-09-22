@@ -107,3 +107,13 @@ La versión v3.4 mantiene el gameplay de Assisted Motion y ahora divide el JavaS
 - `js/08-loop-ui.js` — game loop, HUD, recompensas, flujo de run y arranque.
 
 Los scripts se cargan en ese orden desde `index.html`. No se usa bundler ni Node: sigue siendo un proyecto estático listo para GitHub Pages. La división es estructural y no pretende cambiar la jugabilidad de v3.4.
+
+
+## V3.5 — Interface Update
+- Menú principal rediseñado para aprovechar el espacio exterior al canvas en escritorio.
+- Layout responsive en tres columnas, dos columnas o una columna según el dispositivo.
+- Canvas escalable con límites distintos para escritorio, tablet, móvil y landscape.
+- Panel de inicio separado del área de juego para que el HUD de partida no comparta espacio con el menú.
+- Durante la run, el canvas recupera el foco visual y el menú exterior desaparece.
+- Controles táctiles reservados para dispositivos coarse-touch o pantallas pequeñas y fijados al borde inferior en móvil.
+- Conserva la estructura modular de v3.4 y no modifica la lógica de combate/movimiento.

@@ -23,9 +23,6 @@
             gameState.roomTime = Math.max(35000, 80000 - gameState.level * 1500);
             gameState.threatLevel = 0;
             gameState.nextReinforcement = gameState.roomTime - 18000;
-            // V3.11.1: give player input priority immediately after entering a room.
-            // Enemy pathfinding starts after a short warmup instead of on the first frames.
-            gameState.enemyAIWarmup = 650;
 
             // Spawn player top-left corner
             player.x = TILE_SIZE + (TILE_SIZE - player.width)/2;
@@ -145,7 +142,6 @@
             b.flash = 180;
             gameState.score += 75;
             sfx('bossHit');
-            if (typeof feedbackBossHit === 'function') feedbackBossHit(b.x, b.y);
             triggerScreenShake(3, 100);
             addFloatingText(`-${amount}`, b.x, b.y - b.height / 2, '#fb7185');
             if (b.hp <= 0) defeatBoss();
@@ -160,7 +156,6 @@
             gameState.coins += 30;
             gameState.score += 1500;
             addParticles(b.x, b.y, '#f43f5e', 55);
-            if (typeof feedbackBossDefeat === 'function') feedbackBossDefeat(b.x, b.y);
             addFloatingText('☠ JEFE DERROTADO', b.x, b.y - 50, '#facc15');
             addFloatingText('+30¢  +1500', b.x, b.y + 20, '#fbbf24');
             sfx('boom');

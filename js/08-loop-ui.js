@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.10 — Game loop, HUD, run flow, rewards, game over and bootstrap
+// Bomberman Roguelike v3.6 — Game loop, HUD, run flow, rewards, game over and bootstrap
         function gameLoop(timestamp) {
             let dt = timestamp - gameState.lastTime;
             gameState.lastTime = timestamp;
@@ -36,7 +36,7 @@
             UI['ui-health'].innerText = player.health;
             UI['ui-score'].innerText = gameState.score;
             UI['ui-level'].innerText = gameState.level;
-            UI['ui-bombs'].innerText = `${Math.max(0, player.maxBombs - player.bombsPlaced)}/${player.maxBombs}`;
+            UI['ui-bombs'].innerText = player.maxBombs;
             UI['ui-range'].innerText = player.bombRange;
             UI['ui-speed'].innerText = (player.speed - 2).toFixed(1);
             UI['ui-coins'].innerText = gameState.coins;
@@ -91,12 +91,9 @@
             gameState.threatLevel = 0;
             gameState.nextReinforcement = 20000;
             gameState.paused = false;
-            if (typeof resetCombatFeedback === 'function') resetCombatFeedback();
             player.health = 3;
             player.maxHealth = 5;
             player.maxBombs = 1;
-            player.bombsPlaced = 0;
-            player.bombCooldown = 0;
             player.bombRange = 1;
             player.speed = 3.0;
             player.hasShield = false;
@@ -139,10 +136,8 @@
             player.isInvincible = false;
             player.invincibleTimer = 0;
             initLevel();
-            player.bombCooldown = 0;
             gameState.isPlaying = true;
             gameState.paused = false;
-            if (typeof resetCombatFeedback === 'function') resetCombatFeedback();
             gameState.lastTime = performance.now();
             requestAnimationFrame(gameLoop);
         }

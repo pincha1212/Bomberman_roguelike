@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.11 — Canvas rendering, sprites and combat feedback
+// Bomberman Roguelike v3.6 — Canvas rendering and sprite drawing
         function draw() {
             ctx.fillStyle = '#090d16';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -91,7 +91,6 @@
 
             ctx.restore();
 
-            if (typeof drawCombatFeedbackOverlay === 'function') drawCombatFeedbackOverlay();
             drawAmbientDust();
             drawLighting();
         }
@@ -258,14 +257,6 @@
 
         function drawEnemySprite(e) {
             ctx.save();
-            if (e.aiMode === 'flee') {
-                const warningPulse = 0.32 + Math.sin(gameState.animFrame * 0.22) * 0.12;
-                ctx.strokeStyle = `rgba(34,211,238,${warningPulse})`;
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(e.x, e.y, TILE_SIZE * 0.50, 0, Math.PI * 2);
-                ctx.stroke();
-            }
             if (e.elite) {
                 ctx.strokeStyle = gameState.roomType.color;
                 ctx.globalAlpha = 0.45 + Math.sin(gameState.animFrame * 0.15) * 0.1;
@@ -331,24 +322,10 @@
         }
 
         function drawBombSprite(cx, cy, b) {
-            const total = Math.max(1, b.fuseTotal || (gameState.roomType.id === 'CURSED' ? 1600 : 2000));
-            const urgency = 1 - Math.max(0, Math.min(1, b.timer / total));
-            const pulseSpeed = urgency > 0.55 ? 0.34 : 0.20;
-            let scale = 1.0 + Math.sin(gameState.animFrame * pulseSpeed) * (0.08 + urgency * 0.04);
+            let scale = 1.0 + Math.sin(gameState.animFrame * 0.2) * 0.08;
             ctx.save();
             ctx.translate(cx, cy);
             ctx.scale(scale, scale);
-
-            // V3.9: lectura inmediata de la mecha y tiempo restante.
-            if (urgency > 0.48) {
-                ctx.strokeStyle = urgency > 0.78 ? '#ef4444' : '#facc15';
-                ctx.lineWidth = urgency > 0.78 ? 3 : 2;
-                ctx.globalAlpha = 0.35 + urgency * 0.55;
-                ctx.beginPath();
-                ctx.arc(0, 0, TILE_SIZE * (0.44 + urgency * 0.05), -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * urgency);
-                ctx.stroke();
-                ctx.globalAlpha = 1;
-            }
 
             // Sombra bomba
             ctx.fillStyle = 'rgba(0,0,0,0.5)';
@@ -370,17 +347,11 @@
             ctx.fillStyle = '#64748b';
             ctx.fillRect(-4, -TILE_SIZE*0.38, 8, 6);
 
-            let sparkColor = urgency > 0.78 ? (gameState.animFrame % 2 ? '#ffffff' : '#ef4444') : (gameState.animFrame % 4 < 2 ? '#facc15' : '#ef4444');
+            let sparkColor = gameState.animFrame % 4 < 2 ? '#facc15' : '#ef4444';
             ctx.fillStyle = sparkColor;
             ctx.beginPath();
-            ctx.arc(0, -TILE_SIZE*0.45, 5 + urgency * 2, 0, Math.PI*2);
+            ctx.arc(0, -TILE_SIZE*0.45, 5, 0, Math.PI*2);
             ctx.fill();
-
-            // Barra mínima de mecha: permite leer el estado de la bomba sin texto.
-            ctx.fillStyle = 'rgba(15,23,42,.9)';
-            ctx.fillRect(-TILE_SIZE * 0.30, TILE_SIZE * 0.36, TILE_SIZE * 0.60, 3);
-            ctx.fillStyle = urgency > 0.78 ? '#ef4444' : '#facc15';
-            ctx.fillRect(-TILE_SIZE * 0.30, TILE_SIZE * 0.36, TILE_SIZE * 0.60 * Math.max(0, 1 - urgency), 3);
 
             ctx.restore();
         }

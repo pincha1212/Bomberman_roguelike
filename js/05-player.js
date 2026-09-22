@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.4 — Cardinal assisted player movement and collision helpers
+// Bomberman Roguelike v3.6 — Cardinal assisted player movement and collision helpers
         // V3.2.4 — MOVEMENT UPDATE
         // Movimiento continuo cardinal asistido. La cuadrícula SOLO define las paredes.
         // El personaje usa una hurtbox de movimiento más pequeña que el sprite,

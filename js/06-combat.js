@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.4 — Bombs, explosions, damage, enemies update and gameplay simulation
+// Bomberman Roguelike v3.6 — Bombs, explosions, damage, enemies update and gameplay simulation
         function placeBomb() {
             if (player.bombsPlaced >= player.maxBombs) return;
             let gx = Math.floor((player.x + player.width/2) / TILE_SIZE);
@@ -80,6 +80,11 @@
             if (!gameState.isPlaying || gameState.paused) return;
             gameState.animFrame++;
             renderImmersion();
+
+            // V3.6: la inmunidad tras recibir daño es temporal.
+            // El contador se descuenta cada frame y se desactiva al llegar a cero.
+            updatePlayerInvulnerability(dt);
+
             updateRoomThreat(dt);
             updateHazards(dt);
             updateBoss(dt);
@@ -249,7 +254,20 @@
             return !(r2.left > r1.right || r2.right < r1.left || r2.top > r1.bottom || r2.bottom < r1.top);
         }
 
+        function updatePlayerInvulnerability(dt) {
+            if (!player.isInvincible) return;
+
+            player.invincibleTimer = Math.max(0, player.invincibleTimer - dt);
+            if (player.invincibleTimer <= 0) {
+                player.invincibleTimer = 0;
+                player.isInvincible = false;
+            }
+        }
+
         function takeDamage() {
+            // El bloqueo de daño se valida también aquí para evitar impactos
+            // duplicados si dos fuentes coinciden en el mismo frame.
+            if (player.isInvincible) return;
             sfx('hurt');
             if (player.hasShield) {
                 player.hasShield = false;

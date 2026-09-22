@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.4 — Canvas rendering and sprite drawing
+// Bomberman Roguelike v3.6 — Canvas rendering and sprite drawing
         function draw() {
             ctx.fillStyle = '#090d16';
             ctx.fillRect(0, 0, canvas.width, canvas.height);

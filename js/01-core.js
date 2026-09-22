@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.4 — Core, configuration, state, audio, performance and adaptive interface
+// Bomberman Roguelike v3.6 — Core, configuration, state, audio, performance and adaptive interface
 // V2.0 IMMERSIVE SYSTEMS
 let audioCtx = null;
 const ambient = { dustTimer: 0, lastFoot: 0, introTimer: 0 };

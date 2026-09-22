@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.4 — Keyboard, joystick, bomb button and pause input
+// Bomberman Roguelike v3.6 — Keyboard, joystick, bomb button and pause input
 
         function togglePause() {
             if (!gameState.isPlaying) return;

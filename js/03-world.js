@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.4 — Level generation, boss, threats, traps and reinforcement systems
+// Bomberman Roguelike v3.6 — Level generation, boss, threats, traps and reinforcement systems
         function initLevel() {
             // Expand map grid size with higher levels
             gameState.roomType = getRoomForDepth(gameState.level);

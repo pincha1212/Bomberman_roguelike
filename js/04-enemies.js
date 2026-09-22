@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.4 — Enemy spawning and enemy setup
+// Bomberman Roguelike v3.6 — Enemy spawning and enemy setup
         function spawnEnemies() {
             const baseCount = Math.min(3 + Math.floor(gameState.level * 1.5), 12);
             const count = Math.max(1, Math.round(baseCount * gameState.roomType.enemyMult));

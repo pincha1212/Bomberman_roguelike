@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.6 — Core, configuration, state, audio, performance and adaptive interface
+// Bomberman Roguelike v3.10 — Core, configuration, state, audio, performance and adaptive interface
 // V2.0 IMMERSIVE SYSTEMS
 let audioCtx = null;
 const ambient = { dustTimer: 0, lastFoot: 0, introTimer: 0 };
@@ -317,6 +317,7 @@ const UI = {};
             speed: 3.0,
             maxBombs: 1,
             bombsPlaced: 0,
+            bombCooldown: 0,
             bombRange: 1,
             health: 3,
             maxHealth: 5,
@@ -339,8 +340,11 @@ const UI = {};
             gameState.keys[e.code] = true;
             if (['ArrowUp','ArrowDown','KeyW','KeyS'].includes(e.code)) gameState.lastMoveAxis = 'vertical';
             if (['ArrowLeft','ArrowRight','KeyA','KeyD'].includes(e.code)) gameState.lastMoveAxis = 'horizontal';
-            if((e.code === 'Space' || e.code === 'KeyZ') && gameState.isPlaying) {
-                placeBomb();
+            if (e.code === 'Space' || e.code === 'KeyZ') {
+                e.preventDefault();
+                // Sin auto-repeat: una pulsación = una solicitud de bomba.
+                // El cooldown del sistema evita dobles activaciones accidentales.
+                if (!e.repeat && typeof requestBombPlacement === 'function') requestBombPlacement();
             }
         });
         window.addEventListener('keyup', (e) => gameState.keys[e.code] = false);

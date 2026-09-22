@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.6 — Keyboard, joystick, bomb button and pause input
+// Bomberman Roguelike v3.10 — Keyboard, joystick, bomb button and pause input
 
         function togglePause() {
             if (!gameState.isPlaying) return;
@@ -85,10 +85,10 @@
             if(!bombBtn) return;
             const triggerBomb = (e) => {
                 e.preventDefault();
-                if(gameState.isPlaying) placeBomb();
+                requestBombPlacement();
             };
-            bombBtn.addEventListener('touchstart', triggerBomb, {passive: false});
-            bombBtn.addEventListener('mousedown', triggerBomb);
+            bombBtn.addEventListener('pointerdown', triggerBomb, {passive: false});
+            bombBtn.addEventListener('contextmenu', (e) => e.preventDefault());
         };
         setupBombButton();
 

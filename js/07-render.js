@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.9 — Canvas rendering, sprites and combat feedback
+// Bomberman Roguelike v3.10 — Canvas rendering, sprites and combat feedback
         function draw() {
             ctx.fillStyle = '#090d16';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -340,6 +340,25 @@
                 ctx.arc(0, 0, TILE_SIZE * (0.44 + urgency * 0.05), -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * urgency);
                 ctx.stroke();
                 ctx.globalAlpha = 1;
+            }
+
+            // Estado de salida: mientras la bomba comparte casilla con el jugador,
+            // un aro cian tenue comunica que todavía puede atravesarla para salir.
+            if (b.playerPassThrough) {
+                ctx.strokeStyle = 'rgba(34,211,238,.68)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.arc(0, 0, TILE_SIZE * .43, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            } else if (b.justArmed) {
+                ctx.strokeStyle = 'rgba(250,204,21,.55)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, TILE_SIZE * .40, 0, Math.PI * 2);
+                ctx.stroke();
+                b.justArmed = false;
             }
 
             // Sombra bomba

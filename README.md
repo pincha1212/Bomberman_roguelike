@@ -91,3 +91,19 @@ Revisión profunda del control del jugador para reducir la sensación de movimie
 - Si un frente está bloqueado, el eje activo se detiene sin empujar ni generar desplazamiento diagonal.
 - Teclado y joystick pasan por el mismo selector cardinal.
 - Sin minimapa.
+
+
+## v3.4 — Estructura modular
+
+La versión v3.4 mantiene el gameplay de Assisted Motion y ahora divide el JavaScript en archivos por responsabilidad para facilitar auditorías y correcciones puntuales:
+
+- `js/01-core.js` — configuración, estado, audio, rendimiento y UI adaptativa.
+- `js/02-input.js` — teclado, joystick, botón de bomba y pausa.
+- `js/03-world.js` — generación de salas, jefe, amenazas, trampas y refuerzos.
+- `js/04-enemies.js` — creación/configuración de enemigos.
+- `js/05-player.js` — movimiento cardinal asistido y colisiones del jugador.
+- `js/06-combat.js` — bombas, explosiones, daño y actualización de combate.
+- `js/07-render.js` — renderizado del mapa, sprites y efectos.
+- `js/08-loop-ui.js` — game loop, HUD, recompensas, flujo de run y arranque.
+
+Los scripts se cargan en ese orden desde `index.html`. No se usa bundler ni Node: sigue siendo un proyecto estático listo para GitHub Pages. La división es estructural y no pretende cambiar la jugabilidad de v3.4.

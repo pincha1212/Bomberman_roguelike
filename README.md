@@ -149,3 +149,18 @@ Los scripts se cargan en ese orden desde `index.html`. No se usa bundler ni Node
 - El jugador vuelve a disponer de su cupo completo de bombas al comenzar una nueva run.
 - La misma corrección también evita conservar un contador de bombas usado al pasar a otra profundidad.
 - No se modifica el movimiento, daño, trampas, cámara, bosses ni la interfaz.
+
+
+## v3.9 — Combat & Feedback Update
+
+Pulido del combate y de la lectura visual de las acciones.
+
+- Feedback de impacto al recibir daño, romper escudo, derrotar enemigos y golpear al boss.
+- Micro hit-stop temporal para dar peso a los impactos sin alterar valores de daño.
+- Anillos de impacto y flashes de pantalla de baja intensidad.
+- Bombas con lectura visual de mecha: pulso de urgencia y barra de tiempo restante.
+- Avisos sonoros/visuales durante los últimos 900 ms de una bomba.
+- Feedback inmediato al colocar una bomba y al detonarse.
+- Feedback especial al derrotar al boss.
+- El feedback se reinicia correctamente al empezar una nueva run/profundidad.
+- Sin cambios intencionales en movimiento, daño base, IA, trampas, cámara o economía.

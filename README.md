@@ -181,3 +181,14 @@ Actualización centrada en el comportamiento y navegación de enemigos.
 - Movimiento de enemigos estrictamente cardinal, sin desplazamiento diagonal.
 - Se conserva la colisión de daño del jugador y el resto del sistema de combate.
 - Los enemigos que están huyendo muestran un indicador visual sutil.
+
+
+## v3.11.1 — Enemy AI Startup Freeze Fix
+- Enemy pathfinding no longer competes with the first frames of player input after entering a room.
+- 650 ms AI warmup per room.
+- Maximum of one path rebuild per frame.
+- Deterministic neighbor ordering instead of random comparator tie-breaking.
+- Direct cardinal paths are used before BFS when possible.
+- Bomb-escape replanning is rate-limited.
+- Enemy AI errors are isolated so an exception cannot kill the main game loop.
+- Player movement remains responsive and cardinal.

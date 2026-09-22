@@ -164,19 +164,20 @@ Pulido del combate y de la lectura visual de las acciones.
 - Feedback especial al derrotar al boss.
 - El feedback se reinicia correctamente al empezar una nueva run/profundidad.
 - Sin cambios intencionales en movimiento, daño base, IA, trampas, cámara o economía.
+\n\n## v3.10 — Bomb Handling Update\n\nActualización centrada en la colocación y gestión de bombas sin cambiar las reglas básicas del combate.\n\n- Una pulsación de Espacio/Z coloca como máximo una bomba: el auto-repeat del teclado queda ignorado.\n- Una pulsación táctil coloca una sola bomba y el evento de mouse sintético de navegadores móviles queda bloqueado durante una ventana de seguridad.\n- Se añade un pequeño cooldown de acción para evitar doble colocación por ráfagas de eventos.\n- `placeBomb()` ahora devuelve éxito/fracaso, sincroniza inmediatamente el HUD y registra el momento de colocación.\n- Las bombas tienen un guard de detonación para impedir una doble explosión accidental durante reacciones en cadena.\n- Se añade `js/11-bomb-handling.js` para centralizar la entrada de bomba y facilitar futuras auditorías.\n- Movimiento, daño, trampas, cámara, bosses, economía y feedback de v3.9 se mantienen.\n
 
+## v3.11 — Enemy AI Update
 
-## v3.10 — Bomb Handling Update
+Actualización centrada en el comportamiento y navegación de enemigos.
 
-Pulido del sistema central de bombas para que la colocación y las reacciones sean más predecibles y fáciles de leer.
-
-- Colocación de bomba con cooldown de seguridad para evitar dobles activaciones accidentales.
-- Teclado sin auto-repeat de bomba al mantener Espacio/Z.
-- Botón móvil unificado mediante Pointer Events para evitar dobles disparos táctiles.
-- Una bomba recién colocada puede ser atravesada para salir de su casilla; al abandonarla queda bloqueada.
-- Las bombas muestran visualmente cuándo todavía está disponible la salida de la casilla y cuándo quedaron armadas.
-- Temporizadores y advertencias de mecha aislados en `js/11-bombs.js`.
-- Reacción en cadena procesada con cola, evitando recursión y detonaciones duplicadas.
-- HUD de bombas muestra `disponibles/máximo` para saber inmediatamente cuántas bombas quedan para colocar.
-- Reset del contador y cooldown de bombas al iniciar una run o una nueva profundidad.
-- Se conserva el movimiento cardinal asistido, daño temporal, trampas de un solo uso, cámara de seguimiento, bosses y feedback de v3.9.
+- Se añade `js/12-enemy-ai.js` como módulo independiente de IA.
+- Rastreros: patrulla y persecución por rutas cardinales cuando el jugador entra en su radio de amenaza.
+- Voladores: persecución a mayor distancia y navegación que ignora bloques destructibles, manteniendo las paredes como límite.
+- Especiales: persecución más frecuente y pequeña predicción de la trayectoria actual del jugador.
+- Todos los enemigos detectan explosiones activas y bombas próximas; priorizan rutas de escape.
+- Las rutas usan búsqueda por celdas con límite de nodos para evitar costes excesivos en equipos modestos.
+- Se evita atravesar bombas como obstáculos una vez que el enemigo abandona una celda.
+- Se incorpora recuperación automática cuando un enemigo queda atascado.
+- Movimiento de enemigos estrictamente cardinal, sin desplazamiento diagonal.
+- Se conserva la colisión de daño del jugador y el resto del sistema de combate.
+- Los enemigos que están huyendo muestran un indicador visual sutil.

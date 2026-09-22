@@ -49,3 +49,21 @@ Abrí `index.html` directamente o publicá la carpeta en GitHub Pages.
 - Ajustes específicos para pantallas pequeñas y controles táctiles.
 - El minimapa mantiene su esquina y activa un estado de evitación cuando el jugador se aproxima.
 - No cambia la lógica de combate, movimiento libre, bosses, amenazas, recompensas ni rendimiento de v3.2.2.
+
+
+## v3.2.4 — Movement Update
+- Collision box de movimiento reducida para evitar enganches en esquinas.
+- Padding de seguridad frente a paredes.
+- Colisión por solapamiento real: tocar exactamente el borde de una celda no bloquea el movimiento.
+- Movimiento diagonal habilitado y normalizado para mantener la misma velocidad efectiva.
+- Deslizamiento independiente por ejes para recorrer paredes y salir de esquinas con mayor suavidad.
+- Substeps de 2.25 px para reducir wall-clipping a velocidades altas.
+- Se mantiene el movimiento libre de v2.1 y la interfaz adaptativa de v3.2.3.
+
+
+## v3.2.5 — Movement Update
+- Movimiento exclusivamente cardinal: arriba, abajo, izquierda y derecha.
+- Diagonales deshabilitadas tanto en teclado como en joystick.
+- Cuando se pulsan dos ejes simultáneamente, se conserva un solo eje de movimiento.
+- Se mantiene la colisión rectangular, hitbox reducida, padding y wall sliding de v3.2.4.
+- El personaje no puede desplazarse en diagonal para cortar esquinas.

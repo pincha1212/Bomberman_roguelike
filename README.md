@@ -129,3 +129,14 @@ Los scripts se cargan en ese orden desde `index.html`. No se usa bundler ni Node
 - `takeDamage()` también bloquea impactos duplicados durante el mismo periodo de invulnerabilidad.
 - La inmunidad se reinicia al comenzar una nueva run y al cambiar de profundidad.
 - Se mantienen la interfaz adaptativa de v3.5, el movimiento asistido y la estructura modular del proyecto.
+
+
+## v3.7 — Player Follow Camera Update
+
+- La cámara ahora sigue al personaje al desplazarse por mapas mayores que el canvas.
+- Seguimiento vertical y horizontal con zona de seguridad para evitar micro-sacudidas.
+- Desplazamiento suave e independiente del FPS.
+- Límites de cámara ajustados al tamaño real de cada mapa: nunca muestra fuera del escenario.
+- La cámara se reinicia correctamente al comenzar una nueva profundidad.
+- Se añade `js/09-camera.js` como módulo independiente para facilitar futuras auditorías.
+- No modifica el movimiento cardinal asistido ni las colisiones.

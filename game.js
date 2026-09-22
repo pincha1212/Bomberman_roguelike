@@ -295,6 +295,7 @@ const UI = {};
             lastTime: 0,
             keys: {},
             touchControls: { x: 0, y: 0 },
+            lastMoveAxis: 'vertical',
             camera: { x: 0, y: 0, targetX: 0, targetY: 0 },
             shakeTimer: 0,
             shakeIntensity: 0,
@@ -327,11 +328,14 @@ const UI = {};
             invincibleTimer: 0,
             dir: 'down',
             isMoving: false,
-            walkCycle: 0
+            walkCycle: 0,
+            _frameScale: 1
         };
 
         window.addEventListener('keydown', (e) => {
             gameState.keys[e.code] = true;
+            if (['ArrowUp','ArrowDown','KeyW','KeyS'].includes(e.code)) gameState.lastMoveAxis = 'vertical';
+            if (['ArrowLeft','ArrowRight','KeyA','KeyD'].includes(e.code)) gameState.lastMoveAxis = 'horizontal';
             if((e.code === 'Space' || e.code === 'KeyZ') && gameState.isPlaying) {
                 placeBomb();
             }
@@ -878,23 +882,51 @@ const UI = {};
             return tile === TYPES.WALL || tile === TYPES.BLOCK;
         }
 
-        // V2.1 — Movimiento libre: el personaje NO se alinea ni se "imanta" a una cuadrícula invisible.
-        // La cuadrícula solo define colisiones. El desplazamiento dentro de cada pasillo es continuo.
-        function rectCollidesSolid(x, y, width, height) {
-            const inset = 5;
-            const left = x + inset;
-            const right = x + width - inset;
-            const top = y + inset;
-            const bottom = y + height - inset;
+        // V3.2.4 — MOVEMENT UPDATE
+        // Movimiento continuo y diagonal. La cuadrícula SOLO define las paredes.
+        // El personaje usa una hurtbox de movimiento más pequeña que el sprite,
+        // con un pequeño "skin" de seguridad para evitar enganches en esquinas.
+        const MOVEMENT_COLLISION_INSET = 5;
+        const MOVEMENT_WALL_PADDING = 1.5;
+        const MOVEMENT_EPSILON = 0.001;
 
-            const minGX = Math.floor(left / TILE_SIZE);
-            const maxGX = Math.floor(right / TILE_SIZE);
-            const minGY = Math.floor(top / TILE_SIZE);
-            const maxGY = Math.floor(bottom / TILE_SIZE);
+        function getMovementHitbox(x, y, width, height) {
+            const inset = MOVEMENT_COLLISION_INSET;
+            const pad = MOVEMENT_WALL_PADDING;
+            return {
+                left: x + inset + pad,
+                right: x + width - inset - pad,
+                top: y + inset + pad,
+                bottom: y + height - inset - pad
+            };
+        }
+
+        function rectCollidesSolid(x, y, width, height) {
+            const box = getMovementHitbox(x, y, width, height);
+            if (box.right <= box.left || box.bottom <= box.top) return false;
+
+            const minGX = Math.max(0, Math.floor(box.left / TILE_SIZE));
+            const maxGX = Math.min(gameState.gridWidth - 1, Math.floor((box.right - MOVEMENT_EPSILON) / TILE_SIZE));
+            const minGY = Math.max(0, Math.floor(box.top / TILE_SIZE));
+            const maxGY = Math.min(gameState.gridHeight - 1, Math.floor((box.bottom - MOVEMENT_EPSILON) / TILE_SIZE));
 
             for (let gy = minGY; gy <= maxGY; gy++) {
                 for (let gx = minGX; gx <= maxGX; gx++) {
-                    if (isSolid(gx, gy)) return true;
+                    if (!isSolid(gx, gy)) continue;
+
+                    const wallLeft = gx * TILE_SIZE;
+                    const wallRight = wallLeft + TILE_SIZE;
+                    const wallTop = gy * TILE_SIZE;
+                    const wallBottom = wallTop + TILE_SIZE;
+
+                    // Solamente hay colisión si las áreas se superponen de verdad.
+                    // Tocar exactamente el borde de una celda no genera un "enganche".
+                    if (box.right > wallLeft + MOVEMENT_EPSILON &&
+                        box.left < wallRight - MOVEMENT_EPSILON &&
+                        box.bottom > wallTop + MOVEMENT_EPSILON &&
+                        box.top < wallBottom - MOVEMENT_EPSILON) {
+                        return true;
+                    }
                 }
             }
             return false;
@@ -902,14 +934,20 @@ const UI = {};
 
         function moveAxisWithCollision(axis, amount) {
             if (!amount) return false;
-            const steps = Math.max(1, Math.ceil(Math.abs(amount) / 3));
+
+            // Substeps pequeños: evitan atravesar paredes a velocidades altas y
+            // hacen que el deslizamiento por paredes sea más estable.
+            const maxStep = 2.25;
+            const steps = Math.max(1, Math.ceil(Math.abs(amount) / maxStep));
             const step = amount / steps;
             let moved = false;
 
             for (let i = 0; i < steps; i++) {
                 const nextX = axis === 'x' ? player.x + step : player.x;
                 const nextY = axis === 'y' ? player.y + step : player.y;
+
                 if (rectCollidesSolid(nextX, nextY, player.width, player.height)) break;
+
                 player.x = nextX;
                 player.y = nextY;
                 moved = true;
@@ -918,11 +956,25 @@ const UI = {};
         }
 
         function tryMovePlayer(dx, dy) {
-            // Separar ejes permite deslizarse naturalmente por las paredes y doblar en esquinas.
-            // No existe ningún snap al centro de las celdas.
-            const movedX = moveAxisWithCollision('x', dx);
-            const movedY = moveAxisWithCollision('y', dy);
-            player.isMoving = movedX || movedY;
+            // V3.2.5: movimiento estrictamente cardinal. Nunca se aplican X e Y
+            // en el mismo frame, por lo que el jugador no puede desplazarse
+            // diagonalmente ni "cortar" una esquina.
+            if (Math.abs(dx) <= 0.0001 && Math.abs(dy) <= 0.0001) {
+                player.isMoving = false;
+                return;
+            }
+
+            let axis = gameState.lastMoveAxis;
+            if (Math.abs(dx) > Math.abs(dy)) axis = 'horizontal';
+            else if (Math.abs(dy) > Math.abs(dx)) axis = 'vertical';
+
+            if (axis === 'horizontal') {
+                const dir = dx < 0 ? -1 : dx > 0 ? 1 : 0;
+                player.isMoving = dir !== 0 && moveAxisWithCollision('x', dir * player.speed * player._frameScale);
+            } else {
+                const dir = dy < 0 ? -1 : dy > 0 ? 1 : 0;
+                player.isMoving = dir !== 0 && moveAxisWithCollision('y', dir * player.speed * player._frameScale);
+            }
         }
 
         function placeBomb() {
@@ -1026,21 +1078,32 @@ const UI = {};
                 if (gameState.keys['ArrowRight'] || gameState.keys['KeyD']) dx += 1;
             }
 
-            // Restringir a movimiento Ortogonal estricto (Norte, Sur, Este, Oeste)
-            if (Math.abs(dx) > Math.abs(dy)) {
-                dy = 0;
-                dx = Math.sign(dx);
-                player.dir = dx > 0 ? 'right' : 'left';
-            } else if (Math.abs(dy) > 0) {
-                dx = 0;
-                dy = Math.sign(dy);
-                player.dir = dy > 0 ? 'down' : 'up';
-            }
-
-            player.isMoving = false;
+            // V3.2.5: si el teclado/joystick entrega dos ejes a la vez,
+            // solo se conserva un eje. Esto garantiza movimiento N/S/E/O puro.
             if (dx !== 0 || dy !== 0) {
-                const frameScale = Math.min(dt / 16.6667, 2);
-                tryMovePlayer(dx * player.speed * frameScale, dy * player.speed * frameScale);
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    gameState.lastMoveAxis = 'horizontal';
+                    player.dir = dx > 0 ? 'right' : 'left';
+                } else if (Math.abs(dy) > Math.abs(dx)) {
+                    gameState.lastMoveAxis = 'vertical';
+                    player.dir = dy > 0 ? 'down' : 'up';
+                }
+
+                // En empate, se conserva el último eje utilizado.
+                if (gameState.lastMoveAxis === 'horizontal') {
+                    dx = dx < 0 ? -1 : dx > 0 ? 1 : 0;
+                    dy = 0;
+                    player.dir = dx < 0 ? 'left' : dx > 0 ? 'right' : player.dir;
+                } else {
+                    dy = dy < 0 ? -1 : dy > 0 ? 1 : 0;
+                    dx = 0;
+                    player.dir = dy < 0 ? 'up' : dy > 0 ? 'down' : player.dir;
+                }
+
+                player._frameScale = Math.min(dt / 16.6667, 2);
+                tryMovePlayer(dx, dy);
+            } else {
+                player.isMoving = false;
             }
 
             if (player.isMoving) {

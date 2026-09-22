@@ -286,3 +286,101 @@ body { background: radial-gradient(circle at center, #111827 0%, #05070c 70%); }
 /* V3.2 colossal boss presentation */
 .boss-hud{box-shadow:0 0 32px rgba(244,63,94,.30),inset 0 0 18px rgba(124,58,237,.12);}
 @keyframes bossAlertPulse{0%,100%{box-shadow:0 0 22px rgba(244,63,94,.25)}50%{box-shadow:0 0 42px rgba(244,63,94,.55)}}
+
+
+/* V3.2.3 — ADAPTIVE INTERFACE UPDATE
+   El HUD se desplaza hacia zonas libres del viewport y evita el centro de acción. */
+#ui-layer{
+    top:0;
+    bottom:0;
+    height:100%;
+    padding:8px;
+    display:block;
+    transition:opacity .18s ease;
+}
+#ui-layer > .flex:first-child,
+#ui-layer > .flex:last-child{
+    position:absolute;
+    top:8px;
+    transition:top .18s ease, bottom .18s ease, left .18s ease, right .18s ease, opacity .18s ease, transform .18s ease;
+}
+#ui-layer > .flex:first-child{left:8px;}
+#ui-layer > .flex:last-child{right:8px;}
+
+/* Modos de seguridad: nunca colocamos los dos grupos encima del mismo sector que ocupa el jugador. */
+#game-container.ui-safe-bottom #ui-layer > .flex:first-child,
+#game-container.ui-safe-bottom #ui-layer > .flex:last-child{
+    top:auto;
+    bottom:8px;
+}
+#game-container.ui-safe-left #ui-layer > .flex:last-child{right:8px;}
+#game-container.ui-safe-right #ui-layer > .flex:first-child{left:8px;}
+#game-container.ui-safe-center #ui-layer > .flex:first-child{left:8px;}
+#game-container.ui-safe-center #ui-layer > .flex:last-child{right:8px;}
+
+#run-banner,
+#room-banner{
+    transition:top .18s ease, left .18s ease, right .18s ease, bottom .18s ease, opacity .18s ease, transform .18s ease;
+}
+#run-banner{top:52px;}
+#room-banner{top:82px;}
+
+/* Cuando el jugador ocupa la franja superior central, despejamos completamente esa zona. */
+#game-container.ui-safe-top #run-banner,
+#game-container.ui-safe-top #room-banner,
+#game-container.ui-safe-top .boss-hud{
+    opacity:.12;
+    transform:translateX(-50%) translateY(-7px) scale(.96);
+}
+
+/* En pelea de jefe, la barra usa el borde superior y se compacta para dejar libre el centro. */
+.boss-hud{
+    top:8px;
+    width:min(430px,62%);
+    padding:5px 8px 7px;
+    border-radius:6px;
+    opacity:.92;
+}
+.boss-hud-top{font-size:7px;margin-bottom:4px;}
+.boss-bar-track{height:8px;}
+#game-container.ui-safe-bottom .boss-hud{top:8px;bottom:auto;}
+
+/* Mini mapa: por defecto ocupa una esquina y se oculta temporalmente si el jugador se acerca. */
+#game-container.minimap-avoid .rogue-title{opacity:.25;}
+
+/* Menos ruido visual durante el movimiento: las etiquetas contextuales ceden espacio al gameplay. */
+#game-container.player-moving #run-banner{opacity:.62;}
+#game-container.player-moving #room-banner{opacity:.52;}
+
+@media(max-width:640px){
+    #ui-layer{padding:5px;}
+    #ui-layer > .flex:first-child{left:5px;top:5px;}
+    #ui-layer > .flex:last-child{right:5px;top:5px;}
+    #game-container.ui-safe-bottom #ui-layer > .flex:first-child,
+    #game-container.ui-safe-bottom #ui-layer > .flex:last-child{bottom:5px;}
+    .stat-badge{font-size:.58rem;padding:3px 5px;gap:3px;}
+    #run-banner{top:47px;font-size:6px;padding:4px 6px;max-width:42%;white-space:nowrap;}
+    #room-banner{top:72px;font-size:5px;padding:4px 6px;max-width:52%;}
+    .boss-hud{top:5px;width:56%;padding:4px 6px 5px;}
+    .boss-hud-top{font-size:6px;}
+    .boss-bar-track{height:7px;}
+}
+
+
+/* Quadrantes explícitos: cada bloque del HUD se manda a la esquina opuesta al jugador. */
+#game-container.ui-player-tl #ui-layer > .flex:first-child{top:auto;bottom:8px;left:8px;}
+#game-container.ui-player-tl #ui-layer > .flex:last-child{top:8px;bottom:auto;right:8px;}
+#game-container.ui-player-tr #ui-layer > .flex:first-child{top:8px;bottom:auto;left:8px;}
+#game-container.ui-player-tr #ui-layer > .flex:last-child{top:auto;bottom:8px;right:8px;}
+#game-container.ui-player-bl #ui-layer > .flex:first-child{top:8px;bottom:auto;left:8px;}
+#game-container.ui-player-bl #ui-layer > .flex:last-child{top:8px;bottom:auto;right:8px;}
+#game-container.ui-player-br #ui-layer > .flex:first-child{top:8px;bottom:auto;left:8px;}
+#game-container.ui-player-br #ui-layer > .flex:last-child{top:8px;bottom:auto;right:8px;}
+#game-container.ui-player-tc #ui-layer > .flex:first-child{top:8px;left:8px;}
+#game-container.ui-player-tc #ui-layer > .flex:last-child{top:8px;right:8px;}
+#game-container.ui-player-bc #ui-layer > .flex:first-child{top:8px;left:8px;}
+#game-container.ui-player-bc #ui-layer > .flex:last-child{top:8px;right:8px;}
+@media(max-width:640px){
+ #game-container.ui-player-tl #ui-layer > .flex:first-child{bottom:5px;left:5px;}
+ #game-container.ui-player-tr #ui-layer > .flex:last-child{bottom:5px;right:5px;}
+}

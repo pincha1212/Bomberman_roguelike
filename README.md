@@ -39,3 +39,13 @@ Abrí `index.html` directamente o publicá la carpeta en GitHub Pages.
 - Sombras y efectos del boss adaptativos según rendimiento.
 - Cámara con ligero seguimiento del boss durante combates grandes.
 - Conserva el movimiento libre y las mecánicas de v3.2.1.
+
+
+## v3.2.3 — Adaptive Interface Update
+- HUD reorganizado en grupos compactos y con posicionamiento adaptable.
+- La interfaz evita ocupar la zona inmediata del jugador según su posición en pantalla.
+- Las etiquetas de run/sala reducen su presencia durante el movimiento.
+- La barra del jefe queda compacta en el borde superior para liberar el centro de combate.
+- Ajustes específicos para pantallas pequeñas y controles táctiles.
+- El minimapa mantiene su esquina y activa un estado de evitación cuando el jugador se aproxima.
+- No cambia la lógica de combate, movimiento libre, bosses, amenazas, recompensas ni rendimiento de v3.2.2.

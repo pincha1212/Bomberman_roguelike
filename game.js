@@ -103,6 +103,51 @@ function drawLargeBossShadow(b){
     ctx.restore();
 }
 
+// V3.2.3 ADAPTIVE INTERFACE LAYER
+const adaptiveUI = {
+    lastLayout: '',
+    lastPlayerState: false
+};
+
+function updateAdaptiveInterface(){
+    const root = document.getElementById('game-container');
+    if(!root || !player || !gameState.isPlaying) return;
+
+    const cx = player.x + player.width / 2 - gameState.camera.x;
+    const cy = player.y + player.height / 2 - gameState.camera.y;
+    const w = canvas.width;
+    const h = canvas.height;
+    const nx = cx / Math.max(1,w);
+    const ny = cy / Math.max(1,h);
+
+    // Elegimos una zona opuesta al jugador. El centro queda siempre libre.
+    let layout;
+    if(nx < .34 && ny < .40) layout = 'tl';
+    else if(nx > .66 && ny < .40) layout = 'tr';
+    else if(nx < .34 && ny > .60) layout = 'bl';
+    else if(nx > .66 && ny > .60) layout = 'br';
+    else if(ny <= .50) layout = 'tc';
+    else layout = 'bc';
+    const moving = !!player.isMoving;
+
+    if(layout !== adaptiveUI.lastLayout){
+        root.classList.remove('ui-safe-left','ui-safe-right','ui-safe-center','ui-safe-top','ui-safe-bottom',
+            'ui-player-tl','ui-player-tr','ui-player-bl','ui-player-br','ui-player-tc','ui-player-bc');
+        root.classList.add(`ui-player-${layout}`);
+        adaptiveUI.lastLayout = layout;
+    }
+
+    if(moving !== adaptiveUI.lastPlayerState){
+        root.classList.toggle('player-moving', moving);
+        adaptiveUI.lastPlayerState = moving;
+    }
+
+    // El minimapa vive en la esquina superior derecha del canvas.
+    // Si el jugador entra en esa zona, evitamos ruido visual y lo recuperamos al salir.
+    const nearMiniMap = nx > .72 && ny < .30;
+    root.classList.toggle('minimap-avoid', nearMiniMap);
+}
+
 const UI = {};
 [
     'ui-health','ui-score','ui-level','ui-bombs','ui-range','ui-speed','ui-coins','ui-relics',
@@ -1027,6 +1072,8 @@ const UI = {};
             gameState.camera.x += (gameState.camera.targetX - gameState.camera.x) * 0.12;
             gameState.camera.y += (gameState.camera.targetY - gameState.camera.y) * 0.12;
 
+            updateAdaptiveInterface();
+
             // Update Bombs
             for (let i = gameState.bombs.length - 1; i >= 0; i--) {
                 let b = gameState.bombs[i];
@@ -1602,7 +1649,11 @@ const UI = {};
         }
 
         function drawMiniMap() {
+            const px = player.x + player.width / 2 - gameState.camera.x;
+            const py = player.y + player.height / 2 - gameState.camera.y;
             const mapSize = 70;
+            // El minimapa cede la esquina superior derecha si el jugador está dentro de ella.
+            if(px > canvas.width - 120 && py < 120) return;
             const padding = 10;
             const x = canvas.width - mapSize - padding;
             const y = padding;

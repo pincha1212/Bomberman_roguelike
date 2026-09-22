@@ -4,19 +4,33 @@
 // so they do not cut corners or slide through walls.
 
 const ENEMY_AI = {
-    maxPathNodes: 180,
+    maxPathNodes: 150,
     dangerHorizonMs: 1100,
     stuckWindowMs: 260,
     maxStuckCount: 2,
     accel: 0.42,
     brake: 0.72,
     snapDistance: 5.5,
+    maxPathBuildsPerFrame: 1,
+    escapeRepathMs: 120,
     configs: {
         RASTRERO: { think: 430, chaseRadius: 10, patrolSteps: 4, prediction: 0 },
         VOLADOR: { think: 330, chaseRadius: 15, patrolSteps: 5, prediction: 1 },
         ESPECIAL: { think: 235, chaseRadius: 18, patrolSteps: 5, prediction: 2 }
     }
 };
+
+const enemyAIRuntime = {
+    pathBuildsThisFrame: 0,
+    pathBuildCursor: 0,
+    warmedUp: false
+};
+
+function resetEnemyAIRuntime(){
+    enemyAIRuntime.pathBuildsThisFrame = 0;
+    enemyAIRuntime.pathBuildCursor = 0;
+    enemyAIRuntime.warmedUp = false;
+}
 
 function ensureEnemyAIState(e) {
     if (!e.ai) {
@@ -33,7 +47,8 @@ function ensureEnemyAIState(e) {
             patrolDir: Math.floor(Math.random() * 4),
             patrolTimer: 0,
             lastPlayerX: 0,
-            lastPlayerY: 0
+            lastPlayerY: 0,
+            escapeTimer: 0
         };
     }
     if (!e.ai.mode) e.ai.mode = 'patrol';
@@ -119,17 +134,35 @@ function cardinalNeighbors(cell) {
 }
 
 function orderedNeighbors(e, cell, goal, avoidDanger) {
-    return cardinalNeighbors(cell)
-        .filter(n => isEnemyWalkableCell(e, n.x, n.y, false))
-        .sort((a, b) => {
-            const ad = isCellInBombDanger(a.x, a.y);
-            const bd = isCellInBombDanger(b.x, b.y);
-            if (avoidDanger && ad !== bd) return ad ? 1 : -1;
-            const da = Math.abs(a.x - goal.x) + Math.abs(a.y - goal.y);
-            const db = Math.abs(b.x - goal.x) + Math.abs(b.y - goal.y);
-            if (da !== db) return da - db;
-            return Math.random() - 0.5;
-        });
+    const neighbors = cardinalNeighbors(cell)
+        .filter(n => isEnemyWalkableCell(e, n.x, n.y, false));
+
+    neighbors.sort((a, b) => {
+        const ad = avoidDanger && isCellInBombDanger(a.x, a.y);
+        const bd = avoidDanger && isCellInBombDanger(b.x, b.y);
+        if (ad !== bd) return ad ? 1 : -1;
+        const da = Math.abs(a.x - goal.x) + Math.abs(a.y - goal.y);
+        const db = Math.abs(b.x - goal.x) + Math.abs(b.y - goal.y);
+        return da - db;
+    });
+    return neighbors;
+}
+
+function tryDirectCardinalPath(e, start, goal, avoidDanger) {
+    if (start.x !== goal.x && start.y !== goal.y) return null;
+    const dx = Math.sign(goal.x - start.x);
+    const dy = Math.sign(goal.y - start.y);
+    const path = [];
+    let x = start.x;
+    let y = start.y;
+    while (x !== goal.x || y !== goal.y) {
+        x += dx;
+        y += dy;
+        if (!isEnemyWalkableCell(e, x, y, false)) return null;
+        if (avoidDanger && isCellInBombDanger(x, y)) return null;
+        path.push({x, y, axis: dx !== 0 ? 'x' : 'y', dir: dx !== 0 ? dx : dy});
+    }
+    return path;
 }
 
 function bfsEnemyPath(e, start, goal, avoidDanger) {
@@ -168,7 +201,9 @@ function bfsEnemyPath(e, start, goal, avoidDanger) {
 }
 
 function buildEnemyPath(e, start, goal) {
-    let path = bfsEnemyPath(e, start, goal, true);
+    let path = tryDirectCardinalPath(e, start, goal, true);
+    if (path && path.length) return path;
+    path = bfsEnemyPath(e, start, goal, true);
     if (!path.length) path = bfsEnemyPath(e, start, goal, false);
     return path;
 }
@@ -327,6 +362,12 @@ function steerEnemyToCell(e, target, dt) {
     return true;
 }
 
+function requestEnemyPath(e, start, goal) {
+    if (enemyAIRuntime.pathBuildsThisFrame >= ENEMY_AI.maxPathBuildsPerFrame) return [];
+    enemyAIRuntime.pathBuildsThisFrame++;
+    return buildEnemyPath(e, start, goal);
+}
+
 function updateEnemyOne(e, dt) {
     const ai = ensureEnemyAIState(e);
     const config = enemyConfig(e);
@@ -337,6 +378,7 @@ function updateEnemyOne(e, dt) {
 
     ai.thinkTimer -= dt;
     ai.stuckTimer -= dt;
+    ai.escapeTimer -= dt;
 
     if (ai.stuckTimer <= 0) {
         const moved = Math.hypot(e.x - ai.lastX, e.y - ai.lastY);
@@ -359,11 +401,14 @@ function updateEnemyOne(e, dt) {
     if (threatened) {
         ai.mode = 'flee';
         ai.thinkTimer = Math.min(ai.thinkTimer, 90);
-        const escape = chooseEscapeCell(e);
-        if (escape) {
-            ai.path = [escape];
-            ai.pathIndex = 0;
-            ai.target = escape;
+        if (ai.escapeTimer <= 0 || !ai.path.length || ai.pathIndex >= ai.path.length) {
+            const escape = chooseEscapeCell(e);
+            ai.escapeTimer = ENEMY_AI.escapeRepathMs;
+            if (escape) {
+                ai.path = [escape];
+                ai.pathIndex = 0;
+                ai.target = escape;
+            }
         }
     } else if (ai.thinkTimer <= 0 || !ai.path.length || ai.pathIndex >= ai.path.length) {
         ai.thinkTimer = config.think;
@@ -374,7 +419,7 @@ function updateEnemyOne(e, dt) {
         const shouldChase = e.type === ENEMY_TYPES.ESPECIAL || distanceToPlayer <= config.chaseRadius;
         if (shouldChase) {
             const target = predictedPlayerTarget(e);
-            const path = buildEnemyPath(e, current, target);
+            const path = requestEnemyPath(e, current, target);
             if (path.length) {
                 ai.mode = 'chase';
                 ai.path = path;
@@ -384,7 +429,7 @@ function updateEnemyOne(e, dt) {
                 ai.mode = 'patrol';
                 const patrol = choosePatrolTarget(e);
                 if (patrol) {
-                    ai.path = buildEnemyPath(e, current, patrol);
+                    ai.path = requestEnemyPath(e, current, patrol);
                     ai.target = patrol;
                 }
             }
@@ -392,7 +437,7 @@ function updateEnemyOne(e, dt) {
             ai.mode = 'patrol';
             const patrol = choosePatrolTarget(e);
             if (patrol) {
-                ai.path = buildEnemyPath(e, current, patrol);
+                ai.path = requestEnemyPath(e, current, patrol);
                 ai.target = patrol;
             }
         }
@@ -427,5 +472,30 @@ function updateEnemyOne(e, dt) {
 
 function updateEnemiesAI(dt) {
     if (!gameState.enemies.length) return;
-    for (const e of gameState.enemies) updateEnemyOne(e, dt);
+
+    // V3.11.1: el comienzo de una sala prioriza completamente la respuesta del jugador.
+    if (typeof gameState.enemyAIWarmup === 'number' && gameState.enemyAIWarmup > 0) {
+        gameState.enemyAIWarmup = Math.max(0, gameState.enemyAIWarmup - dt);
+        enemyAIRuntime.warmedUp = false;
+        for (const e of gameState.enemies) {
+            const ai = ensureEnemyAIState(e);
+            ai.path = [];
+            ai.pathIndex = 0;
+        }
+        return;
+    }
+
+    if (!enemyAIRuntime.warmedUp) {
+        enemyAIRuntime.warmedUp = true;
+        enemyAIRuntime.pathBuildCursor = 0;
+    }
+
+    enemyAIRuntime.pathBuildsThisFrame = 0;
+    const total = gameState.enemies.length;
+    const start = enemyAIRuntime.pathBuildCursor % total;
+    for (let offset = 0; offset < total; offset++) {
+        const e = gameState.enemies[(start + offset) % total];
+        updateEnemyOne(e, dt);
+    }
+    enemyAIRuntime.pathBuildCursor = (start + 1) % Math.max(1, total);
 }

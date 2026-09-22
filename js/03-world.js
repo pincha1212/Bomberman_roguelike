@@ -23,6 +23,9 @@
             gameState.roomTime = Math.max(35000, 80000 - gameState.level * 1500);
             gameState.threatLevel = 0;
             gameState.nextReinforcement = gameState.roomTime - 18000;
+            // V3.11.1: give player input priority immediately after entering a room.
+            // Enemy pathfinding starts after a short warmup instead of on the first frames.
+            gameState.enemyAIWarmup = 650;
 
             // Spawn player top-left corner
             player.x = TILE_SIZE + (TILE_SIZE - player.width)/2;

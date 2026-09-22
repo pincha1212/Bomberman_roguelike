@@ -194,10 +194,16 @@
                 if (exp.timer <= 0) gameState.explosions.splice(i, 1);
             }
 
-            // V3.11: IA enemiga modular. Cada enemigo navega por celdas cardinales,
-            // persigue cuando corresponde, evita explosiones/bombas y recupera
-            // rutas cuando queda bloqueado.
-            if (typeof updateEnemiesAI === 'function') updateEnemiesAI(dt);
+            // V3.11.1: la IA no puede detener el game loop si un estado de enemigo
+            // llega corrupto. Se aísla la actualización para mantener el control del jugador.
+            if (typeof updateEnemiesAI === 'function') {
+                try {
+                    updateEnemiesAI(dt);
+                } catch (error) {
+                    console.error('[V3.11.1] Enemy AI update recovered:', error);
+                    if (typeof resetEnemyAIRuntime === 'function') resetEnemyAIRuntime();
+                }
+            }
 
             // Daño por contacto: la IA y la colisión de combate permanecen separadas.
             for (const e of gameState.enemies) {

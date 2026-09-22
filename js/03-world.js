@@ -9,6 +9,9 @@
 
             gameState.grid = Array(gameState.gridHeight).fill().map(() => Array(gameState.gridWidth).fill(TYPES.EMPTY));
             gameState.bombs = [];
+            // V3.8: una nueva sala/run empieza sin bombas ocupando el cupo del jugador.
+            // initLevel() limpia el array de bombas, por lo que el contador debe sincronizarse también.
+            player.bombsPlaced = 0;
             gameState.explosions = [];
             gameState.enemies = [];
             gameState.items = [];

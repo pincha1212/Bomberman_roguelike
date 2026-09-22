@@ -24,6 +24,7 @@
             // Spawn player top-left corner
             player.x = TILE_SIZE + (TILE_SIZE - player.width)/2;
             player.y = TILE_SIZE + (TILE_SIZE - player.height)/2;
+            if (typeof resetCameraToPlayer === 'function') resetCameraToPlayer();
 
             // Outer walls & pillar walls
             for (let y = 0; y < gameState.gridHeight; y++) {

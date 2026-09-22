@@ -97,6 +97,9 @@
             // V3.4: movimiento asistido cardinal. Nunca se combinan X e Y.
             updatePlayerMovement(dt);
 
+            // V3.7: la cámara acompaña al personaje al recorrer sectores del mapa.
+            updateCamera(dt);
+
             updateAdaptiveInterface();
 
             // Update Bombs

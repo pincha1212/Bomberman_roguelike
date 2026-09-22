@@ -192,3 +192,13 @@ Actualización centrada en el comportamiento y navegación de enemigos.
 - Bomb-escape replanning is rate-limited.
 - Enemy AI errors are isolated so an exception cannot kill the main game loop.
 - Player movement remains responsive and cardinal.
+
+
+## v3.11.2 — Startup / Enemy Loop Rollback
+
+Se corrige el congelamiento al comenzar a mover al jugador. La auditoría mostró que el sistema nuevo de IA de v3.11 era la única diferencia relevante dentro del game loop respecto de la línea v3.10/v3.8 que venía funcionando.
+
+- Se retira `js/12-enemy-ai.js` del arranque del juego.
+- Se restaura el movimiento enemigo cardinal probado de la línea anterior.
+- El movimiento del jugador, bombas, daño, trampas, cámara y feedback quedan sin cambios.
+- Esta es una subversión de reparación; no reimplementa todavía la IA avanzada.

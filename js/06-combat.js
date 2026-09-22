@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.6 — Bombs, explosions, damage, enemies update and gameplay simulation
+// Bomberman Roguelike v3.9 — Combat, bombs, explosions, damage and gameplay simulation
         function placeBomb() {
             if (player.bombsPlaced >= player.maxBombs) return;
             let gx = Math.floor((player.x + player.width/2) / TILE_SIZE);
@@ -6,10 +6,12 @@
 
             if (gameState.bombs.some(b => b.x === gx && b.y === gy)) return;
 
+            const fuseTotal = gameState.roomType.id === 'CURSED' ? 1600 : 2000;
             gameState.bombs.push({
-                x: gx, y: gy, range: player.bombRange, timer: gameState.roomType.id === 'CURSED' ? 1600 : 2000, scalePulse: 1.0
+                x: gx, y: gy, range: player.bombRange, timer: fuseTotal, fuseTotal, warnBucket: Math.ceil(fuseTotal / 300), scalePulse: 1.0
             });
             sfx('bomb');
+            if (typeof feedbackBombPlaced === 'function') feedbackBombPlaced(gx, gy);
             player.bombsPlaced++;
         }
 
@@ -20,6 +22,7 @@
 
             triggerScreenShake(7, 300);
             sfx('boom');
+            if (typeof feedbackExplosion === 'function') feedbackExplosion(bomb.x, bomb.y);
             addParticles((bomb.x + 0.5) * TILE_SIZE, (bomb.y + 0.5) * TILE_SIZE, '#f97316', 15);
             if (gameState.relics.some(r => r.id === 'ember_core')) gameState.score += 25;
 
@@ -81,6 +84,9 @@
             gameState.animFrame++;
             renderImmersion();
 
+            if (typeof updateCombatFeedback === 'function') updateCombatFeedback(dt);
+            if (typeof combatFeedback !== 'undefined' && combatFeedback.hitStopTimer > 0) return;
+
             // V3.6: la inmunidad tras recibir daño es temporal.
             // El contador se descuenta cada frame y se desactiva al llegar a cero.
             updatePlayerInvulnerability(dt);
@@ -106,6 +112,14 @@
             for (let i = gameState.bombs.length - 1; i >= 0; i--) {
                 let b = gameState.bombs[i];
                 b.timer -= dt;
+                if (b.timer > 0 && b.timer <= 900) {
+                    const warnBucket = Math.ceil(b.timer / 300);
+                    if (warnBucket !== b.warnBucket) {
+                        b.warnBucket = warnBucket;
+                        sfx('bomb');
+                        if (typeof feedbackBombWarning === 'function') feedbackBombWarning(b.x, b.y);
+                    }
+                }
                 if (b.timer <= 0) explodeBomb(i);
             }
 
@@ -151,6 +165,7 @@
                     let eFullRect = { left: e.x - e.width/2, right: e.x + e.width/2, top: e.y - e.height/2, bottom: e.y + e.height/2 };
                     if (checkOverlap(eFullRect, expRect)) {
                         addParticles(e.x, e.y, e.type.color, 15);
+                        if (typeof feedbackEnemyDefeat === 'function') feedbackEnemyDefeat(e.x, e.y, e.elite);
                         gameState.enemies.splice(j, 1);
                         const killScore = Math.round(100 * gameState.killScoreMult * (e.elite ? 1.25 : 1));
                         const killCoins = Math.max(2, Math.round((2 + Math.random() * 3) * (1 + gameState.coinBonus) * gameState.roomType.coinMult));
@@ -277,12 +292,15 @@
                 player.isInvincible = true;
                 player.invincibleTimer = 1000;
                 addFloatingText('ESCUDO ROTO!', player.x, player.y, '#38bdf8');
+                if (typeof feedbackPlayerDamage === 'function') feedbackPlayerDamage(true);
                 triggerScreenShake(5, 200);
                 updateUI();
                 return;
             }
 
             player.health--;
+            addFloatingText('-1 VIDA', player.x + player.width / 2, player.y - 4, '#f87171');
+            if (typeof feedbackPlayerDamage === 'function') feedbackPlayerDamage(false);
             player.isInvincible = true;
             player.invincibleTimer = 1500;
             triggerScreenShake(10, 400);

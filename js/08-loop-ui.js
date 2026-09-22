@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.6 — Game loop, HUD, run flow, rewards, game over and bootstrap
+// Bomberman Roguelike v3.9 — Game loop, HUD, run flow, rewards, game over and bootstrap
         function gameLoop(timestamp) {
             let dt = timestamp - gameState.lastTime;
             gameState.lastTime = timestamp;
@@ -91,6 +91,7 @@
             gameState.threatLevel = 0;
             gameState.nextReinforcement = 20000;
             gameState.paused = false;
+            if (typeof resetCombatFeedback === 'function') resetCombatFeedback();
             player.health = 3;
             player.maxHealth = 5;
             player.maxBombs = 1;
@@ -138,6 +139,7 @@
             initLevel();
             gameState.isPlaying = true;
             gameState.paused = false;
+            if (typeof resetCombatFeedback === 'function') resetCombatFeedback();
             gameState.lastTime = performance.now();
             requestAnimationFrame(gameLoop);
         }

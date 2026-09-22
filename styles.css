@@ -252,3 +252,18 @@ body { background: radial-gradient(circle at center, #111827 0%, #05070c 70%); }
   .reward-name { font-size:8px; margin-bottom:6px; }
   .reward-desc { font-size:.62rem; }
 }
+
+
+/* V2.0 IMMERSIVE PRESENTATION */
+#game-container::after { content:""; position:absolute; inset:0; pointer-events:none; z-index:9; background:radial-gradient(circle at 50% 48%, transparent 38%, rgba(0,0,0,.18) 68%, rgba(0,0,0,.58) 100%); mix-blend-mode:multiply; }
+#immersion-vignette { position:absolute; inset:0; z-index:8; pointer-events:none; background:radial-gradient(circle at 50% 48%, transparent 28%, rgba(2,6,23,.08) 58%, rgba(2,6,23,.48) 100%); transition:background .25s ease; }
+#room-intro { position:absolute; left:50%; top:42%; transform:translate(-50%,-50%); z-index:25; pointer-events:none; text-align:center; min-width:72%; padding:14px 18px; border-top:1px solid rgba(255,255,255,.25); border-bottom:1px solid rgba(255,255,255,.25); background:linear-gradient(90deg,transparent,rgba(2,6,23,.78),transparent); animation:roomReveal 1.8s ease both; }
+#room-intro .room-number { font:7px 'Press Start 2P'; color:#94a3b8; letter-spacing:.22em; margin-bottom:9px; }
+#room-intro .room-name { font:16px 'Press Start 2P'; color:#f8fafc; text-shadow:0 0 18px currentColor; }
+#room-intro .room-sub { margin-top:9px; font-size:.7rem; color:#cbd5e1; }
+#danger-indicator { position:absolute; left:50%; bottom:34px; transform:translateX(-50%); z-index:24; pointer-events:none; color:#ff5a5f; font:7px 'Press Start 2P'; letter-spacing:.18em; text-shadow:0 0 12px #ff3b30; animation:dangerPulse .55s infinite alternate; }
+.relic-strip { min-height:24px; display:flex; gap:5px; justify-content:center; flex-wrap:wrap; margin:-4px 0 8px; }
+.relic-chip { border:1px solid #475569; background:rgba(2,6,23,.72); color:#e2e8f0; padding:4px 6px; border-radius:3px; font:6px 'Press Start 2P'; }
+@keyframes roomReveal { 0%{opacity:0; transform:translate(-50%,-50%) scale(1.08); filter:blur(6px)} 20%,75%{opacity:1; transform:translate(-50%,-50%) scale(1); filter:blur(0)} 100%{opacity:0; transform:translate(-50%,-50%) scale(.96)} }
+@keyframes dangerPulse { from{opacity:.35} to{opacity:1} }
+@media(max-width:600px){ #room-intro .room-name{font-size:11px}.room-sub{font-size:.6rem}.relic-chip{font-size:5px} }

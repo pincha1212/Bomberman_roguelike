@@ -67,3 +67,11 @@ Abrí `index.html` directamente o publicá la carpeta en GitHub Pages.
 - Cuando se pulsan dos ejes simultáneamente, se conserva un solo eje de movimiento.
 - Se mantiene la colisión rectangular, hitbox reducida, padding y wall sliding de v3.2.4.
 - El personaje no puede desplazarse en diagonal para cortar esquinas.
+
+
+## v3.3 — Trap Update
+- Trampas ocultas hasta su activación.
+- Al activarse se hacen visibles con feedback visual y sonoro.
+- Cada trampa es de un solo uso y no puede volver a dañar al jugador.
+- Se eliminó completamente el minimapa del juego y de la interfaz.
+- Se conserva el movimiento cardinal de v3.2.5 y el resto de sistemas roguelike.

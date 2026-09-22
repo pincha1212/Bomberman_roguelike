@@ -142,10 +142,6 @@ function updateAdaptiveInterface(){
         adaptiveUI.lastPlayerState = moving;
     }
 
-    // El minimapa vive en la esquina superior derecha del canvas.
-    // Si el jugador entra en esa zona, evitamos ruido visual y lo recuperamos al salir.
-    const nearMiniMap = nx > .72 && ny < .30;
-    root.classList.toggle('minimap-avoid', nearMiniMap);
 }
 
 const UI = {};
@@ -450,7 +446,6 @@ const UI = {};
             gameState.particles = [];
             gameState.floaters = [];
             gameState.hazards = [];
-            gameState.hazardCooldown = 0;
             gameState.boss = null;
             gameState.bossProjectiles = [];
             gameState.roomTime = Math.max(35000, 80000 - gameState.level * 1500);
@@ -752,7 +747,7 @@ const UI = {};
                 [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
             }
             const count = Math.min(candidates.length, Math.max(2, 2 + Math.floor(gameState.level / 2) + (gameState.roomType.id === 'CURSED' ? 2 : 0)));
-            gameState.hazards = candidates.slice(0, count).map(h => ({ ...h, active: true, cooldown: 0, phase: Math.random() * Math.PI * 2 }));
+            gameState.hazards = candidates.slice(0, count).map(h => ({ ...h, triggered: false, visible: false, flashTimer: 0, phase: Math.random() * Math.PI * 2 }));
         }
 
         function spawnReinforcement(count = 1) {
@@ -794,19 +789,67 @@ const UI = {};
         }
 
         function updateHazards(dt) {
-            if (gameState.hazardCooldown > 0) gameState.hazardCooldown -= dt;
-            gameState.hazards.forEach(h => { if (h.cooldown > 0) h.cooldown -= dt; });
-            if (gameState.hazardCooldown > 0 || player.isInvincible) return;
+            // V3.3: las trampas son de un solo uso. Permanecen ocultas hasta activarse.
+            for (const h of gameState.hazards) {
+                if (h.flashTimer > 0) h.flashTimer = Math.max(0, h.flashTimer - dt);
+            }
+
+            if (player.isInvincible) return;
+
             const pcx = player.x + player.width / 2, pcy = player.y + player.height / 2;
             for (const h of gameState.hazards) {
+                // Una trampa ya activada nunca vuelve a causar daño.
+                if (h.triggered) continue;
+
                 const hx = (h.x + .5) * TILE_SIZE, hy = (h.y + .5) * TILE_SIZE;
                 const dx = Math.abs(pcx - hx), dy = Math.abs(pcy - hy);
-                if (dx < TILE_SIZE * .32 && dy < TILE_SIZE * .32 && h.cooldown <= 0) {
-                    h.active = false; h.cooldown = 1800; gameState.hazardCooldown = 500;
-                    addParticles(hx, hy, '#ef4444', 10); addFloatingText('TRAMPA!', pcx, pcy, '#ef4444');
-                    sfx('trap'); takeDamage();
+                if (dx < TILE_SIZE * .32 && dy < TILE_SIZE * .32) {
+                    h.triggered = true;
+                    h.visible = true;
+                    h.flashTimer = 1200;
+                    addParticles(hx, hy, '#ef4444', 12);
+                    addFloatingText('TRAMPA ACTIVADA', pcx, pcy, '#ef4444');
+                    sfx('trap');
+                    takeDamage();
                     break;
                 }
+            }
+        }
+
+        function drawHazards() {
+            // Solo se muestran después de haber sido activadas.
+            for (const h of gameState.hazards) {
+                if (!h.visible) continue;
+                const x = h.x * TILE_SIZE;
+                const y = h.y * TILE_SIZE;
+                const cx = x + TILE_SIZE / 2;
+                const cy = y + TILE_SIZE / 2;
+                const active = h.flashTimer > 0;
+                const pulse = active ? (0.5 + Math.sin(gameState.animFrame * 0.35 + h.phase) * 0.5) : 0.18;
+
+                ctx.save();
+                ctx.fillStyle = active ? `rgba(239,68,68,${0.16 + pulse * 0.20})` : 'rgba(127,29,29,.12)';
+                ctx.fillRect(x + 5, y + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+                ctx.strokeStyle = active ? '#ef4444' : '#7f1d1d';
+                ctx.lineWidth = active ? 3 : 2;
+                ctx.strokeRect(x + 7, y + 7, TILE_SIZE - 14, TILE_SIZE - 14);
+
+                ctx.strokeStyle = active ? '#fca5a5' : '#991b1b';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(cx - 12, cy - 12);
+                ctx.lineTo(cx + 12, cy + 12);
+                ctx.moveTo(cx + 12, cy - 12);
+                ctx.lineTo(cx - 12, cy + 12);
+                ctx.stroke();
+
+                if (active) {
+                    ctx.fillStyle = '#fecaca';
+                    ctx.font = '9px "Press Start 2P"';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('!', cx, cy + 3);
+                }
+                ctx.restore();
             }
         }
 
@@ -1357,6 +1400,9 @@ const UI = {};
                 }
             }
 
+            // V3.3: las trampas aparecen visualmente solo después de activarse.
+            drawHazards();
+
             // Draw Items / Powerups
             gameState.items.forEach(it => {
                 drawPowerupSprite(it.x * TILE_SIZE, it.y * TILE_SIZE, it.type);
@@ -1402,8 +1448,6 @@ const UI = {};
 
             ctx.restore();
 
-            // Draw Mini-map in top corner
-            drawMiniMap();
             drawAmbientDust();
             drawLighting();
         }
@@ -1711,46 +1755,6 @@ const UI = {};
             ctx.fillText(icon, x + 10, y + 30 + floaty);
         }
 
-        function drawMiniMap() {
-            const px = player.x + player.width / 2 - gameState.camera.x;
-            const py = player.y + player.height / 2 - gameState.camera.y;
-            const mapSize = 70;
-            // El minimapa cede la esquina superior derecha si el jugador está dentro de ella.
-            if(px > canvas.width - 120 && py < 120) return;
-            const padding = 10;
-            const x = canvas.width - mapSize - padding;
-            const y = padding;
-
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
-            ctx.fillRect(x, y, mapSize, mapSize);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.strokeRect(x, y, mapSize, mapSize);
-
-            let cellW = mapSize / gameState.gridWidth;
-            let cellH = mapSize / gameState.gridHeight;
-
-            for (let gy = 0; gy < gameState.gridHeight; gy++) {
-                for (let gx = 0; gx < gameState.gridWidth; gx++) {
-                    let tile = gameState.grid[gy][gx];
-                    if (tile === TYPES.WALL) {
-                        ctx.fillStyle = '#475569';
-                        ctx.fillRect(x + gx * cellW, y + gy * cellH, cellW, cellH);
-                    } else if (tile === TYPES.BLOCK) {
-                        ctx.fillStyle = '#9a3412';
-                        ctx.fillRect(x + gx * cellW, y + gy * cellH, cellW, cellH);
-                    } else if (tile === TYPES.EXIT_OPEN) {
-                        ctx.fillStyle = '#facc15';
-                        ctx.fillRect(x + gx * cellW, y + gy * cellH, cellW, cellH);
-                    }
-                }
-            }
-
-            // Draw player on mini-map
-            let pgx = (player.x + player.width/2) / TILE_SIZE;
-            let pgy = (player.y + player.height/2) / TILE_SIZE;
-            ctx.fillStyle = '#38bdf8';
-            ctx.fillRect(x + pgx * cellW - 1.5, y + pgy * cellH - 1.5, 3, 3);
-        }
 
         function gameLoop(timestamp) {
             let dt = timestamp - gameState.lastTime;

@@ -345,9 +345,6 @@ body { background: radial-gradient(circle at center, #111827 0%, #05070c 70%); }
 .boss-bar-track{height:8px;}
 #game-container.ui-safe-bottom .boss-hud{top:8px;bottom:auto;}
 
-/* Mini mapa: por defecto ocupa una esquina y se oculta temporalmente si el jugador se acerca. */
-#game-container.minimap-avoid .rogue-title{opacity:.25;}
-
 /* Menos ruido visual durante el movimiento: las etiquetas contextuales ceden espacio al gameplay. */
 #game-container.player-moving #run-banner{opacity:.62;}
 #game-container.player-moving #room-banner{opacity:.52;}

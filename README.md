@@ -117,3 +117,15 @@ Los scripts se cargan en ese orden desde `index.html`. No se usa bundler ni Node
 - Durante la run, el canvas recupera el foco visual y el menú exterior desaparece.
 - Controles táctiles reservados para dispositivos coarse-touch o pantallas pequeñas y fijados al borde inferior en móvil.
 - Conserva la estructura modular de v3.4 y no modifica la lógica de combate/movimiento.
+
+
+## v3.6 — Damage Immunity Fix
+
+- Corregida la inmunidad infinita del jugador después de recibir daño.
+- La inmunidad temporal ahora descuenta su contador en cada actualización.
+- Daño normal: 1500 ms de invulnerabilidad.
+- Escudo roto: 1000 ms de invulnerabilidad.
+- Al llegar a 0 ms, `isInvincible` vuelve automáticamente a `false`.
+- `takeDamage()` también bloquea impactos duplicados durante el mismo periodo de invulnerabilidad.
+- La inmunidad se reinicia al comenzar una nueva run y al cambiar de profundidad.
+- Se mantienen la interfaz adaptativa de v3.5, el movimiento asistido y la estructura modular del proyecto.

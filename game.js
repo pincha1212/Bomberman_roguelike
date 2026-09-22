@@ -325,7 +325,13 @@ const UI = {};
             dir: 'down',
             isMoving: false,
             walkCycle: 0,
-            _frameScale: 1
+            _frameScale: 1,
+            vx: 0,
+            vy: 0,
+            inputDir: 0,
+            inputAxis: null,
+            inputBuffer: null,
+            inputBufferTimer: 0
         };
 
         window.addEventListener('keydown', (e) => {
@@ -926,12 +932,27 @@ const UI = {};
         }
 
         // V3.2.4 — MOVEMENT UPDATE
-        // Movimiento continuo y diagonal. La cuadrícula SOLO define las paredes.
+        // Movimiento continuo cardinal asistido. La cuadrícula SOLO define las paredes.
         // El personaje usa una hurtbox de movimiento más pequeña que el sprite,
         // con un pequeño "skin" de seguridad para evitar enganches en esquinas.
+        // V3.4 — ASSISTED MOTION
+        // El jugador sigue moviéndose SOLO en los cuatro ejes cardinales.
+        // La asistencia no crea diagonales: ayuda a centrar carriles, memoriza
+        // brevemente un giro y suaviza aceleración/frenado/reversa.
         const MOVEMENT_COLLISION_INSET = 5;
         const MOVEMENT_WALL_PADDING = 1.5;
         const MOVEMENT_EPSILON = 0.001;
+        const MOTION = {
+            maxStep: 2.0,
+            acceleration: 0.95,
+            braking: 1.35,
+            reverseBraking: 1.8,
+            turnAssistRadius: 8.5,
+            turnSnapRadius: 4.5,
+            inputBufferMs: 115,
+            stopEpsilon: 0.035,
+            axisDeadzone: 0.18
+        };
 
         function getMovementHitbox(x, y, width, height) {
             const inset = MOVEMENT_COLLISION_INSET;
@@ -956,20 +977,14 @@ const UI = {};
             for (let gy = minGY; gy <= maxGY; gy++) {
                 for (let gx = minGX; gx <= maxGX; gx++) {
                     if (!isSolid(gx, gy)) continue;
-
                     const wallLeft = gx * TILE_SIZE;
                     const wallRight = wallLeft + TILE_SIZE;
                     const wallTop = gy * TILE_SIZE;
                     const wallBottom = wallTop + TILE_SIZE;
-
-                    // Solamente hay colisión si las áreas se superponen de verdad.
-                    // Tocar exactamente el borde de una celda no genera un "enganche".
                     if (box.right > wallLeft + MOVEMENT_EPSILON &&
                         box.left < wallRight - MOVEMENT_EPSILON &&
                         box.bottom > wallTop + MOVEMENT_EPSILON &&
-                        box.top < wallBottom - MOVEMENT_EPSILON) {
-                        return true;
-                    }
+                        box.top < wallBottom - MOVEMENT_EPSILON) return true;
                 }
             }
             return false;
@@ -977,20 +992,13 @@ const UI = {};
 
         function moveAxisWithCollision(axis, amount) {
             if (!amount) return false;
-
-            // Substeps pequeños: evitan atravesar paredes a velocidades altas y
-            // hacen que el deslizamiento por paredes sea más estable.
-            const maxStep = 2.25;
-            const steps = Math.max(1, Math.ceil(Math.abs(amount) / maxStep));
+            const steps = Math.max(1, Math.ceil(Math.abs(amount) / MOTION.maxStep));
             const step = amount / steps;
             let moved = false;
-
             for (let i = 0; i < steps; i++) {
                 const nextX = axis === 'x' ? player.x + step : player.x;
                 const nextY = axis === 'y' ? player.y + step : player.y;
-
                 if (rectCollidesSolid(nextX, nextY, player.width, player.height)) break;
-
                 player.x = nextX;
                 player.y = nextY;
                 moved = true;
@@ -998,26 +1006,134 @@ const UI = {};
             return moved;
         }
 
-        function tryMovePlayer(dx, dy) {
-            // V3.2.5: movimiento estrictamente cardinal. Nunca se aplican X e Y
-            // en el mismo frame, por lo que el jugador no puede desplazarse
-            // diagonalmente ni "cortar" una esquina.
-            if (Math.abs(dx) <= 0.0001 && Math.abs(dy) <= 0.0001) {
-                player.isMoving = false;
-                return;
+        function getLaneTarget(axis) {
+            const center = axis === 'x' ? player.y + player.height / 2 : player.x + player.width / 2;
+            const cell = Math.floor(center / TILE_SIZE);
+            const laneCenter = cell * TILE_SIZE + TILE_SIZE / 2;
+            return axis === 'x' ? laneCenter - player.height / 2 : laneCenter - player.width / 2;
+        }
+
+        function alignToLane(axis) {
+            const target = getLaneTarget(axis);
+            const current = axis === 'x' ? player.y : player.x;
+            const delta = target - current;
+            const abs = Math.abs(delta);
+            if (abs > MOTION.turnAssistRadius) return false;
+
+            // Corrección asistida por etapas: el jugador se detiene en su eje
+            // actual y se centra suavemente en el carril. Nunca se aplican X e Y
+            // en el mismo paso, por lo que no existe movimiento diagonal.
+            if (abs <= MOTION.turnSnapRadius) {
+                const candidateX = axis === 'x' ? player.x : target;
+                const candidateY = axis === 'x' ? target : player.y;
+                if (!rectCollidesSolid(candidateX, candidateY, player.width, player.height)) {
+                    if (axis === 'x') player.y = target;
+                    else player.x = target;
+                    return true;
+                }
             }
 
-            let axis = gameState.lastMoveAxis;
-            if (Math.abs(dx) > Math.abs(dy)) axis = 'horizontal';
-            else if (Math.abs(dy) > Math.abs(dx)) axis = 'vertical';
+            const correction = Math.min(1.8, abs);
+            const moved = axis === 'x'
+                ? moveAxisWithCollision('y', Math.sign(delta) * correction)
+                : moveAxisWithCollision('x', Math.sign(delta) * correction);
+            return moved && Math.abs(target - (axis === 'x' ? player.y : player.x)) <= MOTION.turnSnapRadius;
+        }
 
-            if (axis === 'horizontal') {
-                const dir = dx < 0 ? -1 : dx > 0 ? 1 : 0;
-                player.isMoving = dir !== 0 && moveAxisWithCollision('x', dir * player.speed * player._frameScale);
+        function getCardinalInput() {
+            let dx = gameState.touchControls.x;
+            let dy = gameState.touchControls.y;
+
+            if (Math.abs(dx) < MOTION.axisDeadzone && Math.abs(dy) < MOTION.axisDeadzone) {
+                dx = 0; dy = 0;
+                if (gameState.keys['ArrowUp'] || gameState.keys['KeyW']) dy = -1;
+                if (gameState.keys['ArrowDown'] || gameState.keys['KeyS']) dy = 1;
+                if (gameState.keys['ArrowLeft'] || gameState.keys['KeyA']) dx = -1;
+                if (gameState.keys['ArrowRight'] || gameState.keys['KeyD']) dx = 1;
+            }
+
+            if (!dx && !dy) return { axis: null, dir: 0 };
+
+            // Dominante + último eje en empate: siempre exactamente un eje.
+            if (Math.abs(dx) > Math.abs(dy)) return { axis: 'x', dir: dx < 0 ? -1 : 1 };
+            if (Math.abs(dy) > Math.abs(dx)) return { axis: 'y', dir: dy < 0 ? -1 : 1 };
+            return gameState.lastMoveAxis === 'horizontal'
+                ? { axis: 'x', dir: dx < 0 ? -1 : 1 }
+                : { axis: 'y', dir: dy < 0 ? -1 : 1 };
+        }
+
+        function updatePlayerMovement(dt) {
+            const frameScale = Math.min(dt / 16.6667, 2);
+            player._frameScale = frameScale;
+            const input = getCardinalInput();
+
+            if (input.axis) {
+                player.inputBuffer = input;
+                player.inputBufferTimer = MOTION.inputBufferMs;
+            } else if (player.inputBufferTimer > 0) {
+                player.inputBufferTimer -= dt;
+                if (player.inputBufferTimer <= 0) player.inputBuffer = null;
+            }
+
+            const desired = input.axis ? input : player.inputBuffer;
+            const currentAxis = Math.abs(player.vx) > 0.01 ? 'x' : Math.abs(player.vy) > 0.01 ? 'y' : null;
+            let axis = currentAxis;
+
+            if (!desired) {
+                if (currentAxis === 'x') player.vx = approach(player.vx, 0, MOTION.braking * frameScale);
+                if (currentAxis === 'y') player.vy = approach(player.vy, 0, MOTION.braking * frameScale);
+            } else if (!currentAxis) {
+                axis = desired.axis;
+            } else if (currentAxis !== desired.axis) {
+                // Para girar: primero frena y centra el carril; luego cambia de eje.
+                const centered = alignToLane(desired.axis);
+                const velocity = currentAxis === 'x' ? player.vx : player.vy;
+                if (centered || Math.abs(velocity) <= MOTION.stopEpsilon) {
+                    if (currentAxis === 'x') player.vx = 0;
+                    else player.vy = 0;
+                    axis = desired.axis;
+                } else {
+                    if (currentAxis === 'x') player.vx = approach(player.vx, 0, MOTION.reverseBraking * frameScale);
+                    else player.vy = approach(player.vy, 0, MOTION.reverseBraking * frameScale);
+                    axis = currentAxis;
+                }
             } else {
-                const dir = dy < 0 ? -1 : dy > 0 ? 1 : 0;
-                player.isMoving = dir !== 0 && moveAxisWithCollision('y', dir * player.speed * player._frameScale);
+                axis = desired.axis;
             }
+
+            // Un solo componente de velocidad puede existir en todo momento.
+            if (axis === 'x') {
+                player.vy = 0;
+                const target = desired ? desired.dir * player.speed : 0;
+                player.vx = approach(player.vx, target, (desired ? MOTION.acceleration : MOTION.braking) * frameScale);
+                if (Math.abs(player.vx) < MOTION.stopEpsilon) player.vx = 0;
+                if (player.vx !== 0) player.dir = player.vx < 0 ? 'left' : 'right';
+            } else if (axis === 'y') {
+                player.vx = 0;
+                const target = desired ? desired.dir * player.speed : 0;
+                player.vy = approach(player.vy, target, (desired ? MOTION.acceleration : MOTION.braking) * frameScale);
+                if (Math.abs(player.vy) < MOTION.stopEpsilon) player.vy = 0;
+                if (player.vy !== 0) player.dir = player.vy < 0 ? 'up' : 'down';
+            }
+
+            let moved = false;
+            if (player.vx) moved = moveAxisWithCollision('x', player.vx * frameScale);
+            else if (player.vy) moved = moveAxisWithCollision('y', player.vy * frameScale);
+
+            if (!moved && (player.vx || player.vy)) {
+                // Frente bloqueado: corta solo el eje activo. No empuja al jugador
+                // contra la pared ni genera desplazamiento diagonal accidental.
+                if (player.vx) player.vx = 0;
+                if (player.vy) player.vy = 0;
+            }
+            player.isMoving = moved;
+            if (moved) player.walkCycle += dt * 0.015;
+        }
+
+        function approach(value, target, amount) {
+            if (value < target) return Math.min(value + amount, target);
+            if (value > target) return Math.max(value - amount, target);
+            return target;
         }
 
         function placeBomb() {
@@ -1110,73 +1226,8 @@ const UI = {};
                 gameState.shakeTimer -= dt;
             }
 
-            // Player Touch or Keyboard movement
-            let dx = gameState.touchControls.x;
-            let dy = gameState.touchControls.y;
-
-            if (dx === 0 && dy === 0) {
-                if (gameState.keys['ArrowUp'] || gameState.keys['KeyW']) dy -= 1;
-                if (gameState.keys['ArrowDown'] || gameState.keys['KeyS']) dy += 1;
-                if (gameState.keys['ArrowLeft'] || gameState.keys['KeyA']) dx -= 1;
-                if (gameState.keys['ArrowRight'] || gameState.keys['KeyD']) dx += 1;
-            }
-
-            // V3.2.5: si el teclado/joystick entrega dos ejes a la vez,
-            // solo se conserva un eje. Esto garantiza movimiento N/S/E/O puro.
-            if (dx !== 0 || dy !== 0) {
-                if (Math.abs(dx) > Math.abs(dy)) {
-                    gameState.lastMoveAxis = 'horizontal';
-                    player.dir = dx > 0 ? 'right' : 'left';
-                } else if (Math.abs(dy) > Math.abs(dx)) {
-                    gameState.lastMoveAxis = 'vertical';
-                    player.dir = dy > 0 ? 'down' : 'up';
-                }
-
-                // En empate, se conserva el último eje utilizado.
-                if (gameState.lastMoveAxis === 'horizontal') {
-                    dx = dx < 0 ? -1 : dx > 0 ? 1 : 0;
-                    dy = 0;
-                    player.dir = dx < 0 ? 'left' : dx > 0 ? 'right' : player.dir;
-                } else {
-                    dy = dy < 0 ? -1 : dy > 0 ? 1 : 0;
-                    dx = 0;
-                    player.dir = dy < 0 ? 'up' : dy > 0 ? 'down' : player.dir;
-                }
-
-                player._frameScale = Math.min(dt / 16.6667, 2);
-                tryMovePlayer(dx, dy);
-            } else {
-                player.isMoving = false;
-            }
-
-            if (player.isMoving) {
-                player.walkCycle += dt * 0.015;
-            }
-
-            if (player.isInvincible) {
-                player.invincibleTimer -= dt;
-                if (player.invincibleTimer <= 0) player.isInvincible = false;
-            }
-
-            // Camera Target Interpolation (Smooth follow)
-            let pxCenter = player.x + player.width / 2;
-            let pyCenter = player.y + player.height / 2;
-            
-            gameState.camera.targetX = pxCenter - canvas.width / 2;
-            gameState.camera.targetY = pyCenter - canvas.height / 2;
-            if(gameState.boss && !gameState.boss.defeated){
-                gameState.camera.targetX += (gameState.boss.x - pxCenter) * 0.08;
-                gameState.camera.targetY += (gameState.boss.y - pyCenter) * 0.08;
-            }
-
-            // Clamp camera boundaries
-            const maxCamX = gameState.gridWidth * TILE_SIZE - canvas.width;
-            const maxCamY = gameState.gridHeight * TILE_SIZE - canvas.height;
-            gameState.camera.targetX = Math.max(0, Math.min(gameState.camera.targetX, maxCamX));
-            gameState.camera.targetY = Math.max(0, Math.min(gameState.camera.targetY, maxCamY));
-
-            gameState.camera.x += (gameState.camera.targetX - gameState.camera.x) * 0.12;
-            gameState.camera.y += (gameState.camera.targetY - gameState.camera.y) * 0.12;
+            // V3.4: movimiento asistido cardinal. Nunca se combinan X e Y.
+            updatePlayerMovement(dt);
 
             updateAdaptiveInterface();
 

@@ -75,3 +75,19 @@ Abrí `index.html` directamente o publicá la carpeta en GitHub Pages.
 - Cada trampa es de un solo uso y no puede volver a dañar al jugador.
 - Se eliminó completamente el minimapa del juego y de la interfaz.
 - Se conserva el movimiento cardinal de v3.2.5 y el resto de sistemas roguelike.
+
+
+## v3.4 — Assisted Motion Update
+
+Revisión profunda del control del jugador para reducir la sensación de movimiento tosco sin abandonar el movimiento cardinal.
+
+- Movimiento exclusivamente arriba/abajo/izquierda/derecha.
+- Aceleración y frenado suaves para evitar cambios bruscos.
+- Inversión de dirección con frenado controlado.
+- Buffer de entrada breve para que los giros no se pierdan por milisegundos.
+- Asistencia de carril en intersecciones: el jugador puede centrarse suavemente antes de girar.
+- Corrección de carril por etapas: nunca se mueve X e Y simultáneamente.
+- Colisiones conservan hitbox reducida, padding y substeps.
+- Si un frente está bloqueado, el eje activo se detiene sin empujar ni generar desplazamiento diagonal.
+- Teclado y joystick pasan por el mismo selector cardinal.
+- Sin minimapa.

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOMBERMAN // DESCENT — Roguelike v3.7</title>
+    <title>BOMBERMAN // DESCENT — Roguelike v3.10</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -121,11 +121,12 @@
         </div>
     </div>
 
-    <!-- v3.7 modular JavaScript: each file owns one gameplay area. -->
+    <!-- v3.10 modular JavaScript: bomb handling is isolated for focused debugging. -->
     <script src="js/01-core.js"></script>
     <script src="js/02-input.js"></script>
     <script src="js/03-world.js"></script>
     <script src="js/04-enemies.js"></script>
+    <script src="js/11-bombs.js"></script>
     <script src="js/05-player.js"></script>
     <script src="js/06-combat.js"></script>
     <script src="js/07-render.js"></script>

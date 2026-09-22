@@ -164,3 +164,19 @@ Pulido del combate y de la lectura visual de las acciones.
 - Feedback especial al derrotar al boss.
 - El feedback se reinicia correctamente al empezar una nueva run/profundidad.
 - Sin cambios intencionales en movimiento, daño base, IA, trampas, cámara o economía.
+
+
+## v3.10 — Bomb Handling Update
+
+Pulido del sistema central de bombas para que la colocación y las reacciones sean más predecibles y fáciles de leer.
+
+- Colocación de bomba con cooldown de seguridad para evitar dobles activaciones accidentales.
+- Teclado sin auto-repeat de bomba al mantener Espacio/Z.
+- Botón móvil unificado mediante Pointer Events para evitar dobles disparos táctiles.
+- Una bomba recién colocada puede ser atravesada para salir de su casilla; al abandonarla queda bloqueada.
+- Las bombas muestran visualmente cuándo todavía está disponible la salida de la casilla y cuándo quedaron armadas.
+- Temporizadores y advertencias de mecha aislados en `js/11-bombs.js`.
+- Reacción en cadena procesada con cola, evitando recursión y detonaciones duplicadas.
+- HUD de bombas muestra `disponibles/máximo` para saber inmediatamente cuántas bombas quedan para colocar.
+- Reset del contador y cooldown de bombas al iniciar una run o una nueva profundidad.
+- Se conserva el movimiento cardinal asistido, daño temporal, trampas de un solo uso, cámara de seguimiento, bosses y feedback de v3.9.

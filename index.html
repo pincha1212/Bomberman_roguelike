@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOMBERMAN // DESCENT — Roguelike</title>
+    <title>BOMBERMAN // DESCENT — Roguelike v1.1</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -14,6 +14,7 @@
             <canvas id="gameCanvas" width="600" height="600"></canvas>
             <div class="rogue-title">DESCENT // PROCEDURAL RUN</div>
             <div id="run-banner">RUN 01 · DEPTH 01</div>
+            <div id="room-banner">◆ NORMAL · Sin modificadores</div>
             
             <!-- HUD overlay -->
             <div id="ui-layer">
@@ -22,6 +23,7 @@
                         <div class="stat-badge text-red-400">❤️ <span id="ui-health">3</span></div>
                         <div class="stat-badge text-cyan-300 hidden" id="ui-shield-badge">🛡️ <span id="ui-shield">SI</span></div>
                         <div class="stat-badge text-yellow-300">⭐ <span id="ui-score">0</span></div>
+                        <div class="stat-badge text-amber-300">¢ <span id="ui-coins">0</span></div>
                     </div>
                     <div class="stat-badge text-purple-300 w-fit">🚩 PROFUNDIDAD <span id="ui-level">1</span></div>
                 </div>
@@ -31,6 +33,7 @@
                         <div class="stat-badge text-amber-400">💣 <span id="ui-bombs">1</span></div>
                         <div class="stat-badge text-orange-400">🔥 <span id="ui-range">1</span></div>
                         <div class="stat-badge text-emerald-400">👟 <span id="ui-speed">3</span></div>
+                        <div class="stat-badge text-purple-300">✦ <span id="ui-relics">0</span></div>
                     </div>
                 </div>
             </div>
@@ -42,10 +45,10 @@
                 <h2 class="text-xs md:text-sm mb-4 pixel-font text-blue-400">DESCENT // RUN-BASED ROGUELIKE</h2>
                 
                 <div class="text-left mb-4 space-y-2 p-3 bg-slate-900/90 rounded-xl border border-slate-700 text-xs text-slate-300 max-w-xs">
-                    <p>🏃 <strong>Explora:</strong> Cámara enfocada y mapas grandes.</p>
-                    <p>💣 <strong>Destruye:</strong> Bloques para hallar la salida 🚪.</p>
-                    <p>👾 <strong>Enemigos:</strong> Rastreros 🔴, Voladores 🔵, Especiales 🟢.</p>
-                    <p>🛡️ <strong>Powerups:</strong> Bombas, Fuego, Botas y Escudos.</p>
+                    <p>◆ <strong>RUNS:</strong> Cada partida genera una progresión distinta.</p>
+                    <p>✦ <strong>LOOT:</strong> Rompé bloques y conseguí monedas, powerups y reliquias.</p>
+                    <p>☠ <strong>SALAS:</strong> Élite, Tesoro, Maldita y Santuario cambian las reglas.</p>
+                    <p>↻ <strong>RECOMPENSAS:</strong> Elegí 1 mejora o hacé reroll por monedas.</p>
                 </div>
                 <button id="btn-start" class="btn-pixel">INICIAR RUN</button>
             </div>
@@ -55,16 +58,26 @@
                 <div class="text-4xl mb-2">💀</div>
                 <h1 class="text-2xl mb-2 text-red-500 pixel-font">GAME OVER</h1>
                 <p class="text-xs text-slate-300 mb-1">Profundidad alcanzada: <span id="go-level" class="text-yellow-400 font-bold">1</span></p>
-                <p class="text-xs text-slate-300 mb-5">Puntaje total: <span id="go-score" class="text-cyan-400 font-bold">0</span></p>
+                <p class="text-xs text-slate-300 mb-1">Puntaje total: <span id="go-score" class="text-cyan-400 font-bold">0</span></p>
+                <p class="text-xs text-slate-300 mb-1">Monedas: <span id="go-coins" class="text-amber-300 font-bold">0</span> · Reliquias: <span id="go-relics" class="text-purple-300 font-bold">0</span></p>
+                <p class="text-xs text-slate-400 mb-5">Mejor profundidad: <span id="go-best" class="text-yellow-300 font-bold">0</span></p>
                 <button id="btn-restart" class="btn-pixel">REINTENTAR</button>
             </div>
             
-            <!-- Level Complete Screen -->
+            <!-- Reward screen -->
             <div id="level-complete-screen" class="screen hidden">
-                <div class="text-4xl mb-2">🌟</div>
-                <h1 class="text-lg mb-1 text-green-400 pixel-font">¡NIVEL COMPLETADO!</h1>
-                <p class="text-xs text-slate-300 mb-4">Elige una mejora para esta run:</p>
-                <div id="upgrade-options" class="flex gap-2 flex-wrap justify-center"></div>
+                <div class="reward-kicker">RECOMPENSA DE RUN</div>
+                <h1 id="reward-title" class="text-lg mb-1 text-yellow-300 pixel-font">PROFUNDIDAD 01 SUPERADA</h1>
+                <p id="reward-meta" class="text-xs text-slate-300 mb-4">+10 monedas · elegí 1 mejora para la próxima sala</p>
+                <div id="upgrade-options" class="reward-grid"></div>
+                <div id="reward-footer" class="reward-footer"></div>
+            </div>
+
+            <!-- Pause -->
+            <div id="pause-screen" class="screen hidden">
+                <div class="reward-kicker">RUN PAUSADA</div>
+                <h1 class="text-xl mb-3 text-cyan-300 pixel-font">PAUSA</h1>
+                <button id="btn-resume" class="btn-pixel">CONTINUAR</button>
             </div>
         </div>
         

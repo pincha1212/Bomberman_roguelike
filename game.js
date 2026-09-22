@@ -27,6 +27,90 @@ const canvas = document.getElementById('gameCanvas');
             ESPECIAL: { name: 'Especial', color: '#22c55e', speed: 2.2, canFly: false }
         };
 
+        const ROOM_TYPES = {
+            STANDARD: {
+                id: 'STANDARD', name: 'NORMAL', subtitle: 'Sin modificadores', icon: '◆',
+                blockBonus: 0, enemyMult: 1, enemySpeedMult: 1, dropChance: 0.30,
+                coinMult: 1, rewardCoins: 10, color: '#94a3b8'
+            },
+            ELITE: {
+                id: 'ELITE', name: 'ÉLITE', subtitle: 'Más enemigos · mejores recompensas', icon: '◆◆',
+                blockBonus: -0.03, enemyMult: 1.65, enemySpeedMult: 1.08, dropChance: 0.38,
+                coinMult: 1.5, rewardCoins: 25, color: '#fb7185'
+            },
+            TREASURE: {
+                id: 'TREASURE', name: 'TESORO', subtitle: 'Más botín · menos presión', icon: '✦',
+                blockBonus: 0.02, enemyMult: 0.65, enemySpeedMult: 0.96, dropChance: 0.52,
+                coinMult: 2, rewardCoins: 35, color: '#fbbf24'
+            },
+            CURSED: {
+                id: 'CURSED', name: 'MALDITA', subtitle: 'Enemigos rápidos · botín aumentado', icon: '☠',
+                blockBonus: 0.04, enemyMult: 1.35, enemySpeedMult: 1.18, dropChance: 0.42,
+                coinMult: 1.75, rewardCoins: 30, color: '#c084fc'
+            },
+            SHRINE: {
+                id: 'SHRINE', name: 'SANTUARIO', subtitle: '+1 vida y escudo al entrar', icon: '✚',
+                blockBonus: -0.02, enemyMult: 0.75, enemySpeedMult: 0.95, dropChance: 0.34,
+                coinMult: 1.1, rewardCoins: 15, color: '#67e8f9'
+            }
+        };
+
+        const RELICS = [
+            { id: 'ember_core', icon: '🔥', name: 'NÚCLEO ÍGNEO', rarity: 'RARE', desc: '+1 rango de bomba. Las explosiones valen +25 puntos extra.',
+              apply: () => { player.bombRange += 1; } },
+            { id: 'twin_fuse', icon: '💣', name: 'MECHA GEMELA', rarity: 'UNCOMMON', desc: '+1 bomba máxima.',
+              apply: () => { player.maxBombs += 1; } },
+            { id: 'iron_boots', icon: '👟', name: 'BOTAS DE HIERRO', rarity: 'UNCOMMON', desc: '+0.6 velocidad permanente.',
+              apply: () => { player.speed = Math.min(player.speed + 0.6, 6); } },
+            { id: 'heart_engine', icon: '♥', name: 'MOTOR VITAL', rarity: 'RARE', desc: '+1 vida máxima y recuperas 1 vida ahora.',
+              apply: () => { player.maxHealth += 1; player.health = Math.min(player.health + 1, player.maxHealth); } },
+            { id: 'ward_plate', icon: '🛡', name: 'PLACA DE GUARDA', rarity: 'RARE', desc: 'Obtienes un escudo. Un golpe no destruye la run.',
+              apply: () => { player.hasShield = true; } },
+            { id: 'lucky_charm', icon: '✦', name: 'AMULETO AFORTUNADO', rarity: 'EPIC', desc: '+40% de monedas obtenidas.',
+              apply: () => { gameState.coinBonus += 0.40; } },
+            { id: 'war_trophy', icon: '⚔', name: 'TROFEO DE GUERRA', rarity: 'EPIC', desc: '+50% de puntos por enemigos.',
+              apply: () => { gameState.killScoreMult += 0.50; } },
+            { id: 'merchant_seal', icon: '◉', name: 'SELLO DEL MERCADER', rarity: 'EPIC', desc: 'Los rerolls cuestan 5 monedas menos.',
+              apply: () => { gameState.rerollDiscount += 5; } }
+        ];
+
+        const REWARDS = [
+            { id: 'bomb', kind: 'UPGRADE', rarity: 'COMMON', name: '+1 BOMBA', desc: 'Aumenta las bombas simultáneas.', action: () => player.maxBombs++ },
+            { id: 'range', kind: 'UPGRADE', rarity: 'COMMON', name: '+1 RANGO', desc: 'Las explosiones llegan una casilla más lejos.', action: () => player.bombRange++ },
+            { id: 'speed', kind: 'UPGRADE', rarity: 'COMMON', name: 'BOTAS', desc: '+0.4 velocidad.', action: () => { player.speed = Math.min(player.speed + 0.4, 6); } },
+            { id: 'health', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'CORAZÓN', desc: '+1 vida máxima y recupera 1.', action: () => { player.maxHealth++; player.health = Math.min(player.health + 1, player.maxHealth); } },
+            { id: 'shield', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'ESCUDO', desc: 'Protección contra un golpe.', action: () => player.hasShield = true },
+            { id: 'coin', kind: 'UPGRADE', rarity: 'COMMON', name: 'BOTÍN', desc: '+35 monedas.', action: () => gameState.coins += 35 },
+            { id: 'heal', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'KIT MÉDICO', desc: 'Recupera 2 vidas sin superar el máximo.', action: () => player.health = Math.min(player.health + 2, player.maxHealth) }
+        ];
+
+        const RARITY_COLORS = {
+            COMMON: '#94a3b8', UNCOMMON: '#34d399', RARE: '#60a5fa', EPIC: '#c084fc'
+        };
+
+        function getRoomForDepth(depth) {
+            if (depth === 1) return ROOM_TYPES.STANDARD;
+            const roll = Math.random();
+            if (depth % 5 === 0) return ROOM_TYPES.SHRINE;
+            if (roll < 0.16) return ROOM_TYPES.ELITE;
+            if (roll < 0.34) return ROOM_TYPES.TREASURE;
+            if (roll < 0.48) return ROOM_TYPES.CURSED;
+            return ROOM_TYPES.STANDARD;
+        }
+
+        function getAvailableRelics() {
+            return RELICS.filter(r => !gameState.relics.some(owned => owned.id === r.id));
+        }
+
+        function grantRelic(relic) {
+            if (!relic || gameState.relics.some(r => r.id === relic.id)) return false;
+            gameState.relics.push(relic);
+            relic.apply();
+            addFloatingText(`${relic.icon} ${relic.name}`, player.x, player.y, RARITY_COLORS[relic.rarity]);
+            updateUI();
+            return true;
+        }
+
         let gameState = {
             isPlaying: false,
             level: 1,
@@ -47,7 +131,18 @@ const canvas = document.getElementById('gameCanvas');
             camera: { x: 0, y: 0, targetX: 0, targetY: 0 },
             shakeTimer: 0,
             shakeIntensity: 0,
-            animFrame: 0
+            animFrame: 0,
+            paused: false,
+            coins: 0,
+            relics: [],
+            roomType: ROOM_TYPES.STANDARD,
+            coinBonus: 0,
+            killScoreMult: 1,
+            rerollDiscount: 0,
+            rerolls: 1,
+            blocksBroken: 0,
+            totalKills: 0,
+            bestDepth: Number(localStorage.getItem('bombermanBestDepth') || 0)
         };
 
         let player = {
@@ -75,6 +170,17 @@ const canvas = document.getElementById('gameCanvas');
             }
         });
         window.addEventListener('keyup', (e) => gameState.keys[e.code] = false);
+
+        function togglePause() {
+            if (!gameState.isPlaying) return;
+            gameState.paused = !gameState.paused;
+            const screen = document.getElementById('pause-screen');
+            if (screen) screen.classList.toggle('hidden', !gameState.paused);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
+        });
 
         // Virtual Joystick setup
         const setupJoystick = () => {
@@ -159,6 +265,7 @@ const canvas = document.getElementById('gameCanvas');
 
         function initLevel() {
             // Expand map grid size with higher levels
+            gameState.roomType = getRoomForDepth(gameState.level);
             gameState.gridWidth = 15 + Math.floor((gameState.level - 1) / 2) * 2;
             gameState.gridHeight = 15 + Math.floor((gameState.level - 1) / 2) * 2;
             gameState.gridWidth = Math.min(gameState.gridWidth, 25);
@@ -188,7 +295,7 @@ const canvas = document.getElementById('gameCanvas');
             }
 
             // Destructible soft blocks
-            const blockDensity = Math.min(0.35 + (gameState.level * 0.03), 0.65);
+            const blockDensity = Math.max(0.25, Math.min(0.72, 0.35 + (gameState.level * 0.03) + gameState.roomType.blockBonus));
             for (let y = 1; y < gameState.gridHeight - 1; y++) {
                 for (let x = 1; x < gameState.gridWidth - 1; x++) {
                     if (gameState.grid[y][x] === TYPES.EMPTY) {
@@ -219,24 +326,38 @@ const canvas = document.getElementById('gameCanvas');
                 gameState.grid[gameState.exitPos.y][gameState.exitPos.x] = TYPES.EXIT_OPEN;
             }
 
+            if (gameState.roomType.id === 'SHRINE') {
+                player.health = Math.min(player.health + 1, player.maxHealth);
+                player.hasShield = true;
+                addFloatingText('SANTUARIO: +1 VIDA + ESCUDO', player.x, player.y, '#67e8f9');
+            }
+
             spawnEnemies();
+            updateRoguePresentation();
             updateUI();
         }
 
         function spawnEnemies() {
-            const count = Math.min(3 + Math.floor(gameState.level * 1.5), 12);
-            for (let i = 0; i < count; i++) {
-                let x, y;
-                do {
-                    x = Math.floor(Math.random() * (gameState.gridWidth - 2)) + 1;
-                    y = Math.floor(Math.random() * (gameState.gridHeight - 2)) + 1;
-                } while (gameState.grid[y][x] !== TYPES.EMPTY || (x <= 4 && y <= 4));
-                
-                // Enemy type selection
+            const baseCount = Math.min(3 + Math.floor(gameState.level * 1.5), 12);
+            const count = Math.max(1, Math.round(baseCount * gameState.roomType.enemyMult));
+            const candidates = [];
+            for (let y = 1; y < gameState.gridHeight - 1; y++) {
+                for (let x = 1; x < gameState.gridWidth - 1; x++) {
+                    if (gameState.grid[y][x] === TYPES.EMPTY && !(x <= 4 && y <= 4)) candidates.push({x, y});
+                }
+            }
+            for (let i = candidates.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+            }
+
+            for (let i = 0; i < Math.min(count, candidates.length); i++) {
+                const {x, y} = candidates[i];
                 let rand = Math.random();
                 let type = ENEMY_TYPES.RASTRERO;
                 if (gameState.level >= 2 && rand > 0.6) type = ENEMY_TYPES.VOLADOR;
                 if (gameState.level >= 3 && rand > 0.85) type = ENEMY_TYPES.ESPECIAL;
+                const speed = type.speed * gameState.roomType.enemySpeedMult;
 
                 gameState.enemies.push({
                     x: x * TILE_SIZE + TILE_SIZE / 2,
@@ -244,9 +365,11 @@ const canvas = document.getElementById('gameCanvas');
                     width: TILE_SIZE * 0.75,
                     height: TILE_SIZE * 0.75,
                     type: type,
-                    vx: type.speed * (Math.random() < 0.5 ? 1 : -1),
+                    vx: speed * (Math.random() < 0.5 ? 1 : -1),
                     vy: 0,
-                    changeTimer: Math.random() * 100
+                    baseSpeed: speed,
+                    changeTimer: Math.random() * 100,
+                    elite: gameState.roomType.id === 'ELITE' || gameState.roomType.id === 'CURSED'
                 });
             }
         }
@@ -384,6 +507,7 @@ const canvas = document.getElementById('gameCanvas');
 
             triggerScreenShake(7, 300);
             addParticles((bomb.x + 0.5) * TILE_SIZE, (bomb.y + 0.5) * TILE_SIZE, '#f97316', 15);
+            if (gameState.relics.some(r => r.id === 'ember_core')) gameState.score += 25;
 
             let cells = [{x: bomb.x, y: bomb.y}];
             const dirs = [{dx: 0, dy: -1}, {dx: 0, dy: 1}, {dx: -1, dy: 0}, {dx: 1, dy: 0}];
@@ -401,20 +525,35 @@ const canvas = document.getElementById('gameCanvas');
                     if (type === TYPES.BLOCK) {
                         gameState.grid[ty][tx] = TYPES.EMPTY;
                         gameState.score += 10;
-                        addFloatingText('+10', (tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#cbd5e1');
+                        gameState.blocksBroken++;
+                        const coins = Math.max(1, Math.round((1 + Math.random() * 2) * (1 + gameState.coinBonus) * gameState.roomType.coinMult));
+                        gameState.coins += coins;
+                        addFloatingText(`+10  +${coins}¢`, (tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#fbbf24');
                         addParticles((tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#b45309', 12);
                         
                         if (gameState.exitPos && gameState.exitPos.x === tx && gameState.exitPos.y === ty) {
                             gameState.grid[ty][tx] = TYPES.EXIT_OPEN;
                             addFloatingText('🚪 SALIDA!', (tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#facc15');
-                        } else if (Math.random() < 0.3) {
+                        } else if (Math.random() < gameState.roomType.dropChance) {
                             const ps = Object.keys(POWERUPS);
                             gameState.items.push({ x: tx, y: ty, type: POWERUPS[ps[Math.floor(Math.random() * ps.length)]] });
+                        }
+                        if (getAvailableRelics().length && Math.random() < (gameState.roomType.id === 'TREASURE' ? 0.10 : 0.035)) {
+                            const relicPool = getAvailableRelics();
+                            const relic = relicPool[Math.floor(Math.random() * relicPool.length)];
+                            gameState.items.push({ x: tx, y: ty, type: 'RELIC', relicId: relic.id });
                         }
                         break;
                     }
                 }
             }
+
+            // Reacción en cadena: cualquier bomba alcanzada detona inmediatamente.
+            const chainedBombs = gameState.bombs.filter(other => cells.some(c => c.x === other.x && c.y === other.y));
+            chainedBombs.forEach(other => {
+                const chainIndex = gameState.bombs.indexOf(other);
+                if (chainIndex >= 0) explodeBomb(chainIndex);
+            });
 
             cells.forEach(c => {
                 gameState.explosions.push({ x: c.x, y: c.y, timer: 450 });
@@ -423,7 +562,7 @@ const canvas = document.getElementById('gameCanvas');
         }
 
         function update(dt) {
-            if (!gameState.isPlaying) return;
+            if (!gameState.isPlaying || gameState.paused) return;
             gameState.animFrame++;
 
             // Shake countdown
@@ -455,7 +594,8 @@ const canvas = document.getElementById('gameCanvas');
 
             player.isMoving = false;
             if (dx !== 0 || dy !== 0) {
-                tryMovePlayer(dx * player.speed, dy * player.speed);
+                const frameScale = Math.min(dt / 16.6667, 2);
+                tryMovePlayer(dx * player.speed * frameScale, dy * player.speed * frameScale);
             }
 
             if (player.isMoving) {
@@ -527,8 +667,12 @@ const canvas = document.getElementById('gameCanvas');
                     if (checkOverlap(eFullRect, expRect)) {
                         addParticles(e.x, e.y, e.type.color, 15);
                         gameState.enemies.splice(j, 1);
-                        gameState.score += 100;
-                        addFloatingText('+100', e.x, e.y, '#38bdf8');
+                        const killScore = Math.round(100 * gameState.killScoreMult * (e.elite ? 1.25 : 1));
+                        const killCoins = Math.max(2, Math.round((2 + Math.random() * 3) * (1 + gameState.coinBonus) * gameState.roomType.coinMult));
+                        gameState.score += killScore;
+                        gameState.coins += killCoins;
+                        gameState.totalKills++;
+                        addFloatingText(`+${killScore}  +${killCoins}¢`, e.x, e.y, e.elite ? '#fb7185' : '#38bdf8');
                     }
                 }
 
@@ -549,13 +693,14 @@ const canvas = document.getElementById('gameCanvas');
                     }
                 }
 
-                e.x += e.vx;
+                const enemyFrameScale = Math.min(dt / 16.6667, 2);
+                e.x += e.vx * enemyFrameScale;
                 if (isSolid(Math.floor(e.x / TILE_SIZE), Math.floor(e.y / TILE_SIZE), e.type.canFly)) {
-                    e.x -= e.vx; e.vx *= -1;
+                    e.x -= e.vx * enemyFrameScale; e.vx *= -1;
                 }
-                e.y += e.vy;
+                e.y += e.vy * enemyFrameScale;
                 if (isSolid(Math.floor(e.x / TILE_SIZE), Math.floor(e.y / TILE_SIZE), e.type.canFly)) {
-                    e.y -= e.vy; e.vy *= -1;
+                    e.y -= e.vy * enemyFrameScale; e.vy *= -1;
                 }
 
                 // Hitbox interna del enemigo para dañar al jugador (más pequeña que el visual)
@@ -580,6 +725,10 @@ const canvas = document.getElementById('gameCanvas');
                     if (it.type === POWERUPS.SPEED_UP) { player.speed = Math.min(player.speed + 0.4, 5); addFloatingText('+VELOCIDAD!', player.x, player.y, '#10b981'); }
                     if (it.type === POWERUPS.HEALTH_UP) { player.health = Math.min(player.health + 1, player.maxHealth); addFloatingText('+1 VIDA!', player.x, player.y, '#ef4444'); }
                     if (it.type === POWERUPS.SHIELD_UP) { player.hasShield = true; addFloatingText('ESCUDO ACTIVO!', player.x, player.y, '#38bdf8'); }
+                    if (it.type === 'RELIC') {
+                        const relic = RELICS.find(r => r.id === it.relicId);
+                        if (relic) grantRelic(relic);
+                    }
                     
                     addParticles((it.x + 0.5) * TILE_SIZE, (it.y + 0.5) * TILE_SIZE, '#ffffff', 10);
                     gameState.items.splice(i, 1);
@@ -590,18 +739,20 @@ const canvas = document.getElementById('gameCanvas');
             // Update Particles
             for (let i = gameState.particles.length - 1; i >= 0; i--) {
                 let p = gameState.particles[i];
-                p.x += p.vx;
-                p.y += p.vy;
-                p.life -= 1;
+                const particleFrameScale = Math.min(dt / 16.6667, 2);
+                p.x += p.vx * particleFrameScale;
+                p.y += p.vy * particleFrameScale;
+                p.life -= particleFrameScale;
                 if (p.life <= 0) gameState.particles.splice(i, 1);
             }
 
             // Update Floaters
             for (let i = gameState.floaters.length - 1; i >= 0; i--) {
                 let f = gameState.floaters[i];
-                f.y -= 0.8;
-                f.opacity -= 0.02;
-                f.life -= 1;
+                const floaterFrameScale = Math.min(dt / 16.6667, 2);
+                f.y -= 0.8 * floaterFrameScale;
+                f.opacity -= 0.02 * floaterFrameScale;
+                f.life -= floaterFrameScale;
                 if (f.life <= 0) gameState.floaters.splice(i, 1);
             }
 
@@ -889,6 +1040,15 @@ const canvas = document.getElementById('gameCanvas');
 
         function drawEnemySprite(e) {
             ctx.save();
+            if (e.elite) {
+                ctx.strokeStyle = gameState.roomType.color;
+                ctx.globalAlpha = 0.45 + Math.sin(gameState.animFrame * 0.15) * 0.1;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(e.x, e.y, TILE_SIZE * 0.48, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
             let floaty = e.type.canFly ? Math.sin((gameState.animFrame + e.x) * 0.1) * 4 : Math.sin((gameState.animFrame + e.x) * 0.3) * 2;
             
             // Sombra
@@ -995,6 +1155,18 @@ const canvas = document.getElementById('gameCanvas');
 
         function drawPowerupSprite(x, y, type) {
             let floaty = Math.sin((gameState.animFrame + x) * 0.1) * 3;
+            if (type === 'RELIC') {
+                ctx.fillStyle = '#3b1d6b';
+                ctx.fillRect(x + 6, y + 6 + floaty, TILE_SIZE - 12, TILE_SIZE - 12);
+                ctx.strokeStyle = '#c084fc';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x + 6, y + 6 + floaty, TILE_SIZE - 12, TILE_SIZE - 12);
+                const relic = RELICS.find(r => gameState.items.find(it => it.x * TILE_SIZE === x && it.y * TILE_SIZE === y && it.relicId === r.id)?.id === r.id);
+                ctx.font = '14px "Press Start 2P"';
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(relic?.icon || '✦', x + 11, y + 31 + floaty);
+                return;
+            }
             ctx.fillStyle = '#0284c7';
             ctx.fillRect(x + 8, y + 8 + floaty, TILE_SIZE - 16, TILE_SIZE - 16);
             ctx.strokeStyle = '#38bdf8';
@@ -1066,102 +1238,198 @@ const canvas = document.getElementById('gameCanvas');
             document.getElementById('ui-bombs').innerText = player.maxBombs;
             document.getElementById('ui-range').innerText = player.bombRange;
             document.getElementById('ui-speed').innerText = (player.speed - 2).toFixed(1);
-            
+            document.getElementById('ui-coins').innerText = gameState.coins;
+            document.getElementById('ui-relics').innerText = gameState.relics.length;
+
             const shieldBadge = document.getElementById('ui-shield-badge');
-            if (player.hasShield) {
-                shieldBadge.classList.remove('hidden');
-            } else {
-                shieldBadge.classList.add('hidden');
+            shieldBadge.classList.toggle('hidden', !player.hasShield);
+
+            const roomNode = document.getElementById('room-banner');
+            if (roomNode) {
+                roomNode.textContent = `${gameState.roomType.icon} ${gameState.roomType.name} · ${gameState.roomType.subtitle}`;
+                roomNode.style.setProperty('--room-accent', gameState.roomType.color);
             }
+            updateRoguePresentation();
+        }
+
+        function updateRoguePresentation() {
+            const runNode = document.getElementById('run-banner');
+            if (runNode) runNode.textContent = `RUN ${String(gameState.runNumber || 1).padStart(2, '0')} · DEPTH ${String(gameState.level).padStart(2, '0')}`;
         }
 
         function startGame() {
             document.getElementById('start-screen').classList.add('hidden');
             document.getElementById('game-over-screen').classList.add('hidden');
             document.getElementById('level-complete-screen').classList.add('hidden');
-            
+            document.getElementById('pause-screen')?.classList.add('hidden');
+
+            gameState.runNumber = Number(localStorage.getItem('bombermanRogueRun') || 0) + 1;
+            localStorage.setItem('bombermanRogueRun', gameState.runNumber);
             gameState.level = 1;
             gameState.score = 0;
+            gameState.coins = 0;
+            gameState.relics = [];
+            gameState.coinBonus = 0;
+            gameState.killScoreMult = 1;
+            gameState.rerollDiscount = 0;
+            gameState.rerolls = 1;
+            gameState.blocksBroken = 0;
+            gameState.totalKills = 0;
+            gameState.paused = false;
             player.health = 3;
+            player.maxHealth = 5;
             player.maxBombs = 1;
             player.bombRange = 1;
             player.speed = 3.0;
             player.hasShield = false;
-            
+
             initLevel();
             gameState.isPlaying = true;
+            gameState.lastTime = performance.now();
+            updateRoguePresentation();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function buildRewardChoices() {
+            const choices = [];
+            const availableRelics = getAvailableRelics().map(relic => ({
+                id: `relic_${relic.id}`, kind: 'RELIC', rarity: relic.rarity,
+                name: `${relic.icon} ${relic.name}`, desc: relic.desc, relic
+            }));
+            const pool = [...REWARDS, ...availableRelics];
+            for (let i = pool.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pool[i], pool[j]] = [pool[j], pool[i]];
+            }
+            return pool.slice(0, Math.min(3, pool.length));
+        }
+
+        function applyReward(reward) {
+            if (reward.kind === 'RELIC') {
+                grantRelic(reward.relic);
+            } else {
+                reward.action();
+                addFloatingText(reward.name, player.x, player.y, RARITY_COLORS[reward.rarity]);
+            }
+        }
+
+        function startNextDepth() {
+            gameState.level++;
+            document.getElementById('level-complete-screen').classList.add('hidden');
+            initLevel();
+            gameState.isPlaying = true;
+            gameState.paused = false;
             gameState.lastTime = performance.now();
             requestAnimationFrame(gameLoop);
         }
 
         function completeLevel() {
             gameState.isPlaying = false;
-            gameState.level++;
             const screen = document.getElementById('level-complete-screen');
             const options = document.getElementById('upgrade-options');
+            const rewardTitle = document.getElementById('reward-title');
+            const rewardMeta = document.getElementById('reward-meta');
+            const footer = document.getElementById('reward-footer');
             options.innerHTML = '';
-            
-            const upgs = [
-                { name: '+1 BOMBA', desc: 'Más bombas simultáneas', action: () => player.maxBombs++ },
-                { name: '+1 RANGO', desc: 'Fuego más extendido', action: () => player.bombRange++ },
-                { name: 'VELOCIDAD', desc: 'Móvete más rápido', action: () => player.speed = Math.min(player.speed + 0.4, 5) },
-                { name: 'ESCUDO', desc: 'Protección contra 1 golpe', action: () => player.hasShield = true }
-            ];
+            footer.innerHTML = '';
 
-            // Pick 3 random options
-            upgs.sort(() => Math.random() - 0.5);
-            upgs.slice(0, 3).forEach(u => {
-                let card = document.createElement('div');
-                card.className = 'upgrade-card';
-                card.innerHTML = `<div class="font-bold text-xs text-yellow-400 mb-1">${u.name}</div><div class="text-3xs text-slate-300 text-center">${u.desc}</div>`;
-                card.onclick = () => {
-                    u.action();
-                    screen.classList.add('hidden');
-                    initLevel();
-                    gameState.isPlaying = true;
-                    gameState.lastTime = performance.now();
-                    requestAnimationFrame(gameLoop);
-                };
+            const roomReward = Math.round(ROOM_TYPES[gameState.roomType.id].rewardCoins * (1 + gameState.coinBonus));
+            gameState.coins += roomReward;
+            gameState.score += Math.round(250 * (1 + (gameState.level * 0.08)));
+
+            if (rewardTitle) rewardTitle.textContent = `PROFUNDIDAD ${String(gameState.level).padStart(2, '0')} SUPERADA`;
+            if (rewardMeta) rewardMeta.textContent = `+${roomReward} monedas · elegí 1 mejora para la próxima sala`;
+
+            const choices = buildRewardChoices();
+            choices.forEach(reward => {
+                const card = document.createElement('button');
+                card.type = 'button';
+                card.className = 'upgrade-card reward-card';
+                card.style.setProperty('--rarity', RARITY_COLORS[reward.rarity]);
+                card.innerHTML = `
+                    <div class="reward-rarity">${reward.rarity}</div>
+                    <div class="reward-name">${reward.name}</div>
+                    <div class="reward-desc">${reward.desc}</div>
+                `;
+                card.addEventListener('click', () => {
+                    applyReward(reward);
+                    startNextDepth();
+                }, { once: true });
                 options.appendChild(card);
             });
+
+            const skip = document.createElement('button');
+            skip.className = 'reward-secondary';
+            skip.textContent = 'NO ELEGIR · +15¢';
+            skip.addEventListener('click', () => {
+                gameState.coins += 15;
+                startNextDepth();
+            }, { once: true });
+            footer.appendChild(skip);
+
+            if (gameState.rerolls > 0) {
+                const rerollCost = Math.max(5, 15 - gameState.rerollDiscount);
+                const reroll = document.createElement('button');
+                reroll.className = 'reward-secondary';
+                reroll.textContent = `REROLL · ${rerollCost}¢`;
+                reroll.disabled = gameState.coins < rerollCost;
+                reroll.addEventListener('click', () => {
+                    if (gameState.coins < rerollCost || gameState.rerolls <= 0) return;
+                    gameState.coins -= rerollCost;
+                    gameState.rerolls--;
+                    completeLevelRewardsRefresh(options, footer);
+                });
+                footer.appendChild(reroll);
+            }
+
+            updateUI();
             screen.classList.remove('hidden');
+        }
+
+        function completeLevelRewardsRefresh(options, footer) {
+            options.innerHTML = '';
+            footer.innerHTML = '';
+            const choices = buildRewardChoices();
+            choices.forEach(reward => {
+                const card = document.createElement('button');
+                card.type = 'button';
+                card.className = 'upgrade-card reward-card';
+                card.style.setProperty('--rarity', RARITY_COLORS[reward.rarity]);
+                card.innerHTML = `<div class="reward-rarity">${reward.rarity}</div><div class="reward-name">${reward.name}</div><div class="reward-desc">${reward.desc}</div>`;
+                card.addEventListener('click', () => { applyReward(reward); startNextDepth(); }, { once: true });
+                options.appendChild(card);
+            });
+            const skip = document.createElement('button');
+            skip.className = 'reward-secondary';
+            skip.textContent = 'NO ELEGIR · +15¢';
+            skip.addEventListener('click', () => { gameState.coins += 15; startNextDepth(); }, { once: true });
+            footer.appendChild(skip);
+            updateUI();
         }
 
         function gameOver() {
             gameState.isPlaying = false;
-            document.getElementById('go-level').innerText = gameState.level;
+            gameState.paused = false;
+            const finalDepth = gameState.level;
+            gameState.bestDepth = Math.max(gameState.bestDepth, finalDepth);
+            localStorage.setItem('bombermanBestDepth', gameState.bestDepth);
+            const bestScore = Math.max(Number(localStorage.getItem('bombermanBestScore') || 0), gameState.score);
+            localStorage.setItem('bombermanBestScore', bestScore);
+            document.getElementById('go-level').innerText = finalDepth;
             document.getElementById('go-score').innerText = gameState.score;
+            document.getElementById('go-coins').innerText = gameState.coins;
+            document.getElementById('go-relics').innerText = gameState.relics.length;
+            document.getElementById('go-best').innerText = gameState.bestDepth;
             document.getElementById('game-over-screen').classList.remove('hidden');
         }
 
         document.getElementById('btn-start').addEventListener('click', startGame);
         document.getElementById('btn-restart').addEventListener('click', startGame);
+        document.getElementById('btn-resume')?.addEventListener('click', togglePause);
 
         // Initial setup
+        gameState.runNumber = Number(localStorage.getItem('bombermanRogueRun') || 0) + 1;
         initLevel();
+        updateRoguePresentation();
+        updateUI();
         draw();
-
-        // Roguelike presentation layer: run identity + depth banner.
-        const runBanner = document.getElementById('run-banner');
-        let rogueRun = Number(localStorage.getItem('bombermanRogueRun') || 0);
-        const originalStartGame = typeof startGame === 'function' ? startGame : null;
-        function updateRogueBanner() {
-            const depth = (typeof gameState !== 'undefined' && gameState.level) ? gameState.level : 1;
-            if (runBanner) runBanner.textContent = `RUN ${String(rogueRun).padStart(2,'0')} · DEPTH ${String(depth).padStart(2,'0')}`;
-        }
-        if (runBanner) {
-            const observer = new MutationObserver(updateRogueBanner);
-            const levelNode = document.getElementById('ui-level');
-            if (levelNode) observer.observe(levelNode, {childList:true,subtree:true,characterData:true});
-            updateRogueBanner();
-        }
-        document.getElementById('btn-start')?.addEventListener('click', () => {
-            rogueRun++;
-            localStorage.setItem('bombermanRogueRun', rogueRun);
-            updateRogueBanner();
-        });
-        document.getElementById('btn-restart')?.addEventListener('click', () => {
-            rogueRun++;
-            localStorage.setItem('bombermanRogueRun', rogueRun);
-            updateRogueBanner();
-        });

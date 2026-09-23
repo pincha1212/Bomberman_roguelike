@@ -1,21 +1,18 @@
-# Bomberman Roguelike v3.15.1 — Debug Lab
+# Bomberman Roguelike — Debug integrado v3.15.2
 
-Modo de pruebas aislado para la build actual del juego.
+El menú principal incluye el botón **🧪 ABRIR DEBUG LAB**.
 
-## Qué permite comprobar
+El botón abre `debug/debug.html` en una pestaña nueva para no cerrar ni interrumpir la partida principal.
 
-- Movimiento cardinal y colisiones.
-- Colocación y detonación de bombas.
-- Daño, inmunidad temporal y prevención de doble golpe.
-- Las cinco trampas y su activación de un solo uso.
-- Comportamiento básico de enemigos.
-- Seguimiento y límites de cámara.
-- Reinicio limpio de una run.
+Estructura necesaria:
 
-## Uso
+```text
+index.html
+styles.css
+js/
+debug/
+  debug.html
+  debug.css
+```
 
-Abrí `debug.html` desde la misma carpeta que `index.html`, `styles.css` y `js/`.
-
-El laboratorio carga el juego real dentro de un iframe y ejecuta las pruebas sobre ese motor. Cada prueba prepara un estado aislado antes de ejecutar el escenario.
-
-El modo debug no se carga desde `index.html`, por lo que no altera la partida normal.
+El Debug Lab continúa usando `js/18-debug-mode.js` y queda separado del juego normal.

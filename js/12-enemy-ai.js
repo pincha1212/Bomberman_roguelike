@@ -483,6 +483,10 @@ function updateEnemyIntentV312(e, index, dt) {
         e.lastDirection = chosen.dir;
         ai.blockedTimer = 0;
     }
+
+    if (typeof debugRecordEvent === 'function' && (ai.alert !== 'patrol' || chosen.dir !== currentDir.dir)) {
+        debugRecordEvent('AI', `Enemy ${index} · ${ai.alert} · ${currentDir.dir || '?'} → ${chosen.dir}`, {index, behavior:ai.behavior, alert:ai.alert, desired:chosen.dir, tile});
+    }
 }
 
 function applyEnemyDirectionAtCenterV312(e) {

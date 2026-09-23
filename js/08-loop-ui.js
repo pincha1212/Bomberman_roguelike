@@ -1,6 +1,9 @@
 // Bomberman Roguelike v3.15 — Game loop, HUD, run flow, rewards, death summary and bootstrap
         function gameLoop(timestamp) {
             if (!gameState.isPlaying) { gameState.rafId = 0; return; }
+
+            const debugEnabled = !!window.DEBUG_MODE?.enabled;
+            const frameStart = debugEnabled ? performance.now() : 0;
             let dt = timestamp - gameState.lastTime;
             gameState.lastTime = timestamp;
             if (dt > 100) dt = 16;
@@ -20,8 +23,20 @@
             if (perf.slowFrames >= 20) perf.lowQuality = true;
             if (perf.fastFrames >= 120) perf.lowQuality = false;
 
-            update(dt);
+            const shouldUpdate = !debugEnabled || window.DEBUG_MODE.shouldUpdate();
+            const updateStart = debugEnabled ? performance.now() : 0;
+            if (shouldUpdate) update(dt);
+            const updateMs = debugEnabled ? performance.now() - updateStart : 0;
+
+            const drawStart = debugEnabled ? performance.now() : 0;
             draw();
+            const drawMs = debugEnabled ? performance.now() - drawStart : 0;
+
+            if (debugEnabled) {
+                const frameMs = performance.now() - frameStart;
+                window.DEBUG_MODE.recordFrame(timestamp, frameMs, updateMs, drawMs);
+                window.dispatchEvent(new CustomEvent('bomber-debug-updated'));
+            }
 
             if (gameState.isPlaying) {
                 gameState.rafId = requestAnimationFrame(gameLoop);
@@ -230,6 +245,10 @@
         document.getElementById('btn-start').addEventListener('click', () => { initAudio(); audioCtx?.resume(); sfx('click'); startGame(); });
         document.getElementById('btn-restart').addEventListener('click', () => { initAudio(); audioCtx?.resume(); sfx('click'); startGame(); });
         document.getElementById('btn-resume')?.addEventListener('click', togglePause);
+        document.getElementById('btn-debug-mode')?.addEventListener('click', () => {
+            const base = window.location.href.split('?')[0].split('#')[0];
+            window.location.href = `${base}?debug=1`;
+        });
 
         // Initial setup
         gameState.runNumber = Number(localStorage.getItem('bombermanRogueRun') || 0);

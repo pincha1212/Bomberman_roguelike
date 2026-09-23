@@ -134,6 +134,7 @@ function placeBomb(reason='manual'){
 
     gameState.bombs.push(bomb);
     player.bombsPlaced++;
+    if (typeof debugRecordEvent === 'function') debugRecordEvent('BOMB', `Bomba colocada en ${bomb.x},${bomb.y} · fuse=${Math.round(bomb.timer)}ms`, {x:bomb.x,y:bomb.y,owner:bomb.owner});
     player.bombCooldown = BOMB_HANDLING.placementCooldown;
     if (typeof triggerBombPlacedFeedback === 'function') triggerBombPlacedFeedback(bomb);
     sfx('bomb');

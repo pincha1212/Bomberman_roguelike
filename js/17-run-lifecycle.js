@@ -126,6 +126,7 @@ function resetWorldRuntimeState() {
 }
 
 function beginNewRun() {
+    if (typeof debugRecordEvent === 'function') debugRecordEvent('LIFECYCLE', 'beginNewRun()');
     // Si una callback de requestAnimationFrame quedó en cola, la invalida.
     if (typeof gameState.rafId === 'number' && gameState.rafId && typeof cancelAnimationFrame === 'function') {
         cancelAnimationFrame(gameState.rafId);
@@ -170,6 +171,7 @@ function getDeathCauseLabel(source) {
 }
 
 function finishRun(source = 'unknown') {
+    if (typeof debugRecordEvent === 'function') debugRecordEvent('LIFECYCLE', `finishRun() · ${source}`);
     if (RUN_LIFECYCLE.lastSummary) return RUN_LIFECYCLE.lastSummary;
 
     gameState.isPlaying = false;

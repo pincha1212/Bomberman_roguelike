@@ -100,6 +100,7 @@
             drawAmbientDust();
             drawLighting();
             renderCombatFeedback();
+            if (typeof drawDebugWorldOverlay === 'function') drawDebugWorldOverlay();
         }
 
         function drawSteelWall(x, y) {

@@ -150,6 +150,7 @@ function triggerHazard(h, reason = 'player') {
     const def = trapDefinition(h.type);
     h.triggered = true;
     h.visible = true;
+    if (typeof debugRecordEvent === 'function') debugRecordEvent('TRAP', `Trampa activada: ${h.type} · ${h.x},${h.y}`, {type:h.type,x:h.x,y:h.y,reason});
     h.flashTimer = 1200;
     h.telegraphTimer = 0;
     h.effectTimer = def.activeMs || 650;

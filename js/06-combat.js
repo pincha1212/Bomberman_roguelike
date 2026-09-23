@@ -25,6 +25,7 @@
 
                 const blastId = ++gameState.blastSerial;
                 const cells = calculateBombBlastCells(bomb);
+                if (typeof debugRecordEvent === 'function') debugRecordEvent('BOMB', `Explosión ${blastId} · ${bomb.x},${bomb.y} · ${cells.length} celdas`, {blastId, cells});
                 const blastKeys = new Set(cells.map(c => `${c.x},${c.y}`));
                 // V3.12.3: algunas trampas reaccionan al paso de una explosión.
                 if (typeof reactHazardsToBlast === 'function') reactHazardsToBlast(cells, bomb);
@@ -255,7 +256,11 @@
         }
 
         function takeDamage(source='unknown', sourceX=player.x, sourceY=player.y) {
-            if (!canApplyPlayerDamage()) return false;
+            if (!canApplyPlayerDamage()) {
+                if (typeof debugRecordEvent === 'function') debugRecordEvent('DAMAGE', `Daño bloqueado · ${source}`);
+                return false;
+            }
+            if (typeof debugRecordEvent === 'function') debugRecordEvent('DAMAGE', `Daño aplicado · ${source}`, {hpBefore: player.health, shield: player.hasShield});
 
             sfx('hurt');
             if (player.hasShield) {

@@ -205,3 +205,27 @@ Corrección puntual del movimiento tras colocar una bomba. La bomba propia perma
 - Spawn inicial a distancia segura del jugador, con fallback controlado si el mapa es compacto.
 - Indicadores visuales de estado de IA.
 - Movimiento enemigo separado de la lógica de daño para aislar fallos.
+
+## v3.11.3 — Enemy AI Intelligence & Navigation Fix
+
+Esta revisión corrige un problema estructural de la navegación de enemigos detectado en la IA v3.11.
+
+### Correcciones principales
+
+- Los caminos ahora guardan un **waypoint por cada celda**. Antes el enemigo reutilizaba el objetivo final para avanzar por cada tramo y, al llegar a la primera esquina, podía quedarse bloqueado.
+- Los enemigos con línea de visión reaccionan de inmediato cuando el jugador entra en su corredor.
+- Rastreros, voladores y especiales patrullan cuando no tienen contacto visual, conservando el comportamiento solicitado de seguir su curso cuando no ven al jugador.
+- Los enemigos mantienen memoria breve de la última posición conocida para buscar al jugador después de perderlo de vista.
+- Los especiales usan posiciones de rodeo alrededor del jugador cuando tienen contacto visual.
+- La evasión de bombas tiene prioridad sobre la persecución.
+- Un enemigo atrapado en una celda peligrosa puede atravesar el borde de esa celda para alcanzar una zona segura; el peligro no se trata como una pared física.
+- El pathfinding sigue dosificado y limitado a una reconstrucción por ciclo de scheduler para evitar bloqueos del game loop.
+
+### Validación
+
+- Todos los módulos JS pasan `node --check`.
+- Prueba de giro por esquina: PASS.
+- Persecución con línea de visión: PASS.
+- Pérdida de visión y patrulla: PASS.
+- Escape desde una zona de explosión: PASS.
+- No se habilita movimiento diagonal para enemigos.

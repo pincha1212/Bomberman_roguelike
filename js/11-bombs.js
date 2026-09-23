@@ -32,11 +32,35 @@ function isBombSolidForPlayer(gx, gy){
 }
 
 function markBombEscapeState(){
-    const pgx = Math.floor((player.x + player.width / 2) / TILE_SIZE);
-    const pgy = Math.floor((player.y + player.height / 2) / TILE_SIZE);
+    // La salida segura termina SOLO cuando la hitbox de movimiento del jugador
+    // deja de tocar por completo la casilla de la bomba. Antes se usaba el
+    // centro del jugador; eso podía volver sólida la bomba un frame demasiado
+    // pronto y dejar al jugador atrapado en su propio borde.
+    const playerBox = typeof getMovementHitbox === 'function'
+        ? getMovementHitbox(player.x, player.y, player.width, player.height)
+        : {
+            left: player.x, right: player.x + player.width,
+            top: player.y, bottom: player.y + player.height
+        };
+
     gameState.bombs.forEach(bomb => {
         if (!bomb.playerPassThrough) return;
-        if (pgx !== bomb.x || pgy !== bomb.y) {
+
+        const bombRect = {
+            left: bomb.x * TILE_SIZE,
+            right: (bomb.x + 1) * TILE_SIZE,
+            top: bomb.y * TILE_SIZE,
+            bottom: (bomb.y + 1) * TILE_SIZE
+        };
+
+        const stillOverlaps = playerBox.right > bombRect.left &&
+            playerBox.left < bombRect.right &&
+            playerBox.bottom > bombRect.top &&
+            playerBox.top < bombRect.bottom;
+
+        // Mientras cualquier parte de la hitbox siga dentro de la celda,
+        // la bomba continúa atravesable para garantizar una huida completa.
+        if (!stillOverlaps) {
             bomb.playerPassThrough = false;
             bomb.justArmed = true;
         }

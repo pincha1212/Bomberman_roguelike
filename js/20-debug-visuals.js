@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.16.5 — Debug visualizers
+// Bomberman Roguelike v3.16.6 — Debug visualizers
 // Las capas de navegación se dibujan sobre el mismo canvas del juego.
 (() => {
     'use strict';
@@ -127,6 +127,20 @@
             }
             ctx.restore();
 
+            // TRAZA REAL DEL JUGADOR: solo celdas que el jugador realmente atravesó.
+            if ((player.trail || []).length > 1) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(250,204,21,.72)';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                player.trail.forEach((cell, i) => {
+                    const p = tileCenter(cell.x, cell.y);
+                    if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+                });
+                ctx.stroke();
+                ctx.restore();
+            }
+
             const pc = tileCenter(player.tile.x, player.tile.y);
             for (const dir of (player.options || [])) {
                 const d = DIRS[dir];
@@ -137,6 +151,8 @@
             const pDesired = DIRS[String(player.desiredDirection || '').toUpperCase()];
             if (pCurrent) arrow(pc.x,pc.y,pc.x+pCurrent[0]*18,pc.y+pCurrent[1]*18,'#f8fafc','PC');
             if (pDesired) arrow(pc.x,pc.y,pc.x+pDesired[0]*30,pc.y+pDesired[1]*30,'#f43f5e','PD');
+            const pReal = DIRS[String(player.actualDirection || '').toUpperCase()];
+            if (pReal) arrow(pc.x,pc.y,pc.x+pReal[0]*38,pc.y+pReal[1]*38,'#facc15','REAL');
             ctx.save();
             ctx.fillStyle = '#22d3ee';
             ctx.font = 'bold 9px Consolas,monospace';
@@ -182,10 +198,26 @@
                 }
             }
 
+            // TRAZA REAL DEL ENEMIGO: recorrido observado, distinta de la ruta REF.
+            if ((enemy.trail || []).length > 1) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(250,204,21,.55)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                enemy.trail.forEach((cell, i) => {
+                    const p = tileCenter(cell.x, cell.y);
+                    if (i === 0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
+                });
+                ctx.stroke();
+                ctx.restore();
+            }
+
             const currentDir = DIRS[enemy.currentDirection];
             const desiredDir = DIRS[enemy.desiredDirection];
+            const actualDir = DIRS[String(enemy.actualDirection || '').toUpperCase()];
             if (currentDir) arrow(start.x,start.y,start.x+currentDir[0]*18,start.y+currentDir[1]*18,'#f8fafc','C');
             if (desiredDir) arrow(start.x,start.y,start.x+desiredDir[0]*30,start.y+desiredDir[1]*30,'#f43f5e','D');
+            if (actualDir) arrow(start.x,start.y,start.x+actualDir[0]*40,start.y+actualDir[1]*40,'#facc15','REAL');
             if (enemy.routeNextDirection && enemy.routeNextDirection !== '—' && DIRS[enemy.routeNextDirection]) {
                 const refDir = DIRS[enemy.routeNextDirection];
                 arrow(start.x,start.y,start.x+refDir[0]*38,start.y+refDir[1]*38,'rgba(56,189,248,.9)','R');
@@ -202,10 +234,12 @@
             ctx.save();
             ctx.fillStyle = enemy.seesPlayer ? '#f87171' : color;
             ctx.font = '8px Consolas,monospace';
-            const statusLabel = enemy.stuckLikely ? 'ATASCADO' : (enemy.currentPassable === false ? 'BLOQUEADO' : enemy.movementState || 'OK');
+            const statusLabel = enemy.stuckLikely ? 'ATASCADO' : (enemy.currentPassable === false ? 'BLOQUEADO' : enemy.movementState || enemy.progressStatus || 'OK');
             ctx.fillText(`E${enemy.index} ${enemy.routeLength}c · ${statusLabel}`, start.x+9,start.y+18);
             ctx.fillStyle = '#f8fafc';
             ctx.fillText(`R:${enemy.routeNextDirection} ${enemy.routeAlignment}`, start.x+9,start.y+28);
+            ctx.fillStyle = '#facc15';
+            ctx.fillText(`REAL:${enemy.actualDirection || '—'} · T:${enemy.tileTransitions || 0}`, start.x+9,start.y+38);
             ctx.restore();
         }
     }

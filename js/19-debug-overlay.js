@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.16.5 — Debug Overlay
+// Bomberman Roguelike v3.16.6 — Debug Overlay
 // Panel reconstruido para inspección en vivo. Solo se crea con ?debug=1.
 (() => {
     'use strict';
@@ -12,7 +12,7 @@
     root.innerHTML = `
         <div class="debug-header">
             <div>
-                <div class="debug-kicker">BOMBERMAN ENGINE · v3.16.5</div>
+                <div class="debug-kicker">BOMBERMAN ENGINE · v3.16.6</div>
                 <h2>DEBUG MODE <span id="debug-status" class="debug-status">CARGANDO</span></h2>
             </div>
             <button type="button" class="debug-icon-btn" data-debug-action="toggle" title="Mostrar/ocultar panel">F3</button>
@@ -46,7 +46,7 @@
         </section>
 
         <section class="debug-section">
-            <div class="debug-section-title">PLAYER</div>
+            <div class="debug-section-title">PLAYER · MOVIMIENTO REAL</div>
             <div class="debug-grid debug-grid-4">
                 <div><span>X</span><strong id="dbg-px">—</strong></div>
                 <div><span>Y</span><strong id="dbg-py">—</strong></div>
@@ -54,8 +54,17 @@
                 <div><span>VY</span><strong id="dbg-vy">—</strong></div>
                 <div><span>DIR</span><strong id="dbg-dir">—</strong></div>
                 <div><span>DESEADA</span><strong id="dbg-desired">—</strong></div>
+                <div><span>REAL</span><strong id="dbg-p-real">—</strong></div>
+                <div><span>ESTADO</span><strong id="dbg-p-state">—</strong></div>
                 <div><span>TILE</span><strong id="dbg-tile">—</strong></div>
                 <div><span>INPUT</span><strong id="dbg-input">—</strong></div>
+                <div><span>ALCANZABLES</span><strong id="dbg-p-reachable">—</strong></div>
+                <div><span>CENTRO</span><strong id="dbg-p-center">—</strong></div>
+                <div><span>MOVIDO/MUESTRA</span><strong id="dbg-p-moved">—</strong></div>
+                <div><span>TRANSICIONES</span><strong id="dbg-p-transitions">—</strong></div>
+                <div><span>SIN PROGRESO</span><strong id="dbg-p-stallframes">—</strong></div>
+                <div><span>MISMO TILE</span><strong id="dbg-p-sametile">—</strong></div>
+                <div><span>PROGRESO</span><strong id="dbg-p-progress">—</strong></div>
                 <div><span>HP</span><strong id="dbg-hp">—</strong></div>
                 <div><span>BOMBAS</span><strong id="dbg-bombs">—</strong></div>
                 <div><span>RANGO</span><strong id="dbg-range">—</strong></div>
@@ -117,7 +126,7 @@
                 <div><span>JUGADOR CENTRO</span><strong id="dbg-nav-player-center">—</strong></div>
             </div>
             <div id="dbg-nav-note" class="debug-note">—</div>
-            <div id="dbg-nav-legend" class="debug-note">RUTA REF = ruta teórica · C = dirección actual · D = dirección deseada · LOS = línea de visión.</div>
+            <div id="dbg-nav-legend" class="debug-note">RUTA REF = ruta teórica · REAL = velocidad observada · C = dirección actual · D = deseada · LOS = visión · TRAZA = recorrido real.</div>
             <pre id="dbg-nav-enemies" class="debug-log">Sin datos de navegación.</pre>
         </section>
 
@@ -128,10 +137,16 @@
         </section>
 
         <section class="debug-section debug-tests">
-            <div class="debug-section-head"><div class="debug-section-title">TEST RUNNER</div><span id="dbg-suite">0/7</span></div>
+            <div class="debug-section-head"><div class="debug-section-title">TEST RUNNER</div><span id="dbg-suite">0/${Object.keys(window.DEBUG_TESTS || {}).length}</span></div>
             <div class="debug-test-list">
-                ${['movement','bombs','damage','traps','enemies','camera','restart'].map(name => `<button type="button" data-debug-test="${name}"><span>${name.toUpperCase()}</span><em id="dbg-test-${name}">PENDIENTE</em></button>`).join('')}
+                ${Object.keys(window.DEBUG_TESTS || {}).map(name => `<button type="button" data-debug-test="${name}"><span>${name.replace('ai-stress','AI STRESS').toUpperCase()}</span><em id="dbg-test-${name}">PENDIENTE</em></button>`).join('')}
             </div>
+        </section>
+
+        <section class="debug-section">
+            <div class="debug-section-head"><div class="debug-section-title">AI STRESS</div><span id="dbg-stress-head">PENDIENTE</span></div>
+            <div id="dbg-stress-summary" class="debug-note">Ejecutá AI STRESS para probar movimiento, giros, rutas, bloqueos y evasión.</div>
+            <pre id="dbg-stress-cases" class="debug-log">Sin resultados.</pre>
         </section>
 
         <section class="debug-section">
@@ -193,8 +208,17 @@
             setText('dbg-vy', fmt(p.vy, 2));
             setText('dbg-dir', p.dir);
             setText('dbg-desired', p.desiredDirection);
+            setText('dbg-p-real', p.actualDirection || '—');
+            setText('dbg-p-state', p.movementState || 'NO EXPUESTO');
             setText('dbg-tile', `${p.tile.x},${p.tile.y}`);
             setText('dbg-input', p.inputAxis);
+            setText('dbg-p-reachable', p.reachableTiles ?? s.navigation?.player?.reachableTiles ?? '—');
+            setText('dbg-p-center', p.distanceToCenter != null ? `${fmt(p.distanceToCenter,1)}px` : '—');
+            setText('dbg-p-moved', p.movedPx != null ? `${fmt(p.movedPx,2)}px` : '—');
+            setText('dbg-p-transitions', p.tileTransitions ?? '—');
+            setText('dbg-p-stallframes', p.framesSinceProgress ?? '—');
+            setText('dbg-p-sametile', p.sameTileMs != null ? `${fmt(p.sameTileMs,0)}ms` : '—');
+            setText('dbg-p-progress', p.progressStatus || 'NO EXPUESTO');
             setText('dbg-hp', `${p.hp}/${p.maxHp}`);
             setText('dbg-bombs', `${p.bombsAvailable}/${p.bombsMax} · ${p.bombsPlaced} puestos`);
             setText('dbg-range', p.range);
@@ -203,7 +227,7 @@
             setText('dbg-invuln', p.invulnerable ? `${Math.ceil(p.invulnerabilityMs)}ms` : 'NO');
             setText('dbg-moving', p.isMoving ? 'SI' : 'NO');
         } else {
-            ['dbg-px','dbg-py','dbg-vx','dbg-vy','dbg-dir','dbg-desired','dbg-tile','dbg-input','dbg-hp','dbg-bombs','dbg-range','dbg-speed','dbg-shield','dbg-invuln','dbg-moving'].forEach(id => setText(id, '—'));
+            ['dbg-px','dbg-py','dbg-vx','dbg-vy','dbg-dir','dbg-desired','dbg-p-real','dbg-p-state','dbg-tile','dbg-input','dbg-p-reachable','dbg-p-center','dbg-p-moved','dbg-p-transitions','dbg-p-stallframes','dbg-p-sametile','dbg-p-progress','dbg-hp','dbg-bombs','dbg-range','dbg-speed','dbg-shield','dbg-invuln','dbg-moving'].forEach(id => setText(id, '—'));
         }
 
         const w = s.world;
@@ -249,10 +273,30 @@
         const enemyLines = enemyNav.map(e => {
             const route = e.canReachPlayer ? `${e.routeLength} celdas` : 'SIN RUTA';
             const flags = [e.stuckLikely ? 'ATASCADO' : null, e.currentPassable === false ? 'BLOQUEADO' : null, e.turnReady ? 'CENTRO' : null].filter(Boolean).join(',') || 'OK';
-            return `E${e.index} · tile ${e.tile.x},${e.tile.y} · ${e.behavior}/${e.alert} · actual ${e.currentDirection} · deseada ${e.desiredDirection} · real ${e.actualDirection} · estado ${e.movementState} · ruta ${route} · ref ${e.routeNextDirection}/${e.routeAlignment} · centro ${fmt(e.distanceToCenter,1)}px · ${flags} · target ${e.target?.x},${e.target?.y}`;
+            return `E${e.index} · tile ${e.tile.x},${e.tile.y} · prev ${e.previousTile?.x},${e.previousTile?.y} · ${e.behavior}/${e.alert} · actual ${e.currentDirection} · deseada ${e.desiredDirection} · REAL ${e.actualDirection} · estado ${e.movementState} · progreso ${e.progressStatus} · mov ${fmt(e.movedPx,2)}px · trans ${e.tileTransitions || 0} · giros ${e.directionChanges || 0} · ruta ${route} · ref ${e.routeNextDirection}/${e.routeAlignment} · centro ${fmt(e.distanceToCenter,1)}px · sinProg ${e.framesSinceProgress || 0}f · ${flags} · target ${e.target?.x},${e.target?.y}`;
         });
         const navNode = document.getElementById('dbg-nav-enemies');
         if (navNode) navNode.textContent = enemyLines.length ? enemyLines.join('\n') : 'Sin enemigos en la escena.';
+
+        const stress = s.aiStress;
+        if (stress?.cases?.length) {
+            setText('dbg-stress-head', `${stress.passed}/${stress.total} PASS`);
+            const stuckCases = stress.cases.filter(c => c.stuckLikely).length;
+            const blockedCases = stress.cases.filter(c => c.blockedFrames > 0).length;
+            setText('dbg-stress-summary', `Movimiento real: ${stress.passed}/${stress.total} PASS · ${stress.failed} FAIL · atascos=${stuckCases} · bloqueos=${blockedCases}`);
+            const stressNode = document.getElementById('dbg-stress-cases');
+            if (stressNode) stressNode.textContent = stress.cases.map(c => {
+                const bomb = c.maxBombDistance > 0 ? ` · bomba=${c.minBombDistance}→${c.maxBombDistance} · flee=${c.fleeFrames}` : '';
+                const agree = c.routeDirectionAgreement != null ? ` · acuerdo=${c.routeDirectionAgreement}%` : '';
+                const recovery = c.firstRecoveredDirection && c.firstRecoveredDirection !== '—' ? ` · rec=${c.firstRecoveredDirection}@${c.firstDirectionChangeFrame}f` : '';
+                return `${c.status} ${c.name} · mov=${c.movedPx}px · trans=${c.tileTransitions} · giros=${c.directionChanges} · ruta=${c.routeLength} · REAL=${c.finalAlert} · bloqueos=${c.blockedFrames} · pausaMax=${c.maxNoMoveFrames}f · centroMax=${c.maxCenterDistance}px · atascado=${c.stuckLikely ? 'SI' : 'NO'}${recovery}${agree}${bomb}${c.failure ? ` · ${c.failure}` : ''}`;
+            }).join('\n');
+        } else {
+            setText('dbg-stress-head', 'PENDIENTE');
+            setText('dbg-stress-summary', 'Ejecutá AI STRESS para probar movimiento, giros, rutas, bloqueos y evasión.');
+            const stressNode = document.getElementById('dbg-stress-cases');
+            if (stressNode) stressNode.textContent = 'Sin resultados.';
+        }
 
         const last = D.lastTest;
         setText('dbg-last-test', last ? `${last.name.toUpperCase()} · ${last.status} · ${last.ms.toFixed(1)}ms` : '—');

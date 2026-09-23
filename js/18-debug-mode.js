@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.16.5 — Debug Engine
+// Bomberman Roguelike v3.16.6 — Debug Engine
 // Depuración interna del mismo runtime. Se activa solo con ?debug=1.
 (() => {
     'use strict';
@@ -13,11 +13,13 @@
         { dx: -1, dy: 0, dir: 'LEFT' }
     ]);
 
-    const TEST_NAMES = Object.freeze(['movement', 'bombs', 'damage', 'traps', 'enemies', 'camera', 'restart']);
+    const TEST_NAMES = Object.freeze(['movement', 'bombs', 'damage', 'traps', 'enemies', 'ai-stress', 'camera', 'restart']);
     const MAX_EVENTS = 220;
     const MAX_ERRORS = 100;
     const MAX_TEST_RESULTS = 30;
     const MAX_NAV_NODES = 900;
+    const MAX_MOTION_TRAIL = 24;
+    const AI_STRESS_CASES = 7;
     const EVENT_DEDUPE_MS = 850;
     const EVENT_DEDUPE_TYPES = new Set(['AI', 'DEBUG', 'VISUAL', 'INFO', 'WORLD']);
 
@@ -56,6 +58,9 @@
         navigationSignature: '',
         navigationAt: 0,
         enemyProgress: new WeakMap(),
+        playerProgress: null,
+        motionSampleCount: 0,
+        aiStress: null,
         selectedVisuals: {
             grid: false,
             collision: false,
@@ -101,6 +106,8 @@
                 this.frameWindowCount = 0;
                 this.frameWindowStart = timestamp;
             }
+
+            sampleLiveMotion(timestamp);
         },
 
         recordEvent(type, message, data = null) {
@@ -211,6 +218,8 @@
             const bombs = Array.isArray(state?.bombs) ? state.bombs : [];
             const enemies = Array.isArray(state?.enemies) ? state.enemies : [];
             const explosions = Array.isArray(state?.explosions) ? state.explosions : [];
+            const navigation = this.getNavigationSnapshot();
+            const livePlayer = this.playerProgress || sampleLiveMotion(performance.now(), true)?.player || null;
 
             return {
                 status: !state ? 'ENGINE NO DISPONIBLE' : (state.isPlaying ? (this.paused ? 'PAUSADO' : 'ACTIVO') : 'DETENIDO'),
@@ -241,7 +250,16 @@
                     invulnerabilityMs: Number(player.invincibleTimer || 0),
                     tile: playerTile,
                     inputAxis: player.inputAxis || '—',
-                    inputDir: Number(player.inputDir || 0)
+                    inputDir: Number(player.inputDir || 0),
+                    movementState: livePlayer?.movementState || playerMovementState(player, navigation?.player?.options || []),
+                    distanceToCenter: num(livePlayer?.distanceToCenter ?? distanceToTileCenter(player, playerTile, 'player')),
+                    actualDirection: livePlayer?.actualDirection || movementDirection(player.vx, player.vy),
+                    movedPx: num(livePlayer?.movedPx),
+                    tileTransitions: Number(livePlayer?.tileTransitions || 0),
+                    framesSinceProgress: Number(livePlayer?.framesSinceProgress || 0),
+                    sameTileMs: num(livePlayer?.sameTileMs),
+                    progressStatus: livePlayer?.progressStatus || 'SIN MUESTRA',
+                    trail: Array.isArray(livePlayer?.trail) ? livePlayer.trail.slice(-MAX_MOTION_TRAIL) : []
                 } : null,
                 world: state ? {
                     width: Number(state.gridWidth || 0),
@@ -274,7 +292,7 @@
                 performance: {
                     fps: this.fps,
                     frameMs: this.avgFrameMs,
-                    workMs: this.avgFrameMs,
+                    workMs: this.loopMs,
                     frameIntervalMs: this.frameIntervalMs,
                     avgFrameIntervalMs: this.avgFrameIntervalMs,
                     loopMs: this.loopMs,
@@ -296,7 +314,8 @@
                 events: this.eventLog.length,
                 rawEvents: this.eventCountRaw,
                 suppressedEvents: this.suppressedEvents,
-                navigation: this.getNavigationSnapshot()
+                navigation,
+                aiStress: this.aiStress
             };
         },
 
@@ -309,7 +328,7 @@
 
             const signature = buildNavigationSignature(state, player);
             const now = performance.now();
-            if (!force && this.navigationCache && signature === this.navigationSignature && now - this.navigationAt < 1000) {
+            if (!force && this.navigationCache && signature === this.navigationSignature && now - this.navigationAt < 250) {
                 return this.navigationCache;
             }
 
@@ -345,6 +364,13 @@
                     turnReady: progress.turnReady,
                     currentPassable,
                     nextTile: progress.nextTile,
+                    previousTile: progress.previousTile,
+                    tileTransitions: progress.tileTransitions,
+                    movedPx: progress.movedPx,
+                    framesSinceProgress: progress.framesSinceProgress,
+                    directionChanges: progress.directionChanges,
+                    progressStatus: progress.progressStatus,
+                    trail: progress.trail,
                     seesPlayer: !!ai.seesPlayer,
                     options,
                     reachableTiles: reach.cells.length,
@@ -359,6 +385,9 @@
                 };
             });
 
+            // El snapshot debe usar una muestra de movimiento válida antes de
+            // construir los datos de navegación del jugador.
+            const livePlayer = this.playerProgress || sampleLiveMotion(now, true)?.player || null;
             const playerOptions = cellOptions('player', player, playerTile);
             const playerJunctions = countJunctions(playerReach.cells, 'player', player);
             const result = {
@@ -376,8 +405,14 @@
                     currentDirection: String(player.dir || '—').toUpperCase(),
                     desiredDirection: String(player.desiredDirection || player.inputAxis || '—').toUpperCase(),
                     actualSpeed: Math.hypot(Number(player.vx) || 0, Number(player.vy) || 0),
-                    movementState: playerMovementState(player, playerOptions),
-                    distanceToCenter: distanceToTileCenter(player, playerTile),
+                    movementState: livePlayer?.movementState || playerMovementState(player, playerOptions),
+                    distanceToCenter: num(livePlayer?.distanceToCenter ?? distanceToTileCenter(player, playerTile, 'player')),
+                    actualDirection: livePlayer?.actualDirection || movementDirection(player.vx, player.vy),
+                    movedPx: num(livePlayer?.movedPx),
+                    tileTransitions: Number(livePlayer?.tileTransitions || 0),
+                    framesSinceProgress: Number(livePlayer?.framesSinceProgress || 0),
+                    progressStatus: livePlayer?.progressStatus || 'SIN MUESTRA',
+                    trail: Array.isArray(livePlayer?.trail) ? livePlayer.trail.slice(-MAX_MOTION_TRAIL) : [],
                     treeEdges: playerReach.edges,
                     cells: playerReach.cells
                 },
@@ -393,6 +428,7 @@
         resetNavigation() {
             this.navigationCache = null;
             this.enemyProgress = new WeakMap();
+            this.playerProgress = null;
             this.navigationSignature = '';
             this.navigationAt = 0;
         },
@@ -410,6 +446,7 @@
         async executeTests(names) {
             this.busy = true;
             this.testResults = [];
+            this.aiStress = null;
             const storage = captureStorage();
             const startedSuite = performance.now();
             this.recordEvent('TEST', `Inicio de suite: ${names.length} prueba(s).`);
@@ -505,6 +542,12 @@
                 '',
                 '=== NAVEGACIÓN ===',
                 compactNavigationReport(snapshot.navigation),
+                '',
+                '=== DIAGNÓSTICO IA / MOVIMIENTO REAL ===',
+                compactMotionDiagnostic(snapshot.navigation),
+                '',
+                '=== AI STRESS TEST ===',
+                compactStressReport(this.aiStress),
                 '',
                 '=== EVENT LOG (AGRUPADO) ===',
                 this.eventLog.length ? this.eventLog.map(item => {
@@ -609,14 +652,107 @@
         }
     };
 
-    function distanceToTileCenter(entity, tile) {
+    function distanceToTileCenter(entity, tile, kind = 'player') {
         if (!entity || !tile) return 0;
         const cx = tile.x * TILE_SIZE + TILE_SIZE / 2;
         const cy = tile.y * TILE_SIZE + TILE_SIZE / 2;
-        const ex = Number(entity.x) + (entity.width ? Number(entity.width) / 2 : 0);
-        const ey = Number(entity.y) + (entity.height ? Number(entity.height) / 2 : 0);
+        // Player usa x/y como esquina superior izquierda. Enemy usa x/y como centro.
+        const ex = kind === 'enemy' ? Number(entity.x) : Number(entity.x) + (entity.width ? Number(entity.width) / 2 : 0);
+        const ey = kind === 'enemy' ? Number(entity.y) : Number(entity.y) + (entity.height ? Number(entity.height) / 2 : 0);
         return Math.hypot(ex - cx, ey - cy);
     }
+
+    function sampleLiveMotion(timestamp = performance.now(), force = false) {
+        if (!DEBUG_MODE.enabled) return null;
+        const state = getState();
+        const player = getPlayer();
+        if (!state || !player) return null;
+        const now = Number(timestamp) || performance.now();
+
+        const playerTile = entityTile(player, 'player');
+        const prevP = DEBUG_MODE.playerProgress;
+        const px = Number(player.x) || 0;
+        const py = Number(player.y) || 0;
+        const pdx = prevP ? px - prevP.x : 0;
+        const pdy = prevP ? py - prevP.y : 0;
+        const pMoved = Math.hypot(pdx, pdy);
+        const pTileKey = `${playerTile.x},${playerTile.y}`;
+        const pSameTileSince = prevP?.tileKey === pTileKey ? prevP.sameTileSince : now;
+        const pLastProgressAt = pMoved > 0.05 ? now : (prevP?.lastProgressAt || now);
+        const pFramesSince = pMoved > 0.05 ? 0 : (prevP?.framesSinceProgress || 0) + 1;
+        const pTrail = prevP?.trail ? prevP.trail.slice() : [];
+        if (!pTrail.length || pTrail[pTrail.length - 1].x !== playerTile.x || pTrail[pTrail.length - 1].y !== playerTile.y) pTrail.push({ x: playerTile.x, y: playerTile.y });
+        if (pTrail.length > MAX_MOTION_TRAIL) pTrail.splice(0, pTrail.length - MAX_MOTION_TRAIL);
+        const pSpeed = Math.hypot(Number(player.vx) || 0, Number(player.vy) || 0);
+        let pStatus = pSpeed > 0.08 ? 'AVANZANDO' : 'DETENIDO';
+        if (pMoved > 0.05) pStatus = 'AVANZANDO';
+        else if (pFramesSince >= 30 && pMoved <= 0.05) pStatus = 'SIN PROGRESO';
+        DEBUG_MODE.playerProgress = {
+            x: px, y: py, tileKey: pTileKey, tile: playerTile,
+            previousTile: prevP?.tile || playerTile,
+            sameTileSince: pSameTileSince, sameTileMs: Math.max(0, now - pSameTileSince), lastProgressAt: pLastProgressAt,
+            framesSinceProgress: pFramesSince, movedPx: pMoved,
+            actualDirection: movementDirection(player.vx, player.vy),
+            actualSpeed: pSpeed, distanceToCenter: distanceToTileCenter(player, playerTile, 'player'),
+            tileTransitions: (prevP?.tileTransitions || 0) + (prevP && prevP.tileKey !== pTileKey ? 1 : 0),
+            progressStatus: pStatus, movementState: playerMovementState(player), trail: pTrail,
+            lastSampleAt: now
+        };
+
+        for (let index = 0; index < Math.min(16, state.enemies?.length || 0); index++) {
+            const enemy = state.enemies[index];
+            if (!enemy) continue;
+            sampleEnemyMotion(enemy, index, now);
+        }
+        DEBUG_MODE.motionSampleCount += 1;
+        return { player: DEBUG_MODE.playerProgress };
+    }
+
+    function sampleEnemyMotion(enemy, index, now = performance.now()) {
+        const tile = entityTile(enemy, 'enemy');
+        const previous = DEBUG_MODE.enemyProgress.get(enemy);
+        const x = Number(enemy?.x) || 0;
+        const y = Number(enemy?.y) || 0;
+        const dx = previous ? x - previous.x : 0;
+        const dy = previous ? y - previous.y : 0;
+        const movedPx = Math.hypot(dx, dy);
+        const speed = Math.hypot(Number(enemy?.vx) || 0, Number(enemy?.vy) || 0);
+        const key = `${tile.x},${tile.y}`;
+        const sameTileSince = previous?.tileKey === key ? previous.sameTileSince : now;
+        const lastProgressAt = movedPx > 0.05 ? now : (previous?.lastProgressAt || now);
+        const framesSinceProgress = movedPx > 0.05 ? 0 : (previous?.framesSinceProgress || 0) + 1;
+        const actualDirection = movementDirection(enemy?.vx, enemy?.vy);
+        const ai = enemy?.ai || {};
+        const dir = String(ai.direction || enemy.lastDirection || '—').toUpperCase();
+        const previousDir = previous?.aiDirection || dir;
+        const directionChanges = (previous?.directionChanges || 0) + (previous && dir !== previousDir && dir !== '—' ? 1 : 0);
+        const trail = previous?.trail ? previous.trail.slice() : [];
+        if (!trail.length || trail[trail.length - 1].x !== tile.x || trail[trail.length - 1].y !== tile.y) trail.push({ x: tile.x, y: tile.y });
+        if (trail.length > MAX_MOTION_TRAIL) trail.splice(0, trail.length - MAX_MOTION_TRAIL);
+        const distanceToCenter = distanceToTileCenter(enemy, tile, 'enemy');
+        const currentPassable = enemyCurrentDirectionPassable(enemy, dir, ai.alert);
+        const blockedMs = Number(ai.blockedTimer) || 0;
+        const stuckMs = Number(ai.stuckTimer) || 0;
+        const sameTileMs = now - sameTileSince;
+        const noProgressMs = now - lastProgressAt;
+        const stuckLikely = speed < 0.08 && noProgressMs >= 500 && currentPassable !== false;
+        let progressStatus = movedPx > 0.05 ? 'AVANZANDO' : 'DETENIDO';
+        if (currentPassable === false) progressStatus = 'BLOQUEADO';
+        if (stuckLikely) progressStatus = 'ATASCADO';
+        const movementState = progressStatus === 'AVANZANDO'
+            ? (distanceToCenter <= 9 && String(ai.desiredDirection || '').toUpperCase() !== dir ? 'LISTO PARA GIRAR' : 'MOVIÉNDOSE')
+            : progressStatus;
+        DEBUG_MODE.enemyProgress.set(enemy, {
+            x, y, tileKey: key, tile, previousTile: previous?.tile || tile,
+            sameTileSince, sameTileMs, lastProgressAt, framesSinceProgress, movedPx,
+            actualDirection, actualSpeed: speed, distanceToCenter, blockedMs, stuckMs,
+            stuckLikely, progressStatus, movementState, directionChanges,
+            tileTransitions: (previous?.tileTransitions || 0) + (previous && previous.tileKey !== key ? 1 : 0),
+            aiDirection: dir, trail, lastSampleAt: now
+        });
+        return DEBUG_MODE.enemyProgress.get(enemy);
+    }
+
 
     function movementDirection(vx, vy) {
         const x = Number(vx) || 0;
@@ -639,43 +775,41 @@
     }
 
     function observeEnemyProgress(enemy, index, tile, currentDirection, desiredDirection, options) {
-        const now = performance.now();
-        const previous = DEBUG_MODE.enemyProgress.get(enemy);
-        const x = Number(enemy?.x) || 0;
-        const y = Number(enemy?.y) || 0;
-        const speed = Math.hypot(Number(enemy?.vx) || 0, Number(enemy?.vy) || 0);
-        const center = { x: tile.x * TILE_SIZE + TILE_SIZE / 2, y: tile.y * TILE_SIZE + TILE_SIZE / 2 };
-        const distanceToCenter = Math.hypot((x) - center.x, (y) - center.y);
-        const actualDirection = movementDirection(enemy?.vx, enemy?.vy);
-        const currentKey = `${tile.x},${tile.y}`;
-        let sameTileSince = previous?.tileKey === currentKey ? previous.sameTileSince : now;
-        let noProgressSince = previous?.movementDistance > 0.4 ? now : (previous?.noProgressSince || now);
-        if (previous && Math.hypot(x - previous.x, y - previous.y) > 0.4) noProgressSince = now;
-        DEBUG_MODE.enemyProgress.set(enemy, { x, y, tileKey: currentKey, sameTileSince, noProgressSince, movementDistance: previous ? Math.hypot(x - previous.x, y - previous.y) : 0 });
-
+        const live = DEBUG_MODE.enemyProgress.get(enemy) || sampleEnemyMotion(enemy, index, performance.now());
         const ai = enemy?.ai || {};
-        const blockedMs = Number(ai.blockedTimer) || 0;
-        const stuckMs = Number(ai.stuckTimer) || 0;
-        const turnReady = distanceToCenter <= 9;
-        const sameTileMs = now - sameTileSince;
-        const noProgressMs = now - noProgressSince;
-        const wantsTurn = desiredDirection !== '—' && desiredDirection !== currentDirection;
         const currentPassable = enemyCurrentDirectionPassable(enemy, currentDirection, ai.alert);
-        const stuckLikely = speed < 0.08 && (blockedMs >= 45 || stuckMs >= 45 || (wantsTurn && turnReady && currentPassable === false));
-        let movementState = 'MOVIÉNDOSE';
-        if (stuckLikely) movementState = 'ATASCADO';
-        else if (currentPassable === false) movementState = 'BLOQUEADO';
-        else if (wantsTurn && turnReady) movementState = 'LISTO PARA GIRAR';
-        else if (speed < 0.08) movementState = 'DETENIDO';
-
+        const turnReady = Number(live?.distanceToCenter || 0) <= 9;
+        const wantsTurn = desiredDirection !== '—' && desiredDirection !== currentDirection;
+        let movementState = live?.movementState || 'SIN MUESTRA';
+        if (currentPassable === false && movementState !== 'ATASCADO') movementState = 'BLOQUEADO';
+        else if (wantsTurn && turnReady && movementState === 'AVANZANDO') movementState = 'LISTO PARA GIRAR';
         let nextTile = null;
         const dir = String(currentDirection || '').toLowerCase();
         if (dir === 'up') nextTile = { x: tile.x, y: tile.y - 1 };
         if (dir === 'down') nextTile = { x: tile.x, y: tile.y + 1 };
         if (dir === 'left') nextTile = { x: tile.x - 1, y: tile.y };
         if (dir === 'right') nextTile = { x: tile.x + 1, y: tile.y };
-
-        return { actualDirection, actualSpeed: speed, movementState, distanceToCenter, sameTileMs, noProgressMs, stuckLikely, turnReady, blockedMs, stuckMs, nextTile, options };
+        return {
+            actualDirection: live?.actualDirection || movementDirection(enemy?.vx, enemy?.vy),
+            actualSpeed: Number(live?.actualSpeed || 0),
+            movementState,
+            distanceToCenter: Number(live?.distanceToCenter || 0),
+            sameTileMs: Number(live?.sameTileMs || (performance.now() - (live?.sameTileSince || performance.now()))),
+            noProgressMs: Number(performance.now() - (live?.lastProgressAt || performance.now())),
+            stuckLikely: !!live?.stuckLikely,
+            turnReady,
+            blockedMs: Number(live?.blockedMs || ai.blockedTimer || 0),
+            stuckMs: Number(live?.stuckMs || ai.stuckTimer || 0),
+            nextTile,
+            previousTile: live?.previousTile || tile,
+            tileTransitions: Number(live?.tileTransitions || 0),
+            movedPx: Number(live?.movedPx || 0),
+            framesSinceProgress: Number(live?.framesSinceProgress || 0),
+            directionChanges: Number(live?.directionChanges || 0),
+            progressStatus: live?.progressStatus || 'SIN MUESTRA',
+            trail: live?.trail || [],
+            options
+        };
     }
 
     function inferEnemyTarget(ai, playerTile, enemy, enemyTile) {
@@ -732,6 +866,27 @@
         lines.push(`modo=${nav.mode} · jugador alcanzables=${nav.player?.reachableTiles || 0} · junctions=${nav.player?.junctions || 0} · deadEnds=${nav.player?.deadEnds || 0} · opciones=${(nav.player?.options || []).join(',') || '—'}`);
         for (const e of (nav.enemies || [])) {
             lines.push(`E${e.index} tile=${e.tile.x},${e.tile.y} · ${e.behavior}/${e.alert} · actual=${e.currentDirection} · deseada=${e.desiredDirection} · real=${e.actualDirection} · estado=${e.movementState} · centro=${Number(e.distanceToCenter || 0).toFixed(1)}px · bloqueado=${e.currentPassable === false ? 'SI' : 'NO'} · atascado=${e.stuckLikely ? 'SI' : 'NO'} · ruta=${e.routeLength} · nextRuta=${e.routeNextDirection} · alineación=${e.routeAlignment} · target=${e.target?.x},${e.target?.y}`);
+        }
+        return lines.join('\n');
+    }
+
+    function compactMotionDiagnostic(nav) {
+        if (!nav?.available) return 'Sin diagnóstico de movimiento.';
+        const p = nav.player || {};
+        const lines = [
+            `PLAYER · estado=${p.movementState || '—'} · real=${p.actualDirection || '—'} · centro=${Number(p.distanceToCenter || 0).toFixed(1)}px · movimiento=${Number(p.movedPx || 0).toFixed(2)}px/muestra · transiciones=${p.tileTransitions || 0} · sinProgreso=${p.framesSinceProgress || 0}f`
+        ];
+        for (const e of nav.enemies || []) {
+            lines.push(`E${e.index} · real=${e.actualDirection} · estado=${e.movementState} · tile=${e.tile.x},${e.tile.y} · previo=${e.previousTile?.x},${e.previousTile?.y} · mov=${Number(e.movedPx || 0).toFixed(2)}px · trans=${e.tileTransitions || 0} · giros=${e.directionChanges || 0} · centro=${Number(e.distanceToCenter || 0).toFixed(1)}px · bloqueo=${e.currentPassable === false ? 'SI' : 'NO'} · sinProgreso=${Number(e.framesSinceProgress || 0)}f · atascado=${e.stuckLikely ? 'SI' : 'NO'}`);
+        }
+        return lines.join('\n');
+    }
+
+    function compactStressReport(stress) {
+        if (!stress?.cases?.length) return 'Sin ejecución de AI Stress Test.';
+        const lines = [`resumen=${stress.passed}/${stress.total} PASS · ${stress.failed} FAIL`];
+        for (const c of stress.cases) {
+            lines.push(`${c.status} ${c.name} · mov=${c.movedPx}px · trans=${c.tileTransitions} · giros=${c.directionChanges} · ruta=${c.routeLength} · alerta=${c.finalAlert} · bloqueos=${c.blockedFrames} · atascado=${c.stuckLikely ? 'SI' : 'NO'}${c.failure ? ` · ${c.failure}` : ''}`);
         }
         return lines.join('\n');
     }
@@ -806,6 +961,7 @@
         DEBUG_MODE.resetNavigation();
         if (typeof updateUI === 'function') updateUI(true);
         if (typeof draw === 'function') draw();
+        sampleLiveMotion(performance.now(), true);
         startDebugLoop();
     }
 
@@ -1153,6 +1309,183 @@
             };
         },
 
+        'ai-stress': async () => {
+            prepareControlledStressScene();
+            const stressStarted = performance.now();
+            const cases = [
+                { name: 'direct-chase', player: { x: 5, y: 7 }, enemy: { x: 1, y: 7 }, dir: 'right', minMove: 8, minTurns: 0 },
+                { name: 'corner-turn', player: { x: 7, y: 7 }, enemy: { x: 3, y: 3 }, dir: 'down', minMove: 8, minTurns: 1 },
+                { name: 'long-corridor', player: { x: 13, y: 7 }, enemy: { x: 1, y: 7 }, dir: 'right', minMove: 40, minTurns: 0 },
+                { name: 'intersection', player: { x: 3, y: 3 }, enemy: { x: 7, y: 3 }, dir: 'down', minMove: 8, minTurns: 1 },
+                { name: 'dead-end', player: { x: 5, y: 10 }, enemy: { x: 5, y: 13 }, dir: 'down', minMove: 8, minTurns: 1, recoveryExpected: true },
+                { name: 'blocked-recovery', player: { x: 7, y: 7 }, enemy: { x: 7, y: 1 }, dir: 'up', minMove: 8, minTurns: 0, recoveryExpected: true },
+                { name: 'bomb-flee', player: { x: 13, y: 7 }, enemy: { x: 5, y: 7 }, dir: 'right', minMove: 8, minTurns: 0, bomb: { x: 6, y: 7, timer: 1200, range: 3 } }
+            ];
+            const results = [];
+            for (const spec of cases) {
+                buildStressGrid();
+                const state = getState();
+                const p = getPlayer();
+                state.bombs = [];
+                state.explosions = [];
+                state.hazards = [];
+                state.enemies = [];
+                state.bossProjectiles = [];
+                state.particles = [];
+                state.floaters = [];
+                setPlayerAt(spec.player);
+                p.vx = 0; p.vy = 0;
+                const enemy = createStressEnemy(spec.enemy, spec.dir, results.length);
+                state.enemies.push(enemy);
+                if (spec.bomb) state.bombs.push({ x: spec.bomb.x, y: spec.bomb.y, timer: spec.bomb.timer, range: spec.bomb.range, fuseTotal: 2000, owner: 'debug-stress' });
+                if (typeof ensureEnemyMotionStateV312 === 'function') ensureEnemyMotionStateV312(enemy, results.length);
+                enemy.ai.visionTimer = 0;
+                enemy.ai.decisionTimer = 0;
+                enemy.ai.seesPlayer = false;
+                enemy.ai.memoryTimer = 0;
+                enemy.ai.patrolX = -1;
+                enemy.ai.patrolY = -1;
+                enemy.ai.direction = spec.dir;
+                enemy.ai.desiredDirection = spec.dir;
+                enemy.lastDirection = spec.dir;
+
+                const start = { x: enemy.x, y: enemy.y, tile: entityTile(enemy, 'enemy'), dir: spec.dir };
+                let maxMove = 0;
+                let tileTransitions = 0;
+                let directionChanges = 0;
+                let firstDirectionChangeFrame = -1;
+                let firstRecoveredDirection = '—';
+                let previousTile = { ...start.tile };
+                let previousDir = spec.dir;
+                let minBombDistance = Infinity;
+                let maxBombDistance = 0;
+                let finalAlert = '—';
+                let firstNonPatrolFrame = -1;
+                let blockedFrames = 0;
+                let maxStuckMs = 0;
+                let consecutiveNoMoveFrames = 0;
+                let maxNoMoveFrames = 0;
+                let fleeFrames = 0;
+                let dangerNextFrames = 0;
+                let maxCenterDistance = 0;
+                let routeDirectionMatches = 0;
+                let routeDirectionSamples = 0;
+
+                for (let frame = 0; frame < 180; frame++) {
+                    const beforeX = enemy.x;
+                    const beforeY = enemy.y;
+                    updateEnemyAI(16.6667);
+                    const moved = Math.hypot(enemy.x - beforeX, enemy.y - beforeY);
+                    maxMove = Math.max(maxMove, moved);
+                    if (moved > 0.05) consecutiveNoMoveFrames = 0;
+                    else { consecutiveNoMoveFrames += 1; maxNoMoveFrames = Math.max(maxNoMoveFrames, consecutiveNoMoveFrames); }
+                    const tile = entityTile(enemy, 'enemy');
+                    if (tile.x !== previousTile.x || tile.y !== previousTile.y) {
+                        tileTransitions += 1;
+                        previousTile = { ...tile };
+                    }
+                    const dirNow = String(enemy.ai?.direction || '—').toUpperCase();
+                    if (dirNow !== String(previousDir).toUpperCase() && dirNow !== '—') {
+                        directionChanges += 1;
+                        if (firstDirectionChangeFrame < 0) {
+                            firstDirectionChangeFrame = frame;
+                            firstRecoveredDirection = dirNow;
+                        }
+                    }
+                    previousDir = enemy.ai?.direction || previousDir;
+                    finalAlert = enemy.ai?.alert || enemy.ai?.behavior || '—';
+                    if (firstNonPatrolFrame < 0 && finalAlert !== 'patrol') firstNonPatrolFrame = frame;
+                    if (finalAlert === 'flee') fleeFrames += 1;
+                    if (Number(enemy.ai?.blockedTimer || 0) > 0 || Number(enemy.ai?.stuckTimer || 0) > 0) blockedFrames += 1;
+                    maxStuckMs = Math.max(maxStuckMs, Number(enemy.ai?.stuckTimer || 0));
+                    const center = gridTileCenter(tile.x, tile.y);
+                    maxCenterDistance = Math.max(maxCenterDistance, Math.hypot(enemy.x - center.x, enemy.y - center.y));
+                    if (spec.bomb) {
+                        const bombDistance = Math.abs(entityTile(enemy, 'enemy').x - spec.bomb.x) + Math.abs(entityTile(enemy, 'enemy').y - spec.bomb.y);
+                        minBombDistance = Math.min(minBombDistance, bombDistance);
+                        maxBombDistance = Math.max(maxBombDistance, bombDistance);
+                        const nextByDir = enemyProjectedTileV312(enemy, enemyDirectionV312(String(enemy.ai?.direction || '').toLowerCase()), 1);
+                        if (typeof enemyDangerV312 === 'function' && enemyDangerV312(nextByDir.x, nextByDir.y)) dangerNextFrames += 1;
+                    }
+                    sampleLiveMotion(performance.now(), true);
+                    const currentDirObserved = movementDirection(enemy.vx, enemy.vy);
+                    const routeSnap = getState() && getPlayer() ? DEBUG_MODE.getNavigationSnapshot(true).enemies?.[0] : null;
+                    const routeNext = routeSnap?.routeNextDirection || '—';
+                    if (currentDirObserved !== '—' && routeNext !== '—') {
+                        routeDirectionSamples += 1;
+                        if (currentDirObserved === routeNext) routeDirectionMatches += 1;
+                    }
+                }
+
+                const nav = getState() && getPlayer() ? DEBUG_MODE.getNavigationSnapshot(true) : null;
+                const item = nav?.enemies?.[0] || null;
+                const final = { x: enemy.x, y: enemy.y, tile: entityTile(enemy, 'enemy') };
+                const movedTotal = Math.hypot(final.x - start.x, final.y - start.y);
+                const routeLength = item?.routeLength ?? 0;
+                const canReach = item?.canReachPlayer ?? false;
+                const stuckLikely = !!item?.stuckLikely;
+                const recoveryOk = spec.name !== 'recovery' || String(enemy.ai?.direction || '').toLowerCase() !== 'up';
+                let pass = true;
+                const failures = [];
+                if (movedTotal < spec.minMove) { pass = false; failures.push(`movimiento ${movedTotal.toFixed(1)}<${spec.minMove}`); }
+                if (directionChanges < spec.minTurns) { pass = false; failures.push(`giros ${directionChanges}<${spec.minTurns}`); }
+                if (stuckLikely) { pass = false; failures.push('atasco detectado'); }
+                if (blockedFrames > 120) { pass = false; failures.push(`bloqueo prolongado ${blockedFrames}/180`); }
+                if (spec.name !== 'bomb-flee' && !canReach) { pass = false; failures.push('sin ruta al jugador'); }
+                if (spec.recoveryExpected && firstDirectionChangeFrame < 0) { pass = false; failures.push('no recuperó dirección bloqueada'); }
+                if (spec.name === 'bomb-flee' && fleeFrames < 5) { pass = false; failures.push(`flee insuficiente (${fleeFrames} frames)`); }
+                if (spec.name === 'bomb-flee' && maxBombDistance <= 1) { pass = false; failures.push(`no aumentó distancia a bomba (máx ${maxBombDistance})`); }
+
+                results.push({
+                    name: spec.name,
+                    status: pass ? 'PASS' : 'FAIL',
+                    startTile: start.tile,
+                    finalTile: final.tile,
+                    movedPx: Number(movedTotal.toFixed(1)),
+                    maxStepPx: Number(maxMove.toFixed(2)),
+                    tileTransitions,
+                    directionChanges,
+                    firstDirectionChangeFrame,
+                    firstRecoveredDirection,
+                    routeLength,
+                    canReachPlayer: canReach,
+                    finalAlert,
+                    firstNonPatrolFrame,
+                    blockedFrames,
+                    maxStuckMs: Number(maxStuckMs.toFixed(1)),
+                    maxNoMoveFrames,
+                    maxCenterDistance: Number(maxCenterDistance.toFixed(1)),
+                    routeDirectionAgreement: routeDirectionSamples ? Number((routeDirectionMatches / routeDirectionSamples * 100).toFixed(1)) : null,
+                    fleeFrames,
+                    dangerNextFrames,
+                    stuckLikely,
+                    minBombDistance: Number.isFinite(minBombDistance) ? minBombDistance : null,
+                    maxBombDistance: Number.isFinite(maxBombDistance) ? maxBombDistance : null,
+                    failure: failures.join(' · ') || null
+                });
+            }
+            const passed = results.filter(r => r.status === 'PASS').length;
+            if (results.length !== AI_STRESS_CASES) {
+                DEBUG_MODE.recordEvent('WARN', `AI Stress: se esperaban ${AI_STRESS_CASES} escenarios y se ejecutaron ${results.length}.`);
+            }
+            DEBUG_MODE.aiStress = { total: results.length, passed, failed: results.length - passed, cases: results, durationMs: null };
+            const elapsed = performance.now() - stressStarted;
+            DEBUG_MODE.aiStress.durationMs = elapsed;
+            const stuckCases = results.filter(r => r.stuckLikely).length;
+            const blockedCases = results.filter(r => r.blockedFrames > 0).length;
+            const failureText = results.filter(r => r.failure).map(r => `${r.name}: ${r.failure}`).join(' | ');
+            if (passed !== results.length) throw new Error(`AI Stress: ${passed}/${results.length} casos PASS. ${failureText}`);
+            return {
+                summary: `${passed}/${results.length} escenarios PASS · atascos=${stuckCases} · bloqueos con registro=${blockedCases}`,
+                details: {
+                    cases: results,
+                    durationMs: Number((performance.now() - stressStarted).toFixed(1)),
+                    focus: 'movimiento real, giros, rutas, bloqueos, recuperación y evasión de bomba',
+                    note: 'La prueba observa updateEnemyAI(); no modifica 12-enemy-ai.js.'
+                }
+            };
+        },
+
         camera: async () => {
             prepareTestScene();
             const p = getPlayer();
@@ -1160,12 +1493,15 @@
             const cell = findEmptyCell();
             setPlayerAt(cell);
             resetCameraToPlayer();
-            const before = { x: state.camera.x, y: state.camera.y };
+            const before = { x: Number(state.camera.x), y: Number(state.camera.y) };
+            if (!Number.isFinite(before.x) || !Number.isFinite(before.y)) throw new Error('La cámara no expuso coordenadas numéricas antes de la prueba.');
             p.x = Math.max(TILE_SIZE, (state.gridWidth - 3) * TILE_SIZE - p.width / 2);
             p.y = Math.max(TILE_SIZE, (state.gridHeight - 3) * TILE_SIZE - p.height / 2);
             for (let i = 0; i < 12; i++) updateCamera(16.6667);
             const bounds = getCameraBounds();
-            const after = { x: state.camera.x, y: state.camera.y };
+            const after = { x: Number(state.camera.x), y: Number(state.camera.y) };
+            if (!Number.isFinite(after.x) || !Number.isFinite(after.y)) throw new Error('La cámara no produjo coordenadas numéricas después del seguimiento.');
+            if (!Number.isFinite(bounds.maxX) || !Number.isFinite(bounds.maxY)) throw new Error('Los límites de cámara no son numéricos.');
             if (after.x < -0.01 || after.x > bounds.maxX + 0.01 || after.y < -0.01 || after.y > bounds.maxY + 0.01) throw new Error('La cámara salió de sus límites.');
             if (Math.abs(after.x - before.x) < 0.01 && Math.abs(after.y - before.y) < 0.01) throw new Error('La cámara no siguió al jugador.');
             return { summary: `(${before.x.toFixed(0)},${before.y.toFixed(0)}) → (${after.x.toFixed(0)},${after.y.toFixed(0)})`, details: { before, after, target: { x: state.camera.targetX, y: state.camera.targetY }, bounds } };
@@ -1195,6 +1531,82 @@
             return { summary: 'estado limpio · reset verificado', details: { health: p.health, bombsPlaced: p.bombsPlaced, velocity: { x: p.vx, y: p.vy }, bombs: state.bombs.length, explosions: state.explosions.length, projectiles: state.bossProjectiles.length, shakeTimer: state.shakeTimer } };
         }
     };
+
+    function buildStressGrid() {
+        const state = getState();
+        if (!state) throw new Error('gameState no disponible.');
+        state.gridWidth = 15;
+        state.gridHeight = 15;
+        state.grid = Array.from({ length: 15 }, () => Array(15).fill(TYPES.WALL));
+        const carve = (x, y) => { if (x > 0 && x < 14 && y > 0 && y < 14) state.grid[y][x] = TYPES.EMPTY; };
+        for (let x = 1; x <= 13; x++) carve(x, 7);
+        for (let y = 1; y <= 13; y++) carve(7, y);
+        for (let x = 3; x <= 11; x++) carve(x, 3);
+        for (let y = 3; y <= 7; y++) carve(3, y);
+        for (let y = 3; y <= 7; y++) carve(11, y);
+        for (let y = 7; y <= 13; y++) carve(5, y);
+        for (let y = 7; y <= 13; y++) carve(9, y);
+        for (let x = 5; x <= 7; x++) carve(x, 11);
+        state.bombs = [];
+        state.explosions = [];
+        state.hazards = [];
+        state.enemies = [];
+        state.bossProjectiles = [];
+        state.particles = [];
+        state.floaters = [];
+        state.items = [];
+        state.exitPos = null;
+        state.isPlaying = true;
+        state.paused = false;
+        state.shakeTimer = 0;
+        state.shakeIntensity = 0;
+        DEBUG_MODE.resetNavigation();
+    }
+
+    function prepareControlledStressScene() {
+        stopDebugLoop();
+        const state = getState();
+        if (!state) throw new Error('gameState no disponible.');
+        if (typeof resetWorldRuntimeState === 'function') resetWorldRuntimeState();
+        if (typeof resetPlayerRuntimeState === 'function') resetPlayerRuntimeState();
+        if (typeof resetRelicModifiers === 'function') resetRelicModifiers();
+        if (typeof resetBombHandlingState === 'function') resetBombHandlingState();
+        if (typeof resetCombatFeedbackForRun === 'function') resetCombatFeedbackForRun();
+        state.level = 1;
+        state.runNumber = 1;
+        if (typeof initLevel === 'function') initLevel();
+        buildStressGrid();
+        state.isPlaying = true;
+        state.paused = false;
+        state.rafId = 0;
+        state.lastTime = performance.now();
+        DEBUG_MODE.paused = false;
+        DEBUG_MODE.stepRequested = false;
+        DEBUG_MODE.resetNavigation();
+    }
+
+    function createStressEnemy(cell, direction, index) {
+        const enemy = {
+            x: cell.x * TILE_SIZE + TILE_SIZE / 2,
+            y: cell.y * TILE_SIZE + TILE_SIZE / 2,
+            width: TILE_SIZE * 0.75,
+            height: TILE_SIZE * 0.75,
+            type: ENEMY_TYPES.RASTRERO,
+            vx: 0,
+            vy: 0,
+            baseSpeed: 1.4,
+            lastDirection: direction,
+            desiredDirection: direction,
+            __gridAnchor: 'center'
+        };
+        if (typeof ensureEnemyMotionStateV312 === 'function') ensureEnemyMotionStateV312(enemy, index);
+        enemy.ai.direction = direction;
+        enemy.ai.desiredDirection = direction;
+        enemy.ai.visionTimer = 0;
+        enemy.ai.decisionTimer = 0;
+        enemy.lastDirection = direction;
+        return enemy;
+    }
 
     function prepareTestScene() {
         stopDebugLoop();
@@ -1293,6 +1705,6 @@
         }
     });
 
-    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.16.5 cargado en el mismo runtime.');
+    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.16.6 cargado en el mismo runtime.');
     DEBUG_MODE.recordEvent('DEBUG', 'Usá RESET para activar una escena de depuración limpia.');
 })();

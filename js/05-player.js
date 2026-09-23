@@ -44,6 +44,7 @@
 
             for (let gy = minGY; gy <= maxGY; gy++) {
                 for (let gx = minGX; gx <= maxGX; gx++) {
+                    if (typeof isBombSolidForPlayer === 'function' && isBombSolidForPlayer(gx, gy)) return true;
                     if (!isSolid(gx, gy)) continue;
                     const wallLeft = gx * TILE_SIZE;
                     const wallRight = wallLeft + TILE_SIZE;

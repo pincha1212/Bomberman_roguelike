@@ -36,7 +36,12 @@
             UI['ui-health'].innerText = player.health;
             UI['ui-score'].innerText = gameState.score;
             UI['ui-level'].innerText = gameState.level;
-            UI['ui-bombs'].innerText = player.maxBombs;
+            const bombAvailable = Math.max(0, player.maxBombs - player.bombsPlaced);
+            UI['ui-bombs'].innerText = `${bombAvailable}/${player.maxBombs}`;
+            const bombStat = document.getElementById('bomb-stat');
+            const bombFill = document.getElementById('ui-bombs-fill');
+            if (bombStat) bombStat.classList.toggle('bomb-empty', bombAvailable <= 0);
+            if (bombFill) bombFill.style.width = `${player.maxBombs > 0 ? (bombAvailable / player.maxBombs) * 100 : 0}%`;
             UI['ui-range'].innerText = player.bombRange;
             UI['ui-speed'].innerText = (player.speed - 2).toFixed(1);
             UI['ui-coins'].innerText = gameState.coins;
@@ -101,11 +106,14 @@
             player.maxHealth = 5;
             player.maxBombs = 1;
             player.bombRange = 1;
+            player.bombCooldown = 0;
             player.speed = 3.0;
             player.hasShield = false;
             player.isInvincible = false;
             player.invincibleTimer = 0;
             player.lastDamageFrame = -1;
+            gameState.lastMoveInputAt = 0;
+            if (typeof resetBombHandlingState === 'function') resetBombHandlingState();
 
             initLevel();
             gameState.isPlaying = true;
@@ -143,6 +151,8 @@
             player.isInvincible = false;
             player.invincibleTimer = 0;
             player.lastDamageFrame = -1;
+            gameState.lastMoveInputAt = 0;
+            if (typeof resetBombHandlingState === 'function') resetBombHandlingState();
             combatFeedback.hitStop = 0;
             combatFeedback.flash = 0;
             combatFeedback.playerHit = 0;

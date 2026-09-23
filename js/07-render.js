@@ -56,6 +56,7 @@
                 renderBombRangePreview(b);
                 drawBombSprite((b.x + 0.5) * TILE_SIZE, (b.y + 0.5) * TILE_SIZE, b);
             });
+            drawBombChainLinks();
 
             // Draw Explosions
             gameState.explosions.forEach(exp => {
@@ -330,6 +331,14 @@
             ctx.translate(cx, cy);
             ctx.scale(scale, scale);
 
+            // La bomba del jugador usa un aro cian de identidad; la mecha sigue en ámbar/rojo.
+            if ((b.owner || 'player') === 'player') {
+                ctx.strokeStyle = 'rgba(34,211,238,.78)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, TILE_SIZE * .42, 0, Math.PI * 2);
+                ctx.stroke();
+            }
             renderBombFuseFeedback(0, 0, b);
 
             // Sombra bomba

@@ -21,6 +21,7 @@
             let joyActive = false;
             let joyCenterX = 0;
             let joyCenterY = 0;
+            let lastJoyDirection = null;
 
             const updateJoyPosition = (clientX, clientY) => {
                 let dx = clientX - joyCenterX;
@@ -42,6 +43,16 @@
 
                 gameState.touchControls.x = normalizedX;
                 gameState.touchControls.y = normalizedY;
+                let joyDirection = null;
+                if (Math.abs(normalizedX) >= Math.abs(normalizedY) && Math.abs(normalizedX) >= 0.2) {
+                    joyDirection = normalizedX > 0 ? 'right' : 'left';
+                } else if (Math.abs(normalizedY) >= 0.2) {
+                    joyDirection = normalizedY > 0 ? 'down' : 'up';
+                }
+                if (joyDirection !== lastJoyDirection) {
+                    if (joyDirection) gameState.lastMoveInputAt = performance.now();
+                    lastJoyDirection = joyDirection;
+                }
             };
 
             const start = (e) => {
@@ -66,6 +77,7 @@
                 knob.style.transform = `translate(0px, 0px)`;
                 gameState.touchControls.x = 0;
                 gameState.touchControls.y = 0;
+                lastJoyDirection = null;
             };
 
             zone.addEventListener('touchstart', start, { passive: false });
@@ -79,16 +91,41 @@
         };
 
         setupJoystick();
-        
-        const setupBombButton = () => {
+
+        // V3.10: un único sistema de input para bomba.
+        // Una pulsación coloca una bomba; mantener pulsado permite repetir con
+        // retardo/cooldown controlados y nunca depende del auto-repeat del teclado.
+        const setupBombInput = () => {
             const bombBtn = document.getElementById('btn-bomb-mobile');
-            if(!bombBtn) return;
-            const triggerBomb = (e) => {
-                e.preventDefault();
-                if(gameState.isPlaying) placeBomb();
+            const startHold = (event, source='input') => {
+                event?.preventDefault?.();
+                if (typeof beginBombHold === 'function') beginBombHold(source, event);
             };
-            bombBtn.addEventListener('touchstart', triggerBomb, {passive: false});
-            bombBtn.addEventListener('mousedown', triggerBomb);
+            const endHold = (event) => {
+                event?.preventDefault?.();
+                if (typeof endBombHold === 'function') endBombHold();
+            };
+
+            window.addEventListener('keydown', (e) => {
+                if (e.code !== 'Space' && e.code !== 'KeyZ') return;
+                if (!gameState.isPlaying) return;
+                e.preventDefault();
+                if (e.repeat) return;
+                startHold(e, 'keyboard');
+            });
+            window.addEventListener('keyup', (e) => {
+                if (e.code === 'Space' || e.code === 'KeyZ') endHold(e);
+            });
+            window.addEventListener('blur', () => endHold());
+
+            if (!bombBtn) return;
+            bombBtn.addEventListener('pointerdown', (e) => {
+                startHold(e, 'pointer');
+                try { bombBtn.setPointerCapture(e.pointerId); } catch (_) {}
+            }, {passive:false});
+            bombBtn.addEventListener('pointerup', endHold, {passive:false});
+            bombBtn.addEventListener('pointercancel', endHold, {passive:false});
+            bombBtn.addEventListener('contextmenu', (e) => e.preventDefault());
         };
-        setupBombButton();
+        setupBombInput();
 

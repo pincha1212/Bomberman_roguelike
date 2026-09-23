@@ -298,6 +298,7 @@ const UI = {};
             shakeIntensity: 0,
             animFrame: 0,
             blastSerial: 0,
+            lastMoveInputAt: 0,
             paused: false,
             coins: 0,
             relics: [],
@@ -318,6 +319,7 @@ const UI = {};
             speed: 3.0,
             maxBombs: 1,
             bombsPlaced: 0,
+            bombCooldown: 0,
             bombRange: 1,
             health: 3,
             maxHealth: 5,
@@ -338,10 +340,13 @@ const UI = {};
 
         window.addEventListener('keydown', (e) => {
             gameState.keys[e.code] = true;
-            if (['ArrowUp','ArrowDown','KeyW','KeyS'].includes(e.code)) gameState.lastMoveAxis = 'vertical';
-            if (['ArrowLeft','ArrowRight','KeyA','KeyD'].includes(e.code)) gameState.lastMoveAxis = 'horizontal';
-            if((e.code === 'Space' || e.code === 'KeyZ') && gameState.isPlaying) {
-                placeBomb();
+            if (['ArrowUp','ArrowDown','KeyW','KeyS'].includes(e.code)) {
+                gameState.lastMoveAxis = 'vertical';
+                if (!e.repeat) gameState.lastMoveInputAt = performance.now();
+            }
+            if (['ArrowLeft','ArrowRight','KeyA','KeyD'].includes(e.code)) {
+                gameState.lastMoveAxis = 'horizontal';
+                if (!e.repeat) gameState.lastMoveInputAt = performance.now();
             }
         });
         window.addEventListener('keyup', (e) => gameState.keys[e.code] = false);

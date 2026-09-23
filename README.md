@@ -149,3 +149,14 @@ Los scripts se cargan en ese orden desde `index.html`. No se usa bundler ni Node
 - El jugador vuelve a disponer de su cupo completo de bombas al comenzar una nueva run.
 - La misma corrección también evita conservar un contador de bombas usado al pasar a otra profundidad.
 - No se modifica el movimiento, daño, trampas, cámara, bosses ni la interfaz.
+
+
+## v3.9 — Combat & Feedback Update
+- Feedback visual/audio reforzado al colocar bombas, recibir daño, derrotar enemigos y golpear al boss.
+- Preview temporal del alcance de cada bomba, respetando paredes y bloques.
+- Animación de mecha con progreso visual y aviso de urgencia en los últimos 650 ms.
+- Hit-stop corto que ralentiza únicamente el movimiento/animación; timers críticos continúan normalmente.
+- Retroceso visual del jugador al recibir daño y feedback de muerte.
+- Diferenciación cromática por fuente de daño: enemigo, boss/proyectil, trampa y escudo.
+- Protección explícita contra más de una aplicación de daño al jugador en el mismo frame.
+- Nuevo módulo `js/10-feedback.js`.

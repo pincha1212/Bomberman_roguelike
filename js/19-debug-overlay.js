@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.16 — Debug Overlay
+// Bomberman Roguelike v3.16.2 — Debug Overlay
 // Interfaz visual del Debug Engine. Solo existe cuando la URL contiene ?debug=1.
 (() => {
     'use strict';
@@ -85,7 +85,25 @@
                 <label><input type="checkbox" data-debug-visual="ai"> IA</label>
                 <label><input type="checkbox" data-debug-visual="camera"> Cámara</label>
                 <label><input type="checkbox" data-debug-visual="spawns"> Spawns</label>
+                <label><input type="checkbox" data-debug-visual="paths"> Rutas / alcance</label>
             </div>
+        </section>
+
+        <section class="debug-section">
+            <div class="debug-section-head"><div class="debug-section-title">NAVEGACIÓN</div><span id="dbg-nav-count">0</span></div>
+            <div class="debug-grid debug-grid-3">
+                <div><span>PLAYER TILE</span><strong id="dbg-nav-player-tile">-</strong></div>
+                <div><span>ALCANZABLES</span><strong id="dbg-nav-player-reachable">0</strong></div>
+                <div><span>GIROS POSIBLES</span><strong id="dbg-nav-player-options">-</strong></div>
+            </div>
+            <div id="dbg-nav-note" class="debug-note">Rutas de referencia: BFS sobre la rejilla actual. No modifica la IA ni el movimiento.</div>
+            <pre id="dbg-nav-enemies" class="debug-log">Sin datos de navegación.</pre>
+        </section>
+
+        <section class="debug-section">
+            <div class="debug-section-head"><div class="debug-section-title">INSPECTOR DE TEST</div><span id="dbg-last-test">—</span></div>
+            <div id="dbg-test-summary" class="debug-note">Ejecutá una prueba para ver sus datos.</div>
+            <pre id="dbg-test-data" class="debug-log">Ejecutá una prueba para ver sus datos.</pre>
         </section>
 
         <section class="debug-section">
@@ -159,10 +177,26 @@
         setText('dbg-projectiles', s.world.projectiles);
         setText('dbg-boss', s.world.boss ? 'SI' : 'NO');
         setText('dbg-run', s.run);
+
+        const nav = s.navigation || {};
+        const playerNav = nav.player || {};
+        setText('dbg-nav-player-tile', `${playerNav.tile?.x ?? '-'},${playerNav.tile?.y ?? '-'}`);
+        setText('dbg-nav-player-reachable', playerNav.reachableTiles ?? 0);
+        setText('dbg-nav-player-options', (playerNav.options || []).join(' · ') || '-');
+        setText('dbg-nav-note', nav.mode === 'reference-bfs' ? 'Rutas de referencia: BFS sobre la rejilla actual. No modifica la IA ni el movimiento.' : 'Navegación no disponible.');
+        setText('dbg-nav-count', `${(nav.enemies || []).filter(e => e.canReachPlayer).length}/${(nav.enemies || []).length}`);
+        const navLines = (nav.enemies || []).map(e => {
+            const route = e.canReachPlayer ? `${e.routeLength} celdas` : 'SIN RUTA';
+            const opts = e.options?.join(',') || '-';
+            return `E${e.index} · T${e.tile.x},${e.tile.y} · ${e.behavior}/${e.alert} · ${e.direction}→${e.desiredDirection} · ruta=${route} · opciones=${opts}`;
+        }).join('\n');
+        const navNode = document.getElementById('dbg-nav-enemies');
+        if (navNode) { navNode.textContent = navLines || 'Sin enemigos.'; navNode.scrollTop = navNode.scrollHeight; }
+
         setText('debug-status', D.busy ? 'TESTS' : (!s.playing ? 'DETENIDO' : (D.paused ? 'PAUSADO' : 'ACTIVO')));
 
         const eventText = D.eventLog.slice(-80).map(item => {
-            const t = new Date().toLocaleTimeString('es-AR', { hour12: false });
+            const t = item.wallTime || '--:--:--';
             return `[${t}] ${item.type.padEnd(6)} ${item.message}`;
         }).join('\n');
         const eventNode = document.getElementById('dbg-events');
@@ -179,6 +213,15 @@
         }
         setText('dbg-error-count', D.runtimeErrors.length);
 
+        const lastTest = D.lastTest;
+        setText('dbg-last-test', lastTest ? `${lastTest.name.toUpperCase()} · ${lastTest.status} · ${lastTest.ms.toFixed(1)}ms` : '—');
+        const testDataNode = document.getElementById('dbg-test-data');
+        setText('dbg-test-summary', lastTest ? lastTest.summary : 'Ejecutá una prueba para ver sus datos.');
+        if (testDataNode) {
+            testDataNode.textContent = lastTest ? JSON.stringify(lastTest.details ?? {}, null, 2) : 'Ejecutá una prueba para ver sus datos.';
+            testDataNode.scrollTop = 0;
+        }
+
         const results = D.testResults;
         const passed = results.filter(r => r.status === 'PASS').length;
         const tests = window.DEBUG_TESTS || {};
@@ -187,7 +230,8 @@
             const result = results.slice().reverse().find(r => r.name === name);
             const node = document.getElementById(`dbg-test-${name}`);
             if (!node) continue;
-            node.textContent = result ? (result.status === 'PASS' ? 'PASS' : 'FAIL') : '—';
+            node.textContent = result ? `${result.status === 'PASS' ? 'PASS' : 'FAIL'} · ${Number(result.ms || 0).toFixed(0)}ms` : '—';
+            node.title = result ? String(result.result || '') : '';
             node.className = result ? (result.status === 'PASS' ? 'debug-pass' : 'debug-fail') : '';
             const parent = node.closest('button');
             parent?.classList.toggle('is-pass', result?.status === 'PASS');

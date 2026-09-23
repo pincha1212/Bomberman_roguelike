@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.16 — Debug world visualizers
+// Bomberman Roguelike v3.16.2 — Debug world visualizers
 (() => {
     'use strict';
     if (!window.DEBUG_MODE?.enabled) return;
@@ -142,6 +142,85 @@
         ctx.restore();
     }
 
+    function drawDebugReachableArea(nav) {
+        const cells = nav?.player?.cells || [];
+        if (!cells.length) return;
+        ctx.save();
+        ctx.fillStyle = 'rgba(34,211,238,.055)';
+        ctx.strokeStyle = 'rgba(34,211,238,.18)';
+        ctx.lineWidth = 1;
+        for (const pair of cells) {
+            const x = pair[0];
+            const y = pair[1];
+            const p = screenPoint(x * TILE_SIZE, y * TILE_SIZE);
+            ctx.fillRect(p.x + 2, p.y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+            ctx.strokeRect(p.x + 3, p.y + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+        }
+        ctx.restore();
+    }
+
+    function routeColor(index) {
+        const palette = ['#22c55e', '#f59e0b', '#a78bfa', '#fb7185', '#38bdf8', '#f97316', '#e879f9', '#84cc16'];
+        return palette[index % palette.length];
+    }
+
+    function drawDebugNavigationPaths() {
+        const nav = typeof debugNavigationSnapshot === 'function' ? debugNavigationSnapshot() : null;
+        if (!nav) return;
+
+        drawDebugReachableArea(nav);
+
+        const playerCenter = screenPoint(
+            (nav.player.tile.x + 0.5) * TILE_SIZE,
+            (nav.player.tile.y + 0.5) * TILE_SIZE
+        );
+        ctx.save();
+        ctx.strokeStyle = 'rgba(34,211,238,.95)';
+        ctx.fillStyle = 'rgba(34,211,238,.95)';
+        ctx.lineWidth = 3;
+        for (const dir of (nav.player.options || [])) {
+            const d = { UP:[0,-1], RIGHT:[1,0], DOWN:[0,1], LEFT:[-1,0] }[dir];
+            if (!d) continue;
+            drawArrow(playerCenter.x, playerCenter.y, playerCenter.x + d[0] * 24, playerCenter.y + d[1] * 24, '#22d3ee', `P:${dir}`);
+        }
+        ctx.restore();
+
+        for (const enemy of (nav.enemies || [])) {
+            const path = enemy.route || [];
+            const color = routeColor(enemy.index);
+            if (!path.length) {
+                const p = screenPoint((enemy.tile.x + 0.5) * TILE_SIZE, (enemy.tile.y + 0.5) * TILE_SIZE);
+                ctx.save();
+                ctx.strokeStyle = 'rgba(248,113,113,.8)';
+                ctx.setLineDash([5, 4]);
+                ctx.strokeRect(p.x + 7, p.y + 7, TILE_SIZE - 14, TILE_SIZE - 14);
+                ctx.font = '8px Consolas,monospace';
+                ctx.fillStyle = '#fca5a5';
+                ctx.fillText(`E${enemy.index} SIN RUTA`, p.x + 3, p.y - 4);
+                ctx.restore();
+                continue;
+            }
+
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 0.75;
+            ctx.beginPath();
+            path.forEach((cell, i) => {
+                const p = screenPoint((cell.x + 0.5) * TILE_SIZE, (cell.y + 0.5) * TILE_SIZE);
+                if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+            });
+            ctx.stroke();
+            const last = path[Math.min(path.length - 1, 5)];
+            const prev = path[Math.max(0, Math.min(path.length - 2, 4))];
+            const p1 = screenPoint((prev.x + 0.5) * TILE_SIZE, (prev.y + 0.5) * TILE_SIZE);
+            const p2 = screenPoint((last.x + 0.5) * TILE_SIZE, (last.y + 0.5) * TILE_SIZE);
+            drawArrow(p1.x, p1.y, p2.x, p2.y, color, `E${enemy.index} ${enemy.routeLength}`);
+            ctx.restore();
+        }
+    }
+
     function drawDebugSpawns() {
         ctx.save();
         for(const e of gameState.enemies){
@@ -162,5 +241,6 @@
         if(D.selectedVisuals.ai) drawDebugAI();
         if(D.selectedVisuals.camera) drawDebugCamera();
         if(D.selectedVisuals.spawns) drawDebugSpawns();
+        if(D.selectedVisuals.paths) drawDebugNavigationPaths();
     };
 })();

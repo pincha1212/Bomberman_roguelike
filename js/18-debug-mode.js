@@ -1,10 +1,122 @@
-// Bomberman Roguelike v3.16 — Debug Engine
+// Bomberman Roguelike v3.16.2 — Debug Engine
 // Se activa únicamente con ?debug=1. El modo normal no muestra ni ejecuta el panel.
 (() => {
     'use strict';
 
     const params = new URLSearchParams(window.location.search);
     const enabled = params.get('debug') === '1';
+
+    const NAV_DIRS = [
+        { dx: 0, dy: -1, dir: 'UP' },
+        { dx: 1, dy: 0, dir: 'RIGHT' },
+        { dx: 0, dy: 1, dir: 'DOWN' },
+        { dx: -1, dy: 0, dir: 'LEFT' }
+    ];
+
+    function navKey(x, y) { return `${x},${y}`; }
+
+    function navTilePassable(kind, entity, x, y, startX, startY) {
+        if (!gridIsInside(x, y)) return false;
+        const canFly = kind === 'enemy' && !!entity?.type?.canFly;
+        if (gridTileIsBlocked(x, y, { canFly })) return false;
+
+        if (x === startX && y === startY) return true;
+
+        const bombAtTile = gameState.bombs?.some(b => b && b.x === x && b.y === y);
+        return !bombAtTile;
+    }
+
+    function buildReachableMap(kind, entity, start, maxNodes = 900) {
+        const queue = [{ x: start.x, y: start.y }];
+        let cursor = 0;
+        const visited = new Set([navKey(start.x, start.y)]);
+        const parent = new Map();
+        const depth = new Map([[navKey(start.x, start.y), 0]]);
+
+        while (cursor < queue.length && visited.size < maxNodes) {
+            const current = queue[cursor++];
+            for (const dir of NAV_DIRS) {
+                const nx = current.x + dir.dx;
+                const ny = current.y + dir.dy;
+                const key = navKey(nx, ny);
+                if (visited.has(key) || !navTilePassable(kind, entity, nx, ny, start.x, start.y)) continue;
+                visited.add(key);
+                parent.set(key, navKey(current.x, current.y));
+                depth.set(key, (depth.get(navKey(current.x, current.y)) || 0) + 1);
+                queue.push({ x: nx, y: ny });
+            }
+        }
+
+        return { visited, parent, depth, truncated: queue.length > 0 };
+    }
+
+    function buildPath(parent, start, target, maxLength = 80) {
+        const targetKey = navKey(target.x, target.y);
+        if (start.x === target.x && start.y === target.y) return [{ x: start.x, y: start.y }];
+        if (!parent.has(targetKey)) return [];
+
+        const path = [];
+        let current = targetKey;
+        let guard = 0;
+        while (current && guard++ < maxLength) {
+            const [x, y] = current.split(',').map(Number);
+            path.push({ x, y });
+            if (x === start.x && y === start.y) break;
+            current = parent.get(current);
+        }
+        if (!path.length || path[path.length - 1].x !== start.x || path[path.length - 1].y !== start.y) return [];
+        path.reverse();
+        return path;
+    }
+
+    function getNavigationSnapshot() {
+        const playerEntity = window.BOMBER_ENGINE?.getPlayer?.() || window.player || globalThis.player;
+        const playerTile = typeof gridCurrentTile === 'function'
+            ? gridCurrentTile(playerEntity, 'player')
+            : { x: Math.floor((playerEntity?.x || 0) / TILE_SIZE), y: Math.floor((playerEntity?.y || 0) / TILE_SIZE) };
+
+        const now = performance.now();
+        if (DEBUG_MODE.navigationCache && now - DEBUG_MODE.navigationCacheAt < 220) return DEBUG_MODE.navigationCache;
+
+        const playerReach = buildReachableMap('player', playerEntity, playerTile, 900);
+        const enemies = (gameState.enemies || []).slice(0, 12).map((enemy, index) => {
+            const tile = typeof gridCurrentTile === 'function' ? gridCurrentTile(enemy, 'enemy') : {
+                x: Math.floor(enemy.x / TILE_SIZE), y: Math.floor(enemy.y / TILE_SIZE)
+            };
+            const reach = buildReachableMap('enemy', enemy, tile, 900);
+            const path = buildPath(reach.parent, tile, playerTile, 80);
+            const options = NAV_DIRS.filter(dir => navTilePassable('enemy', enemy, tile.x + dir.dx, tile.y + dir.dy, tile.x, tile.y)).map(dir => dir.dir);
+            return {
+                index,
+                tile,
+                behavior: enemy.ai?.behavior || '?',
+                alert: enemy.ai?.alert || '?',
+                direction: enemy.ai?.direction || enemy.lastDirection || '?',
+                desiredDirection: enemy.ai?.desiredDirection || enemy.desiredDirection || '?',
+                seesPlayer: !!enemy.ai?.seesPlayer,
+                reachableTiles: reach.visited.size,
+                truncated: reach.truncated,
+                options,
+                route: path,
+                routeLength: Math.max(0, path.length - 1),
+                canReachPlayer: path.length > 0
+            };
+        });
+
+        DEBUG_MODE.navigationCache = {
+            mode: 'reference-bfs',
+            player: {
+                tile: playerTile,
+                reachableTiles: playerReach.visited.size,
+                truncated: playerReach.truncated,
+                cells: Array.from(playerReach.visited).map(k => k.split(',').map(Number)),
+                    options: NAV_DIRS.filter(dir => navTilePassable('player', playerEntity, playerTile.x + dir.dx, playerTile.y + dir.dy, playerTile.x, playerTile.y)).map(dir => dir.dir)
+            },
+            enemies
+        };
+        DEBUG_MODE.navigationCacheAt = now;
+        return DEBUG_MODE.navigationCache;
+    }
 
     const DEBUG_MODE = {
         enabled,
@@ -27,6 +139,9 @@
         busy: false,
         storageSnapshot: null,
         lastState: null,
+        lastTest: null,
+        navigationCache: null,
+        navigationCacheAt: 0,
         selectedVisuals: {
             grid: false,
             collision: false,
@@ -35,7 +150,8 @@
             explosions: false,
             ai: false,
             camera: false,
-            spawns: false
+            spawns: false,
+            paths: false
         },
 
         frameStart() {
@@ -66,6 +182,7 @@
             if (!this.enabled) return;
             const item = {
                 time: performance.now(),
+                wallTime: new Date().toLocaleTimeString('es-AR', { hour12: false }),
                 type: String(type || 'INFO').toUpperCase(),
                 message: String(message || ''),
                 data
@@ -173,7 +290,9 @@
                     minMs: Number.isFinite(this.minFrameMs) ? this.minFrameMs : 0,
                     maxMs: this.maxFrameMs
                 },
-                errors: this.runtimeErrors.length
+                errors: this.runtimeErrors.length,
+                lastTest: this.lastTest,
+                navigation: getNavigationSnapshot()
             };
             this.lastState = state;
             return state;
@@ -187,10 +306,16 @@
             this.recordEvent('TEST', `Inicio: ${name}`);
             try {
                 const result = await DEBUG_TESTS[name]();
-                this.testResults.push({ name, status: 'PASS', result, ms: performance.now() - started });
-                this.recordEvent('PASS', `${name}: ${result}`);
+                const normalized = normalizeTestResult(result);
+                const ms = performance.now() - started;
+                this.lastTest = { name, status: 'PASS', summary: normalized.summary, details: normalized.details, ms };
+                this.testResults.push({ name, status: 'PASS', result: normalized.summary, details: normalized.details, ms });
+                this.recordEvent('PASS', `${name}: ${normalized.summary}`, normalized.details);
             } catch (error) {
-                this.testResults.push({ name, status: 'FAIL', result: error?.message || String(error), ms: performance.now() - started });
+                const message = error?.message || String(error);
+                const ms = performance.now() - started;
+                this.lastTest = { name, status: 'FAIL', summary: message, details: { error: message, stack: error?.stack || '' }, ms };
+                this.testResults.push({ name, status: 'FAIL', result: message, details: this.lastTest.details, ms });
                 this.captureError(error, `test:${name}`);
             } finally {
                 restoreDebugStorage(this.storageSnapshot);
@@ -207,15 +332,21 @@
             this.storageSnapshot = captureDebugStorage();
             this.testResults = [];
             const names = Object.keys(DEBUG_TESTS);
-            this.recordEvent('TEST', `Suite v3.16.1 iniciada: ${names.length} pruebas.`);
+            this.recordEvent('TEST', `Suite v3.16.2 iniciada: ${names.length} pruebas.`);
             for (const name of names) {
                 const started = performance.now();
                 try {
                     const result = await DEBUG_TESTS[name]();
-                    this.testResults.push({ name, status: 'PASS', result, ms: performance.now() - started });
-                    this.recordEvent('PASS', `${name}: ${result}`);
+                    const normalized = normalizeTestResult(result);
+                    const ms = performance.now() - started;
+                    this.lastTest = { name, status: 'PASS', summary: normalized.summary, details: normalized.details, ms };
+                    this.testResults.push({ name, status: 'PASS', result: normalized.summary, details: normalized.details, ms });
+                    this.recordEvent('PASS', `${name}: ${normalized.summary}`, normalized.details);
                 } catch (error) {
-                    this.testResults.push({ name, status: 'FAIL', result: error?.message || String(error), ms: performance.now() - started });
+                    const message = error?.message || String(error);
+                    const ms = performance.now() - started;
+                    this.lastTest = { name, status: 'FAIL', summary: message, details: { error: message, stack: error?.stack || '' }, ms };
+                    this.testResults.push({ name, status: 'FAIL', result: message, details: this.lastTest.details, ms });
                     this.captureError(error, `test:${name}`);
                 }
                 window.dispatchEvent(new CustomEvent('bomber-debug-updated'));
@@ -233,6 +364,7 @@
         clearEvents() {
             this.eventLog.length = 0;
             this.runtimeErrors.length = 0;
+            this.lastTest = null;
             this.recordEvent('DEBUG', 'Registro limpiado.');
         },
 
@@ -389,6 +521,13 @@
         }
     }
 
+    function normalizeTestResult(result) {
+        if (result && typeof result === 'object' && Object.prototype.hasOwnProperty.call(result, 'summary')) {
+            return { summary: String(result.summary), details: result.details ?? {} };
+        }
+        return { summary: String(result ?? 'OK'), details: {} };
+    }
+
     const DEBUG_TESTS = {
         movement: async () => {
             prepareTest();
@@ -400,7 +539,7 @@
             gameState.keys = {};
             if (!(player.x > before + 1)) throw new Error('El jugador no avanzó hacia la derecha.');
             if (Math.abs(player.vy) > 0.05) throw new Error('El movimiento cardinal generó componente Y.');
-            return `OK · X ${before.toFixed(1)} → ${player.x.toFixed(1)}`;
+            return { summary: `OK · X ${before.toFixed(1)} → ${player.x.toFixed(1)}`, details: { beforeX: before, afterX: player.x, deltaX: player.x - before, velocityX: player.vx, velocityY: player.vy, input: 'ArrowRight' } };
         },
 
         bombs: async () => {
@@ -417,7 +556,7 @@
             if (gameState.bombs.length !== 0) throw new Error('La bomba no fue removida.');
             if (gameState.explosions.length === 0) throw new Error('La detonación no creó explosiones.');
             if (player.bombsPlaced !== 0) throw new Error('bombsPlaced no volvió a cero.');
-            return `OK · ${gameState.explosions.length} celdas de explosión`;
+            return { summary: `OK · ${gameState.explosions.length} celdas de explosión`, details: { bomb: { x: c.x, y: c.y }, explosionCells: gameState.explosions.map(e => ({ x: e.x, y: e.y })), bombsRemaining: gameState.bombs.length, bombsPlaced: player.bombsPlaced } };
         },
 
         damage: async () => {
@@ -436,7 +575,7 @@
             gs.animFrame = 2;
             if (takeDamage('debug-third', p.x, p.y) !== true) throw new Error('No volvió a recibir daño tras la inmunidad.');
             if (p.health !== 1) throw new Error('El segundo golpe no restó exactamente 1 HP.');
-            return `OK · HP ${hp1} → ${p.health}`;
+            return { summary: `OK · HP ${hp1} → ${p.health}`, details: { firstHitHp: hp1, finalHp: p.health, invulnerabilityMs: 1600, secondHitBlocked: true } };
         },
 
         traps: async () => {
@@ -453,7 +592,7 @@
                 if (triggerHazard(hazard, 'debug') !== true) throw new Error(`No activó ${type}.`);
                 if (triggerHazard(hazard, 'debug-second') !== false) throw new Error(`${type} se activó dos veces.`);
             }
-            return `OK · ${types.length} tipos · activación única`;
+            return { summary: `OK · ${types.length} tipos · activación única`, details: { trapTypes: types, activationCountPerType: 1 } };
         },
 
         enemies: async () => {
@@ -479,7 +618,7 @@
             for (let i = 0; i < 20; i++) updateEnemyAI(100);
             if (!e.ai || !['chase', 'surround', 'flee', 'patrol'].includes(e.ai.behavior)) throw new Error('El estado de IA no se inicializó.');
             if (typeof gridCurrentTile === 'function' && e.ai.lastDecisionTileX < 0) throw new Error('La IA no tomó ninguna decisión de intersección.');
-            return `OK · behavior=${e.ai.behavior} · dir=${e.ai.direction || '?'}`;
+            return { summary: `OK · behavior=${e.ai.behavior} · dir=${e.ai.direction || '?'}`, details: { tile: gridCurrentTile(e, 'enemy'), behavior: e.ai.behavior, alert: e.ai.alert, direction: e.ai.direction, desiredDirection: e.ai.desiredDirection, seesPlayer: e.ai.seesPlayer, reachableTiles: DEBUG_MODE.snapshot().navigation.enemies.find(n => n.index === 0)?.reachableTiles ?? null, routeLength: DEBUG_MODE.snapshot().navigation.enemies.find(n => n.index === 0)?.routeLength ?? null } };
         },
 
         camera: async () => {
@@ -495,7 +634,7 @@
             if (gameState.camera.x < -0.01 || gameState.camera.x > bounds.maxX + 0.01) throw new Error('Cámara fuera de límites X.');
             if (gameState.camera.y < -0.01 || gameState.camera.y > bounds.maxY + 0.01) throw new Error('Cámara fuera de límites Y.');
             if (gameState.camera.x === before.x && gameState.camera.y === before.y) throw new Error('La cámara no siguió al jugador.');
-            return `OK · (${before.x.toFixed(0)},${before.y.toFixed(0)}) → (${gameState.camera.x.toFixed(0)},${gameState.camera.y.toFixed(0)})`;
+            return { summary: `OK · (${before.x.toFixed(0)},${before.y.toFixed(0)}) → (${gameState.camera.x.toFixed(0)},${gameState.camera.y.toFixed(0)})`, details: { before, after: { x: gameState.camera.x, y: gameState.camera.y }, target: { x: gameState.camera.targetX, y: gameState.camera.targetY }, bounds } };
         },
 
         restart: async () => {
@@ -520,7 +659,7 @@
             if (player.vx !== 0 || player.vy !== 0) throw new Error('La velocidad del jugador no se restableció.');
             if (gameState.bombs.length !== 0 || gameState.explosions.length !== 0) throw new Error('Persistieron bombas/explosiones.');
             if (gameState.bossProjectiles.length !== 0 || gameState.shakeTimer !== 0) throw new Error('Persistieron proyectiles o shake.');
-            return 'OK · estado limpio después del reinicio';
+            return { summary: 'OK · estado limpio después del reinicio', details: { health: player.health, bombsPlaced: player.bombsPlaced, velocity: { x: player.vx, y: player.vy }, bombs: gameState.bombs.length, explosions: gameState.explosions.length, projectiles: gameState.bossProjectiles.length, shakeTimer: gameState.shakeTimer } };
         }
     };
 
@@ -529,6 +668,7 @@
     window.debugRecordEvent = (...args) => DEBUG_MODE.recordEvent(...args);
     window.debugCaptureError = (...args) => DEBUG_MODE.captureError(...args);
     window.debugStateSnapshot = () => DEBUG_MODE.snapshot();
+    window.debugNavigationSnapshot = () => getNavigationSnapshot();
 
     if (!enabled) return;
 

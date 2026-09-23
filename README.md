@@ -206,26 +206,15 @@ Corrección puntual del movimiento tras colocar una bomba. La bomba propia perma
 - Indicadores visuales de estado de IA.
 - Movimiento enemigo separado de la lógica de daño para aislar fallos.
 
-## v3.11.3 — Enemy AI Intelligence & Navigation Fix
+## V3.12 — Grid Motion & Collision Update
 
-Esta revisión corrige un problema estructural de la navegación de enemigos detectado en la IA v3.11.
+Base de movimiento y colisión unificada para jugador y enemigos.
 
-### Correcciones principales
-
-- Los caminos ahora guardan un **waypoint por cada celda**. Antes el enemigo reutilizaba el objetivo final para avanzar por cada tramo y, al llegar a la primera esquina, podía quedarse bloqueado.
-- Los enemigos con línea de visión reaccionan de inmediato cuando el jugador entra en su corredor.
-- Rastreros, voladores y especiales patrullan cuando no tienen contacto visual, conservando el comportamiento solicitado de seguir su curso cuando no ven al jugador.
-- Los enemigos mantienen memoria breve de la última posición conocida para buscar al jugador después de perderlo de vista.
-- Los especiales usan posiciones de rodeo alrededor del jugador cuando tienen contacto visual.
-- La evasión de bombas tiene prioridad sobre la persecución.
-- Un enemigo atrapado en una celda peligrosa puede atravesar el borde de esa celda para alcanzar una zona segura; el peligro no se trata como una pared física.
-- El pathfinding sigue dosificado y limitado a una reconstrucción por ciclo de scheduler para evitar bloqueos del game loop.
-
-### Validación
-
-- Todos los módulos JS pasan `node --check`.
-- Prueba de giro por esquina: PASS.
-- Persecución con línea de visión: PASS.
-- Pérdida de visión y patrulla: PASS.
-- Escape desde una zona de explosión: PASS.
-- No se habilita movimiento diagonal para enemigos.
+- Colisión de paredes/bloques basada en la rejilla con posición continua.
+- Un único módulo `js/13-collision.js` como fuente de verdad para ocupación y movimiento cardinal.
+- Jugador mantiene movimiento cardinal asistido y salida segura de bombas.
+- Enemigos pasan a movimiento continuo por corredores con dirección deseada y decisiones en centros/intersecciones.
+- Se elimina el pathfinding BFS de la IA en favor de decisiones locales por dirección.
+- Evasión de bombas y explosiones integrada en las decisiones locales.
+- Recuperación de atascos y centrado de carril sin diagonales.
+- Se conserva spawn seguro, patrulla cuando el jugador no es visible, persecución cuando hay visión y rodeo para enemigos especiales.

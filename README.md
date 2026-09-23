@@ -218,3 +218,17 @@ Base de movimiento y colisión unificada para jugador y enemigos.
 - Evasión de bombas y explosiones integrada en las decisiones locales.
 - Recuperación de atascos y centrado de carril sin diagonales.
 - Se conserva spawn seguro, patrulla cuando el jugador no es visible, persecución cuando hay visión y rodeo para enemigos especiales.
+
+
+## v3.12.1 — Enemy Behavior Update
+- Ajustada la IA para reaccionar de forma más inmediata cuando detecta al jugador.
+- Persecución directa prioritaria cuando jugador y enemigo comparten corredor.
+- Dirección inicial corregida para no arrancar contra una pared.
+- Decisiones locales más frecuentes, manteniendo movimiento continuo.
+- Memoria corta de la última posición visible del jugador.
+- Enemigo especial conserva objetivo de rodeo por intervalos breves.
+- Bombas y explosiones tienen prioridad sobre persecución normal.
+- Huida pondera seguridad futura y distancia al peligro.
+- Reversión de dirección desalentada salvo cuando es necesaria para escapar o destrabarse.
+- Si una dirección queda bloqueada, el enemigo cambia sin permanecer congelado durante cientos de milisegundos.
+- Sin BFS/A* por frame: la IA continúa basada en decisiones locales sobre la rejilla.

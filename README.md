@@ -255,3 +255,10 @@ Base de movimiento y colisión unificada para jugador y enemigos.
 ## v3.12.4.1 — Freeze correction / dependency audit
 
 Audited the complete v3.12.3 runtime chain. The freeze root cause was a truncated `js/03-world.js`: `update(dt)` called `updateRoomThreat(dt)`, but that function and its dependency `spawnReinforcement()` were missing from the reconstructed file. The correction restores both functions, keeps the v3.12.3 trap system in `js/14-traps.js`, and retains the defensive camera call from v3.12.4.
+
+
+## v3.13 — Room Design Update
+
+The procedural grid now receives a spatial design pass before play begins. Layouts include connected combat rooms, risk corridors, treasure rooms, alternative routes, a designed goal room and a destructible secret room.
+
+Added `js/15-room-design.js` for layout generation, spatial accents and room-specific item placement. The exit gate is placed by the designed final room instead of relying on a purely random block. Hazard generation prefers the designed risk zone and excludes secret-room interiors. Enemy spawning prefers combat-room cells while keeping the safe spawn radius.

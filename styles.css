@@ -364,6 +364,14 @@ body { background: radial-gradient(circle at center, #111827 0%, #05070c 70%); }
 }
 
 
+
+/* V3.10 — lectura rápida de capacidad de bombas */
+.bomb-stat{position:relative;min-width:64px;justify-content:flex-start;}
+.bomb-capacity{display:block;width:28px;height:4px;border:1px solid rgba(251,191,36,.45);background:rgba(15,23,42,.85);overflow:hidden;border-radius:4px;}
+.bomb-capacity span{display:block;width:100%;height:100%;background:#fbbf24;transform-origin:left center;transition:width .08s linear;}
+.bomb-stat.bomb-empty .bomb-capacity span{background:#ef4444;}
+@media(max-width:640px){.bomb-stat{min-width:58px}.bomb-capacity{width:22px;height:3px}}
+
 /* Quadrantes explícitos: cada bloque del HUD se manda a la esquina opuesta al jugador. */
 #game-container.ui-player-tl #ui-layer > .flex:first-child{top:auto;bottom:8px;left:8px;}
 #game-container.ui-player-tl #ui-layer > .flex:last-child{top:8px;bottom:auto;right:8px;}

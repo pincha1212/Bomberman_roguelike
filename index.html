@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOMBERMAN // DESCENT — Roguelike v3.7</title>
+    <title>BOMBERMAN // DESCENT — Roguelike v3.10</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -14,7 +14,7 @@
             <aside class="menu-rail menu-rail-left" aria-label="Resumen de la aventura">
                 <div class="menu-rail-top">
                     <span class="menu-kicker">BOMBERMAN // DESCENT</span>
-                    <span class="menu-version">v3.7</span>
+                    <span class="menu-version">v3.10</span>
                 </div>
                 <div class="menu-rail-content">
                     <div class="menu-mark">💣</div>
@@ -53,7 +53,7 @@
 
                     <div class="flex flex-col items-end gap-1.5">
                         <div class="flex gap-1.5">
-                            <div class="stat-badge text-amber-400">💣 <span id="ui-bombs">1</span></div>
+                            <div class="stat-badge bomb-stat text-amber-400" id="bomb-stat">💣 <span id="ui-bombs">1/1</span><span class="bomb-capacity" aria-hidden="true"><span id="ui-bombs-fill"></span></span></div>
                             <div class="stat-badge text-orange-400">🔥 <span id="ui-range">1</span></div>
                             <div class="stat-badge text-emerald-400">👟 <span id="ui-speed">3</span></div>
                             <div class="stat-badge text-purple-300">✦ <span id="ui-relics">0</span></div>
@@ -121,11 +121,12 @@
         </div>
     </div>
 
-    <!-- v3.7 modular JavaScript: each file owns one gameplay area. -->
+    <!-- v3.10 modular JavaScript: bomb handling is isolated for focused debugging. -->
     <script src="js/01-core.js"></script>
     <script src="js/02-input.js"></script>
     <script src="js/03-world.js"></script>
     <script src="js/04-enemies.js"></script>
+    <script src="js/11-bombs.js"></script>
     <script src="js/05-player.js"></script>
     <script src="js/06-combat.js"></script>
     <script src="js/07-render.js"></script>

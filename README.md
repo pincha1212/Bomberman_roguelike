@@ -160,3 +160,29 @@ Los scripts se cargan en ese orden desde `index.html`. No se usa bundler ni Node
 - Diferenciación cromática por fuente de daño: enemigo, boss/proyectil, trampa y escudo.
 - Protección explícita contra más de una aplicación de daño al jugador en el mismo frame.
 - Nuevo módulo `js/10-feedback.js`.
+
+
+## v3.10 — Bomb Handling Update
+
+- Colocación de bombas aislada en `js/11-bombs.js`.
+- Una pulsación = una bomba; mantener pulsado permite repetición controlada con retardo y cooldown.
+- Bloqueo de colocación accidental cuando el input de movimiento acaba de activarse.
+- Bomba con estado de salida segura y bloqueo al abandonar la casilla.
+- Geometría de explosión centralizada para evitar discrepancias entre preview y detonación.
+- Cadenas visibles mediante enlaces y contador `CADENA ×N`.
+- Bombas del jugador identificadas visualmente con aro cian.
+- HUD muestra bombas disponibles/máximas y una barra de capacidad.
+- Se conservan el feedback de v3.9 para mecha, preview de alcance e impacto.
+
+
+## v3.10 — Bomb Handling Update (completado sobre v3.9)
+
+- Repetición al mantener bomba con retardo inicial y cooldown seguro.
+- Gracia corta contra colocación accidental al cambiar de dirección.
+- Ocupación de bombas y salida segura conservadas.
+- Geometría de explosión unificada entre preview y detonación.
+- Contacto de explosión estricto para evitar golpes fantasma en esquinas/bordes.
+- Cadenas visibles con enlaces temporales y contador `CADENA ×N`.
+- Bombas del jugador identificadas con aro cian.
+- HUD de bombas: disponibles/máximas + barra de capacidad.
+- Se conserva el feedback de v3.9 para mecha y preview de alcance.

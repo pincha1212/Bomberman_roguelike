@@ -338,6 +338,12 @@ const UI = {};
             inputBufferTimer: 0
         };
 
+        // Contexto explícito para módulos y hosts que aíslan el scope de cada script.
+        // Mantiene referencias vivas sin duplicar el estado del motor.
+        window.BOMBER_ENGINE = window.BOMBER_ENGINE || {};
+        window.BOMBER_ENGINE.getState = () => gameState;
+        window.BOMBER_ENGINE.getPlayer = () => player;
+
         window.addEventListener('keydown', (e) => {
             gameState.keys[e.code] = true;
             if (['ArrowUp','ArrowDown','KeyW','KeyS'].includes(e.code)) {

@@ -71,11 +71,14 @@ function triggerBossHitFeedback(b){
     triggerHitStop(70);
 }
 
-function triggerPlayerDamageFeedback(source='unknown', sourceX=player.x, sourceY=player.y, lethal=false, shield=false){
-    const px = player.x + player.width / 2;
-    const py = player.y + player.height / 2;
-    const dx = px - sourceX;
-    const dy = py - sourceY;
+function triggerPlayerDamageFeedback(source='unknown', sourceX=null, sourceY=null, lethal=false, shield=false){
+    const p = window.BOMBER_ENGINE?.getPlayer?.() || player;
+    const px = p.x + p.width / 2;
+    const py = p.y + p.height / 2;
+    const sx = sourceX == null ? p.x : sourceX;
+    const sy = sourceY == null ? p.y : sourceY;
+    const dx = px - sx;
+    const dy = py - sy;
     const len = Math.hypot(dx,dy) || 1;
     const strength = shield ? 3.5 : 5.5;
 
@@ -93,7 +96,7 @@ function triggerPlayerDamageFeedback(source='unknown', sourceX=player.x, sourceY
     const sourceColor = shield ? '#38bdf8' :
         source === 'boss-contact' || source === 'boss-projectile' ? '#c084fc' :
         source === 'trap' ? '#f43f5e' : '#ef4444';
-    if(!shield || source !== 'unknown') addFloatingText(`¡${sourceLabel}!`, player.x, player.y - player.height * .7, sourceColor);
+    if(!shield || source !== 'unknown') addFloatingText(`¡${sourceLabel}!`, p.x, p.y - p.height * .7, sourceColor);
     triggerCombatFlash(shield ? 'rgba(56,189,248,1)' :
         source === 'boss-contact' || source === 'boss-projectile' ? 'rgba(192,132,252,1)' :
         'rgba(239,68,68,1)', shield ? .22 : .20, shield ? 95 : 120);
@@ -111,9 +114,11 @@ function getPlayerRenderRecoil(){
 // El daño al jugador ya tenía inmunidad temporal. Este guard añade una segunda
 // barrera explícita: una sola aplicación de daño por frame.
 function canApplyPlayerDamage(){
-    if(player.isInvincible) return false;
-    if(player.lastDamageFrame === gameState.animFrame) return false;
-    player.lastDamageFrame = gameState.animFrame;
+    const p = window.BOMBER_ENGINE?.getPlayer?.() || player;
+    const gs = window.BOMBER_ENGINE?.getState?.() || gameState;
+    if(p.isInvincible) return false;
+    if(p.lastDamageFrame === gs.animFrame) return false;
+    p.lastDamageFrame = gs.animFrame;
     return true;
 }
 

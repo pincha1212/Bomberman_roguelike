@@ -246,41 +246,46 @@
         }
 
         function updatePlayerInvulnerability(dt) {
-            if (!player.isInvincible) return;
+            const p = window.BOMBER_ENGINE?.getPlayer?.() || player;
+            if (!p.isInvincible) return;
 
-            player.invincibleTimer = Math.max(0, player.invincibleTimer - dt);
-            if (player.invincibleTimer <= 0) {
-                player.invincibleTimer = 0;
-                player.isInvincible = false;
+            p.invincibleTimer = Math.max(0, p.invincibleTimer - dt);
+            if (p.invincibleTimer <= 0) {
+                p.invincibleTimer = 0;
+                p.isInvincible = false;
             }
         }
 
-        function takeDamage(source='unknown', sourceX=player.x, sourceY=player.y) {
+        function takeDamage(source='unknown', sourceX=null, sourceY=null) {
+            const p = window.BOMBER_ENGINE?.getPlayer?.() || player;
+            const gs = window.BOMBER_ENGINE?.getState?.() || gameState;
+            const sx = sourceX == null ? p.x : sourceX;
+            const sy = sourceY == null ? p.y : sourceY;
             if (!canApplyPlayerDamage()) {
                 if (typeof debugRecordEvent === 'function') debugRecordEvent('DAMAGE', `Daño bloqueado · ${source}`);
                 return false;
             }
-            if (typeof debugRecordEvent === 'function') debugRecordEvent('DAMAGE', `Daño aplicado · ${source}`, {hpBefore: player.health, shield: player.hasShield});
+            if (typeof debugRecordEvent === 'function') debugRecordEvent('DAMAGE', `Daño aplicado · ${source}`, {hpBefore: p.health, shield: p.hasShield});
 
             sfx('hurt');
-            if (player.hasShield) {
-                player.hasShield = false;
-                player.isInvincible = true;
-                player.invincibleTimer = 1000 + (Number(gameState.hitInvulnerabilityBonus) || 0);
-                addFloatingText('ESCUDO ROTO!', player.x, player.y, '#38bdf8');
-                addParticles(player.x, player.y, '#38bdf8', 16);
-                triggerPlayerDamageFeedback(source, sourceX, sourceY, false, true);
+            if (p.hasShield) {
+                p.hasShield = false;
+                p.isInvincible = true;
+                p.invincibleTimer = 1000 + (Number(gs.hitInvulnerabilityBonus) || 0);
+                addFloatingText('ESCUDO ROTO!', p.x, p.y, '#38bdf8');
+                addParticles(p.x, p.y, '#38bdf8', 16);
+                triggerPlayerDamageFeedback(source, sx, sy, false, true);
                 triggerScreenShake(5, 200);
                 updateUI(true);
                 return true;
             }
 
-            player.health--;
-            player.isInvincible = true;
-            player.invincibleTimer = 1500 + (Number(gameState.hitInvulnerabilityBonus) || 0);
-            const lethal = player.health <= 0;
-            addParticles(player.x, player.y, '#ef4444', lethal ? 26 : 15);
-            triggerPlayerDamageFeedback(source, sourceX, sourceY, lethal, false);
+            p.health--;
+            p.isInvincible = true;
+            p.invincibleTimer = 1500 + (Number(gs.hitInvulnerabilityBonus) || 0);
+            const lethal = p.health <= 0;
+            addParticles(p.x, p.y, '#ef4444', lethal ? 26 : 15);
+            triggerPlayerDamageFeedback(source, sx, sy, lethal, false);
             triggerScreenShake(lethal ? 14 : 10, lethal ? 520 : 400);
             if (lethal) sfx('death');
             updateUI(true);

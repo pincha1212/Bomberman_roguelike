@@ -159,7 +159,7 @@
         setText('dbg-projectiles', s.world.projectiles);
         setText('dbg-boss', s.world.boss ? 'SI' : 'NO');
         setText('dbg-run', s.run);
-        setText('debug-status', D.paused ? 'PAUSADO' : 'ACTIVO');
+        setText('debug-status', D.busy ? 'TESTS' : (!s.playing ? 'DETENIDO' : (D.paused ? 'PAUSADO' : 'ACTIVO')));
 
         const eventText = D.eventLog.slice(-80).map(item => {
             const t = new Date().toLocaleTimeString('es-AR', { hour12: false });
@@ -181,8 +181,9 @@
 
         const results = D.testResults;
         const passed = results.filter(r => r.status === 'PASS').length;
-        setText('dbg-suite', `${passed}/${Object.keys(DEBUG_TESTS).length}`);
-        for (const name of Object.keys(DEBUG_TESTS)) {
+        const tests = window.DEBUG_TESTS || {};
+        setText('dbg-suite', `${passed}/${Object.keys(tests).length}`);
+        for (const name of Object.keys(tests)) {
             const result = results.slice().reverse().find(r => r.name === name);
             const node = document.getElementById(`dbg-test-${name}`);
             if (!node) continue;

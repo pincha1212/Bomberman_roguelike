@@ -207,7 +207,7 @@
             this.storageSnapshot = captureDebugStorage();
             this.testResults = [];
             const names = Object.keys(DEBUG_TESTS);
-            this.recordEvent('TEST', `Suite iniciada: ${names.length} pruebas.`);
+            this.recordEvent('TEST', `Suite v3.16.1 iniciada: ${names.length} pruebas.`);
             for (const name of names) {
                 const started = performance.now();
                 try {
@@ -375,12 +375,15 @@
             initLevel();
             gameState.isPlaying = false;
             gameState.lastTime = performance.now();
+            gameState.isPlaying = true;
+            gameState.paused = false;
             updateRoguePresentation();
             updateUI(true);
             draw();
             DEBUG_MODE.paused = false;
             DEBUG_MODE.stepRequested = false;
-            DEBUG_MODE.recordEvent('LIFECYCLE', 'Escena restaurada. La run queda lista para iniciar.');
+            ensureDebugLoop();
+            DEBUG_MODE.recordEvent('LIFECYCLE', 'Escena restaurada. La run de depuración quedó activa.');
         } catch (error) {
             DEBUG_MODE.captureError(error, 'restore-scene');
         }
@@ -419,19 +422,21 @@
 
         damage: async () => {
             prepareTest();
-            player.health = 3;
-            player.isInvincible = false;
-            player.invincibleTimer = 0;
-            player.lastDamageFrame = -1;
-            gameState.animFrame = 1;
-            if (takeDamage('debug', player.x, player.y) !== true) throw new Error('El primer daño no fue aplicado.');
-            const hp1 = player.health;
-            if (takeDamage('debug-second', player.x, player.y) !== false) throw new Error('Se aplicó daño doble durante la inmunidad.');
+            const p = window.BOMBER_ENGINE?.getPlayer?.() || player;
+            const gs = window.BOMBER_ENGINE?.getState?.() || gameState;
+            p.health = 3;
+            p.isInvincible = false;
+            p.invincibleTimer = 0;
+            p.lastDamageFrame = -1;
+            gs.animFrame = 1;
+            if (takeDamage('debug', p.x, p.y) !== true) throw new Error('El primer daño no fue aplicado.');
+            const hp1 = p.health;
+            if (takeDamage('debug-second', p.x, p.y) !== false) throw new Error('Se aplicó daño doble durante la inmunidad.');
             updatePlayerInvulnerability(1600);
-            gameState.animFrame = 2;
-            if (takeDamage('debug-third', player.x, player.y) !== true) throw new Error('No volvió a recibir daño tras la inmunidad.');
-            if (player.health !== 1) throw new Error('El segundo golpe no restó exactamente 1 HP.');
-            return `OK · HP ${hp1} → ${player.health}`;
+            gs.animFrame = 2;
+            if (takeDamage('debug-third', p.x, p.y) !== true) throw new Error('No volvió a recibir daño tras la inmunidad.');
+            if (p.health !== 1) throw new Error('El segundo golpe no restó exactamente 1 HP.');
+            return `OK · HP ${hp1} → ${p.health}`;
         },
 
         traps: async () => {
@@ -520,6 +525,7 @@
     };
 
     window.DEBUG_MODE = DEBUG_MODE;
+    window.DEBUG_TESTS = DEBUG_TESTS;
     window.debugRecordEvent = (...args) => DEBUG_MODE.recordEvent(...args);
     window.debugCaptureError = (...args) => DEBUG_MODE.captureError(...args);
     window.debugStateSnapshot = () => DEBUG_MODE.snapshot();

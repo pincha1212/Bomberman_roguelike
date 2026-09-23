@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.6 — Bombs, explosions, damage, enemies update and gameplay simulation
+// Bomberman Roguelike v3.15 — Bombs, explosions, damage and gameplay simulation
         function explodeBomb(bombIndex) {
             const first = gameState.bombs[bombIndex];
             if (!first) return;
@@ -86,6 +86,7 @@
         function update(dt) {
             clampLargeEntities();
             if (!gameState.isPlaying || gameState.paused) return;
+            if (typeof tickRunClock === 'function') tickRunClock(dt);
             gameState.animFrame++;
             updateCombatFeedback(dt);
             renderImmersion();
@@ -278,7 +279,7 @@
             triggerScreenShake(lethal ? 14 : 10, lethal ? 520 : 400);
             if (lethal) sfx('death');
             updateUI(true);
-            if (lethal) gameOver();
+            if (lethal) gameOver(source);
             return true;
         }
 

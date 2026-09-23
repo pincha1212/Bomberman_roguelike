@@ -1,5 +1,6 @@
-// Bomberman Roguelike v3.6 — Game loop, HUD, run flow, rewards, game over and bootstrap
+// Bomberman Roguelike v3.15 — Game loop, HUD, run flow, rewards, death summary and bootstrap
         function gameLoop(timestamp) {
+            if (!gameState.isPlaying) { gameState.rafId = 0; return; }
             let dt = timestamp - gameState.lastTime;
             gameState.lastTime = timestamp;
             if (dt > 100) dt = 16;
@@ -23,7 +24,9 @@
             draw();
 
             if (gameState.isPlaying) {
-                requestAnimationFrame(gameLoop);
+                gameState.rafId = requestAnimationFrame(gameLoop);
+            } else {
+                gameState.rafId = 0;
             }
         }
 
@@ -79,50 +82,15 @@
             document.getElementById('level-complete-screen').classList.add('hidden');
             document.getElementById('pause-screen')?.classList.add('hidden');
 
-            gameState.runNumber = Number(localStorage.getItem('bombermanRogueRun') || 0) + 1;
-            localStorage.setItem('bombermanRogueRun', gameState.runNumber);
-            gameState.level = 1;
-            gameState.score = 0;
-            gameState.coins = 0;
-            gameState.relics = [];
-            gameState.coinBonus = 0;
-            gameState.killScoreMult = 1;
-            gameState.rerollDiscount = 0;
-            gameState.rerolls = 1;
-            gameState.fireScoreMult = 1;
-            gameState.hitInvulnerabilityBonus = 0;
-            if (typeof resetRelicModifiers === 'function') resetRelicModifiers();
-            gameState.blocksBroken = 0;
-            gameState.totalKills = 0;
-            gameState.hazards = [];
-            gameState.roomTime = 0;
-            gameState.threatLevel = 0;
-            gameState.nextReinforcement = 20000;
-            gameState.paused = false;
-            combatFeedback.hitStop = 0;
-            combatFeedback.flash = 0;
-            combatFeedback.playerHit = 0;
-            combatFeedback.death = 0;
-            combatFeedback.playerRecoilX = 0;
-            combatFeedback.playerRecoilY = 0;
-            player.health = 3;
-            player.maxHealth = 5;
-            player.maxBombs = 1;
-            player.bombRange = 1;
-            player.bombCooldown = 0;
-            player.speed = 3.0;
-            player.hasShield = false;
-            player.isInvincible = false;
-            player.invincibleTimer = 0;
-            player.lastDamageFrame = -1;
-            gameState.lastMoveInputAt = 0;
-            if (typeof resetBombHandlingState === 'function') resetBombHandlingState();
-
+            // V3.15: una nueva run pasa por un reinicio centralizado para evitar
+            // arrastres de bombas, enemigos, trampas, proyectiles, timers, input o cámara.
+            beginNewRun();
             initLevel();
             gameState.isPlaying = true;
             gameState.lastTime = performance.now();
             updateRoguePresentation();
-            requestAnimationFrame(gameLoop);
+            updateUI(true);
+            gameState.rafId = requestAnimationFrame(gameLoop);
         }
 
         function buildRewardChoices() {
@@ -166,7 +134,7 @@
             gameState.isPlaying = true;
             gameState.paused = false;
             gameState.lastTime = performance.now();
-            requestAnimationFrame(gameLoop);
+            gameState.rafId = requestAnimationFrame(gameLoop);
         }
 
         function completeLevel() {
@@ -254,20 +222,9 @@
             updateUI();
         }
 
-        function gameOver() {
-            gameState.isPlaying = false;
-            gameState.paused = false;
-            const finalDepth = gameState.level;
-            gameState.bestDepth = Math.max(gameState.bestDepth, finalDepth);
-            localStorage.setItem('bombermanBestDepth', gameState.bestDepth);
-            const bestScore = Math.max(Number(localStorage.getItem('bombermanBestScore') || 0), gameState.score);
-            localStorage.setItem('bombermanBestScore', bestScore);
-            document.getElementById('go-level').innerText = finalDepth;
-            document.getElementById('go-score').innerText = gameState.score;
-            document.getElementById('go-coins').innerText = gameState.coins;
-            document.getElementById('go-relics').innerText = gameState.relics.length;
-            document.getElementById('go-best').innerText = gameState.bestDepth;
-            document.getElementById('game-over-screen').classList.remove('hidden');
+        function gameOver(source = 'unknown') {
+            finishRun(source);
+            document.getElementById('game-over-screen')?.classList.remove('hidden');
         }
 
         document.getElementById('btn-start').addEventListener('click', () => { initAudio(); audioCtx?.resume(); sfx('click'); startGame(); });
@@ -275,7 +232,7 @@
         document.getElementById('btn-resume')?.addEventListener('click', togglePause);
 
         // Initial setup
-        gameState.runNumber = Number(localStorage.getItem('bombermanRogueRun') || 0) + 1;
+        gameState.runNumber = Number(localStorage.getItem('bombermanRogueRun') || 0);
         initLevel();
         updateRoguePresentation();
         updateUI();

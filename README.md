@@ -251,3 +251,10 @@ Base de movimiento y colisión unificada para jugador y enemigos.
 - Las trampas de explosión retardada muestran un contador visual y generan su propia explosión al finalizar.
 - Una explosión de bomba puede armar una trampa de explosión retardada sin volver a generar daño invisible o doble.
 - Las explosiones originadas por trampas se identifican como `owner: 'trap'` para que el feedback de daño indique correctamente la fuente.
+
+
+## v3.12.4 — Freeze Correction
+
+- Auditoría encontró que `index.html` cargaba `js/09-camera.js`, pero el módulo no estaba presente en la cadena de deltas reconstruida. `js/06-combat.js` llamaba `updateCamera(dt)` sin protección; ese ReferenceError podía detener `requestAnimationFrame` y dejar el juego congelado.
+- Se restaura `js/09-camera.js` y la llamada a cámara queda defensiva para que una ausencia futura del módulo no vuelva a cortar el game loop.
+- No se modificó la lógica de trampas.

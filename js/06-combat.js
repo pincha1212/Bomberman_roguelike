@@ -26,6 +26,8 @@
                 const blastId = ++gameState.blastSerial;
                 const cells = calculateBombBlastCells(bomb);
                 const blastKeys = new Set(cells.map(c => `${c.x},${c.y}`));
+                // V3.12.3: algunas trampas reaccionan al paso de una explosión.
+                if (typeof reactHazardsToBlast === 'function') reactHazardsToBlast(cells, bomb);
 
                 for (const cell of cells) {
                     if (!cell.block) continue;
@@ -134,7 +136,8 @@
                 // Reducimos un poquito el hitbox de la explosión para que sea más justo
                 // Contacto estricto: tocar apenas una esquina/borde de la celda no cuenta como golpe.
                 if (explosionOverlapsRect(pHurtbox, exp, 5)) {
-                    takeDamage('explosion', (exp.x + .5) * TILE_SIZE, (exp.y + .5) * TILE_SIZE);
+                    const damageSource = exp.owner === 'trap' ? 'trap' : 'explosion';
+                    takeDamage(damageSource, (exp.x + .5) * TILE_SIZE, (exp.y + .5) * TILE_SIZE);
                 }
 
                 if (gameState.boss && !gameState.boss.defeated) {

@@ -139,13 +139,15 @@
             // Un solo componente de velocidad puede existir en todo momento.
             if (axis === 'x') {
                 player.vy = 0;
-                const target = desired ? desired.dir * player.speed : 0;
+                const effectiveSpeed = desired && typeof getHazardSpeedFactor === 'function' ? player.speed * getHazardSpeedFactor() : player.speed;
+                const target = desired ? desired.dir * effectiveSpeed : 0;
                 player.vx = approach(player.vx, target, (desired ? MOTION.acceleration : MOTION.braking) * frameScale);
                 if (Math.abs(player.vx) < MOTION.stopEpsilon) player.vx = 0;
                 if (player.vx !== 0) player.dir = player.vx < 0 ? 'left' : 'right';
             } else if (axis === 'y') {
                 player.vx = 0;
-                const target = desired ? desired.dir * player.speed : 0;
+                const effectiveSpeed = desired && typeof getHazardSpeedFactor === 'function' ? player.speed * getHazardSpeedFactor() : player.speed;
+                const target = desired ? desired.dir * effectiveSpeed : 0;
                 player.vy = approach(player.vy, target, (desired ? MOTION.acceleration : MOTION.braking) * frameScale);
                 if (Math.abs(player.vy) < MOTION.stopEpsilon) player.vy = 0;
                 if (player.vy !== 0) player.dir = player.vy < 0 ? 'up' : 'down';

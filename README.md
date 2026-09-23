@@ -1,4 +1,4 @@
-# BOMBERMAN // DESCENT — Roguelike v3.16
+# BOMBERMAN // DESCENT — Roguelike v3.16.1
 
 Videojuego web estático desarrollado con HTML, CSS y JavaScript vanilla. Preparado para GitHub Pages, sin backend ni bundler.
 

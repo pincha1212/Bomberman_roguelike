@@ -186,3 +186,8 @@ Los scripts se cargan en ese orden desde `index.html`. No se usa bundler ni Node
 - Bombas del jugador identificadas con aro cian.
 - HUD de bombas: disponibles/máximas + barra de capacidad.
 - Se conserva el feedback de v3.9 para mecha y preview de alcance.
+
+## v3.10.1 — Bomb Escape Fix
+
+Corrección puntual del movimiento tras colocar una bomba. La bomba propia permanece atravesable mientras la hitbox de movimiento del jugador siga tocando su casilla; solo pasa a ser sólida cuando el jugador la abandona por completo. Esto evita que la bomba se vuelva sólida un frame demasiado pronto y deje al personaje atrapado al intentar huir.
+

@@ -383,6 +383,98 @@
             this.recordEvent('DEBUG', 'Event Log limpiado.');
         },
 
+        buildTestReport() {
+            const snapshot = this.snapshot();
+            const total = this.testResults.length;
+            const passed = this.testResults.filter(r => r.status === 'PASS').length;
+            const failed = this.testResults.filter(r => r.status === 'FAIL').length;
+            const started = this.testResults[0]?.name || '—';
+
+            const lines = [
+                'BOMBERMAN ROGUELIKE — DEBUG TEST COMPLETO',
+                `Fecha: ${new Date().toLocaleString('es-AR')}`,
+                `Suite: ${total} pruebas registradas · ${passed} PASS · ${failed} FAIL`,
+                `Primera prueba: ${started}`,
+                '',
+                '=== RESUMEN ===',
+                ...this.testResults.map((r, index) => {
+                    const ms = Number(r.ms || 0).toFixed(1);
+                    return `${index + 1}. ${String(r.name || 'TEST').toUpperCase()} — ${r.status} — ${ms} ms — ${r.summary || r.result || 'Sin resumen'}`;
+                }),
+                '',
+                '=== INSPECTOR DE TEST ===',
+                this.lastTest
+                    ? JSON.stringify({
+                        name: this.lastTest.name,
+                        status: this.lastTest.status,
+                        summary: this.lastTest.summary,
+                        ms: Number(this.lastTest.ms || 0),
+                        details: this.lastTest.details || {}
+                    }, null, 2)
+                    : 'Sin prueba seleccionada.',
+                '',
+                '=== ESTADO DEL MOTOR ===',
+                JSON.stringify({
+                    status: snapshot.status,
+                    engine: snapshot.engine,
+                    performance: snapshot.performance,
+                    player: snapshot.player,
+                    world: snapshot.world,
+                    navigation: snapshot.navigation,
+                    relics: snapshot.relics,
+                    errors: snapshot.errors,
+                    events: snapshot.events
+                }, null, 2),
+                '',
+                '=== EVENT LOG ===',
+                this.eventLog.length
+                    ? this.eventLog.map(item => {
+                        const suffix = item.data ? ` · ${safeJson(item.data)}` : '';
+                        return `[${item.wallTime}] ${item.type} ${item.message}${suffix}`;
+                    }).join('\n')
+                    : 'Sin eventos.',
+                '',
+                '=== RUNTIME ERRORS ===',
+                this.runtimeErrors.length
+                    ? this.runtimeErrors.map((e, index) => {
+                        const loc = e.url ? ` · ${e.url}` : '';
+                        return `${index + 1}. [${e.wallTime}] ${e.source}: ${e.message}${loc}${e.stack ? `\n${e.stack}` : ''}`;
+                    }).join('\n\n')
+                    : 'Sin errores de runtime.'
+            ];
+
+            return lines.join('\n');
+        },
+
+        async copyTestReport() {
+            if (!this.enabled) return { ok: false, message: 'Debug no activo.' };
+            const report = this.buildTestReport();
+            try {
+                if (navigator.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(report);
+                } else {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = report;
+                    textarea.setAttribute('readonly', '');
+                    textarea.style.position = 'fixed';
+                    textarea.style.opacity = '0';
+                    textarea.style.pointerEvents = 'none';
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    const ok = document.execCommand('copy');
+                    textarea.remove();
+                    if (!ok) throw new Error('El navegador rechazó la copia al portapapeles.');
+                }
+                this.lastAction = 'Reporte de tests copiado';
+                this.recordEvent('DEBUG', 'Reporte completo de tests copiado al portapapeles.', { tests: this.testResults.length });
+                return { ok: true, message: 'Reporte copiado.' };
+            } catch (error) {
+                this.captureError(error, 'clipboard.copy');
+                this.lastAction = 'Error al copiar reporte';
+                return { ok: false, message: error?.message || 'No se pudo copiar el reporte.' };
+            }
+        },
+
         clearErrors() {
             this.runtimeErrors.length = 0;
             this.recordEvent('DEBUG', 'Runtime Errors limpiado.');
@@ -450,6 +542,10 @@
             return { summary: String(result.summary), details: result.details ?? {} };
         }
         return { summary: String(result ?? 'OK'), details: {} };
+    }
+
+    function safeJson(value) {
+        try { return JSON.stringify(value); } catch (_) { return '[datos]'; }
     }
 
     function nextFrame() {

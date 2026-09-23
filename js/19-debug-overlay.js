@@ -23,6 +23,7 @@
             <button type="button" data-debug-action="pause">PAUSA <kbd>F4</kbd></button>
             <button type="button" data-debug-action="step">STEP <kbd>F6</kbd></button>
             <button type="button" data-debug-action="run-tests">TESTS <kbd>F7</kbd></button>
+            <button type="button" data-debug-action="copy-tests" title="Copia el informe completo de tests, estado, eventos y errores">COPIAR TEST</button>
         </div>
 
         <section class="debug-section">
@@ -285,6 +286,18 @@
         else if (name === 'pause') D.requestPause();
         else if (name === 'step') D.requestStep();
         else if (name === 'run-tests') D.runAllTests();
+        else if (name === 'copy-tests') D.copyTestReport().then(result => {
+            const button = root.querySelector('[data-debug-action="copy-tests"]');
+            if (!button) return;
+            const original = button.textContent;
+            button.textContent = result.ok ? 'COPIADO ✓' : 'ERROR ✕';
+            button.classList.toggle('is-pass', !!result.ok);
+            button.classList.toggle('is-fail', !result.ok);
+            window.setTimeout(() => {
+                button.textContent = original;
+                button.classList.remove('is-pass', 'is-fail');
+            }, 1600);
+        });
         else if (name === 'reset') D.resetScene();
         else if (name === 'bomb') D.manualBomb();
         else if (name === 'damage') D.manualDamage();

@@ -1,45 +1,21 @@
-# Bomberman Roguelike v3.15 — Death & Restart Update
+# Bomberman Roguelike v3.15.1 — Debug Lab
 
-## Enfoque
+Modo de pruebas aislado para la build actual del juego.
 
-Esta versión pule el cierre de una run y garantiza un reinicio limpio. La muerte ahora muestra un resumen completo de la partida y el siguiente intento vuelve a iniciar todos los sistemas temporales y entidades desde cero.
+## Qué permite comprobar
 
-## Resumen de muerte
+- Movimiento cardinal y colisiones.
+- Colocación y detonación de bombas.
+- Daño, inmunidad temporal y prevención de doble golpe.
+- Las cinco trampas y su activación de un solo uso.
+- Comportamiento básico de enemigos.
+- Seguimiento y límites de cámara.
+- Reinicio limpio de una run.
 
-La pantalla final informa:
+## Uso
 
-- Profundidad alcanzada.
-- Enemigos derrotados.
-- Monedas obtenidas.
-- Reliquias conseguidas.
-- Tiempo de run activo.
-- Puntaje total.
-- Mejor profundidad histórica.
-- Mejor puntaje histórico.
-- Causa del último daño letal.
+Abrí `debug.html` desde la misma carpeta que `index.html`, `styles.css` y `js/`.
 
-Los récords se guardan en `localStorage` y se distinguen cuando la run establece una nueva marca.
+El laboratorio carga el juego real dentro de un iframe y ejecuta las pruebas sobre ese motor. Cada prueba prepara un estado aislado antes de ejecutar el escenario.
 
-## Reinicio limpio
-
-Cada nueva run limpia de forma centralizada:
-
-- bombas y contador de bombas;
-- explosiones y proyectiles;
-- enemigos y jefe;
-- trampas y estados temporales de movimiento;
-- timers de sala, amenaza, daño, bombas y feedback;
-- partículas y textos flotantes;
-- input de teclado, joystick y retención de bomba;
-- velocidad, vida, escudo, alcance y modificadores de reliquias;
-- cámara, shake y estado de animación.
-
-La run también tiene un reloj propio que no avanza mientras el juego está pausado.
-
-## Arquitectura
-
-El ciclo de vida de la run está aislado en `js/17-run-lifecycle.js`, para facilitar auditorías y pruebas de reinicio sin mezclarlo con combate, movimiento o generación del mapa.
-
-## Compatibilidad
-
-Proyecto web estático para GitHub Pages. HTML, CSS y JavaScript vanilla, sin backend ni bundler.
+El modo debug no se carga desde `index.html`, por lo que no altera la partida normal.

@@ -1,22 +1,20 @@
-# Bomberman Roguelike — Debug integrado v3.15.2
+# Bomberman Roguelike v3.15.4
 
-El menú principal incluye el botón **🧪 ABRIR DEBUG LAB**.
+Build completa lista para GitHub Pages, con el juego modular y el Debug Lab integrado.
 
-El botón abre `debug/debug.html` en una pestaña nueva para no cerrar ni interrumpir la partida principal.
+## Estructura
 
-Estructura necesaria:
+- `index.html` — juego principal.
+- `styles.css` — interfaz del juego.
+- `js/` — módulos del motor.
+- `debug/debug.html` — laboratorio de pruebas aisladas.
+- `debug/debug.css` — interfaz del laboratorio.
 
-```text
-index.html
-styles.css
-js/
-debug/
-  debug.html
-  debug.css
-```
+## Debug Lab
 
-El Debug Lab continúa usando `js/18-debug-mode.js` y queda separado del juego normal.
+Desde el menú principal, `ABRIR DEBUG LAB` abre `debug/debug.html`.
+El laboratorio carga el motor real con `../index.html?debug=1` y su JavaScript se carga con `../js/18-debug-mode.js`. Las rutas son relativas para funcionar tanto en `https://usuario.github.io/` como en `https://usuario.github.io/repositorio/`.
 
 ## GitHub Pages
 
-La carpeta `debug/` es parte del sitio publicado. El botón del menú usa una ruta relativa (`./debug/debug.html`) y el laboratorio carga el motor con `../index.html?debug=1`, para que las rutas funcionen tanto en un sitio raíz como en un sitio de proyecto de GitHub Pages.
+Subí el contenido de este ZIP directamente a la raíz de la fuente publicada. `index.html` debe quedar en el nivel superior del repositorio/fuente de Pages.

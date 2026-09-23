@@ -1,128 +1,33 @@
-// Bomberman Roguelike v3.16.2 — Debug Engine
-// Se activa únicamente con ?debug=1. El modo normal no muestra ni ejecuta el panel.
+// Bomberman Roguelike v3.16.3 — Debug Engine
+// Depuración interna del mismo runtime. Se activa solo con ?debug=1.
 (() => {
     'use strict';
 
     const params = new URLSearchParams(window.location.search);
     const enabled = params.get('debug') === '1';
 
-    const NAV_DIRS = [
+    const DIRS = Object.freeze([
         { dx: 0, dy: -1, dir: 'UP' },
         { dx: 1, dy: 0, dir: 'RIGHT' },
         { dx: 0, dy: 1, dir: 'DOWN' },
         { dx: -1, dy: 0, dir: 'LEFT' }
-    ];
+    ]);
 
-    function navKey(x, y) { return `${x},${y}`; }
+    const TEST_NAMES = Object.freeze(['movement', 'bombs', 'damage', 'traps', 'enemies', 'camera', 'restart']);
+    const MAX_EVENTS = 220;
+    const MAX_ERRORS = 100;
+    const MAX_TEST_RESULTS = 30;
+    const MAX_NAV_NODES = 900;
 
-    function navTilePassable(kind, entity, x, y, startX, startY) {
-        if (!gridIsInside(x, y)) return false;
-        const canFly = kind === 'enemy' && !!entity?.type?.canFly;
-        if (gridTileIsBlocked(x, y, { canFly })) return false;
-
-        if (x === startX && y === startY) return true;
-
-        const bombAtTile = gameState.bombs?.some(b => b && b.x === x && b.y === y);
-        return !bombAtTile;
-    }
-
-    function buildReachableMap(kind, entity, start, maxNodes = 900) {
-        const queue = [{ x: start.x, y: start.y }];
-        let cursor = 0;
-        const visited = new Set([navKey(start.x, start.y)]);
-        const parent = new Map();
-        const depth = new Map([[navKey(start.x, start.y), 0]]);
-
-        while (cursor < queue.length && visited.size < maxNodes) {
-            const current = queue[cursor++];
-            for (const dir of NAV_DIRS) {
-                const nx = current.x + dir.dx;
-                const ny = current.y + dir.dy;
-                const key = navKey(nx, ny);
-                if (visited.has(key) || !navTilePassable(kind, entity, nx, ny, start.x, start.y)) continue;
-                visited.add(key);
-                parent.set(key, navKey(current.x, current.y));
-                depth.set(key, (depth.get(navKey(current.x, current.y)) || 0) + 1);
-                queue.push({ x: nx, y: ny });
-            }
-        }
-
-        return { visited, parent, depth, truncated: queue.length > 0 };
-    }
-
-    function buildPath(parent, start, target, maxLength = 80) {
-        const targetKey = navKey(target.x, target.y);
-        if (start.x === target.x && start.y === target.y) return [{ x: start.x, y: start.y }];
-        if (!parent.has(targetKey)) return [];
-
-        const path = [];
-        let current = targetKey;
-        let guard = 0;
-        while (current && guard++ < maxLength) {
-            const [x, y] = current.split(',').map(Number);
-            path.push({ x, y });
-            if (x === start.x && y === start.y) break;
-            current = parent.get(current);
-        }
-        if (!path.length || path[path.length - 1].x !== start.x || path[path.length - 1].y !== start.y) return [];
-        path.reverse();
-        return path;
-    }
-
-    function getNavigationSnapshot() {
-        const playerEntity = window.BOMBER_ENGINE?.getPlayer?.() || window.player || globalThis.player;
-        const playerTile = typeof gridCurrentTile === 'function'
-            ? gridCurrentTile(playerEntity, 'player')
-            : { x: Math.floor((playerEntity?.x || 0) / TILE_SIZE), y: Math.floor((playerEntity?.y || 0) / TILE_SIZE) };
-
-        const now = performance.now();
-        if (DEBUG_MODE.navigationCache && now - DEBUG_MODE.navigationCacheAt < 220) return DEBUG_MODE.navigationCache;
-
-        const playerReach = buildReachableMap('player', playerEntity, playerTile, 900);
-        const enemies = (gameState.enemies || []).slice(0, 12).map((enemy, index) => {
-            const tile = typeof gridCurrentTile === 'function' ? gridCurrentTile(enemy, 'enemy') : {
-                x: Math.floor(enemy.x / TILE_SIZE), y: Math.floor(enemy.y / TILE_SIZE)
-            };
-            const reach = buildReachableMap('enemy', enemy, tile, 900);
-            const path = buildPath(reach.parent, tile, playerTile, 80);
-            const options = NAV_DIRS.filter(dir => navTilePassable('enemy', enemy, tile.x + dir.dx, tile.y + dir.dy, tile.x, tile.y)).map(dir => dir.dir);
-            return {
-                index,
-                tile,
-                behavior: enemy.ai?.behavior || '?',
-                alert: enemy.ai?.alert || '?',
-                direction: enemy.ai?.direction || enemy.lastDirection || '?',
-                desiredDirection: enemy.ai?.desiredDirection || enemy.desiredDirection || '?',
-                seesPlayer: !!enemy.ai?.seesPlayer,
-                reachableTiles: reach.visited.size,
-                truncated: reach.truncated,
-                options,
-                route: path,
-                routeLength: Math.max(0, path.length - 1),
-                canReachPlayer: path.length > 0
-            };
-        });
-
-        DEBUG_MODE.navigationCache = {
-            mode: 'reference-bfs',
-            player: {
-                tile: playerTile,
-                reachableTiles: playerReach.visited.size,
-                truncated: playerReach.truncated,
-                cells: Array.from(playerReach.visited).map(k => k.split(',').map(Number)),
-                    options: NAV_DIRS.filter(dir => navTilePassable('player', playerEntity, playerTile.x + dir.dx, playerTile.y + dir.dy, playerTile.x, playerTile.y)).map(dir => dir.dir)
-            },
-            enemies
-        };
-        DEBUG_MODE.navigationCacheAt = now;
-        return DEBUG_MODE.navigationCache;
-    }
+    const getState = () => window.BOMBER_ENGINE?.getState?.() || null;
+    const getPlayer = () => window.BOMBER_ENGINE?.getPlayer?.() || null;
 
     const DEBUG_MODE = {
         enabled,
         visible: enabled,
         paused: false,
         stepRequested: false,
+        busy: false,
         frameCount: 0,
         fps: 0,
         avgFrameMs: 0,
@@ -130,18 +35,17 @@
         maxFrameMs: 0,
         updateMs: 0,
         drawMs: 0,
-        lastTimestamp: 0,
+        loopMs: 0,
         frameWindowStart: 0,
         frameWindowCount: 0,
         eventLog: [],
-        runtimeErrors: (window.__BOMBER_DEBUG_BOOT_ERRORS || []).map(item => ({ time: performance.now(), source: 'boot', message: String(item), stack: '' })),
+        runtimeErrors: [],
         testResults: [],
-        busy: false,
-        storageSnapshot: null,
-        lastState: null,
         lastTest: null,
+        lastAction: '—',
         navigationCache: null,
-        navigationCacheAt: 0,
+        navigationSignature: '',
+        navigationAt: 0,
         selectedVisuals: {
             grid: false,
             collision: false,
@@ -151,28 +55,24 @@
             ai: false,
             camera: false,
             spawns: false,
-            paths: false
-        },
-
-        frameStart() {
-            if (!this.enabled) return performance.now();
-            return performance.now();
+            paths: true
         },
 
         recordFrame(timestamp, frameMs, updateMs, drawMs) {
             if (!this.enabled) return;
-            this.frameCount++;
-            this.frameWindowCount++;
-            this.updateMs = updateMs;
-            this.drawMs = drawMs;
-            this.avgFrameMs = this.avgFrameMs ? this.avgFrameMs * 0.92 + frameMs * 0.08 : frameMs;
-            this.minFrameMs = Math.min(this.minFrameMs, frameMs);
-            this.maxFrameMs = Math.max(this.maxFrameMs, frameMs);
+            this.frameCount += 1;
+            this.frameWindowCount += 1;
+            this.updateMs = Number(updateMs) || 0;
+            this.drawMs = Number(drawMs) || 0;
+            this.loopMs = Number(frameMs) || 0;
+            this.avgFrameMs = this.avgFrameMs ? this.avgFrameMs * 0.90 + this.loopMs * 0.10 : this.loopMs;
+            this.minFrameMs = Math.min(this.minFrameMs, this.loopMs);
+            this.maxFrameMs = Math.max(this.maxFrameMs, this.loopMs);
 
             if (!this.frameWindowStart) this.frameWindowStart = timestamp;
             const elapsed = timestamp - this.frameWindowStart;
             if (elapsed >= 500) {
-                this.fps = this.frameWindowCount * 1000 / elapsed;
+                this.fps = this.frameWindowCount * 1000 / Math.max(1, elapsed);
                 this.frameWindowCount = 0;
                 this.frameWindowStart = timestamp;
             }
@@ -180,47 +80,60 @@
 
         recordEvent(type, message, data = null) {
             if (!this.enabled) return;
+            const normalizedType = String(type || 'INFO').toUpperCase();
+            const item = {
+                id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                time: performance.now(),
+                wallTime: new Date().toLocaleTimeString('es-AR', { hour12: false }),
+                type: normalizedType,
+                message: String(message || ''),
+                data: data && typeof data === 'object' ? data : null
+            };
+            this.eventLog.push(item);
+            if (this.eventLog.length > MAX_EVENTS) this.eventLog.splice(0, this.eventLog.length - MAX_EVENTS);
+            dispatchUpdate();
+        },
+
+        captureError(error, source = 'runtime', extra = null) {
+            if (!this.enabled) return;
+            const message = error?.message || String(error || 'Error desconocido');
+            const stack = error?.stack || '';
+            const url = extra?.url || '';
+            const fingerprint = `${source}|${message}|${url}|${stack.split('\n')[1] || ''}`;
+            const previous = this.runtimeErrors[this.runtimeErrors.length - 1];
+            if (previous?.fingerprint === fingerprint && performance.now() - previous.time < 500) return;
+
             const item = {
                 time: performance.now(),
                 wallTime: new Date().toLocaleTimeString('es-AR', { hour12: false }),
-                type: String(type || 'INFO').toUpperCase(),
-                message: String(message || ''),
-                data
-            };
-            this.eventLog.push(item);
-            if (this.eventLog.length > 180) this.eventLog.shift();
-        },
-
-        captureError(error, source = 'runtime') {
-            if (!this.enabled) return;
-            const message = error?.message || String(error || 'Error');
-            const stack = error?.stack || '';
-            this.runtimeErrors.push({
-                time: performance.now(),
-                source,
+                source: String(source),
                 message,
-                stack
-            });
-            if (this.runtimeErrors.length > 80) this.runtimeErrors.shift();
-            this.recordEvent('ERROR', message, { source });
+                stack,
+                url,
+                fingerprint
+            };
+            this.runtimeErrors.push(item);
+            if (this.runtimeErrors.length > MAX_ERRORS) this.runtimeErrors.splice(0, this.runtimeErrors.length - MAX_ERRORS);
+            this.recordEvent('ERROR', message, { source, url });
         },
 
         requestPause() {
-            if (!this.enabled) return;
+            if (!this.enabled || this.busy) return;
             this.paused = !this.paused;
             this.stepRequested = false;
             this.recordEvent('DEBUG', this.paused ? 'Simulación pausada.' : 'Simulación reanudada.');
         },
 
         requestStep() {
-            if (!this.enabled) return;
-            if (!gameState.isPlaying) {
-                this.recordEvent('WARN', 'STEP ignorado: la run no está activa.');
+            if (!this.enabled || this.busy) return;
+            const state = getState();
+            if (!state?.isPlaying) {
+                this.recordEvent('WARN', 'STEP rechazado: la escena no está activa. Usá RESET.');
                 return;
             }
             this.paused = true;
             this.stepRequested = true;
-            this.recordEvent('DEBUG', 'STEP solicitado: se ejecutará un frame lógico.');
+            this.recordEvent('DEBUG', 'STEP: se ejecutará un único frame lógico.');
         },
 
         shouldUpdate() {
@@ -237,192 +150,318 @@
             if (!this.enabled) return;
             this.visible = !this.visible;
             document.getElementById('debug-overlay')?.classList.toggle('hidden', !this.visible);
+            this.recordEvent('DEBUG', this.visible ? 'Panel mostrado.' : 'Panel oculto.');
         },
 
         snapshot() {
-            const playerTile = typeof gridCurrentTile === 'function' ? gridCurrentTile(player, 'player') : { x: -1, y: -1 };
-            const state = {
-                playing: !!gameState.isPlaying,
-                paused: !!gameState.paused,
-                debugPaused: this.paused,
-                run: Number(gameState.runNumber || 0),
-                depth: Number(gameState.level || 0),
-                room: gameState.roomType?.id || '?',
-                threat: Number(gameState.threatLevel || 0),
-                roomTime: Number(gameState.roomTime || 0),
-                player: {
-                    x: Number(player.x || 0),
-                    y: Number(player.y || 0),
-                    vx: Number(player.vx || 0),
-                    vy: Number(player.vy || 0),
-                    dir: player.dir || '?',
-                    inputAxis: player.inputAxis || null,
-                    hp: Number(player.health || 0),
-                    speed: Number(player.speed || 0),
-                    bombs: Number(player.maxBombs || 0),
+            const state = getState();
+            const player = getPlayer();
+            const playerTile = player ? entityTile(player, 'player') : { x: -1, y: -1 };
+            const room = state?.roomType || null;
+            const hazards = Array.isArray(state?.hazards) ? state.hazards : [];
+            const bombs = Array.isArray(state?.bombs) ? state.bombs : [];
+            const enemies = Array.isArray(state?.enemies) ? state.enemies : [];
+            const explosions = Array.isArray(state?.explosions) ? state.explosions : [];
+
+            return {
+                status: !state ? 'ENGINE NO DISPONIBLE' : (state.isPlaying ? (this.paused ? 'PAUSADO' : 'ACTIVO') : 'DETENIDO'),
+                engine: {
+                    stateAvailable: !!state,
+                    playerAvailable: !!player,
+                    playing: !!state?.isPlaying,
+                    gamePaused: !!state?.paused,
+                    debugPaused: !!this.paused,
+                    rafId: Number(state?.rafId || 0),
+                    lastTime: Number(state?.lastTime || 0)
+                },
+                player: player ? {
+                    x: num(player.x), y: num(player.y),
+                    vx: num(player.vx), vy: num(player.vy),
+                    dir: player.dir || '—',
+                    desiredDirection: player.desiredDirection || player.inputAxis || '—',
+                    isMoving: !!player.isMoving,
+                    hp: Number(player.health ?? 0),
+                    maxHp: Number(player.maxHealth ?? 0),
+                    bombsAvailable: Math.max(0, Number(player.maxBombs || 0) - Number(player.bombsPlaced || 0)),
+                    bombsMax: Number(player.maxBombs || 0),
                     bombsPlaced: Number(player.bombsPlaced || 0),
                     range: Number(player.bombRange || 0),
+                    speed: num(player.speed),
                     shield: !!player.hasShield,
-                    tile: playerTile
-                },
-                world: {
-                    width: Number(gameState.gridWidth || 0),
-                    height: Number(gameState.gridHeight || 0),
-                    enemies: gameState.enemies?.length || 0,
-                    bombs: gameState.bombs?.length || 0,
-                    explosions: gameState.explosions?.length || 0,
-                    hazards: gameState.hazards?.length || 0,
-                    particles: gameState.particles?.length || 0,
-                    projectiles: gameState.bossProjectiles?.length || 0,
-                    boss: !!gameState.boss && !gameState.boss.defeated
-                },
-                camera: {
-                    x: Number(gameState.camera?.x || 0),
-                    y: Number(gameState.camera?.y || 0),
-                    targetX: Number(gameState.camera?.targetX || 0),
-                    targetY: Number(gameState.camera?.targetY || 0)
-                },
+                    invulnerable: !!player.isInvincible,
+                    invulnerabilityMs: Number(player.invincibleTimer || 0),
+                    tile: playerTile,
+                    inputAxis: player.inputAxis || '—',
+                    inputDir: Number(player.inputDir || 0)
+                } : null,
+                world: state ? {
+                    width: Number(state.gridWidth || 0),
+                    height: Number(state.gridHeight || 0),
+                    depth: Number(state.level || 0),
+                    room: room?.id || '—',
+                    roomName: room?.name || '—',
+                    threat: Number(state.threatLevel || 0),
+                    roomTimeMs: Number(state.roomTime || 0),
+                    run: Number(state.runNumber || 0),
+                    score: Number(state.score || 0),
+                    coins: Number(state.coins || 0),
+                    blocksBroken: Number(state.blocksBroken || 0),
+                    enemies: enemies.length,
+                    bombs: bombs.length,
+                    explosions: explosions.length,
+                    traps: hazards.length,
+                    activeTraps: hazards.filter(h => !!h?.triggered).length,
+                    particles: Array.isArray(state.particles) ? state.particles.length : 0,
+                    projectiles: Array.isArray(state.bossProjectiles) ? state.bossProjectiles.length : 0,
+                    boss: !!state.boss && !state.boss.defeated,
+                    exit: state.exitPos ? `${state.exitPos.x},${state.exitPos.y}` : '—'
+                } : null,
+                camera: state ? {
+                    x: num(state.camera?.x),
+                    y: num(state.camera?.y),
+                    targetX: num(state.camera?.targetX),
+                    targetY: num(state.camera?.targetY)
+                } : null,
                 performance: {
                     fps: this.fps,
                     frameMs: this.avgFrameMs,
+                    loopMs: this.loopMs,
                     updateMs: this.updateMs,
                     drawMs: this.drawMs,
                     minMs: Number.isFinite(this.minFrameMs) ? this.minFrameMs : 0,
                     maxMs: this.maxFrameMs
                 },
+                tests: {
+                    passed: this.testResults.filter(r => r.status === 'PASS').length,
+                    failed: this.testResults.filter(r => r.status === 'FAIL').length,
+                    total: TEST_NAMES.length,
+                    busy: this.busy,
+                    last: this.lastTest
+                },
                 errors: this.runtimeErrors.length,
-                lastTest: this.lastTest,
-                navigation: getNavigationSnapshot()
+                events: this.eventLog.length,
+                navigation: this.getNavigationSnapshot()
             };
-            this.lastState = state;
-            return state;
+        },
+
+        getNavigationSnapshot(force = false) {
+            const state = getState();
+            const player = getPlayer();
+            if (!state || !player || !Array.isArray(state.grid) || !state.grid.length || !Number(state.gridWidth) || !Number(state.gridHeight)) {
+                return emptyNavigation('Sin rejilla o jugador.');
+            }
+
+            const signature = buildNavigationSignature(state, player);
+            const now = performance.now();
+            if (!force && this.navigationCache && signature === this.navigationSignature && now - this.navigationAt < 1000) {
+                return this.navigationCache;
+            }
+
+            const playerTile = entityTile(player, 'player');
+            const playerReach = buildReachable('player', player, playerTile, MAX_NAV_NODES);
+            const enemies = (state.enemies || []).slice(0, 16).map((enemy, index) => {
+                const tile = entityTile(enemy, 'enemy');
+                const reach = buildReachable('enemy', enemy, tile, MAX_NAV_NODES);
+                const path = shortestPathTo(tile, playerTile, 'enemy', enemy, reach);
+                const options = cellOptions('enemy', enemy, tile);
+                const junctions = countJunctions(reach.cells, 'enemy', enemy);
+                return {
+                    index,
+                    tile,
+                    behavior: enemy.ai?.behavior || '—',
+                    alert: enemy.ai?.alert || '—',
+                    currentDirection: enemy.ai?.direction || enemy.lastDirection || '—',
+                    desiredDirection: enemy.ai?.desiredDirection || enemy.desiredDirection || '—',
+                    seesPlayer: !!enemy.ai?.seesPlayer,
+                    options,
+                    reachableTiles: reach.cells.length,
+                    truncated: reach.truncated,
+                    junctions,
+                    route: path,
+                    routeLength: Math.max(0, path.length - 1),
+                    canReachPlayer: path.length > 0,
+                    target: { ...playerTile }
+                };
+            });
+
+            const playerOptions = cellOptions('player', player, playerTile);
+            const playerJunctions = countJunctions(playerReach.cells, 'player', player);
+            const result = {
+                available: true,
+                mode: 'collision-grid-reference',
+                note: 'Visualización de navegación basada en la misma rejilla y reglas de colisión del juego. No modifica la IA.',
+                signature,
+                player: {
+                    tile: playerTile,
+                    reachableTiles: playerReach.cells.length,
+                    truncated: playerReach.truncated,
+                    junctions: playerJunctions,
+                    deadEnds: countDeadEnds(playerReach.cells, 'player', player),
+                    options: playerOptions,
+                    treeEdges: playerReach.edges,
+                    cells: playerReach.cells
+                },
+                enemies
+            };
+
+            this.navigationCache = result;
+            this.navigationSignature = signature;
+            this.navigationAt = now;
+            return result;
+        },
+
+        resetNavigation() {
+            this.navigationCache = null;
+            this.navigationSignature = '';
+            this.navigationAt = 0;
         },
 
         async runTest(name) {
             if (!this.enabled || this.busy || !DEBUG_TESTS[name]) return;
-            this.busy = true;
-            this.storageSnapshot = captureDebugStorage();
-            const started = performance.now();
-            this.recordEvent('TEST', `Inicio: ${name}`);
-            try {
-                const result = await DEBUG_TESTS[name]();
-                const normalized = normalizeTestResult(result);
-                const ms = performance.now() - started;
-                this.lastTest = { name, status: 'PASS', summary: normalized.summary, details: normalized.details, ms };
-                this.testResults.push({ name, status: 'PASS', result: normalized.summary, details: normalized.details, ms });
-                this.recordEvent('PASS', `${name}: ${normalized.summary}`, normalized.details);
-            } catch (error) {
-                const message = error?.message || String(error);
-                const ms = performance.now() - started;
-                this.lastTest = { name, status: 'FAIL', summary: message, details: { error: message, stack: error?.stack || '' }, ms };
-                this.testResults.push({ name, status: 'FAIL', result: message, details: this.lastTest.details, ms });
-                this.captureError(error, `test:${name}`);
-            } finally {
-                restoreDebugStorage(this.storageSnapshot);
-                this.storageSnapshot = null;
-                if (this.testResults.length > 40) this.testResults.splice(0, this.testResults.length - 40);
-                this.busy = false;
-                window.dispatchEvent(new CustomEvent('bomber-debug-updated'));
-            }
+            await this.executeTests([name]);
         },
 
         async runAllTests() {
             if (!this.enabled || this.busy) return;
+            await this.executeTests(TEST_NAMES);
+        },
+
+        async executeTests(names) {
             this.busy = true;
-            this.storageSnapshot = captureDebugStorage();
             this.testResults = [];
-            const names = Object.keys(DEBUG_TESTS);
-            this.recordEvent('TEST', `Suite v3.16.2 iniciada: ${names.length} pruebas.`);
-            for (const name of names) {
-                const started = performance.now();
-                try {
-                    const result = await DEBUG_TESTS[name]();
-                    const normalized = normalizeTestResult(result);
-                    const ms = performance.now() - started;
-                    this.lastTest = { name, status: 'PASS', summary: normalized.summary, details: normalized.details, ms };
-                    this.testResults.push({ name, status: 'PASS', result: normalized.summary, details: normalized.details, ms });
-                    this.recordEvent('PASS', `${name}: ${normalized.summary}`, normalized.details);
-                } catch (error) {
-                    const message = error?.message || String(error);
-                    const ms = performance.now() - started;
-                    this.lastTest = { name, status: 'FAIL', summary: message, details: { error: message, stack: error?.stack || '' }, ms };
-                    this.testResults.push({ name, status: 'FAIL', result: message, details: this.lastTest.details, ms });
-                    this.captureError(error, `test:${name}`);
+            const storage = captureStorage();
+            const startedSuite = performance.now();
+            this.recordEvent('TEST', `Inicio de suite: ${names.length} prueba(s).`);
+
+            try {
+                for (const name of names) {
+                    const started = performance.now();
+                    let result = null;
+                    try {
+                        result = await DEBUG_TESTS[name]();
+                        const normalized = normalizeResult(result);
+                        this.lastTest = {
+                            name,
+                            status: 'PASS',
+                            summary: normalized.summary,
+                            details: normalized.details,
+                            ms: performance.now() - started
+                        };
+                        this.testResults.push({ ...this.lastTest, result: normalized.summary });
+                        this.recordEvent('PASS', `${name}: ${normalized.summary}`, normalized.details);
+                    } catch (error) {
+                        const message = error?.message || String(error);
+                        this.lastTest = {
+                            name,
+                            status: 'FAIL',
+                            summary: message,
+                            details: { error: message, stack: error?.stack || '' },
+                            ms: performance.now() - started
+                        };
+                        this.testResults.push({ ...this.lastTest, result: message });
+                        this.captureError(error, `test:${name}`);
+                        this.recordEvent('FAIL', `${name}: ${message}`, this.lastTest.details);
+                    }
+                    if (this.testResults.length > MAX_TEST_RESULTS) this.testResults.shift();
+                    dispatchUpdate();
+                    await nextFrame();
                 }
-                window.dispatchEvent(new CustomEvent('bomber-debug-updated'));
-                await new Promise(resolve => setTimeout(resolve, 40));
+            } finally {
+                restoreStorage(storage);
+                this.busy = false;
+                this.resetNavigation();
+                restorePlayableDebugScene();
+                const passed = this.testResults.filter(r => r.status === 'PASS').length;
+                const failed = this.testResults.filter(r => r.status === 'FAIL').length;
+                this.recordEvent(failed === 0 ? 'PASS' : 'WARN', `Suite finalizada: ${passed}/${names.length} PASS · ${failed} FAIL · ${(performance.now() - startedSuite).toFixed(0)}ms.`);
+                dispatchUpdate();
             }
-            const passed = this.testResults.filter(r => r.status === 'PASS').length;
-            this.recordEvent(passed === names.length ? 'PASS' : 'WARN', `Suite finalizada: ${passed}/${names.length}.`);
-            restoreDebugStorage(this.storageSnapshot);
-            this.storageSnapshot = null;
-            this.busy = false;
-            restorePlayableScene();
-            window.dispatchEvent(new CustomEvent('bomber-debug-updated'));
         },
 
         clearEvents() {
             this.eventLog.length = 0;
-            this.runtimeErrors.length = 0;
-            this.lastTest = null;
-            this.recordEvent('DEBUG', 'Registro limpiado.');
+            this.recordEvent('DEBUG', 'Event Log limpiado.');
         },
 
-        setVisual(key, enabled) {
+        clearErrors() {
+            this.runtimeErrors.length = 0;
+            this.recordEvent('DEBUG', 'Runtime Errors limpiado.');
+        },
+
+        setVisual(key, value) {
             if (!Object.prototype.hasOwnProperty.call(this.selectedVisuals, key)) return;
-            this.selectedVisuals[key] = !!enabled;
+            this.selectedVisuals[key] = !!value;
+            this.recordEvent('VISUAL', `${key}: ${value ? 'ON' : 'OFF'}`);
         },
 
         manualBomb() {
             try {
-                const result = placeBomb('debug-manual');
-                this.recordEvent(result ? 'BOMB' : 'WARN', result ? 'Bomba colocada manualmente.' : 'Bomba rechazada.');
-            } catch (error) { this.captureError(error, 'manual-bomb'); }
+                const placed = typeof placeBomb === 'function' ? placeBomb('debug-manual') : false;
+                this.lastAction = placed ? 'BOMBA COLOCADA' : 'BOMBA RECHAZADA';
+                this.recordEvent(placed ? 'BOMB' : 'WARN', this.lastAction);
+            } catch (error) {
+                this.captureError(error, 'action:bomb');
+            }
         },
 
         manualDamage() {
             try {
-                const result = takeDamage('debug', player.x, player.y);
-                this.recordEvent(result ? 'DAMAGE' : 'INFO', result ? 'Daño aplicado manualmente.' : 'Daño bloqueado por inmunidad.');
-            } catch (error) { this.captureError(error, 'manual-damage'); }
+                const player = getPlayer();
+                const before = Number(player?.health ?? 0);
+                const result = typeof takeDamage === 'function' ? takeDamage('debug-manual', player?.x || 0, player?.y || 0) : false;
+                const after = Number(player?.health ?? before);
+                this.lastAction = result ? `DAÑO ${before} → ${after}` : 'DAÑO BLOQUEADO';
+                this.recordEvent(result ? 'DAMAGE' : 'INFO', this.lastAction, { before, after });
+            } catch (error) {
+                this.captureError(error, 'action:damage');
+            }
         },
 
         manualEnemy() {
             try {
+                if (typeof spawnEnemies !== 'function') throw new Error('spawnEnemies() no disponible.');
                 spawnEnemies();
-                this.recordEvent('AI', `Enemigos en escena: ${gameState.enemies.length}.`);
-            } catch (error) { this.captureError(error, 'manual-enemy'); }
+                const count = getState()?.enemies?.length || 0;
+                this.lastAction = `ENEMIGOS: ${count}`;
+                this.recordEvent('AI', this.lastAction, { count });
+            } catch (error) {
+                this.captureError(error, 'action:enemy');
+            }
         },
 
         resetScene() {
             try {
-                stopGameLoopForDebug();
-                if (typeof resetWorldRuntimeState === 'function') resetWorldRuntimeState();
-                if (typeof resetPlayerRuntimeState === 'function') resetPlayerRuntimeState();
-                if (typeof resetRelicModifiers === 'function') resetRelicModifiers();
-                if (typeof resetBombHandlingState === 'function') resetBombHandlingState();
-                if (typeof resetCombatFeedbackForRun === 'function') resetCombatFeedbackForRun();
-                initLevel();
-                gameState.runNumber = Math.max(1, Number(localStorage.getItem('bombermanRogueRun') || 1));
-                gameState.isPlaying = true;
-                gameState.paused = false;
-                gameState.lastTime = performance.now();
-                DEBUG_MODE.paused = false;
-                DEBUG_MODE.stepRequested = false;
-                updateUI(true);
-                draw();
-                ensureDebugLoop();
-                this.recordEvent('LIFECYCLE', 'Escena de depuración reiniciada sin modificar estadísticas persistentes.');
-            } catch (error) { this.captureError(error, 'reset-scene'); }
+                prepareCleanDebugScene();
+                this.lastAction = 'ESCENA REINICIADA';
+                this.recordEvent('LIFECYCLE', 'Escena de depuración reconstruida.');
+                dispatchUpdate();
+            } catch (error) {
+                this.captureError(error, 'action:reset');
+            }
         }
     };
 
-    function captureDebugStorage() {
+    function num(value) {
+        return Number.isFinite(Number(value)) ? Number(value) : 0;
+    }
+
+    function normalizeResult(result) {
+        if (result && typeof result === 'object' && 'summary' in result) {
+            return { summary: String(result.summary), details: result.details ?? {} };
+        }
+        return { summary: String(result ?? 'OK'), details: {} };
+    }
+
+    function nextFrame() {
+        return new Promise(resolve => requestAnimationFrame(() => resolve()));
+    }
+
+    function captureStorage() {
         const keys = ['bombermanRogueRun', 'bombermanBestDepth', 'bombermanBestScore'];
         return Object.fromEntries(keys.map(key => [key, localStorage.getItem(key)]));
     }
 
-    function restoreDebugStorage(snapshot) {
+    function restoreStorage(snapshot) {
         if (!snapshot) return;
         for (const [key, value] of Object.entries(snapshot)) {
             if (value === null) localStorage.removeItem(key);
@@ -430,250 +469,515 @@
         }
     }
 
-    function stopGameLoopForDebug() {
-        if (gameState?.rafId) {
-            cancelAnimationFrame(gameState.rafId);
-            gameState.rafId = 0;
-        }
-        gameState.isPlaying = false;
+    function stopDebugLoop() {
+        const state = getState();
+        if (!state) return;
+        if (state.rafId) cancelAnimationFrame(state.rafId);
+        state.rafId = 0;
+        state.isPlaying = false;
     }
 
-    function ensureDebugLoop() {
-        if (!gameState.isPlaying || gameState.rafId) return;
-        gameState.lastTime = performance.now();
-        gameState.rafId = requestAnimationFrame(gameLoop);
+    function startDebugLoop() {
+        const state = getState();
+        if (!state || !state.isPlaying || state.rafId) return;
+        state.lastTime = performance.now();
+        state.rafId = requestAnimationFrame(gameLoop);
     }
 
-    function findEmptyCell(preferCorridor = false) {
-        const candidates = [];
-        for (let y = 1; y < gameState.gridHeight - 1; y++) {
-            for (let x = 1; x < gameState.gridWidth - 1; x++) {
-                if (gameState.grid[y]?.[x] !== TYPES.EMPTY) continue;
-                if (preferCorridor && gameState.grid[y]?.[x + 1] === TYPES.EMPTY && gameState.grid[y]?.[x + 2] === TYPES.EMPTY) {
-                    return { x, y };
-                }
-                candidates.push({ x, y });
-            }
-        }
-        return candidates[0] || { x: 1, y: 1 };
-    }
+    function prepareCleanDebugScene() {
+        stopDebugLoop();
+        const state = getState();
+        if (!state) throw new Error('gameState no disponible.');
 
-    function setPlayerAt(cell) {
-        const center = { x: cell.x * TILE_SIZE + TILE_SIZE / 2, y: cell.y * TILE_SIZE + TILE_SIZE / 2 };
-        player.x = center.x - player.width / 2;
-        player.y = center.y - player.height / 2;
-        player.vx = 0;
-        player.vy = 0;
-        player.isMoving = false;
-        player.inputAxis = null;
-        player.inputBuffer = null;
-        player.inputBufferTimer = 0;
-        gameState.keys = {};
-        gameState.touchControls = { x: 0, y: 0 };
-        resetCameraToPlayer();
-    }
-
-    function prepareTest() {
-        stopGameLoopForDebug();
-        gameState.paused = false;
         if (typeof resetWorldRuntimeState === 'function') resetWorldRuntimeState();
         if (typeof resetPlayerRuntimeState === 'function') resetPlayerRuntimeState();
         if (typeof resetRelicModifiers === 'function') resetRelicModifiers();
         if (typeof resetBombHandlingState === 'function') resetBombHandlingState();
         if (typeof resetCombatFeedbackForRun === 'function') resetCombatFeedbackForRun();
-        if (typeof RUN_LIFECYCLE !== 'undefined') {
-            RUN_LIFECYCLE.elapsedMs = 0;
-            RUN_LIFECYCLE.lastSummary = null;
-        }
-        gameState.runNumber = 1;
+
+        state.runNumber = Math.max(1, Number(localStorage.getItem('bombermanRogueRun') || 1));
+        if (typeof initLevel !== 'function') throw new Error('initLevel() no disponible.');
         initLevel();
-        gameState.isPlaying = true;
-        gameState.paused = false;
-        gameState.lastTime = performance.now();
-        updateUI(true);
-        draw();
+        state.isPlaying = true;
+        state.paused = false;
+        state.lastTime = performance.now();
+        state.rafId = 0;
+        DEBUG_MODE.paused = false;
+        DEBUG_MODE.stepRequested = false;
+        DEBUG_MODE.resetNavigation();
+        if (typeof updateUI === 'function') updateUI(true);
+        if (typeof draw === 'function') draw();
+        startDebugLoop();
     }
 
-    function restorePlayableScene() {
+    function restorePlayableDebugScene() {
         try {
-            stopGameLoopForDebug();
-            gameState.paused = false;
-            if (typeof resetWorldRuntimeState === 'function') resetWorldRuntimeState();
-            if (typeof resetPlayerRuntimeState === 'function') resetPlayerRuntimeState();
-            if (typeof resetRelicModifiers === 'function') resetRelicModifiers();
-            if (typeof resetBombHandlingState === 'function') resetBombHandlingState();
-            if (typeof resetCombatFeedbackForRun === 'function') resetCombatFeedbackForRun();
-            gameState.runNumber = Math.max(1, Number(localStorage.getItem('bombermanRogueRun') || 1));
-            initLevel();
-            gameState.isPlaying = false;
-            gameState.lastTime = performance.now();
-            gameState.isPlaying = true;
-            gameState.paused = false;
-            updateRoguePresentation();
-            updateUI(true);
-            draw();
-            DEBUG_MODE.paused = false;
-            DEBUG_MODE.stepRequested = false;
-            ensureDebugLoop();
-            DEBUG_MODE.recordEvent('LIFECYCLE', 'Escena restaurada. La run de depuración quedó activa.');
+            prepareCleanDebugScene();
         } catch (error) {
-            DEBUG_MODE.captureError(error, 'restore-scene');
+            DEBUG_MODE.captureError(error, 'restore-debug-scene');
         }
     }
 
-    function normalizeTestResult(result) {
-        if (result && typeof result === 'object' && Object.prototype.hasOwnProperty.call(result, 'summary')) {
-            return { summary: String(result.summary), details: result.details ?? {} };
+    function emptyNavigation(note) {
+        return {
+            available: false,
+            mode: 'none',
+            note,
+            player: { tile: { x: -1, y: -1 }, reachableTiles: 0, truncated: false, junctions: 0, deadEnds: 0, options: [], treeEdges: [], cells: [] },
+            enemies: []
+        };
+    }
+
+    function entityTile(entity, kind) {
+        if (typeof gridCurrentTile === 'function') {
+            try { return gridCurrentTile(entity, kind); } catch (_) {}
         }
-        return { summary: String(result ?? 'OK'), details: {} };
+        const state = getState();
+        if (!entity || !state) return { x: -1, y: -1 };
+        if (kind === 'player') {
+            return { x: Math.floor((num(entity.x) + num(entity.width) / 2) / TILE_SIZE), y: Math.floor((num(entity.y) + num(entity.height) / 2) / TILE_SIZE) };
+        }
+        return { x: Math.floor(num(entity.x) / TILE_SIZE), y: Math.floor(num(entity.y) / TILE_SIZE) };
+    }
+
+    function cellOptions(kind, entity, tile) {
+        return DIRS.filter(dir => isCellPassable(kind, entity, tile.x + dir.dx, tile.y + dir.dy, tile, false)).map(d => d.dir);
+    }
+
+    function isCellPassable(kind, entity, x, y, currentTile, ignoreBombs = false) {
+        const state = getState();
+        if (!state || !Array.isArray(state.grid) || !gridInsideLocal(x, y)) return false;
+
+        const canFly = kind === 'enemy' && !!entity?.type?.canFly;
+        if (typeof gridTileIsBlocked === 'function' && gridTileIsBlocked(x, y, { canFly })) return false;
+        const tileType = state.grid[y]?.[x];
+        if (tileType === TYPES.WALL || (!canFly && tileType === TYPES.BLOCK)) return false;
+        if (ignoreBombs) return true;
+
+        if (kind === 'player') {
+            const bomb = state.bombs?.find(b => b.x === x && b.y === y);
+            if (bomb && !(currentTile && currentTile.x === x && currentTile.y === y)) return false;
+            if (typeof gridCanOccupy === 'function') {
+                const center = { x: x * TILE_SIZE + TILE_SIZE / 2, y: y * TILE_SIZE + TILE_SIZE / 2 };
+                const topLeft = { x: center.x - entity.width / 2, y: center.y - entity.height / 2 };
+                return gridCanOccupy(entity, topLeft.x, topLeft.y, { kind: 'player' });
+            }
+            return true;
+        }
+
+        const bomb = state.bombs?.find(b => b.x === x && b.y === y);
+        if (bomb && !(currentTile && currentTile.x === x && currentTile.y === y)) return false;
+        if (typeof gridCanOccupy === 'function') {
+            const center = { x: x * TILE_SIZE + TILE_SIZE / 2, y: y * TILE_SIZE + TILE_SIZE / 2 };
+            return gridCanOccupy(entity, center.x, center.y, {
+                kind: 'enemy',
+                canFly,
+                allowCurrentBombTile: true,
+                ignoreBombs: false
+            });
+        }
+        return true;
+    }
+
+    function gridInsideLocal(x, y) {
+        const state = getState();
+        return !!state && x >= 0 && y >= 0 && x < state.gridWidth && y < state.gridHeight;
+    }
+
+    function buildReachable(kind, entity, start, maxNodes) {
+        const queue = [{ x: start.x, y: start.y }];
+        let cursor = 0;
+        const visited = new Set([`${start.x},${start.y}`]);
+        const parent = new Map();
+        const cells = [];
+        const edges = [];
+        const startKey = `${start.x},${start.y}`;
+
+        while (cursor < queue.length && visited.size <= maxNodes) {
+            const current = queue[cursor++];
+            const currentKey = `${current.x},${current.y}`;
+            cells.push({ x: current.x, y: current.y });
+
+            for (const dir of DIRS) {
+                const nx = current.x + dir.dx;
+                const ny = current.y + dir.dy;
+                const key = `${nx},${ny}`;
+                if (visited.has(key) || !isCellPassable(kind, entity, nx, ny, start, false)) continue;
+                visited.add(key);
+                parent.set(key, currentKey);
+                edges.push([{ x: current.x, y: current.y }, { x: nx, y: ny }]);
+                queue.push({ x: nx, y: ny });
+                if (visited.size >= maxNodes) break;
+            }
+        }
+
+        return {
+            parent,
+            cells,
+            edges,
+            truncated: cursor < queue.length,
+            startKey
+        };
+    }
+
+    function shortestPathTo(start, target, kind, entity, reachable) {
+        const targetKey = `${target.x},${target.y}`;
+        if (start.x === target.x && start.y === target.y) return [{ ...start }];
+        if (!reachable.parent.has(targetKey)) return [];
+
+        const path = [];
+        let key = targetKey;
+        let guard = 0;
+        while (key && guard++ < 120) {
+            const [x, y] = key.split(',').map(Number);
+            path.push({ x, y });
+            if (x === start.x && y === start.y) break;
+            key = reachable.parent.get(key);
+        }
+        if (!path.length || path[path.length - 1].x !== start.x || path[path.length - 1].y !== start.y) return [];
+        path.reverse();
+        return path;
+    }
+
+    function countJunctions(cells, kind, entity) {
+        let count = 0;
+        for (const cell of cells) {
+            if (cellOptions(kind, entity, cell).length >= 3) count++;
+        }
+        return count;
+    }
+
+    function countDeadEnds(cells, kind, entity) {
+        let count = 0;
+        for (const cell of cells) {
+            if (cellOptions(kind, entity, cell).length <= 1) count++;
+        }
+        return count;
+    }
+
+    function buildNavigationSignature(state, player) {
+        const p = entityTile(player, 'player');
+        const enemyPart = (state.enemies || []).slice(0, 16).map(e => {
+            const t = entityTile(e, 'enemy');
+            return `${t.x},${t.y}`;
+        }).join(';');
+        const bombPart = (state.bombs || []).map(b => `${b.x},${b.y}`).sort().join(';');
+        return [state.gridWidth, state.gridHeight, state.level, state.blocksBroken || 0, p.x, p.y, enemyPart, bombPart].join('|');
+    }
+
+    function instrumentRuntime() {
+        if (!enabled || window.__BOMBER_DEBUG_INSTRUMENTED) return;
+        window.__BOMBER_DEBUG_INSTRUMENTED = true;
+
+        const originalRAF = window.requestAnimationFrame.bind(window);
+        void originalRAF; // Mantener referencia explícita; el engine sigue usando el RAF nativo.
+
+        const runtimeErrorHandler = event => {
+            if (event instanceof ErrorEvent || event.error || event.message) {
+                DEBUG_MODE.captureError(event.error || event.message, 'window.error', {
+                    url: event.filename || '',
+                    line: event.lineno || 0,
+                    column: event.colno || 0
+                });
+            }
+        };
+        window.addEventListener('error', runtimeErrorHandler);
+        window.addEventListener('error', event => {
+            const target = event.target;
+            if (target && target !== window) {
+                const url = target.src || target.href || '';
+                DEBUG_MODE.captureError(new Error(`Recurso no cargado: ${url || target.tagName}`), 'resource.error', { url });
+            }
+        }, true);
+        window.addEventListener('unhandledrejection', event => DEBUG_MODE.captureError(event.reason, 'unhandledrejection'));
+
+        if (!window.__BOMBER_DEBUG_CONSOLE_HOOKED) {
+            const originalConsoleError = console.error.bind(console);
+            console.error = (...args) => {
+                try { DEBUG_MODE.captureError(new Error(args.map(String).join(' ')), 'console.error'); } catch (_) {}
+                originalConsoleError(...args);
+            };
+            window.__BOMBER_DEBUG_CONSOLE_HOOKED = true;
+        }
+
+        const hooks = [
+            ['initLevel', 'WORLD', args => `initLevel() · depth=${getState()?.level ?? '—'}`],
+            ['completeLevel', 'WORLD', () => `completeLevel() · depth=${getState()?.level ?? '—'}`],
+            ['gameOver', 'LIFECYCLE', args => `gameOver(${String(args?.[0] ?? 'unknown')})`],
+            ['startNextDepth', 'WORLD', () => `startNextDepth() · depth=${getState()?.level ?? '—'}`],
+            ['beginNewRun', 'LIFECYCLE', () => 'beginNewRun()'],
+            ['finishRun', 'LIFECYCLE', args => `finishRun(${String(args?.[0] ?? 'unknown')})`]
+        ];
+
+        for (const [name, type, formatter] of hooks) wrapGlobalFunction(name, type, formatter);
+    }
+
+    function wrapGlobalFunction(name, type, formatter) {
+        if (typeof window[name] !== 'function') return;
+        const marker = `__BOMBER_DEBUG_WRAPPED_${name}`;
+        if (window[marker]) return;
+        const original = window[name];
+        const wrapped = function(...args) {
+            DEBUG_MODE.recordEvent(type, formatter(args));
+            return original.apply(this, args);
+        };
+        try {
+            window[name] = wrapped;
+            window[marker] = true;
+        } catch (_) {}
     }
 
     const DEBUG_TESTS = {
         movement: async () => {
-            prepareTest();
-            const c = findEmptyCell(true);
-            setPlayerAt(c);
-            const before = player.x;
-            gameState.keys = { ArrowRight: true };
+            prepareTestScene();
+            const p = getPlayer();
+            const state = getState();
+            const cell = findEmptyCell(true);
+            setPlayerAt(cell);
+            const before = { x: p.x, y: p.y };
+            state.keys = { ArrowRight: true };
             for (let i = 0; i < 12; i++) updatePlayerMovement(16.6667);
-            gameState.keys = {};
-            if (!(player.x > before + 1)) throw new Error('El jugador no avanzó hacia la derecha.');
-            if (Math.abs(player.vy) > 0.05) throw new Error('El movimiento cardinal generó componente Y.');
-            return { summary: `OK · X ${before.toFixed(1)} → ${player.x.toFixed(1)}`, details: { beforeX: before, afterX: player.x, deltaX: player.x - before, velocityX: player.vx, velocityY: player.vy, input: 'ArrowRight' } };
+            state.keys = {};
+            const after = { x: p.x, y: p.y };
+            if (!(after.x > before.x + 1)) throw new Error('El jugador no avanzó hacia la derecha.');
+            if (Math.abs(Number(p.vy) || 0) > 0.05) throw new Error('El movimiento cardinal produjo VY.');
+            return {
+                summary: `X ${before.x.toFixed(1)} → ${after.x.toFixed(1)} · Δ${(after.x - before.x).toFixed(1)}px`,
+                details: { cell, before, after, deltaX: after.x - before.x, vx: p.vx, vy: p.vy, cardinal: true }
+            };
         },
 
         bombs: async () => {
-            prepareTest();
-            gameState.enemies = [];
-            gameState.hazards = [];
-            gameState.explosions = [];
-            const c = findEmptyCell();
-            setPlayerAt(c);
-            const placed = placeBomb('debug-test');
-            if (placed !== true) throw new Error('No se pudo colocar la bomba.');
-            if (gameState.bombs.length !== 1) throw new Error('El conteo de bombas no aumentó correctamente.');
+            prepareTestScene();
+            const p = getPlayer();
+            const state = getState();
+            const cell = findEmptyCell();
+            setPlayerAt(cell);
+            state.enemies = [];
+            state.hazards = [];
+            const placed = typeof placeBomb === 'function' && placeBomb('debug-test');
+            if (!placed) throw new Error('No se pudo colocar la bomba.');
+            if (state.bombs.length !== 1) throw new Error(`Bombas inesperadas: ${state.bombs.length}.`);
+            const bomb = state.bombs[0];
+            if (typeof explodeBomb !== 'function') throw new Error('explodeBomb() no disponible.');
             explodeBomb(0);
-            if (gameState.bombs.length !== 0) throw new Error('La bomba no fue removida.');
-            if (gameState.explosions.length === 0) throw new Error('La detonación no creó explosiones.');
-            if (player.bombsPlaced !== 0) throw new Error('bombsPlaced no volvió a cero.');
-            return { summary: `OK · ${gameState.explosions.length} celdas de explosión`, details: { bomb: { x: c.x, y: c.y }, explosionCells: gameState.explosions.map(e => ({ x: e.x, y: e.y })), bombsRemaining: gameState.bombs.length, bombsPlaced: player.bombsPlaced } };
+            if (state.bombs.length !== 0) throw new Error('La bomba no fue removida.');
+            if (!state.explosions.length) throw new Error('No se generaron celdas de explosión.');
+            if (p.bombsPlaced !== 0) throw new Error(`bombsPlaced quedó en ${p.bombsPlaced}.`);
+            return {
+                summary: `${state.explosions.length} celdas · rango ${bomb.range}`,
+                details: {
+                    bomb: { x: bomb.x, y: bomb.y, range: bomb.range, fuseTotal: bomb.fuseTotal },
+                    explosionCells: state.explosions.map(e => ({ x: e.x, y: e.y })),
+                    bombsRemaining: state.bombs.length,
+                    bombsPlaced: p.bombsPlaced
+                }
+            };
         },
 
         damage: async () => {
-            prepareTest();
-            const p = window.BOMBER_ENGINE?.getPlayer?.() || player;
-            const gs = window.BOMBER_ENGINE?.getState?.() || gameState;
+            prepareTestScene();
+            const p = getPlayer();
+            const state = getState();
+            if (typeof takeDamage !== 'function') throw new Error('takeDamage() no disponible.');
             p.health = 3;
             p.isInvincible = false;
             p.invincibleTimer = 0;
             p.lastDamageFrame = -1;
-            gs.animFrame = 1;
-            if (takeDamage('debug', p.x, p.y) !== true) throw new Error('El primer daño no fue aplicado.');
-            const hp1 = p.health;
-            if (takeDamage('debug-second', p.x, p.y) !== false) throw new Error('Se aplicó daño doble durante la inmunidad.');
-            updatePlayerInvulnerability(1600);
-            gs.animFrame = 2;
-            if (takeDamage('debug-third', p.x, p.y) !== true) throw new Error('No volvió a recibir daño tras la inmunidad.');
-            if (p.health !== 1) throw new Error('El segundo golpe no restó exactamente 1 HP.');
-            return { summary: `OK · HP ${hp1} → ${p.health}`, details: { firstHitHp: hp1, finalHp: p.health, invulnerabilityMs: 1600, secondHitBlocked: true } };
+            state.animFrame = 1;
+            const first = takeDamage('debug-test-1', p.x, p.y);
+            const afterFirst = p.health;
+            const second = takeDamage('debug-test-2', p.x, p.y);
+            const blocked = second === false && p.health === afterFirst;
+            if (first !== true) throw new Error('El primer daño no fue aplicado.');
+            if (!blocked) throw new Error('El segundo golpe no quedó bloqueado por inmunidad.');
+            if (typeof updatePlayerInvulnerability === 'function') updatePlayerInvulnerability(1600);
+            p.isInvincible = false;
+            p.invincibleTimer = 0;
+            state.animFrame += 1;
+            const third = takeDamage('debug-test-3', p.x, p.y);
+            if (third !== true || p.health !== 1) throw new Error('El tercer golpe no restó el HP esperado.');
+            return {
+                summary: `HP 3 → ${afterFirst} → ${p.health} · inmunidad OK`,
+                details: { initialHp: 3, afterFirst, afterSecond: afterFirst, finalHp: p.health, firstApplied: first, secondBlocked: blocked, thirdApplied: third }
+            };
         },
 
         traps: async () => {
-            prepareTest();
-            const c = findEmptyCell();
+            prepareTestScene();
+            const state = getState();
+            if (typeof triggerHazard !== 'function' || typeof TRAP_TYPES === 'undefined') throw new Error('Sistema de trampas no disponible.');
+            const cell = findEmptyCell();
             const types = Object.values(TRAP_TYPES);
+            const results = [];
             for (const type of types) {
-                const hazard = {
-                    x: c.x, y: c.y, id: `debug-${type}`, type,
-                    triggered: false, visible: false, telegraphTimer: 0,
-                    flashTimer: 0, effectTimer: 0, delayTimer: 0,
-                    effectConsumed: false, detonated: false, phase: 0
-                };
-                if (triggerHazard(hazard, 'debug') !== true) throw new Error(`No activó ${type}.`);
-                if (triggerHazard(hazard, 'debug-second') !== false) throw new Error(`${type} se activó dos veces.`);
+                const hazard = { x: cell.x, y: cell.y, id: `debug-${type}`, type, triggered: false, visible: false, telegraphTimer: 0, flashTimer: 0, effectTimer: 0, delayTimer: 0, effectConsumed: false, detonated: false, phase: 0 };
+                const first = triggerHazard(hazard, 'debug-test');
+                const second = triggerHazard(hazard, 'debug-test-second');
+                if (first !== true || second !== false) throw new Error(`Trampa inválida: ${type}.`);
+                results.push({ type, first, second, triggered: hazard.triggered, visible: hazard.visible, effectConsumed: hazard.effectConsumed });
             }
-            return { summary: `OK · ${types.length} tipos · activación única`, details: { trapTypes: types, activationCountPerType: 1 } };
+            state.hazards = [];
+            return { summary: `${types.length} tipos · 1 activación c/u`, details: { cell, traps: results } };
         },
 
         enemies: async () => {
-            prepareTest();
-            gameState.bombs = [];
-            gameState.explosions = [];
-            gameState.hazards = [];
-            gameState.enemies = [];
-            const c = findEmptyCell(true);
-            setPlayerAt(c);
-            const startX = Math.min(gameState.gridWidth - 2, c.x + 3);
+            prepareTestScene();
+            const state = getState();
+            const p = getPlayer();
+            state.bombs = [];
+            state.explosions = [];
+            state.hazards = [];
+            state.enemies = [];
+            const cell = findEmptyCell(true);
+            setPlayerAt(cell);
+            let enemyCell = findEnemyTestCell(cell);
             const e = {
-                x: startX * TILE_SIZE + TILE_SIZE / 2,
-                y: c.y * TILE_SIZE + TILE_SIZE / 2,
+                x: enemyCell.x * TILE_SIZE + TILE_SIZE / 2,
+                y: enemyCell.y * TILE_SIZE + TILE_SIZE / 2,
                 width: TILE_SIZE * 0.75,
                 height: TILE_SIZE * 0.75,
                 type: ENEMY_TYPES.RASTRERO,
                 vx: -1.4, vy: 0, baseSpeed: 1.4,
                 lastDirection: 'left', desiredDirection: 'left', __gridAnchor: 'center'
             };
-            gameState.enemies.push(e);
-            ensureEnemyMotionStateV312(e, 0);
+            state.enemies.push(e);
+            if (typeof ensureEnemyMotionStateV312 === 'function') ensureEnemyMotionStateV312(e, 0);
             for (let i = 0; i < 20; i++) updateEnemyAI(100);
-            if (!e.ai || !['chase', 'surround', 'flee', 'patrol'].includes(e.ai.behavior)) throw new Error('El estado de IA no se inicializó.');
-            if (typeof gridCurrentTile === 'function' && e.ai.lastDecisionTileX < 0) throw new Error('La IA no tomó ninguna decisión de intersección.');
-            return { summary: `OK · behavior=${e.ai.behavior} · dir=${e.ai.direction || '?'}`, details: { tile: gridCurrentTile(e, 'enemy'), behavior: e.ai.behavior, alert: e.ai.alert, direction: e.ai.direction, desiredDirection: e.ai.desiredDirection, seesPlayer: e.ai.seesPlayer, reachableTiles: DEBUG_MODE.snapshot().navigation.enemies.find(n => n.index === 0)?.reachableTiles ?? null, routeLength: DEBUG_MODE.snapshot().navigation.enemies.find(n => n.index === 0)?.routeLength ?? null } };
+            const nav = DEBUG_MODE.getNavigationSnapshot(true);
+            const item = nav.enemies[0];
+            if (!e.ai) throw new Error('La IA no creó su estado.');
+            if (!item) throw new Error('La navegación no encontró al enemigo.');
+            return {
+                summary: `${e.ai.behavior || '—'} · ${e.ai.direction || '—'} · ruta ${item.routeLength}`,
+                details: { playerTile: entityTile(p, 'player'), enemyTile: item.tile, behavior: e.ai.behavior, alert: e.ai.alert, currentDirection: item.currentDirection, desiredDirection: item.desiredDirection, seesPlayer: item.seesPlayer, reachableTiles: item.reachableTiles, routeLength: item.routeLength, canReachPlayer: item.canReachPlayer, options: item.options }
+            };
         },
 
         camera: async () => {
-            prepareTest();
-            const c = findEmptyCell();
-            setPlayerAt(c);
+            prepareTestScene();
+            const p = getPlayer();
+            const state = getState();
+            const cell = findEmptyCell();
+            setPlayerAt(cell);
             resetCameraToPlayer();
-            const before = { x: gameState.camera.x, y: gameState.camera.y };
-            player.x = Math.max(TILE_SIZE, (gameState.gridWidth - 3) * TILE_SIZE);
-            player.y = Math.max(TILE_SIZE, (gameState.gridHeight - 3) * TILE_SIZE);
+            const before = { x: state.camera.x, y: state.camera.y };
+            p.x = Math.max(TILE_SIZE, (state.gridWidth - 3) * TILE_SIZE - p.width / 2);
+            p.y = Math.max(TILE_SIZE, (state.gridHeight - 3) * TILE_SIZE - p.height / 2);
             for (let i = 0; i < 12; i++) updateCamera(16.6667);
             const bounds = getCameraBounds();
-            if (gameState.camera.x < -0.01 || gameState.camera.x > bounds.maxX + 0.01) throw new Error('Cámara fuera de límites X.');
-            if (gameState.camera.y < -0.01 || gameState.camera.y > bounds.maxY + 0.01) throw new Error('Cámara fuera de límites Y.');
-            if (gameState.camera.x === before.x && gameState.camera.y === before.y) throw new Error('La cámara no siguió al jugador.');
-            return { summary: `OK · (${before.x.toFixed(0)},${before.y.toFixed(0)}) → (${gameState.camera.x.toFixed(0)},${gameState.camera.y.toFixed(0)})`, details: { before, after: { x: gameState.camera.x, y: gameState.camera.y }, target: { x: gameState.camera.targetX, y: gameState.camera.targetY }, bounds } };
+            const after = { x: state.camera.x, y: state.camera.y };
+            if (after.x < -0.01 || after.x > bounds.maxX + 0.01 || after.y < -0.01 || after.y > bounds.maxY + 0.01) throw new Error('La cámara salió de sus límites.');
+            if (Math.abs(after.x - before.x) < 0.01 && Math.abs(after.y - before.y) < 0.01) throw new Error('La cámara no siguió al jugador.');
+            return { summary: `(${before.x.toFixed(0)},${before.y.toFixed(0)}) → (${after.x.toFixed(0)},${after.y.toFixed(0)})`, details: { before, after, target: { x: state.camera.targetX, y: state.camera.targetY }, bounds } };
         },
 
         restart: async () => {
-            prepareTest();
-            player.health = 1;
-            player.vx = 4;
-            player.vy = 2;
-            player.bombsPlaced = 2;
-            gameState.bombs = [{ x: 2, y: 2, timer: 10 }];
-            gameState.explosions = [{ x: 2, y: 2, timer: 300 }];
-            gameState.enemies = [{ x: 100, y: 100 }];
-            gameState.hazards = [{ x: 3, y: 3, triggered: true }];
-            gameState.bossProjectiles = [{ x: 1, y: 1 }];
-            gameState.particles = [{ x: 1, y: 1 }];
-            gameState.shakeTimer = 100;
-            gameState.shakeIntensity = 9;
-            finishRun('debug-test');
-            beginNewRun();
+            prepareTestScene();
+            const state = getState();
+            const p = getPlayer();
+            p.health = 1; p.vx = 4; p.vy = 2; p.bombsPlaced = 2;
+            state.bombs = [{ x: 2, y: 2, timer: 10 }];
+            state.explosions = [{ x: 2, y: 2, timer: 300 }];
+            state.enemies = [{ x: 100, y: 100 }];
+            state.hazards = [{ x: 3, y: 3, triggered: true }];
+            state.bossProjectiles = [{ x: 1, y: 1 }];
+            state.particles = [{ x: 1, y: 1 }];
+            state.shakeTimer = 100;
+            state.shakeIntensity = 9;
+            if (typeof resetWorldRuntimeState !== 'function' || typeof resetPlayerRuntimeState !== 'function') throw new Error('Funciones de reset no disponibles.');
+            resetWorldRuntimeState();
+            resetPlayerRuntimeState();
             initLevel();
-            if (player.health !== 3) throw new Error('La vida no se restableció.');
-            if (player.bombsPlaced !== 0) throw new Error('bombsPlaced quedó contaminado.');
-            if (player.vx !== 0 || player.vy !== 0) throw new Error('La velocidad del jugador no se restableció.');
-            if (gameState.bombs.length !== 0 || gameState.explosions.length !== 0) throw new Error('Persistieron bombas/explosiones.');
-            if (gameState.bossProjectiles.length !== 0 || gameState.shakeTimer !== 0) throw new Error('Persistieron proyectiles o shake.');
-            return { summary: 'OK · estado limpio después del reinicio', details: { health: player.health, bombsPlaced: player.bombsPlaced, velocity: { x: player.vx, y: player.vy }, bombs: gameState.bombs.length, explosions: gameState.explosions.length, projectiles: gameState.bossProjectiles.length, shakeTimer: gameState.shakeTimer } };
+            if (p.health !== 3) throw new Error(`HP quedó en ${p.health}.`);
+            if (p.bombsPlaced !== 0) throw new Error(`bombsPlaced quedó en ${p.bombsPlaced}.`);
+            if (p.vx !== 0 || p.vy !== 0) throw new Error('La velocidad no fue limpiada.');
+            if (state.bombs.length || state.explosions.length || state.bossProjectiles.length || state.shakeTimer) throw new Error('Persistieron objetos del estado anterior.');
+            return { summary: 'estado limpio · reset verificado', details: { health: p.health, bombsPlaced: p.bombsPlaced, velocity: { x: p.vx, y: p.vy }, bombs: state.bombs.length, explosions: state.explosions.length, projectiles: state.bossProjectiles.length, shakeTimer: state.shakeTimer } };
         }
     };
+
+    function prepareTestScene() {
+        stopDebugLoop();
+        const state = getState();
+        if (!state) throw new Error('gameState no disponible.');
+        if (typeof resetWorldRuntimeState === 'function') resetWorldRuntimeState();
+        if (typeof resetPlayerRuntimeState === 'function') resetPlayerRuntimeState();
+        if (typeof resetRelicModifiers === 'function') resetRelicModifiers();
+        if (typeof resetBombHandlingState === 'function') resetBombHandlingState();
+        if (typeof resetCombatFeedbackForRun === 'function') resetCombatFeedbackForRun();
+        state.runNumber = 1;
+        initLevel();
+        state.isPlaying = true;
+        state.paused = false;
+        state.lastTime = performance.now();
+        state.rafId = 0;
+        DEBUG_MODE.paused = false;
+        DEBUG_MODE.stepRequested = false;
+        DEBUG_MODE.resetNavigation();
+    }
+
+    function findEmptyCell(preferCorridor = false) {
+        const state = getState();
+        const candidates = [];
+        for (let y = 1; y < state.gridHeight - 1; y++) {
+            for (let x = 1; x < state.gridWidth - 1; x++) {
+                if (state.grid[y]?.[x] !== TYPES.EMPTY) continue;
+                if (preferCorridor && state.grid[y]?.[x + 1] === TYPES.EMPTY && state.grid[y]?.[x + 2] === TYPES.EMPTY) return { x, y };
+                candidates.push({ x, y });
+            }
+        }
+        return candidates[0] || { x: 1, y: 1 };
+    }
+
+    function findEnemyTestCell(playerCell) {
+        const state = getState();
+        for (let radius = 3; radius < 10; radius++) {
+            const candidates = [
+                { x: playerCell.x + radius, y: playerCell.y },
+                { x: playerCell.x - radius, y: playerCell.y },
+                { x: playerCell.x, y: playerCell.y + radius },
+                { x: playerCell.x, y: playerCell.y - radius }
+            ];
+            for (const cell of candidates) {
+                if (gridInsideLocal(cell.x, cell.y) && state.grid[cell.y]?.[cell.x] === TYPES.EMPTY) return cell;
+            }
+        }
+        return findEmptyCell(true);
+    }
+
+    function setPlayerAt(cell) {
+        const p = getPlayer();
+        const center = { x: cell.x * TILE_SIZE + TILE_SIZE / 2, y: cell.y * TILE_SIZE + TILE_SIZE / 2 };
+        p.x = center.x - p.width / 2;
+        p.y = center.y - p.height / 2;
+        p.vx = 0; p.vy = 0;
+        p.isMoving = false;
+        p.inputAxis = null;
+        p.inputBuffer = null;
+        p.inputBufferTimer = 0;
+        const state = getState();
+        state.keys = {};
+        state.touchControls = { x: 0, y: 0 };
+        if (typeof resetCameraToPlayer === 'function') resetCameraToPlayer();
+    }
+
+    function dispatchUpdate() {
+        if (!enabled) return;
+        window.dispatchEvent(new CustomEvent('bomber-debug-updated'));
+    }
+
+    instrumentRuntime();
 
     window.DEBUG_MODE = DEBUG_MODE;
     window.DEBUG_TESTS = DEBUG_TESTS;
     window.debugRecordEvent = (...args) => DEBUG_MODE.recordEvent(...args);
     window.debugCaptureError = (...args) => DEBUG_MODE.captureError(...args);
     window.debugStateSnapshot = () => DEBUG_MODE.snapshot();
-    window.debugNavigationSnapshot = () => getNavigationSnapshot();
+    window.debugNavigationSnapshot = force => DEBUG_MODE.getNavigationSnapshot(!!force);
 
     if (!enabled) return;
 
-    window.addEventListener('error', event => DEBUG_MODE.captureError(event.error || event.message, 'window.error'));
-    window.addEventListener('unhandledrejection', event => DEBUG_MODE.captureError(event.reason, 'unhandledrejection'));
     window.addEventListener('keydown', event => {
         if (event.code === 'F3') {
             event.preventDefault();
@@ -689,4 +993,7 @@
             DEBUG_MODE.runAllTests();
         }
     });
+
+    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.16.3 cargado en el mismo runtime.');
+    DEBUG_MODE.recordEvent('DEBUG', 'Usá RESET para activar una escena de depuración limpia.');
 })();

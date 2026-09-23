@@ -1,13 +1,14 @@
-// Bomberman Roguelike v3.16.2 — Debug world visualizers
+// Bomberman Roguelike v3.16.3 — Debug visualizers
+// Las capas de navegación se dibujan sobre el mismo canvas del juego.
 (() => {
     'use strict';
     if (!window.DEBUG_MODE?.enabled) return;
 
     const D = window.DEBUG_MODE;
+    const DIRS = { UP:[0,-1], RIGHT:[1,0], DOWN:[0,1], LEFT:[-1,0] };
 
-    function screenPoint(x, y) {
-        return { x: x - gameState.camera.x, y: y - gameState.camera.y };
-    }
+    const toScreen = (x, y) => ({ x: x - gameState.camera.x, y: y - gameState.camera.y });
+    const tileCenter = (x, y) => toScreen((x + .5) * TILE_SIZE, (y + .5) * TILE_SIZE);
 
     function drawRect(rect, stroke, fill = null, lineWidth = 1) {
         if (!rect) return;
@@ -19,9 +20,13 @@
         ctx.restore();
     }
 
-    function drawDebugGrid() {
+    function screenRect(rect) {
+        return { left: rect.left - gameState.camera.x, right: rect.right - gameState.camera.x, top: rect.top - gameState.camera.y, bottom: rect.bottom - gameState.camera.y };
+    }
+
+    function drawGrid() {
         ctx.save();
-        ctx.strokeStyle = 'rgba(56,189,248,.20)';
+        ctx.strokeStyle = 'rgba(56,189,248,.17)';
         ctx.lineWidth = 1;
         for (let x = 0; x <= gameState.gridWidth; x++) {
             const sx = x * TILE_SIZE - gameState.camera.x;
@@ -34,197 +39,184 @@
         ctx.restore();
     }
 
-    function drawDebugCollision() {
+    function drawCollision() {
         if (typeof gridGetEntityRect === 'function') {
-            drawRect(screenRect({
-                left: player.x + 5,
-                right: player.x + player.width - 5,
-                top: player.y + 5,
-                bottom: player.y + player.height - 5
-            }), 'rgba(34,211,238,.95)');
-        }
-        for (const e of gameState.enemies) {
-            const rect = typeof gridGetEntityRect === 'function'
-                ? gridGetEntityRect(e, e.x, e.y, 'enemy')
-                : {left:e.x-e.width*.47,right:e.x+e.width*.47,top:e.y-e.height*.47,bottom:e.y+e.height*.47};
-            drawRect(screenRect(rect), 'rgba(248,113,113,.95)');
+            drawRect(screenRect(gridGetEntityRect(player, player.x, player.y, 'player')), 'rgba(34,211,238,.95)');
+            for (const enemy of gameState.enemies) {
+                drawRect(screenRect(gridGetEntityRect(enemy, enemy.x, enemy.y, 'enemy')), 'rgba(248,113,113,.95)');
+            }
         }
     }
 
-    function screenRect(rect) {
-        return { left: rect.left - gameState.camera.x, right: rect.right - gameState.camera.x, top: rect.top - gameState.camera.y, bottom: rect.bottom - gameState.camera.y };
-    }
-
-    function drawDebugHitboxes() {
-        const playerRect = { left: player.x, right: player.x + player.width, top: player.y, bottom: player.y + player.height };
-        drawRect(screenRect(playerRect), 'rgba(255,255,255,.82)', null, 1.5);
-        for (const e of gameState.enemies) {
-            const rect = {left:e.x-e.width/2,right:e.x+e.width/2,top:e.y-e.height/2,bottom:e.y+e.height/2};
-            drawRect(screenRect(rect), 'rgba(250,204,21,.82)');
+    function drawHitboxes() {
+        drawRect(screenRect({ left: player.x, right: player.x + player.width, top: player.y, bottom: player.y + player.height }), 'rgba(255,255,255,.8)', null, 1.5);
+        for (const enemy of gameState.enemies) {
+            drawRect(screenRect({ left: enemy.x-enemy.width/2, right: enemy.x+enemy.width/2, top: enemy.y-enemy.height/2, bottom: enemy.y+enemy.height/2 }), 'rgba(250,204,21,.85)');
         }
     }
 
-    function drawDebugBombs() {
+    function drawBombs() {
         for (const bomb of gameState.bombs) {
             const cells = typeof calculateBombBlastCells === 'function' ? calculateBombBlastCells(bomb) : [];
             ctx.save();
-            ctx.strokeStyle = 'rgba(251,191,36,.8)';
-            ctx.fillStyle = 'rgba(251,191,36,.08)';
+            ctx.fillStyle = 'rgba(251,191,36,.07)';
+            ctx.strokeStyle = 'rgba(251,191,36,.85)';
             for (const cell of cells) {
-                const p = screenPoint(cell.x * TILE_SIZE, cell.y * TILE_SIZE);
-                ctx.fillRect(p.x + 3, p.y + 3, TILE_SIZE - 6, TILE_SIZE - 6);
-                ctx.strokeRect(p.x + 3, p.y + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+                const p = toScreen(cell.x*TILE_SIZE, cell.y*TILE_SIZE);
+                ctx.fillRect(p.x+3,p.y+3,TILE_SIZE-6,TILE_SIZE-6);
+                ctx.strokeRect(p.x+3,p.y+3,TILE_SIZE-6,TILE_SIZE-6);
             }
-            const pc = screenPoint((bomb.x + .5) * TILE_SIZE, (bomb.y + .5) * TILE_SIZE);
+            const c = tileCenter(bomb.x,bomb.y);
             ctx.fillStyle = '#fbbf24';
             ctx.font = '8px Consolas,monospace';
-            ctx.fillText(`${Math.ceil(Math.max(0,bomb.timer))}ms`, pc.x - 18, pc.y - 20);
+            ctx.fillText(`${Math.ceil(Math.max(0,bomb.timer))}ms`, c.x-18, c.y-20);
             ctx.restore();
         }
     }
 
-    function drawDebugExplosions() {
+    function drawExplosions() {
+        ctx.save();
         for (const exp of gameState.explosions) {
-            const p = screenPoint(exp.x * TILE_SIZE, exp.y * TILE_SIZE);
-            ctx.save();
+            const p = toScreen(exp.x*TILE_SIZE, exp.y*TILE_SIZE);
             ctx.strokeStyle = 'rgba(251,113,133,.95)';
             ctx.lineWidth = 2;
-            ctx.strokeRect(p.x + 2, p.y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+            ctx.strokeRect(p.x+2,p.y+2,TILE_SIZE-4,TILE_SIZE-4);
             ctx.fillStyle = '#fecdd3';
             ctx.font = '8px Consolas,monospace';
-            ctx.fillText(`${Math.ceil(exp.timer)}ms`, p.x + 4, p.y + 11);
+            ctx.fillText(`${Math.ceil(exp.timer)}ms`, p.x+4, p.y+11);
+        }
+        ctx.restore();
+    }
+
+    function arrow(x1,y1,x2,y2,color,label='') {
+        const ang = Math.atan2(y2-y1, x2-x1);
+        const head = 7;
+        ctx.save();
+        ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x2,y2);
+        ctx.lineTo(x2-Math.cos(ang-.55)*head, y2-Math.sin(ang-.55)*head);
+        ctx.lineTo(x2-Math.cos(ang+.55)*head, y2-Math.sin(ang+.55)*head);
+        ctx.closePath(); ctx.fill();
+        if (label) { ctx.font='8px Consolas,monospace'; ctx.fillText(label,x1+4,y1-5); }
+        ctx.restore();
+    }
+
+    function drawNavigation() {
+        const nav = D.getNavigationSnapshot();
+        if (!nav?.available) return;
+
+        const player = nav.player;
+        if (player) {
+            // Árbol de alcance: representa las celdas a las que el jugador puede llegar.
+            ctx.save();
+            ctx.strokeStyle = 'rgba(34,211,238,.18)';
+            ctx.lineWidth = 1;
+            for (const edge of (player.treeEdges || [])) {
+                const a = tileCenter(edge[0].x, edge[0].y);
+                const b = tileCenter(edge[1].x, edge[1].y);
+                ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+            }
+            ctx.fillStyle = 'rgba(34,211,238,.045)';
+            ctx.strokeStyle = 'rgba(34,211,238,.13)';
+            for (const cell of (player.cells || [])) {
+                const p = toScreen(cell.x*TILE_SIZE, cell.y*TILE_SIZE);
+                ctx.fillRect(p.x+2,p.y+2,TILE_SIZE-4,TILE_SIZE-4);
+                ctx.strokeRect(p.x+3,p.y+3,TILE_SIZE-6,TILE_SIZE-6);
+            }
+            ctx.restore();
+
+            const pc = tileCenter(player.tile.x, player.tile.y);
+            for (const dir of (player.options || [])) {
+                const d = DIRS[dir];
+                if (!d) continue;
+                arrow(pc.x,pc.y,pc.x+d[0]*24,pc.y+d[1]*24,'#22d3ee',`P:${dir}`);
+            }
+            ctx.save();
+            ctx.fillStyle = '#22d3ee';
+            ctx.font = 'bold 9px Consolas,monospace';
+            ctx.fillText(`PLAYER ${player.tile.x},${player.tile.y} · ${player.reachableTiles} celdas`, pc.x+8, pc.y+17);
+            ctx.restore();
+        }
+
+        for (const enemy of (nav.enemies || [])) {
+            const color = ['#22c55e','#f59e0b','#a78bfa','#fb7185','#38bdf8','#f97316','#e879f9','#84cc16'][enemy.index % 8];
+            const path = enemy.route || [];
+            const start = tileCenter(enemy.tile.x, enemy.tile.y);
+
+            if (!path.length) {
+                ctx.save();
+                ctx.strokeStyle='rgba(248,113,113,.9)';
+                ctx.setLineDash([5,4]);
+                ctx.strokeRect(start.x+7,start.y+7,TILE_SIZE-14,TILE_SIZE-14);
+                ctx.fillStyle='#fca5a5';
+                ctx.font='8px Consolas,monospace';
+                ctx.fillText(`E${enemy.index} SIN RUTA`,start.x-4,start.y-7);
+                ctx.restore();
+            } else {
+                ctx.save();
+                ctx.strokeStyle = color;
+                ctx.fillStyle = color;
+                ctx.globalAlpha = .88;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                path.forEach((cell,i)=>{
+                    const p = tileCenter(cell.x,cell.y);
+                    if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
+                });
+                ctx.stroke();
+                ctx.restore();
+
+                // Flechas cada 2-3 celdas para que la dirección sea legible sin llenar el mapa.
+                for(let i=1;i<path.length;i+=2){
+                    const a = tileCenter(path[i-1].x,path[i-1].y);
+                    const b = tileCenter(path[i].x,path[i].y);
+                    arrow(a.x,a.y,b.x,b.y,color,`E${enemy.index}`);
+                }
+            }
+
+            const currentDir = DIRS[enemy.currentDirection];
+            const desiredDir = DIRS[enemy.desiredDirection];
+            if (currentDir) arrow(start.x,start.y,start.x+currentDir[0]*18,start.y+currentDir[1]*18,'#f8fafc','C');
+            if (desiredDir) arrow(start.x,start.y,start.x+desiredDir[0]*30,start.y+desiredDir[1]*30,'#f43f5e','D');
+
+            ctx.save();
+            ctx.fillStyle = enemy.seesPlayer ? '#f87171' : color;
+            ctx.font = '8px Consolas,monospace';
+            ctx.fillText(`E${enemy.index} ${enemy.routeLength}c`, start.x+9,start.y+18);
             ctx.restore();
         }
     }
 
-    function drawArrow(x1,y1,x2,y2,color,label) {
-        const ang=Math.atan2(y2-y1,x2-x1), head=6;
-        ctx.save();
-        ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=2;
-        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(x2,y2); ctx.lineTo(x2-Math.cos(ang-.55)*head,y2-Math.sin(ang-.55)*head); ctx.lineTo(x2-Math.cos(ang+.55)*head,y2-Math.sin(ang+.55)*head); ctx.closePath(); ctx.fill();
-        if(label){ctx.font='8px Consolas,monospace';ctx.fillText(label,x1+4,y1-5);}
-        ctx.restore();
-    }
-
-    function drawDebugAI() {
-        const p = screenPoint(player.x + player.width/2, player.y + player.height/2);
-        ctx.save();
-        ctx.strokeStyle='rgba(56,189,248,.25)';
-        ctx.setLineDash([4,4]);
-        for(const e of gameState.enemies){
-            if(!e.ai) continue;
-            const ex=e.x-gameState.camera.x, ey=e.y-gameState.camera.y;
-            const dirMap={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
-            const d=dirMap[e.ai.direction]||[0,0];
-            drawArrow(ex,ey,ex+d[0]*24,ey+d[1]*24,'#22c55e',e.ai.behavior||'patrol');
-            ctx.fillStyle=e.ai.seesPlayer?'#ef4444':'#facc15';
-            ctx.font='8px Consolas,monospace';
-            ctx.fillText(`${e.ai.direction||'?'} / ${e.ai.desiredDirection||'?'}`,ex+7,ey+11);
-            if(e.ai.seesPlayer){
-                drawArrow(ex,ey,p.x,p.y,'rgba(239,68,68,.45)','LOS');
-            }
+    function drawAI() {
+        const nav = D.getNavigationSnapshot();
+        if (!nav?.available) return;
+        const p = tileCenter(nav.player.tile.x, nav.player.tile.y);
+        for (const enemy of (nav.enemies || [])) {
+            const e = tileCenter(enemy.tile.x, enemy.tile.y);
+            if (enemy.seesPlayer) arrow(e.x,e.y,p.x,p.y,'rgba(239,68,68,.42)','LOS');
         }
-        ctx.restore();
     }
 
-    function drawDebugCamera() {
+    function drawCamera() {
         ctx.save();
-        ctx.strokeStyle='rgba(96,165,250,.8)';
+        ctx.strokeStyle='rgba(96,165,250,.85)';
         ctx.lineWidth=2;
         ctx.strokeRect(1,1,canvas.width-2,canvas.height-2);
         if(typeof getCameraBounds==='function'){
             const b=getCameraBounds();
-            ctx.fillStyle='rgba(148,163,184,.9)';
+            ctx.fillStyle='rgba(148,163,184,.95)';
             ctx.font='9px Consolas,monospace';
-            ctx.fillText(`CAM ${gameState.camera.x.toFixed(0)},${gameState.camera.y.toFixed(0)} / MAX ${b.maxX.toFixed(0)},${b.maxY.toFixed(0)}`,8,canvas.height-10);
+            ctx.fillText(`CAM ${gameState.camera.x.toFixed(0)},${gameState.camera.y.toFixed(0)} · MAX ${b.maxX.toFixed(0)},${b.maxY.toFixed(0)}`,8,canvas.height-10);
         }
         ctx.restore();
     }
 
-    function drawDebugReachableArea(nav) {
-        const cells = nav?.player?.cells || [];
-        if (!cells.length) return;
+    function drawSpawns() {
         ctx.save();
-        ctx.fillStyle = 'rgba(34,211,238,.055)';
-        ctx.strokeStyle = 'rgba(34,211,238,.18)';
-        ctx.lineWidth = 1;
-        for (const pair of cells) {
-            const x = pair[0];
-            const y = pair[1];
-            const p = screenPoint(x * TILE_SIZE, y * TILE_SIZE);
-            ctx.fillRect(p.x + 2, p.y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-            ctx.strokeRect(p.x + 3, p.y + 3, TILE_SIZE - 6, TILE_SIZE - 6);
-        }
-        ctx.restore();
-    }
-
-    function routeColor(index) {
-        const palette = ['#22c55e', '#f59e0b', '#a78bfa', '#fb7185', '#38bdf8', '#f97316', '#e879f9', '#84cc16'];
-        return palette[index % palette.length];
-    }
-
-    function drawDebugNavigationPaths() {
-        const nav = typeof debugNavigationSnapshot === 'function' ? debugNavigationSnapshot() : null;
-        if (!nav) return;
-
-        drawDebugReachableArea(nav);
-
-        const playerCenter = screenPoint(
-            (nav.player.tile.x + 0.5) * TILE_SIZE,
-            (nav.player.tile.y + 0.5) * TILE_SIZE
-        );
-        ctx.save();
-        ctx.strokeStyle = 'rgba(34,211,238,.95)';
-        ctx.fillStyle = 'rgba(34,211,238,.95)';
-        ctx.lineWidth = 3;
-        for (const dir of (nav.player.options || [])) {
-            const d = { UP:[0,-1], RIGHT:[1,0], DOWN:[0,1], LEFT:[-1,0] }[dir];
-            if (!d) continue;
-            drawArrow(playerCenter.x, playerCenter.y, playerCenter.x + d[0] * 24, playerCenter.y + d[1] * 24, '#22d3ee', `P:${dir}`);
-        }
-        ctx.restore();
-
-        for (const enemy of (nav.enemies || [])) {
-            const path = enemy.route || [];
-            const color = routeColor(enemy.index);
-            if (!path.length) {
-                const p = screenPoint((enemy.tile.x + 0.5) * TILE_SIZE, (enemy.tile.y + 0.5) * TILE_SIZE);
-                ctx.save();
-                ctx.strokeStyle = 'rgba(248,113,113,.8)';
-                ctx.setLineDash([5, 4]);
-                ctx.strokeRect(p.x + 7, p.y + 7, TILE_SIZE - 14, TILE_SIZE - 14);
-                ctx.font = '8px Consolas,monospace';
-                ctx.fillStyle = '#fca5a5';
-                ctx.fillText(`E${enemy.index} SIN RUTA`, p.x + 3, p.y - 4);
-                ctx.restore();
-                continue;
-            }
-
-            ctx.save();
-            ctx.strokeStyle = color;
-            ctx.fillStyle = color;
-            ctx.lineWidth = 2;
-            ctx.globalAlpha = 0.75;
-            ctx.beginPath();
-            path.forEach((cell, i) => {
-                const p = screenPoint((cell.x + 0.5) * TILE_SIZE, (cell.y + 0.5) * TILE_SIZE);
-                if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
-            });
-            ctx.stroke();
-            const last = path[Math.min(path.length - 1, 5)];
-            const prev = path[Math.max(0, Math.min(path.length - 2, 4))];
-            const p1 = screenPoint((prev.x + 0.5) * TILE_SIZE, (prev.y + 0.5) * TILE_SIZE);
-            const p2 = screenPoint((last.x + 0.5) * TILE_SIZE, (last.y + 0.5) * TILE_SIZE);
-            drawArrow(p1.x, p1.y, p2.x, p2.y, color, `E${enemy.index} ${enemy.routeLength}`);
-            ctx.restore();
-        }
-    }
-
-    function drawDebugSpawns() {
-        ctx.save();
-        for(const e of gameState.enemies){
-            const p=screenPoint(e.x,e.y);
+        for(const enemy of gameState.enemies){
+            const p = toScreen(enemy.x,enemy.y);
             ctx.strokeStyle='rgba(168,85,247,.82)';
             ctx.strokeRect(p.x-12,p.y-12,24,24);
         }
@@ -233,14 +225,14 @@
 
     window.drawDebugWorldOverlay = function(){
         if(!D.visible) return;
-        if(D.selectedVisuals.grid) drawDebugGrid();
-        if(D.selectedVisuals.collision) drawDebugCollision();
-        if(D.selectedVisuals.hitboxes) drawDebugHitboxes();
-        if(D.selectedVisuals.bombs) drawDebugBombs();
-        if(D.selectedVisuals.explosions) drawDebugExplosions();
-        if(D.selectedVisuals.ai) drawDebugAI();
-        if(D.selectedVisuals.camera) drawDebugCamera();
-        if(D.selectedVisuals.spawns) drawDebugSpawns();
-        if(D.selectedVisuals.paths) drawDebugNavigationPaths();
+        if(D.selectedVisuals.grid) drawGrid();
+        if(D.selectedVisuals.collision) drawCollision();
+        if(D.selectedVisuals.hitboxes) drawHitboxes();
+        if(D.selectedVisuals.bombs) drawBombs();
+        if(D.selectedVisuals.explosions) drawExplosions();
+        if(D.selectedVisuals.paths) drawNavigation();
+        if(D.selectedVisuals.ai) drawAI();
+        if(D.selectedVisuals.camera) drawCamera();
+        if(D.selectedVisuals.spawns) drawSpawns();
     };
 })();

@@ -81,14 +81,22 @@ function generateHazards() {
         for (let x = 1; x < gameState.gridWidth - 1; x++) {
             if (gameState.grid[y][x] !== TYPES.EMPTY) continue;
             if ((x <= 3 && y <= 3) || (gameState.exitPos && gameState.exitPos.x === x && gameState.exitPos.y === y)) continue;
+            if (gameState.roomDesign?.secretInterior?.has(`${x},${y}`)) continue;
             candidates.push({ x, y });
         }
     }
 
-    for (let i = candidates.length - 1; i > 0; i--) {
+    const riskCandidates = candidates.filter(c => gameState.roomDesign?.riskCells?.has(`${c.x},${c.y}`));
+    const normalCandidates = candidates.filter(c => !gameState.roomDesign?.riskCells?.has(`${c.x},${c.y}`));
+    for (let i = riskCandidates.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+        [riskCandidates[i], riskCandidates[j]] = [riskCandidates[j], riskCandidates[i]];
     }
+    for (let i = normalCandidates.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [normalCandidates[i], normalCandidates[j]] = [normalCandidates[j], normalCandidates[i]];
+    }
+    candidates.splice(0, candidates.length, ...riskCandidates, ...normalCandidates);
 
     const count = Math.min(
         candidates.length,

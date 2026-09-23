@@ -57,7 +57,11 @@
                 }
             }
 
-            // Hide exit portal under a random block
+            // V3.13: segunda pasada de generación. Primero creamos el mapa procedural
+            // base y después tallamos salas/corredores con intención espacial.
+            applyRoomDesignV313();
+
+            // V3.13: el layout diseñado elige una puerta de salida dentro de la sala final.
             let blocks = [];
             for (let y = 1; y < gameState.gridHeight - 1; y++) {
                 for (let x = 1; x < gameState.gridWidth - 1; x++) {
@@ -65,7 +69,12 @@
                 }
             }
             
-            if (blocks.length > 0) {
+            const designedExit = gameState.roomDesign?.exitGate;
+            if (designedExit && designedExit.x > 0 && designedExit.x < gameState.gridWidth - 1 && designedExit.y > 0 && designedExit.y < gameState.gridHeight - 1) {
+                gameState.exitPos = { x: designedExit.x, y: designedExit.y };
+                if (gameState.grid[designedExit.y][designedExit.x] === TYPES.WALL) gameState.grid[designedExit.y][designedExit.x] = TYPES.EMPTY;
+                gameState.grid[designedExit.y][designedExit.x] = TYPES.BLOCK;
+            } else if (blocks.length > 0) {
                 let exitBlock = blocks[Math.floor(Math.random() * blocks.length)];
                 gameState.exitPos = {x: exitBlock.x, y: exitBlock.y};
             } else {
@@ -84,6 +93,7 @@
             }
 
             generateHazards();
+            placeRoomDesignItemsV313();
             spawnEnemies();
             showRoomIntro();
             updateRoguePresentation();
@@ -101,7 +111,8 @@
                     }
                 }
             }
-            gameState.exitPos = {x: gameState.gridWidth - 2, y: gameState.gridHeight - 2};
+            const designedExit = gameState.roomDesign?.exitGate || { x: gameState.gridWidth - 2, y: gameState.gridHeight - 2 };
+            gameState.exitPos = { x: designedExit.x, y: designedExit.y };
             if (gameState.grid[gameState.exitPos.y][gameState.exitPos.x] === TYPES.WALL) gameState.grid[gameState.exitPos.y][gameState.exitPos.x] = TYPES.EMPTY;
             gameState.grid[gameState.exitPos.y][gameState.exitPos.x] = TYPES.EXIT_LOCKED;
             gameState.enemies = [];

@@ -43,6 +43,9 @@
                 }
             }
 
+            // V3.13: acentos espaciales; las salas se leen en el propio piso, sin minimapa.
+            if (typeof drawRoomDesignLayerV313 === 'function') drawRoomDesignLayerV313();
+
             // V3.3: las trampas aparecen visualmente solo después de activarse.
             drawHazards();
 

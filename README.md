@@ -1,57 +1,44 @@
-# Bomberman Roguelike v3.14 — Powerups & Relics 2
+# Bomberman Roguelike v3.15 — Death & Restart Update
 
 ## Enfoque
 
-Esta versión amplía el sistema roguelike con categorías de build y reliquias que modifican reglas ya existentes. Los efectos se acumulan durante una misma run y buscan crear decisiones simples pero combinables.
+Esta versión pule el cierre de una run y garantiza un reinicio limpio. La muerte ahora muestra un resumen completo de la partida y el siguiente intento vuelve a iniciar todos los sistemas temporales y entidades desde cero.
 
-## Categorías
+## Resumen de muerte
 
-- **BOMB** — bombas, colocación y temporización.
-- **FIRE** — alcance y puntuación ligada al poder de fuego.
-- **SPEED** — velocidad permanente.
-- **DEFENSE** — vida, escudo e invulnerabilidad.
-- **MOVEMENT** — asistencia para girar y tomar corredores.
-- **RISK** — poder adicional a cambio de mayor peligro.
-- **ECONOMY** — monedas y recompensas.
+La pantalla final informa:
 
-## Nuevas reliquias
+- Profundidad alcanzada.
+- Enemigos derrotados.
+- Monedas obtenidas.
+- Reliquias conseguidas.
+- Tiempo de run activo.
+- Puntaje total.
+- Mejor profundidad histórica.
+- Mejor puntaje histórico.
+- Causa del último daño letal.
 
-**⏱ MECHA CORTA — BOMB**  
-Las bombas tienen una mecha 28% más corta.
+Los récords se guardan en `localStorage` y se distinguen cuando la run establece una nueva marca.
 
-**🧨 PÓLVORA INESTABLE — RISK**  
-+1 rango de bomba. Las propias explosiones son menos tolerantes al roce.
+## Reinicio limpio
 
-**🧲 BOTAS MAGNÉTICAS — MOVEMENT**  
-Mejora la asistencia de giro, el centrado y la ventana para tomar una esquina.
+Cada nueva run limpia de forma centralizada:
 
-**🔆 LENTE TÉRMICA — FIRE**  
-+1 rango de bomba y +10% de puntuación por enemigos derrotados.
+- bombas y contador de bombas;
+- explosiones y proyectiles;
+- enemigos y jefe;
+- trampas y estados temporales de movimiento;
+- timers de sala, amenaza, daño, bombas y feedback;
+- partículas y textos flotantes;
+- input de teclado, joystick y retención de bomba;
+- velocidad, vida, escudo, alcance y modificadores de reliquias;
+- cámara, shake y estado de animación.
 
-**🪙 NÚCLEO DE SALVAMENTO — ECONOMY**  
-+20% de monedas obtenidas. Se acumula con otros bonos económicos.
+La run también tiene un reloj propio que no avanza mientras el juego está pausado.
 
-**🔷 CAPARAZÓN CINÉTICO — DEFENSE**  
-Añade 250 ms de invulnerabilidad después de recibir daño.
+## Arquitectura
 
-## Reliquias existentes recategorizadas
-
-- Núcleo Ígneo → FIRE
-- Mecha Gemela → BOMB
-- Botas de Hierro → SPEED
-- Motor Vital → DEFENSE
-- Placa de Guarda → DEFENSE
-- Trofeo de Guerra → RISK
-- Amuleto Afortunado → ECONOMY
-- Sello del Mercader → ECONOMY
-
-## Combinaciones
-
-Las reliquias se suman a los powerups normales. Una build puede combinar, por ejemplo, más bombas con una mecha corta, más rango con pólvora inestable y mejores giros con botas magnéticas.
-
-## Interfaz
-
-Las recompensas muestran su categoría y las reliquias activas también muestran su categoría en la tira superior. Esto permite leer rápidamente qué tipo de build está formando la run.
+El ciclo de vida de la run está aislado en `js/17-run-lifecycle.js`, para facilitar auditorías y pruebas de reinicio sin mezclarlo con combate, movimiento o generación del mapa.
 
 ## Compatibilidad
 

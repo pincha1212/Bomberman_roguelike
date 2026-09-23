@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOMBERMAN // DESCENT — Roguelike v3.14</title>
+    <title>BOMBERMAN // DESCENT — Roguelike v3.15</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -14,7 +14,7 @@
             <aside class="menu-rail menu-rail-left" aria-label="Resumen de la aventura">
                 <div class="menu-rail-top">
                     <span class="menu-kicker">BOMBERMAN // DESCENT</span>
-                    <span class="menu-version">v3.14</span>
+                    <span class="menu-version">v3.15</span>
                 </div>
                 <div class="menu-rail-content">
                     <div class="menu-mark">💣</div>
@@ -61,15 +61,30 @@
                     </div>
                 </div>
 
-                <!-- Game Over Screen -->
-                <div id="game-over-screen" class="screen hidden">
-                    <div class="text-4xl mb-2">💀</div>
-                    <h1 class="text-2xl mb-2 text-red-500 pixel-font">GAME OVER</h1>
-                    <p class="text-xs text-slate-300 mb-1">Profundidad alcanzada: <span id="go-level" class="text-yellow-400 font-bold">1</span></p>
-                    <p class="text-xs text-slate-300 mb-1">Puntaje total: <span id="go-score" class="text-cyan-400 font-bold">0</span></p>
-                    <p class="text-xs text-slate-300 mb-1">Monedas: <span id="go-coins" class="text-amber-300 font-bold">0</span> · Reliquias: <span id="go-relics" class="text-purple-300 font-bold">0</span></p>
-                    <p class="text-xs text-slate-400 mb-5">Mejor profundidad: <span id="go-best" class="text-yellow-300 font-bold">0</span></p>
-                    <button id="btn-restart" class="btn-pixel">REINTENTAR</button>
+                <!-- Death / Run Summary -->
+                <div id="game-over-screen" class="screen hidden death-screen">
+                    <div class="death-kicker pixel-font">RUN TERMINADA</div>
+                    <div class="death-icon">💀</div>
+                    <h1 class="death-title pixel-font">GAME OVER</h1>
+                    <div id="go-record" class="death-record">RUN FINALIZADA</div>
+                    <div class="death-cause">CAUSA · <strong id="go-cause">Daño recibido</strong></div>
+                    <div class="death-summary-grid">
+                        <div class="death-stat"><span>RUN</span><strong id="go-run">RUN 01</strong></div>
+                        <div class="death-stat"><span>PROFUNDIDAD</span><strong id="go-level">1</strong></div>
+                        <div class="death-stat"><span>TIEMPO</span><strong id="go-time">00:00</strong></div>
+                        <div class="death-stat"><span>ENEMIGOS</span><strong id="go-kills">0</strong></div>
+                        <div class="death-stat"><span>MONEDAS</span><strong id="go-coins">0</strong></div>
+                        <div class="death-stat"><span>PUNTAJE</span><strong id="go-score">0</strong></div>
+                    </div>
+                    <div class="death-records">
+                        <div><span>MEJOR PROFUNDIDAD</span><strong id="go-best">0</strong></div>
+                        <div><span>MEJOR PUNTAJE</span><strong id="go-best-score">0</strong></div>
+                    </div>
+                    <div class="death-relics-wrap">
+                        <div class="death-section-label">RELIQUIAS CONSEGUIDAS <span id="go-relics">0</span></div>
+                        <div id="go-relic-list" class="death-relic-list"></div>
+                    </div>
+                    <button id="btn-restart" class="btn-pixel death-restart">NUEVA RUN</button>
                 </div>
 
                 <!-- Reward screen -->
@@ -121,7 +136,7 @@
         </div>
     </div>
 
-    <!-- v3.14 modular JavaScript: relic categories and combined build modifiers are isolated. -->
+    <!-- v3.15 modular JavaScript: death, run summary and clean restart are isolated. -->
     <script src="js/01-core.js"></script>
     <script src="js/16-relics.js"></script>
     <script src="js/02-input.js"></script>
@@ -137,6 +152,7 @@
     <script src="js/07-render.js"></script>
     <script src="js/09-camera.js"></script>
     <script src="js/10-feedback.js"></script>
+    <script src="js/17-run-lifecycle.js"></script>
     <script src="js/08-loop-ui.js"></script>
 </body>
 </html>

@@ -164,41 +164,22 @@
                 if (exp.timer <= 0) gameState.explosions.splice(i, 1);
             }
 
-            // Update Enemies
-            gameState.enemies.forEach(e => {
-                e.changeTimer -= dt * 0.1;
-                if (e.changeTimer <= 0) {
-                    e.changeTimer = 30 + Math.random() * 50;
-                    if (Math.random() < 0.5) {
-                        e.vx = e.type.speed * gameState.roomType.enemySpeedMult * (1 + gameState.threatLevel * 0.04) * (Math.random() < 0.5 ? 1 : -1);
-                        e.vy = 0;
-                    } else {
-                        e.vx = 0;
-                        e.vy = e.type.speed * gameState.roomType.enemySpeedMult * (1 + gameState.threatLevel * 0.04) * (Math.random() < 0.5 ? 1 : -1);
-                    }
-                }
+            // V3.11: IA de enemigos aislada y con pathfinding dosificado.
+            updateEnemyAI(dt);
 
-                const enemyFrameScale = Math.min(getCombatMotionDt(dt) / 16.6667, 2);
-                e.x += e.vx * enemyFrameScale;
-                if (isSolid(Math.floor(e.x / TILE_SIZE), Math.floor(e.y / TILE_SIZE), e.type.canFly)) {
-                    e.x -= e.vx * enemyFrameScale; e.vx *= -1;
-                }
-                e.y += e.vy * enemyFrameScale;
-                if (isSolid(Math.floor(e.x / TILE_SIZE), Math.floor(e.y / TILE_SIZE), e.type.canFly)) {
-                    e.y -= e.vy * enemyFrameScale; e.vy *= -1;
-                }
-
-                // Hitbox interna del enemigo para dañar al jugador (más pequeña que el visual)
-                let eHitbox = { 
-                    left: e.x - e.width * 0.3, 
-                    right: e.x + e.width * 0.3, 
-                    top: e.y - e.height * 0.3, 
-                    bottom: e.y + e.height * 0.3 
+            // Contacto jugador-enemigo: separado del movimiento para que la IA
+            // no pueda romper accidentalmente el sistema de daño.
+            for (let j = gameState.enemies.length - 1; j >= 0; j--) {
+                const e = gameState.enemies[j];
+                if (!e) continue;
+                const eHitbox = {
+                    left: e.x - e.width * 0.3,
+                    right: e.x + e.width * 0.3,
+                    top: e.y - e.height * 0.3,
+                    bottom: e.y + e.height * 0.3
                 };
-                
-                // Comprobamos la colisión usando las cajas reducidas de ambos
                 if (checkOverlap(pHurtbox, eHitbox)) takeDamage('enemy', e.x, e.y);
-            });
+            }
 
             // Items pickup
             for (let i = gameState.items.length - 1; i >= 0; i--) {

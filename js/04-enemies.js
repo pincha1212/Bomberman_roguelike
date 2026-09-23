@@ -3,11 +3,26 @@
             const baseCount = Math.min(3 + Math.floor(gameState.level * 1.5), 12);
             const count = Math.max(1, Math.round(baseCount * gameState.roomType.enemyMult));
             const candidates = [];
+            const px = Math.floor((player.x + player.width / 2) / TILE_SIZE);
+            const py = Math.floor((player.y + player.height / 2) / TILE_SIZE);
             for (let y = 1; y < gameState.gridHeight - 1; y++) {
                 for (let x = 1; x < gameState.gridWidth - 1; x++) {
-                    if (gameState.grid[y][x] === TYPES.EMPTY && !(x <= 4 && y <= 4)) candidates.push({x, y});
+                    if (gameState.grid[y][x] !== TYPES.EMPTY) continue;
+                    const distance = Math.abs(x - px) + Math.abs(y - py);
+                    if (distance >= 7) candidates.push({x, y, distance});
                 }
             }
+            // Si el mapa es muy compacto, bajamos el radio de seguridad solo lo necesario.
+            if (candidates.length < count) {
+                for (let y = 1; y < gameState.gridHeight - 1; y++) {
+                    for (let x = 1; x < gameState.gridWidth - 1; x++) {
+                        if (gameState.grid[y][x] !== TYPES.EMPTY) continue;
+                        const distance = Math.abs(x - px) + Math.abs(y - py);
+                        if (distance >= 5 && !candidates.some(c => c.x === x && c.y === y)) candidates.push({x, y, distance});
+                    }
+                }
+            }
+
             for (let i = candidates.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
@@ -31,7 +46,8 @@
                     vy: 0,
                     baseSpeed: speed,
                     changeTimer: Math.random() * 100,
-                    elite: gameState.roomType.id === 'ELITE' || gameState.roomType.id === 'CURSED'
+                    elite: gameState.roomType.id === 'ELITE' || gameState.roomType.id === 'CURSED',
+                    lastDirection: 'down'
                 });
             }
         }

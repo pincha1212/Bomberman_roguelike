@@ -67,6 +67,7 @@
             gameState.enemies.forEach(e => {
                 drawEnemySprite(e);
             });
+            if (typeof drawEnemyAISignals === 'function') drawEnemyAISignals();
 
             // Draw Boss
             drawBoss();

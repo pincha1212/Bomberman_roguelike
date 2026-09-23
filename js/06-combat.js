@@ -107,7 +107,8 @@
             updatePlayerMovement(dt);
 
             // V3.7: la cámara acompaña al personaje al recorrer sectores del mapa.
-            updateCamera(dt);
+            // V3.12.4: la cámara no puede detener el game loop si el módulo no está disponible.
+            if (typeof updateCamera === 'function') updateCamera(dt);
 
             updateAdaptiveInterface();
 

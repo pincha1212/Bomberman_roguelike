@@ -252,9 +252,6 @@ Base de movimiento y colisión unificada para jugador y enemigos.
 - Una explosión de bomba puede armar una trampa de explosión retardada sin volver a generar daño invisible o doble.
 - Las explosiones originadas por trampas se identifican como `owner: 'trap'` para que el feedback de daño indique correctamente la fuente.
 
+## v3.12.4.1 — Freeze correction / dependency audit
 
-## v3.12.4 — Freeze Correction
-
-- Auditoría encontró que `index.html` cargaba `js/09-camera.js`, pero el módulo no estaba presente en la cadena de deltas reconstruida. `js/06-combat.js` llamaba `updateCamera(dt)` sin protección; ese ReferenceError podía detener `requestAnimationFrame` y dejar el juego congelado.
-- Se restaura `js/09-camera.js` y la llamada a cámara queda defensiva para que una ausencia futura del módulo no vuelva a cortar el game loop.
-- No se modificó la lógica de trampas.
+Audited the complete v3.12.3 runtime chain. The freeze root cause was a truncated `js/03-world.js`: `update(dt)` called `updateRoomThreat(dt)`, but that function and its dependency `spawnReinforcement()` were missing from the reconstructed file. The correction restores both functions, keeps the v3.12.3 trap system in `js/14-traps.js`, and retains the defensive camera call from v3.12.4.

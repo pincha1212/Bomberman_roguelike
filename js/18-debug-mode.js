@@ -338,7 +338,7 @@
     ready = false;
     engineStatus.textContent = 'CARGANDO…';
     runtimeBadge.textContent = 'CARGANDO';
-    frame.src = '../index.html?debug=1';
+    frame.src = 'index.html?debug=1';
   }
 
   frame.addEventListener('load', () => {

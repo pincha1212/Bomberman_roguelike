@@ -239,3 +239,15 @@ Base de movimiento y colisión unificada para jugador y enemigos.
 - El centrado automático ahora solo se ejecuta cuando existe un giro real pendiente.
 - Un enemigo que sigue recto ya no hace `snap` al centro en cada frame.
 - Movimiento cardinal, colisiones de v3.12 y comportamiento de v3.12.1 conservados.
+
+
+## v3.12.3 — Trap & Hazard Update
+
+- Trampas de un solo uso con estados separados: sin activar, armada, detonada y gastada.
+- Cinco tipos: pinchos, fuego, hielo, ralentización y explosión retardada.
+- Telegraphing por proximidad: una trampa normalmente permanece oculta, pero ofrece una señal visual antes de activarse cuando el jugador se aproxima.
+- Después de activarse, la trampa queda siempre visible y no vuelve a activarse.
+- Las trampas de hielo y ralentización aplican un efecto temporal al movimiento sin modificar permanentemente la velocidad del jugador.
+- Las trampas de explosión retardada muestran un contador visual y generan su propia explosión al finalizar.
+- Una explosión de bomba puede armar una trampa de explosión retardada sin volver a generar daño invisible o doble.
+- Las explosiones originadas por trampas se identifican como `owner: 'trap'` para que el feedback de daño indique correctamente la fuente.

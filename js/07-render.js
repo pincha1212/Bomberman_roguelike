@@ -53,6 +53,7 @@
 
             // Draw Bombs
             gameState.bombs.forEach(b => {
+                renderBombRangePreview(b);
                 drawBombSprite((b.x + 0.5) * TILE_SIZE, (b.y + 0.5) * TILE_SIZE, b);
             });
 
@@ -93,6 +94,7 @@
 
             drawAmbientDust();
             drawLighting();
+            renderCombatFeedback();
         }
 
         function drawSteelWall(x, y) {
@@ -160,12 +162,13 @@
         function drawBombermanSprite(x, y) {
             ctx.save();
             let bounce = Math.sin(player.walkCycle * 4) * (player.isMoving ? 3 : 1);
-            let py = y + bounce;
+            const recoil = getPlayerRenderRecoil();
+            let px = x + recoil.x, py = y + bounce + recoil.y;
 
             // Sombra
             ctx.fillStyle = 'rgba(0,0,0,0.5)';
             ctx.beginPath();
-            ctx.ellipse(x + player.width/2, y + player.height, player.width/2.2, 5, 0, 0, Math.PI*2);
+            ctx.ellipse(px + player.width/2, y + player.height, player.width/2.2, 5, 0, 0, Math.PI*2);
             ctx.fill();
 
             // Burbuja de Escudo
@@ -173,67 +176,67 @@
                 ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
                 ctx.lineWidth = 4;
                 ctx.beginPath();
-                ctx.arc(x + player.width/2, py + player.height/2, player.width*0.8, 0, Math.PI*2);
+                ctx.arc(px + player.width/2, py + player.height/2, player.width*0.8, 0, Math.PI*2);
                 ctx.stroke();
             }
 
             // Traje (Azul)
             ctx.fillStyle = '#2563eb';
-            ctx.fillRect(x + 6, py + 12, player.width - 12, player.height - 16);
+            ctx.fillRect(px + 6, py + 12, player.width - 12, player.height - 16);
             
             // Cinturón
             ctx.fillStyle = '#0f172a';
-            ctx.fillRect(x + 6, py + 22, player.width - 12, 4);
+            ctx.fillRect(px + 6, py + 22, player.width - 12, 4);
             // Hebilla
             ctx.fillStyle = '#facc15';
             if (player.dir === 'down') {
-                ctx.fillRect(x + player.width/2 - 4, py + 21, 8, 6);
+                ctx.fillRect(px + player.width/2 - 4, py + 21, 8, 6);
             } else if (player.dir === 'left') {
-                ctx.fillRect(x + 4, py + 21, 4, 6);
+                ctx.fillRect(px + 4, py + 21, 4, 6);
             } else if (player.dir === 'right') {
-                ctx.fillRect(x + player.width - 8, py + 21, 4, 6);
+                ctx.fillRect(px + player.width - 8, py + 21, 4, 6);
             }
 
             // Casco (Blanco)
             ctx.fillStyle = '#f8fafc';
             ctx.beginPath();
-            ctx.arc(x + player.width/2, py + 10, 14, 0, Math.PI*2);
+            ctx.arc(px + player.width/2, py + 10, 14, 0, Math.PI*2);
             ctx.fill();
 
             // Rostro Direccional
             if (player.dir === 'down') {
                 ctx.fillStyle = '#ffedd5';
-                ctx.fillRect(x + player.width/2 - 9, py + 4, 18, 11);
+                ctx.fillRect(px + player.width/2 - 9, py + 4, 18, 11);
                 ctx.fillStyle = '#0f172a';
-                ctx.fillRect(x + player.width/2 - 5, py + 7, 3, 6);
-                ctx.fillRect(x + player.width/2 + 2, py + 7, 3, 6);
+                ctx.fillRect(px + player.width/2 - 5, py + 7, 3, 6);
+                ctx.fillRect(px + player.width/2 + 2, py + 7, 3, 6);
             } else if (player.dir === 'left') {
                 ctx.fillStyle = '#ffedd5';
-                ctx.fillRect(x + player.width/2 - 12, py + 4, 14, 11);
+                ctx.fillRect(px + player.width/2 - 12, py + 4, 14, 11);
                 ctx.fillStyle = '#0f172a';
-                ctx.fillRect(x + player.width/2 - 7, py + 7, 3, 6);
+                ctx.fillRect(px + player.width/2 - 7, py + 7, 3, 6);
             } else if (player.dir === 'right') {
                 ctx.fillStyle = '#ffedd5';
-                ctx.fillRect(x + player.width/2 - 2, py + 4, 14, 11);
+                ctx.fillRect(px + player.width/2 - 2, py + 4, 14, 11);
                 ctx.fillStyle = '#0f172a';
-                ctx.fillRect(x + player.width/2 + 4, py + 7, 3, 6);
+                ctx.fillRect(px + player.width/2 + 4, py + 7, 3, 6);
             }
 
             // Antena
             ctx.fillStyle = '#94a3b8'; 
-            ctx.fillRect(x + player.width/2 - 2, py - 6, 4, 4);
+            ctx.fillRect(px + player.width/2 - 2, py - 6, 4, 4);
             ctx.fillStyle = '#ec4899'; 
             ctx.beginPath();
-            ctx.arc(x + player.width/2, py - 8, 5, 0, Math.PI*2);
+            ctx.arc(px + player.width/2, py - 8, 5, 0, Math.PI*2);
             ctx.fill();
 
             // Guantes
             ctx.fillStyle = '#ec4899';
             if (player.dir !== 'right') { 
-                ctx.beginPath(); ctx.arc(x + 2, py + 18, 5, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(px + 2, py + 18, 5, 0, Math.PI*2); ctx.fill();
             }
             if (player.dir !== 'left') { 
-                ctx.beginPath(); ctx.arc(x + player.width - 2, py + 18, 5, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(px + player.width - 2, py + 18, 5, 0, Math.PI*2); ctx.fill();
             }
 
             // Pies (Zapatos Rojos) animando
@@ -242,14 +245,14 @@
             let rightFootY = py + player.height - 4 + (player.isMoving && Math.floor(player.walkCycle*4)%2===1 ? -4 : 0);
             
             if (player.dir === 'right') {
-                ctx.beginPath(); ctx.ellipse(x + player.width/2 - 2, leftFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.ellipse(x + player.width/2 + 6, rightFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(px + player.width/2 - 2, leftFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(px + player.width/2 + 6, rightFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
             } else if (player.dir === 'left') {
-                ctx.beginPath(); ctx.ellipse(x + player.width/2 - 6, leftFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.ellipse(x + player.width/2 + 2, rightFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(px + player.width/2 - 6, leftFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(px + player.width/2 + 2, rightFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
             } else {
-                ctx.beginPath(); ctx.ellipse(x + 8, leftFootY, 5, 4, 0, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.ellipse(x + player.width - 8, rightFootY, 5, 4, 0, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(px + 8, leftFootY, 5, 4, 0, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(px + player.width - 8, rightFootY, 5, 4, 0, 0, Math.PI*2); ctx.fill();
             }
 
             ctx.restore();
@@ -327,6 +330,8 @@
             ctx.translate(cx, cy);
             ctx.scale(scale, scale);
 
+            renderBombFuseFeedback(0, 0, b);
+
             // Sombra bomba
             ctx.fillStyle = 'rgba(0,0,0,0.5)';
             ctx.beginPath(); ctx.ellipse(0, TILE_SIZE*0.3, TILE_SIZE*0.3, 4, 0, 0, Math.PI*2); ctx.fill();
@@ -350,8 +355,16 @@
             let sparkColor = gameState.animFrame % 4 < 2 ? '#facc15' : '#ef4444';
             ctx.fillStyle = sparkColor;
             ctx.beginPath();
-            ctx.arc(0, -TILE_SIZE*0.45, 5, 0, Math.PI*2);
+            ctx.arc(0, -TILE_SIZE*0.45, 5 + (b.timer < 650 ? Math.sin(gameState.animFrame*.8)*2 : 0), 0, Math.PI*2);
             ctx.fill();
+            if(b.timer < 650){
+                ctx.strokeStyle='#fee2e2';
+                ctx.lineWidth=2;
+                ctx.beginPath();
+                ctx.moveTo(0,-TILE_SIZE*.47);
+                ctx.lineTo(Math.cos(gameState.animFrame)*7,-TILE_SIZE*.58+Math.sin(gameState.animFrame)*5);
+                ctx.stroke();
+            }
 
             ctx.restore();
         }

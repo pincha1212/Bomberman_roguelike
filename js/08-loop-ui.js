@@ -91,6 +91,12 @@
             gameState.threatLevel = 0;
             gameState.nextReinforcement = 20000;
             gameState.paused = false;
+            combatFeedback.hitStop = 0;
+            combatFeedback.flash = 0;
+            combatFeedback.playerHit = 0;
+            combatFeedback.death = 0;
+            combatFeedback.playerRecoilX = 0;
+            combatFeedback.playerRecoilY = 0;
             player.health = 3;
             player.maxHealth = 5;
             player.maxBombs = 1;
@@ -99,6 +105,7 @@
             player.hasShield = false;
             player.isInvincible = false;
             player.invincibleTimer = 0;
+            player.lastDamageFrame = -1;
 
             initLevel();
             gameState.isPlaying = true;
@@ -135,6 +142,13 @@
             document.getElementById('level-complete-screen').classList.add('hidden');
             player.isInvincible = false;
             player.invincibleTimer = 0;
+            player.lastDamageFrame = -1;
+            combatFeedback.hitStop = 0;
+            combatFeedback.flash = 0;
+            combatFeedback.playerHit = 0;
+            combatFeedback.death = 0;
+            combatFeedback.playerRecoilX = 0;
+            combatFeedback.playerRecoilY = 0;
             initLevel();
             gameState.isPlaying = true;
             gameState.paused = false;

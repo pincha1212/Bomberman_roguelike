@@ -6,10 +6,14 @@
 
             if (gameState.bombs.some(b => b.x === gx && b.y === gy)) return;
 
-            gameState.bombs.push({
-                x: gx, y: gy, range: player.bombRange, timer: gameState.roomType.id === 'CURSED' ? 1600 : 2000, scalePulse: 1.0
-            });
+            const bombTimer = gameState.roomType.id === 'CURSED' ? 1600 : 2000;
+            const bomb = {
+                x: gx, y: gy, range: player.bombRange, timer: bombTimer, maxTimer: bombTimer, scalePulse: 1.0,
+                previewTimer: 650, placedAt: gameState.animFrame
+            };
+            gameState.bombs.push(bomb);
             sfx('bomb');
+            triggerBombPlacedFeedback(bomb);
             player.bombsPlaced++;
         }
 
@@ -23,6 +27,7 @@
             addParticles((bomb.x + 0.5) * TILE_SIZE, (bomb.y + 0.5) * TILE_SIZE, '#f97316', 15);
             if (gameState.relics.some(r => r.id === 'ember_core')) gameState.score += 25;
 
+            const blastId = ++gameState.blastSerial;
             let cells = [{x: bomb.x, y: bomb.y}];
             const dirs = [{dx: 0, dy: -1}, {dx: 0, dy: 1}, {dx: -1, dy: 0}, {dx: 1, dy: 0}];
 
@@ -70,7 +75,7 @@
             });
 
             cells.forEach(c => {
-                gameState.explosions.push({ x: c.x, y: c.y, timer: 450 });
+                gameState.explosions.push({ x: c.x, y: c.y, timer: 450, blastId });
             });
             updateUI();
         }
@@ -79,6 +84,7 @@
             clampLargeEntities();
             if (!gameState.isPlaying || gameState.paused) return;
             gameState.animFrame++;
+            updateCombatFeedback(dt);
             renderImmersion();
 
             // V3.6: la inmunidad tras recibir daño es temporal.
@@ -106,6 +112,7 @@
             for (let i = gameState.bombs.length - 1; i >= 0; i--) {
                 let b = gameState.bombs[i];
                 b.timer -= dt;
+                if (b.previewTimer > 0) b.previewTimer = Math.max(0, b.previewTimer - dt);
                 if (b.timer <= 0) explodeBomb(i);
             }
 
@@ -137,12 +144,14 @@
                 };
                 
                 // Usamos el pHurtbox reducido para ver si el fuego te toca
-                if (!player.isInvincible && checkOverlap(pHurtbox, expRect)) takeDamage();
+                if (checkOverlap(pHurtbox, expRect)) takeDamage('explosion', (exp.x + .5) * TILE_SIZE, (exp.y + .5) * TILE_SIZE);
 
                 if (gameState.boss && !gameState.boss.defeated) {
                     const b = gameState.boss;
                     const bossRect = { left:b.x-b.width/2, right:b.x+b.width/2, top:b.y-b.height/2, bottom:b.y+b.height/2 };
-                    if (checkOverlap(bossRect, expRect)) damageBoss(1);
+                    if (checkOverlap(bossRect, expRect) && b.lastBlastHitId !== exp.blastId) {
+                        if (damageBoss(1)) b.lastBlastHitId = exp.blastId;
+                    }
                 }
 
                 for (let j = gameState.enemies.length - 1; j >= 0; j--) {
@@ -150,7 +159,7 @@
                     // El enemigo tiene hitbox completo para que sea fácil matarlo con bombas
                     let eFullRect = { left: e.x - e.width/2, right: e.x + e.width/2, top: e.y - e.height/2, bottom: e.y + e.height/2 };
                     if (checkOverlap(eFullRect, expRect)) {
-                        addParticles(e.x, e.y, e.type.color, 15);
+                        triggerEnemyDefeatFeedback(e);
                         gameState.enemies.splice(j, 1);
                         const killScore = Math.round(100 * gameState.killScoreMult * (e.elite ? 1.25 : 1));
                         const killCoins = Math.max(2, Math.round((2 + Math.random() * 3) * (1 + gameState.coinBonus) * gameState.roomType.coinMult));
@@ -178,7 +187,7 @@
                     }
                 }
 
-                const enemyFrameScale = Math.min(dt / 16.6667, 2);
+                const enemyFrameScale = Math.min(getCombatMotionDt(dt) / 16.6667, 2);
                 e.x += e.vx * enemyFrameScale;
                 if (isSolid(Math.floor(e.x / TILE_SIZE), Math.floor(e.y / TILE_SIZE), e.type.canFly)) {
                     e.x -= e.vx * enemyFrameScale; e.vx *= -1;
@@ -197,7 +206,7 @@
                 };
                 
                 // Comprobamos la colisión usando las cajas reducidas de ambos
-                if (!player.isInvincible && checkOverlap(pHurtbox, eHitbox)) takeDamage();
+                if (checkOverlap(pHurtbox, eHitbox)) takeDamage('enemy', e.x, e.y);
             });
 
             // Items pickup
@@ -267,27 +276,32 @@
             }
         }
 
-        function takeDamage() {
-            // El bloqueo de daño se valida también aquí para evitar impactos
-            // duplicados si dos fuentes coinciden en el mismo frame.
-            if (player.isInvincible) return;
+        function takeDamage(source='unknown', sourceX=player.x, sourceY=player.y) {
+            if (!canApplyPlayerDamage()) return false;
+
             sfx('hurt');
             if (player.hasShield) {
                 player.hasShield = false;
                 player.isInvincible = true;
                 player.invincibleTimer = 1000;
                 addFloatingText('ESCUDO ROTO!', player.x, player.y, '#38bdf8');
+                addParticles(player.x, player.y, '#38bdf8', 16);
+                triggerPlayerDamageFeedback(source, sourceX, sourceY, false, true);
                 triggerScreenShake(5, 200);
-                updateUI();
-                return;
+                updateUI(true);
+                return true;
             }
 
             player.health--;
             player.isInvincible = true;
             player.invincibleTimer = 1500;
-            triggerScreenShake(10, 400);
-            addParticles(player.x, player.y, '#ef4444', 15);
-            updateUI();
-            if (player.health <= 0) gameOver();
+            const lethal = player.health <= 0;
+            addParticles(player.x, player.y, '#ef4444', lethal ? 26 : 15);
+            triggerPlayerDamageFeedback(source, sourceX, sourceY, lethal, false);
+            triggerScreenShake(lethal ? 14 : 10, lethal ? 520 : 400);
+            if (lethal) sfx('death');
+            updateUI(true);
+            if (lethal) gameOver();
+            return true;
         }
 

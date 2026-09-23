@@ -131,7 +131,8 @@
         }
 
         function updatePlayerMovement(dt) {
-            const frameScale = Math.min(dt / 16.6667, 2);
+            const motionDt = getCombatMotionDt(dt);
+            const frameScale = Math.min(motionDt / 16.6667, 2);
             player._frameScale = frameScale;
             const input = getCardinalInput();
 
@@ -195,7 +196,7 @@
                 if (player.vy) player.vy = 0;
             }
             player.isMoving = moved;
-            if (moved) player.walkCycle += dt * 0.015;
+            if (moved) player.walkCycle += motionDt * 0.015;
         }
 
         function approach(value, target, amount) {

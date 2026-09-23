@@ -20,6 +20,7 @@
             gameState.hazards = [];
             gameState.boss = null;
             gameState.bossProjectiles = [];
+            gameState.blastSerial = 0;
             gameState.roomTime = Math.max(35000, 80000 - gameState.level * 1500);
             gameState.threatLevel = 0;
             gameState.nextReinforcement = gameState.roomTime - 18000;
@@ -127,7 +128,8 @@
                 invuln: 0,
                 flash: 0,
                 roarTimer: 0,
-                defeated: false
+                defeated: false,
+                lastBlastHitId: -1
             };
             sfx('bossRoar');
             triggerScreenShake(8, 350);
@@ -136,15 +138,17 @@
 
         function damageBoss(amount = 1) {
             const b = gameState.boss;
-            if (!b || b.defeated || b.invuln > 0) return;
+            if (!b || b.defeated || b.invuln > 0) return false;
             b.hp -= amount;
             b.invuln = 220;
+            triggerBossHitFeedback(b);
             b.flash = 180;
             gameState.score += 75;
             sfx('bossHit');
             triggerScreenShake(3, 100);
             addFloatingText(`-${amount}`, b.x, b.y - b.height / 2, '#fb7185');
             if (b.hp <= 0) defeatBoss();
+            return true;
         }
 
         function defeatBoss() {
@@ -231,7 +235,7 @@
             b.attackTimer-=dt; b.summonTimer-=dt; b.waveTimer-=dt; b.chargeTimer-=dt; b.moveTimer-=dt;
             const ratio=b.hp/b.maxHp;
             b.phase=ratio<=.33?3:(ratio<=.66?2:1);
-            const scale=Math.min(dt/16.6667,2);
+            const scale=Math.min(getCombatMotionDt(dt)/16.6667,2);
 
             if(b.charging){
                 b.chargeTime-=dt;
@@ -257,13 +261,13 @@
 
             const hit={left:b.x-b.width*.38,right:b.x+b.width*.38,top:b.y-b.height*.38,bottom:b.y+b.height*.38};
             const ph={left:player.x+5,right:player.x+player.width-5,top:player.y+5,bottom:player.y+player.height-5};
-            if(!player.isInvincible && checkOverlap(hit,ph)) takeDamage();
+            if(checkOverlap(hit,ph)) takeDamage('boss-contact', b.x, b.y);
             for(let i=gameState.bossProjectiles.length-1;i>=0;i--){
                 const p=gameState.bossProjectiles[i]; p.x+=p.vx*scale;p.y+=p.vy*scale;p.life-=dt;
                 const gx=Math.floor(p.x/TILE_SIZE),gy=Math.floor(p.y/TILE_SIZE);
                 if(isSolid(gx,gy)){gameState.bossProjectiles.splice(i,1);continue;}
                 const pr={left:p.x-p.radius,right:p.x+p.radius,top:p.y-p.radius,bottom:p.y+p.radius};
-                if(!player.isInvincible && checkOverlap(ph,pr)){takeDamage();gameState.bossProjectiles.splice(i,1);continue;}
+                if(checkOverlap(ph,pr)){takeDamage(p.kind==='wave' ? 'boss-projectile' : 'boss-projectile', p.x, p.y);gameState.bossProjectiles.splice(i,1);continue;}
                 if(p.life<=0) gameState.bossProjectiles.splice(i,1);
             }
         }
@@ -383,7 +387,7 @@
                     addParticles(hx, hy, '#ef4444', 12);
                     addFloatingText('TRAMPA ACTIVADA', pcx, pcy, '#ef4444');
                     sfx('trap');
-                    takeDamage();
+                    takeDamage('trap', hx, hy);
                     break;
                 }
             }

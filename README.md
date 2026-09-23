@@ -191,3 +191,17 @@ Los scripts se cargan en ese orden desde `index.html`. No se usa bundler ni Node
 
 Corrección puntual del movimiento tras colocar una bomba. La bomba propia permanece atravesable mientras la hitbox de movimiento del jugador siga tocando su casilla; solo pasa a ser sólida cuando el jugador la abandona por completo. Esto evita que la bomba se vuelva sólida un frame demasiado pronto y deje al personaje atrapado al intentar huir.
 
+
+
+## v3.11 — Enemy AI Update
+
+- IA enemiga modular en `js/12-enemy-ai.js`.
+- Rastreros: persecución cardinal.
+- Voladores: patrulla y persecución al acercarse.
+- Especiales: buscan posiciones laterales para rodear al jugador.
+- Detección de bombas y explosiones para evasión.
+- Pathfinding cardinal dosificado: máximo una reconstrucción por intervalo corto, evitando bloquear el game loop.
+- Recuperación ante atascos y recalculo de ruta.
+- Spawn inicial a distancia segura del jugador, con fallback controlado si el mapa es compacto.
+- Indicadores visuales de estado de IA.
+- Movimiento enemigo separado de la lógica de daño para aislar fallos.

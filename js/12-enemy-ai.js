@@ -488,7 +488,13 @@ function updateEnemyIntentV312(e, index, dt) {
 function applyEnemyDirectionAtCenterV312(e) {
     const ai = e.ai;
     const desired = enemyDirectionV312(ai.desiredDirection);
-    if (!enemyIsNearCenterV312(e)) return false;
+
+    // FIX v3.12.2: no volver a centrar al enemigo mientras sigue avanzando en
+    // la misma dirección. Antes, cada frame dentro del radio de 9 px hacía
+    // `snap -> avanzar -> snap -> avanzar`, produciendo el temblor en el lugar.
+    // El centrado solo debe ocurrir cuando realmente hay un giro pendiente.
+    const wantsTurn = desired.dir !== ai.direction;
+    if (!wantsTurn || !enemyIsNearCenterV312(e)) return false;
 
     const tile = enemyTileV312(e);
     const center = enemyCenterV312(tile.x, tile.y);

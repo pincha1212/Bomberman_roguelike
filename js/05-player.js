@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.6 — Cardinal assisted player movement and collision helpers
+// Bomberman Roguelike v3.12 — Cardinal assisted player movement and collision helpers
         // V3.2.4 — MOVEMENT UPDATE
         // Movimiento continuo cardinal asistido. La cuadrícula SOLO define las paredes.
         // El personaje usa una hurtbox de movimiento más pequeña que el sprite,
@@ -23,56 +23,21 @@
         };
 
         function getMovementHitbox(x, y, width, height) {
-            const inset = MOVEMENT_COLLISION_INSET;
-            const pad = MOVEMENT_WALL_PADDING;
-            return {
-                left: x + inset + pad,
-                right: x + width - inset - pad,
-                top: y + inset + pad,
-                bottom: y + height - inset - pad
-            };
+            return gridGetEntityRect({width, height}, x, y, 'player');
         }
 
         function rectCollidesSolid(x, y, width, height) {
-            const box = getMovementHitbox(x, y, width, height);
-            if (box.right <= box.left || box.bottom <= box.top) return false;
-
-            const minGX = Math.max(0, Math.floor(box.left / TILE_SIZE));
-            const maxGX = Math.min(gameState.gridWidth - 1, Math.floor((box.right - MOVEMENT_EPSILON) / TILE_SIZE));
-            const minGY = Math.max(0, Math.floor(box.top / TILE_SIZE));
-            const maxGY = Math.min(gameState.gridHeight - 1, Math.floor((box.bottom - MOVEMENT_EPSILON) / TILE_SIZE));
-
-            for (let gy = minGY; gy <= maxGY; gy++) {
-                for (let gx = minGX; gx <= maxGX; gx++) {
-                    if (typeof isBombSolidForPlayer === 'function' && isBombSolidForPlayer(gx, gy)) return true;
-                    if (!isSolid(gx, gy)) continue;
-                    const wallLeft = gx * TILE_SIZE;
-                    const wallRight = wallLeft + TILE_SIZE;
-                    const wallTop = gy * TILE_SIZE;
-                    const wallBottom = wallTop + TILE_SIZE;
-                    if (box.right > wallLeft + MOVEMENT_EPSILON &&
-                        box.left < wallRight - MOVEMENT_EPSILON &&
-                        box.bottom > wallTop + MOVEMENT_EPSILON &&
-                        box.top < wallBottom - MOVEMENT_EPSILON) return true;
-                }
-            }
-            return false;
+            const probe = { width, height, __gridAnchor: 'topleft' };
+            return !gridCanOccupy(probe, x, y, { kind: 'player' });
         }
 
         function moveAxisWithCollision(axis, amount) {
             if (!amount) return false;
-            const steps = Math.max(1, Math.ceil(Math.abs(amount) / MOTION.maxStep));
-            const step = amount / steps;
-            let moved = false;
-            for (let i = 0; i < steps; i++) {
-                const nextX = axis === 'x' ? player.x + step : player.x;
-                const nextY = axis === 'y' ? player.y + step : player.y;
-                if (rectCollidesSolid(nextX, nextY, player.width, player.height)) break;
-                player.x = nextX;
-                player.y = nextY;
-                moved = true;
-            }
-            return moved;
+            const result = gridMoveCardinal(player, axis === 'x' ? amount : 0, axis === 'y' ? amount : 0, {
+                kind: 'player',
+                maxStep: MOTION.maxStep
+            });
+            return result.moved;
         }
 
         function getLaneTarget(axis) {

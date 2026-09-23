@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.16.6 — Debug Engine
+// Bomberman Roguelike v3.16.7 — Debug Engine
 // Depuración interna del mismo runtime. Se activa solo con ?debug=1.
 (() => {
     'use strict';
@@ -370,6 +370,12 @@
                     framesSinceProgress: progress.framesSinceProgress,
                     directionChanges: progress.directionChanges,
                     progressStatus: progress.progressStatus,
+                    physicalBlocked: !!ai.physicalBlocked,
+                    physicalBlockedMs: Number(ai.physicalBlockedTimer || 0),
+                    cornerCorrectionMs: Number(ai.cornerCorrectionMs || 0),
+                    recoveryCount: Number(ai.recoveryCount || 0),
+                    lastRecoveryReason: ai.lastRecoveryReason || '—',
+                    recoveryPathNodes: Number(ai.lastRecoveryPathNodes || 0),
                     trail: progress.trail,
                     seesPlayer: !!ai.seesPlayer,
                     options,
@@ -1318,7 +1324,7 @@
                 { name: 'long-corridor', player: { x: 13, y: 7 }, enemy: { x: 1, y: 7 }, dir: 'right', minMove: 40, minTurns: 0 },
                 { name: 'intersection', player: { x: 3, y: 3 }, enemy: { x: 7, y: 3 }, dir: 'down', minMove: 8, minTurns: 1 },
                 { name: 'dead-end', player: { x: 5, y: 10 }, enemy: { x: 5, y: 13 }, dir: 'down', minMove: 8, minTurns: 1, recoveryExpected: true },
-                { name: 'blocked-recovery', player: { x: 7, y: 7 }, enemy: { x: 7, y: 1 }, dir: 'up', minMove: 8, minTurns: 0, recoveryExpected: true },
+                { name: 'corner-recovery-no-player', player: { x: 13, y: 13 }, enemy: { x: 7, y: 7 }, dir: 'up', minMove: 8, minTurns: 0, recoveryExpected: true, cornerOffset: 12, patrolTarget: { x: 7, y: 1 } },
                 { name: 'bomb-flee', player: { x: 13, y: 7 }, enemy: { x: 5, y: 7 }, dir: 'right', minMove: 8, minTurns: 0, bomb: { x: 6, y: 7, timer: 1200, range: 3 } }
             ];
             const results = [];
@@ -1348,6 +1354,13 @@
                 enemy.ai.direction = spec.dir;
                 enemy.ai.desiredDirection = spec.dir;
                 enemy.lastDirection = spec.dir;
+                enemy.ai.seesPlayer = false;
+                enemy.ai.memoryTimer = 0;
+                if (spec.patrolTarget) {
+                    enemy.ai.patrolX = spec.patrolTarget.x;
+                    enemy.ai.patrolY = spec.patrolTarget.y;
+                }
+                if (spec.cornerOffset) enemy.x += Number(spec.cornerOffset);
 
                 const start = { x: enemy.x, y: enemy.y, tile: entityTile(enemy, 'enemy'), dir: spec.dir };
                 let maxMove = 0;
@@ -1370,6 +1383,9 @@
                 let maxCenterDistance = 0;
                 let routeDirectionMatches = 0;
                 let routeDirectionSamples = 0;
+                let physicalBlockedFrames = 0;
+                let cornerCorrectionFrames = 0;
+                let maxPhysicalBlockedMs = 0;
 
                 for (let frame = 0; frame < 180; frame++) {
                     const beforeX = enemy.x;
@@ -1397,6 +1413,9 @@
                     if (firstNonPatrolFrame < 0 && finalAlert !== 'patrol') firstNonPatrolFrame = frame;
                     if (finalAlert === 'flee') fleeFrames += 1;
                     if (Number(enemy.ai?.blockedTimer || 0) > 0 || Number(enemy.ai?.stuckTimer || 0) > 0) blockedFrames += 1;
+                    if (enemy.ai?.physicalBlocked) physicalBlockedFrames += 1;
+                    if (Number(enemy.ai?.cornerCorrectionMs || 0) > 0) cornerCorrectionFrames += 1;
+                    maxPhysicalBlockedMs = Math.max(maxPhysicalBlockedMs, Number(enemy.ai?.physicalBlockedTimer || 0));
                     maxStuckMs = Math.max(maxStuckMs, Number(enemy.ai?.stuckTimer || 0));
                     const center = gridTileCenter(tile.x, tile.y);
                     maxCenterDistance = Math.max(maxCenterDistance, Math.hypot(enemy.x - center.x, enemy.y - center.y));
@@ -1425,6 +1444,8 @@
                 const canReach = item?.canReachPlayer ?? false;
                 const stuckLikely = !!item?.stuckLikely;
                 const recoveryOk = spec.name !== 'recovery' || String(enemy.ai?.direction || '').toLowerCase() !== 'up';
+                const noPlayerAssist = spec.name !== 'corner-recovery-no-player' || (!enemy.ai?.seesPlayer && Number(enemy.ai?.memoryTimer || 0) <= 0);
+                const cornerCorrected = spec.name !== 'corner-recovery-no-player' || Number(enemy.ai?.recoveryCount || 0) > 0 || Number(enemy.ai?.cornerCorrectionMs || 0) > 0;
                 let pass = true;
                 const failures = [];
                 if (movedTotal < spec.minMove) { pass = false; failures.push(`movimiento ${movedTotal.toFixed(1)}<${spec.minMove}`); }
@@ -1435,6 +1456,8 @@
                 if (spec.recoveryExpected && firstDirectionChangeFrame < 0) { pass = false; failures.push('no recuperó dirección bloqueada'); }
                 if (spec.name === 'bomb-flee' && fleeFrames < 5) { pass = false; failures.push(`flee insuficiente (${fleeFrames} frames)`); }
                 if (spec.name === 'bomb-flee' && maxBombDistance <= 1) { pass = false; failures.push(`no aumentó distancia a bomba (máx ${maxBombDistance})`); }
+                if (spec.name === 'corner-recovery-no-player' && !noPlayerAssist) { pass = false; failures.push('necesitó ver al jugador'); }
+                if (spec.name === 'corner-recovery-no-player' && !cornerCorrected) { pass = false; failures.push('no corrigió la esquina'); }
 
                 results.push({
                     name: spec.name,
@@ -1458,6 +1481,14 @@
                     routeDirectionAgreement: routeDirectionSamples ? Number((routeDirectionMatches / routeDirectionSamples * 100).toFixed(1)) : null,
                     fleeFrames,
                     dangerNextFrames,
+                    physicalBlockedFrames,
+                    cornerCorrectionFrames,
+                    maxPhysicalBlockedMs: Number(maxPhysicalBlockedMs.toFixed(1)),
+                    recoveryCount: Number(enemy.ai?.recoveryCount || 0),
+                    recoveryReason: enemy.ai?.lastRecoveryReason || '—',
+                    recoveryPathNodes: Number(enemy.ai?.lastRecoveryPathNodes || 0),
+                    noPlayerAssist,
+                    cornerCorrected,
                     stuckLikely,
                     minBombDistance: Number.isFinite(minBombDistance) ? minBombDistance : null,
                     maxBombDistance: Number.isFinite(maxBombDistance) ? maxBombDistance : null,
@@ -1480,7 +1511,7 @@
                 details: {
                     cases: results,
                     durationMs: Number((performance.now() - stressStarted).toFixed(1)),
-                    focus: 'movimiento real, giros, rutas, bloqueos, recuperación y evasión de bomba',
+                    focus: 'movimiento real, giros, rutas, bloqueos físicos, corrección de esquinas, recuperación y evasión de bomba',
                     note: 'La prueba observa updateEnemyAI(); no modifica 12-enemy-ai.js.'
                 }
             };
@@ -1705,6 +1736,6 @@
         }
     });
 
-    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.16.6 cargado en el mismo runtime.');
+    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.16.7 cargado en el mismo runtime.');
     DEBUG_MODE.recordEvent('DEBUG', 'Usá RESET para activar una escena de depuración limpia.');
 })();

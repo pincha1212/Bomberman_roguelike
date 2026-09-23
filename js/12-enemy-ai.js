@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.12.1 — Enemy behavior update
+// Bomberman Roguelike v3.16.7 — Enemy self-recovery update
 // Navegación local tipo corredor/intersección: la IA decide una dirección
 // y 13-collision.js se ocupa del movimiento y las paredes.
 
@@ -13,6 +13,9 @@ const enemyAI_V312 = {
     turnRadius: 9,
     lookaheadTiles: 3,
     stuckMs: 180,
+    physicalRecoveryMs: 220,
+    cornerAssistSpeed: 1.15,
+    recoveryPathNodes: 240,
     cursor: 0,
     decisionCursor: 0
 };
@@ -96,6 +99,12 @@ function ensureEnemyMotionStateV312(e, index) {
             surroundTimer: 0,
             stuckTimer: 0,
             blockedTimer: 0,
+            physicalBlockedTimer: 0,
+            physicalBlocked: false,
+            cornerCorrectionMs: 0,
+            recoveryCount: 0,
+            lastRecoveryReason: '',
+            lastRecoveryPathNodes: 0,
             lastX: e.x,
             lastY: e.y,
             slot: index % 4,
@@ -168,6 +177,118 @@ function enemyCanSeePlayerV312(e) {
 
 function enemyDirectionV312(dir) {
     return ENEMY_DIRS_V312.find(d => d.dir === dir) || ENEMY_DIRS_V312[1];
+}
+
+function enemyImmediateDirectionPassableV312(e, dir, avoidDanger = false, probe = 1.0) {
+    if (!e || !dir) return false;
+    const nx = e.x + dir.x * probe;
+    const ny = e.y + dir.y * probe;
+    return gridCanOccupy(e, nx, ny, {
+        kind: 'enemy',
+        canFly: !!e.type.canFly,
+        avoidDanger,
+        allowCurrentBombTile: true
+    });
+}
+
+function enemyPhysicalDirectionChoicesV312(e, avoidDanger = false) {
+    return ENEMY_DIRS_V312.filter(dir => enemyImmediateDirectionPassableV312(e, dir, avoidDanger));
+}
+
+function enemyRecoveryDirectionByPathV312(e) {
+    if (!e || !gameState.grid?.length) return null;
+    const start = enemyTileV312(e);
+    const target = enemyTargetForStateV312(e);
+    if (!target) return null;
+    const tx = Math.max(0, Math.min(gameState.gridWidth - 1, Number(target.x) || 0));
+    const ty = Math.max(0, Math.min(gameState.gridHeight - 1, Number(target.y) || 0));
+    if (start.x === tx && start.y === ty) return null;
+
+    const queue = [{ x: start.x, y: start.y }];
+    let cursor = 0;
+    const parent = new Map();
+    const visited = new Set([`${start.x},${start.y}`]);
+    const keyOf = (x, y) => `${x},${y}`;
+    const avoidDanger = e.ai?.alert === 'flee';
+    let found = null;
+
+    while (cursor < queue.length && visited.size <= enemyAI_V312.recoveryPathNodes) {
+        const current = queue[cursor++];
+        if (current.x === tx && current.y === ty) {
+            found = current;
+            break;
+        }
+
+        for (const dir of ENEMY_DIRS_V312) {
+            const nx = current.x + dir.x;
+            const ny = current.y + dir.y;
+            if (!gridIsInside(nx, ny)) continue;
+            const key = keyOf(nx, ny);
+            if (visited.has(key)) continue;
+            const center = enemyCenterV312(nx, ny);
+            if (!gridCanOccupy(e, center.x, center.y, {
+                kind: 'enemy',
+                canFly: !!e.type.canFly,
+                avoidDanger,
+                allowCurrentBombTile: true
+            })) continue;
+            visited.add(key);
+            parent.set(key, current);
+            queue.push({ x: nx, y: ny });
+        }
+    }
+
+    if (!found) return null;
+
+    let current = found;
+    while (true) {
+        const prev = parent.get(keyOf(current.x, current.y));
+        if (!prev) return null;
+        if (prev.x === start.x && prev.y === start.y) {
+            return {
+                dir: directionBetweenEnemyCellsV312(start, current),
+                nodes: visited.size
+            };
+        }
+        current = prev;
+    }
+}
+
+function directionBetweenEnemyCellsV312(from, to) {
+    if (to.x > from.x) return 'right';
+    if (to.x < from.x) return 'left';
+    if (to.y > from.y) return 'down';
+    if (to.y < from.y) return 'up';
+    return null;
+}
+
+function enemyCornerAssistV312(e, dir, dt, avoidDanger = false) {
+    if (!e || !dir || !gameState.grid?.length) return false;
+    const tile = enemyTileV312(e);
+    const center = enemyCenterV312(tile.x, tile.y);
+    // Solo corregimos el eje perpendicular al avance. Nunca movemos X e Y en
+    // el mismo frame y no hacemos snap: es una asistencia gradual.
+    const perpendicularAxis = dir.x !== 0 ? 'y' : 'x';
+    const current = e[perpendicularAxis];
+    const target = center[perpendicularAxis];
+    const offset = target - current;
+    const absOffset = Math.abs(offset);
+    if (absOffset < 0.5 || absOffset > TILE_SIZE * 0.5) return false;
+
+    const scale = Math.min(Math.max(dt / 16.6667, 0.5), 2);
+    const amount = Math.min(absOffset, enemyAI_V312.cornerAssistSpeed * scale);
+    const delta = Math.sign(offset) * amount;
+    const nx = perpendicularAxis === 'x' ? e.x + delta : e.x;
+    const ny = perpendicularAxis === 'y' ? e.y + delta : e.y;
+    if (!gridCanOccupy(e, nx, ny, {
+        kind: 'enemy',
+        canFly: !!e.type.canFly,
+        avoidDanger,
+        allowCurrentBombTile: true
+    })) return false;
+
+    e[perpendicularAxis] = perpendicularAxis === 'x' ? nx : ny;
+    return true;
 }
 
 function enemyDirectionPassableV312(e, dir, avoidDanger = false) {
@@ -371,10 +492,24 @@ function enemyTargetForStateV312(e) {
 
 function enemyChooseDirectionAtIntersectionV312(e) {
     const ai = e.ai;
-    const possible = enemyAvailableDirectionsV312(e, false);
+    const dangerHere = enemyDangerV312(enemyTileV312(e).x, enemyTileV312(e).y);
+    const physicalChoices = enemyPhysicalDirectionChoicesV312(e, ai.alert === 'flee');
+    const possible = ai.physicalBlocked && physicalChoices.length ? physicalChoices : enemyAvailableDirectionsV312(e, false);
     if (!possible.length) return null;
 
-    const dangerHere = enemyDangerV312(enemyTileV312(e).x, enemyTileV312(e).y);
+    // Recuperación excepcional: solo ante bloqueo físico/stuck usamos una ruta
+    // limitada para salir de la esquina. La IA normal sigue siendo local.
+    if (ai.physicalBlocked || Number(ai.blockedTimer || 0) > 0 || Number(ai.stuckTimer || 0) > 0) {
+        const recovery = enemyRecoveryDirectionByPathV312(e);
+        if (recovery?.dir) {
+            ai.lastRecoveryPathNodes = recovery.nodes;
+            const recoveryDir = enemyDirectionV312(recovery.dir);
+            if (physicalChoices.some(dir => dir.dir === recovery.dir) && enemyImmediateDirectionPassableV312(e, recoveryDir, ai.alert === 'flee', 0.75)) {
+                return recoveryDir;
+            }
+        }
+    }
+
     if (dangerHere || ai.alert === 'flee') {
         return enemyChooseFleeDirectionV312(e) || possible[0];
     }
@@ -382,7 +517,11 @@ function enemyChooseDirectionAtIntersectionV312(e) {
     const filtered = possible.length > 1
         ? possible.filter(dir => dir.dir !== ENEMY_OPPOSITE_V312[ai.direction])
         : possible;
-    const options = filtered.length ? filtered : possible;
+    let options = filtered.length ? filtered : possible;
+    if (ai.physicalBlocked && options.length > 1) {
+        const nonCurrent = options.filter(dir => dir.dir !== ai.direction);
+        if (nonCurrent.length) options = nonCurrent;
+    }
 
     // Si el jugador está directamente en el mismo corredor, la respuesta es inmediata.
     if (ai.seesPlayer) {
@@ -456,13 +595,18 @@ function updateEnemyIntentV312(e, index, dt) {
 
     const currentDir = enemyDirectionV312(ai.direction);
     const currentPassable = enemyDirectionPassableV312(e, currentDir, ai.alert === 'flee');
-    const atCenter = enemyIsNearCenterV312(e);
+    const atCenterRaw = enemyIsNearCenterV312(e);
+    // Durante una recuperación física no tratamos la cercanía al centro como
+    // una intersección normal: primero dejamos terminar la corrección lateral.
+    const atCenter = atCenterRaw && !(ai.physicalBlocked && ai.physicalBlockedTimer < enemyAI_V312.physicalRecoveryMs);
 
-    // Un giro nunca se posterga si la dirección actual está bloqueada.
+    // La rejilla sirve para anticipar paredes. El bloqueo físico se confirma
+    // solamente después de que gridMoveCardinal() falle con el hitbox real.
+    // Así la IA puede corregir la alineación lateral antes de abandonar la ruta.
     if (!currentPassable) ai.blockedTimer += dt;
     else ai.blockedTimer = 0;
 
-    const shouldDecide = atCenter || !currentPassable || ai.decisionTimer <= 0 || ai.alert === 'flee';
+    const shouldDecide = atCenter || !currentPassable || ai.physicalBlockedTimer >= enemyAI_V312.physicalRecoveryMs || ai.decisionTimer <= 0 || ai.alert === 'flee';
     if (!shouldDecide) return;
 
     if (ai.patrolX >= 0 && tile.x === ai.patrolX && tile.y === ai.patrolY && ai.alert === 'patrol') {
@@ -475,6 +619,18 @@ function updateEnemyIntentV312(e, index, dt) {
 
     ai.desiredDirection = chosen.dir;
     ai.decisionTimer = enemyAI_V312.decisionInterval + (index % 3) * 10;
+    if (ai.physicalBlockedTimer > 0) {
+        ai.physicalBlocked = true;
+        if (chosen.dir !== currentDir.dir && enemyImmediateDirectionPassableV312(e, chosen, ai.alert === 'flee', 0.75)) {
+            ai.direction = chosen.dir;
+            e.lastDirection = chosen.dir;
+            ai.recoveryCount += 1;
+            ai.lastRecoveryReason = ai.lastRecoveryPathNodes > 0 ? 'replan-ruta' : 'bloqueo-fisico';
+            ai.blockedTimer = 0;
+            ai.physicalBlockedTimer = 0;
+            ai.physicalBlocked = false;
+        }
+    }
     ai.lastDecisionTileX = tile.x;
     ai.lastDecisionTileY = tile.y;
 
@@ -484,8 +640,14 @@ function updateEnemyIntentV312(e, index, dt) {
         ai.blockedTimer = 0;
     }
 
-    if (typeof debugRecordEvent === 'function' && (ai.alert !== 'patrol' || chosen.dir !== currentDir.dir)) {
-        debugRecordEvent('AI', `Enemy ${index} · ${ai.alert} · ${currentDir.dir || '?'} → ${chosen.dir}`, {index, behavior:ai.behavior, alert:ai.alert, desired:chosen.dir, tile});
+    if (typeof debugRecordEvent === 'function' && (ai.alert !== 'patrol' || chosen.dir !== currentDir.dir || ai.lastRecoveryReason)) {
+        debugRecordEvent('AI', `Enemy ${index} · ${ai.alert} · ${currentDir.dir || '?'} → ${chosen.dir}`, {
+            index, behavior: ai.behavior, alert: ai.alert, desired: chosen.dir, tile,
+            physicalBlocked: !!ai.physicalBlocked, physicalBlockedMs: Number(ai.physicalBlockedTimer.toFixed(1)),
+            recoveryCount: Number(ai.recoveryCount || 0), recoveryReason: ai.lastRecoveryReason || '—', recoveryPathNodes: Number(ai.lastRecoveryPathNodes || 0)
+        });
+        ai.lastRecoveryReason = '';
+        ai.lastRecoveryPathNodes = 0;
     }
 }
 
@@ -545,6 +707,8 @@ function moveEnemyV312(e, dt) {
 
     if (result.moved) {
         ai.stuckTimer = 0;
+        ai.physicalBlockedTimer = 0;
+        ai.physicalBlocked = false;
         ai.lastX = e.x;
         ai.lastY = e.y;
         if (dir.x) e.vx = dir.x * speed, e.vy = 0;
@@ -556,22 +720,33 @@ function moveEnemyV312(e, dt) {
     e.vx = 0;
     e.vy = 0;
     ai.stuckTimer += dt;
+    ai.physicalBlocked = true;
+    ai.physicalBlockedTimer += dt;
 
-    // Si chocó, no espera varios cientos de milisegundos haciendo nada.
-    if (ai.stuckTimer >= 50 || ai.blockedTimer >= 50) {
+    // Primero corregimos la alineación lateral de forma gradual. No hace snap
+    // ni movimiento diagonal: solo desplaza el eje perpendicular del corredor.
+    if (ai.physicalBlockedTimer <= enemyAI_V312.physicalRecoveryMs) {
+        if (enemyCornerAssistV312(e, dir, dt, ai.alert === 'flee')) {
+            ai.cornerCorrectionMs += dt;
+            ai.lastRecoveryReason = 'asistencia-esquina';
+            return;
+        }
+    }
+
+    // Si el corredor sigue bloqueado, hacemos una decisión de recuperación
+    // basada en la posición física actual, no en la presencia del jugador.
+    if (ai.physicalBlockedTimer >= enemyAI_V312.physicalRecoveryMs || ai.stuckTimer >= enemyAI_V312.stuckMs || ai.blockedTimer >= 50) {
         ai.stuckTimer = 0;
         ai.blockedTimer = 0;
-        const tile = enemyTileV312(e);
-        const center = enemyCenterV312(tile.x, tile.y);
-        if (Math.abs(e.x - center.x) <= enemyAI_V312.turnRadius && Math.abs(e.y - center.y) <= enemyAI_V312.turnRadius) {
-            e.x = center.x;
-            e.y = center.y;
-        }
         const fallback = enemyChooseDirectionAtIntersectionV312(e);
-        if (fallback) {
+        if (fallback && enemyImmediateDirectionPassableV312(e, fallback, ai.alert === 'flee', 0.75)) {
             ai.desiredDirection = fallback.dir;
             ai.direction = fallback.dir;
             e.lastDirection = fallback.dir;
+            ai.recoveryCount += 1;
+            ai.lastRecoveryReason = ai.lastRecoveryPathNodes > 0 ? 'replan-ruta' : 'replan-fisico';
+            ai.physicalBlockedTimer = 0;
+            ai.physicalBlocked = false;
         }
     }
 }

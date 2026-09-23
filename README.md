@@ -232,3 +232,10 @@ Base de movimiento y colisión unificada para jugador y enemigos.
 - Reversión de dirección desalentada salvo cuando es necesaria para escapar o destrabarse.
 - Si una dirección queda bloqueada, el enemigo cambia sin permanecer congelado durante cientos de milisegundos.
 - Sin BFS/A* por frame: la IA continúa basada en decisiones locales sobre la rejilla.
+
+
+## v3.12.2 — Enemy Tremble Fix
+- Corregido el temblor de enemigos cerca del centro de una celda.
+- El centrado automático ahora solo se ejecuta cuando existe un giro real pendiente.
+- Un enemigo que sigue recto ya no hace `snap` al centro en cada frame.
+- Movimiento cardinal, colisiones de v3.12 y comportamiento de v3.12.1 conservados.

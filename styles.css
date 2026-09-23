@@ -742,3 +742,31 @@ body{
     min-height:0;
 }
 .main-menu.run-active #game-container{flex:0 0 auto;}
+
+
+/* V3.14 — Powerups & Relics 2 */
+.relic-category-badge{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    align-self:center;
+    width:max-content;
+    max-width:100%;
+    padding:3px 6px;
+    margin:-3px auto 7px;
+    border:1px solid color-mix(in srgb, var(--relic-category, #94a3b8) 55%, transparent);
+    color:var(--relic-category, #94a3b8);
+    background:color-mix(in srgb, var(--relic-category, #94a3b8) 10%, transparent);
+    border-radius:999px;
+    font:5px 'Press Start 2P';
+    letter-spacing:.05em;
+}
+.relic-chip small{
+    color:var(--relic-category, #cbd5e1);
+    opacity:.86;
+    margin-left:4px;
+    font-size:.78em;
+}
+@media(max-width:640px){
+    .relic-category-badge{font-size:4px;padding:2px 5px;margin-bottom:5px;}
+}

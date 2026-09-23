@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOMBERMAN // DESCENT — Roguelike v3.15</title>
+    <title>BOMBERMAN // DESCENT — Roguelike v3.16</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="game-body">
 
     <div id="app-wrapper">
         <main id="main-menu" class="main-menu" aria-label="Menú principal">
             <aside class="menu-rail menu-rail-left" aria-label="Resumen de la aventura">
                 <div class="menu-rail-top">
                     <span class="menu-kicker">BOMBERMAN // DESCENT</span>
-                    <span class="menu-version">v3.15</span>
+                    <span class="menu-version">v3.16</span>
                 </div>
                 <div class="menu-rail-content">
                     <div class="menu-mark">💣</div>
@@ -121,7 +121,7 @@
                 </div>
                 <div class="menu-actions">
                     <button id="btn-start" class="btn-pixel menu-start-button">INICIAR RUN</button>
-                    <a class="btn-pixel menu-debug-button" href="./debug/debug.html" target="_blank" rel="noopener noreferrer">🧪 ABRIR DEBUG LAB</a>
+                    <button id="btn-debug-mode" class="btn-debug-mode" type="button">🧪 ABRIR DEBUG MODE</button>
                     <div class="menu-hint"><span>TECLADO</span><strong>WASD / ↑↓←→</strong><span>· BOMBA</span><strong>ESPACIO</strong></div>
                 </div>
                 <div class="menu-footer"><span>PROCEDURAL COMBAT</span><span>•</span><span>ADAPTIVE MOTION</span><span>•</span><span>DEEPER EVERY RUN</span></div>
@@ -137,7 +137,15 @@
         </div>
     </div>
 
-    <!-- v3.15 modular JavaScript: death, run summary and clean restart are isolated. -->
+    <script>
+        if (new URLSearchParams(window.location.search).get('debug') === '1') {
+            window.__BOMBER_DEBUG_BOOT_ERRORS = [];
+            window.addEventListener('error', event => window.__BOMBER_DEBUG_BOOT_ERRORS.push(`${event.message || 'Error'} @ ${event.filename || 'unknown'}:${event.lineno || 0}`));
+            window.addEventListener('unhandledrejection', event => window.__BOMBER_DEBUG_BOOT_ERRORS.push(`UnhandledPromiseRejection: ${String(event.reason || 'unknown')}`));
+        }
+    </script>
+
+    <!-- v3.16 modular JavaScript. Debug Engine uses the same runtime; no iframe. -->
     <script src="js/01-core.js"></script>
     <script src="js/16-relics.js"></script>
     <script src="js/02-input.js"></script>
@@ -154,6 +162,9 @@
     <script src="js/09-camera.js"></script>
     <script src="js/10-feedback.js"></script>
     <script src="js/17-run-lifecycle.js"></script>
+    <script src="js/18-debug-mode.js"></script>
+    <script src="js/19-debug-overlay.js"></script>
+    <script src="js/20-debug-visuals.js"></script>
     <script src="js/08-loop-ui.js"></script>
 </body>
 </html>

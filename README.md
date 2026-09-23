@@ -1,20 +1,29 @@
-# Bomberman Roguelike v3.15.4
+# BOMBERMAN // DESCENT — Roguelike v3.16
 
-Build completa lista para GitHub Pages, con el juego modular y el Debug Lab integrado.
+Videojuego web estático desarrollado con HTML, CSS y JavaScript vanilla. Preparado para GitHub Pages, sin backend ni bundler.
 
-## Estructura
+## Debug Mode
 
-- `index.html` — juego principal.
-- `styles.css` — interfaz del juego.
-- `js/` — módulos del motor.
-- `debug/debug.html` — laboratorio de pruebas aisladas.
-- `debug/debug.css` — interfaz del laboratorio.
+El motor incorpora un modo de depuración integrado en el mismo runtime del juego. No usa iframe ni un segundo motor.
 
-## Debug Lab
+Abrir normalmente:
+`index.html`
 
-Desde el menú principal, `ABRIR DEBUG LAB` abre `debug/debug.html`.
-El laboratorio carga el motor real con `../index.html?debug=1` y su JavaScript se carga con `../js/18-debug-mode.js`. Las rutas son relativas para funcionar tanto en `https://usuario.github.io/` como en `https://usuario.github.io/repositorio/`.
+Abrir con depuración:
+`index.html?debug=1`
 
-## GitHub Pages
+Desde el menú principal también está disponible el botón **ABRIR DEBUG MODE**.
 
-Subí el contenido de este ZIP directamente a la raíz de la fuente publicada. `index.html` debe quedar en el nivel superior del repositorio/fuente de Pages.
+### Herramientas
+
+- Estado en tiempo real: FPS, frame time, update, draw, jugador, mundo, cámara y errores.
+- Pausa lógica independiente del juego: `F4`.
+- Avance de un frame: `F6`.
+- Mostrar/ocultar panel: `F3`.
+- Ejecutar suite completa: `F7`.
+- Visualizadores de grid, colisiones, hitboxes, bombas, explosiones, IA, cámara y spawns.
+- Acciones manuales para bomba, daño, enemigo y reinicio de escena.
+- Registro de eventos y errores de runtime.
+- Tests aislados de movimiento, bombas, daño, trampas, enemigos, cámara y reinicio.
+
+El Debug Mode se carga sobre el mismo `index.html` y conserva la estructura de módulos `js/` del juego.

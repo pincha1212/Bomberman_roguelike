@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.16.3 — Debug visualizers
+// Bomberman Roguelike v3.16.5 — Debug visualizers
 // Las capas de navegación se dibujan sobre el mismo canvas del juego.
 (() => {
     'use strict';
@@ -133,6 +133,10 @@
                 if (!d) continue;
                 arrow(pc.x,pc.y,pc.x+d[0]*24,pc.y+d[1]*24,'#22d3ee',`P:${dir}`);
             }
+            const pCurrent = DIRS[String(player.currentDirection || '').toUpperCase()];
+            const pDesired = DIRS[String(player.desiredDirection || '').toUpperCase()];
+            if (pCurrent) arrow(pc.x,pc.y,pc.x+pCurrent[0]*18,pc.y+pCurrent[1]*18,'#f8fafc','PC');
+            if (pDesired) arrow(pc.x,pc.y,pc.x+pDesired[0]*30,pc.y+pDesired[1]*30,'#f43f5e','PD');
             ctx.save();
             ctx.fillStyle = '#22d3ee';
             ctx.font = 'bold 9px Consolas,monospace';
@@ -160,12 +164,14 @@
                 ctx.fillStyle = color;
                 ctx.globalAlpha = .88;
                 ctx.lineWidth = 3;
+                ctx.setLineDash([8, 5]);
                 ctx.beginPath();
                 path.forEach((cell,i)=>{
                     const p = tileCenter(cell.x,cell.y);
                     if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
                 });
                 ctx.stroke();
+                ctx.setLineDash([]);
                 ctx.restore();
 
                 // Flechas cada 2-3 celdas para que la dirección sea legible sin llenar el mapa.
@@ -180,11 +186,26 @@
             const desiredDir = DIRS[enemy.desiredDirection];
             if (currentDir) arrow(start.x,start.y,start.x+currentDir[0]*18,start.y+currentDir[1]*18,'#f8fafc','C');
             if (desiredDir) arrow(start.x,start.y,start.x+desiredDir[0]*30,start.y+desiredDir[1]*30,'#f43f5e','D');
+            if (enemy.routeNextDirection && enemy.routeNextDirection !== '—' && DIRS[enemy.routeNextDirection]) {
+                const refDir = DIRS[enemy.routeNextDirection];
+                arrow(start.x,start.y,start.x+refDir[0]*38,start.y+refDir[1]*38,'rgba(56,189,248,.9)','R');
+            }
+            ctx.save();
+            if (enemy.stuckLikely) {
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([4,3]);
+                ctx.strokeRect(start.x+4,start.y+4,TILE_SIZE-8,TILE_SIZE-8);
+            }
+            ctx.restore();
 
             ctx.save();
             ctx.fillStyle = enemy.seesPlayer ? '#f87171' : color;
             ctx.font = '8px Consolas,monospace';
-            ctx.fillText(`E${enemy.index} ${enemy.routeLength}c`, start.x+9,start.y+18);
+            const statusLabel = enemy.stuckLikely ? 'ATASCADO' : (enemy.currentPassable === false ? 'BLOQUEADO' : enemy.movementState || 'OK');
+            ctx.fillText(`E${enemy.index} ${enemy.routeLength}c · ${statusLabel}`, start.x+9,start.y+18);
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillText(`R:${enemy.routeNextDirection} ${enemy.routeAlignment}`, start.x+9,start.y+28);
             ctx.restore();
         }
     }

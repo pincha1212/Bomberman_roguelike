@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.16.3 — Debug Overlay
+// Bomberman Roguelike v3.16.5 — Debug Overlay
 // Panel reconstruido para inspección en vivo. Solo se crea con ?debug=1.
 (() => {
     'use strict';
@@ -12,7 +12,7 @@
     root.innerHTML = `
         <div class="debug-header">
             <div>
-                <div class="debug-kicker">BOMBERMAN ENGINE · v3.16.3</div>
+                <div class="debug-kicker">BOMBERMAN ENGINE · v3.16.5</div>
                 <h2>DEBUG MODE <span id="debug-status" class="debug-status">CARGANDO</span></h2>
             </div>
             <button type="button" class="debug-icon-btn" data-debug-action="toggle" title="Mostrar/ocultar panel">F3</button>
@@ -33,11 +33,15 @@
                 <div><span>LOOP</span><strong id="dbg-loop">—</strong></div>
                 <div><span>PAUSA</span><strong id="dbg-pause">NO</strong></div>
                 <div><span>FPS</span><strong id="dbg-fps">0</strong></div>
-                <div><span>FRAME MS</span><strong id="dbg-frame-ms">0</strong></div>
+                <div><span>TRABAJO/FRAME</span><strong id="dbg-frame-ms">0</strong></div>
                 <div><span>UPDATE/DRAW</span><strong id="dbg-update-draw">0 / 0</strong></div>
+                <div><span>INTERVALO RAF</span><strong id="dbg-frame-interval">0</strong></div>
+                <div><span>RAF MIN/MAX</span><strong id="dbg-raf-range">0 / 0</strong></div>
                 <div><span>FRAME</span><strong id="dbg-frame">0</strong></div>
                 <div><span>RAF ID</span><strong id="dbg-raf">0</strong></div>
                 <div><span>ERRORES</span><strong id="dbg-errors">0</strong></div>
+                <div><span>EVENTOS</span><strong id="dbg-event-total">0/0</strong></div>
+                <div><span>COLAPSADOS</span><strong id="dbg-event-collapsed">0</strong></div>
             </div>
         </section>
 
@@ -108,8 +112,12 @@
                 <div><span>ENEMIGOS CON RUTA</span><strong id="dbg-nav-routes">0/0</strong></div>
                 <div><span>NODOS LIMITADOS</span><strong id="dbg-nav-truncated">NO</strong></div>
                 <div><span>MODO</span><strong id="dbg-nav-mode">—</strong></div>
+                <div><span>DIAGNÓSTICO</span><strong id="dbg-nav-diagnostic">—</strong></div>
+                <div><span>JUGADOR ESTADO</span><strong id="dbg-nav-player-state">—</strong></div>
+                <div><span>JUGADOR CENTRO</span><strong id="dbg-nav-player-center">—</strong></div>
             </div>
             <div id="dbg-nav-note" class="debug-note">—</div>
+            <div id="dbg-nav-legend" class="debug-note">RUTA REF = ruta teórica · C = dirección actual · D = dirección deseada · LOS = línea de visión.</div>
             <pre id="dbg-nav-enemies" class="debug-log">Sin datos de navegación.</pre>
         </section>
 
@@ -167,11 +175,15 @@
         setText('dbg-loop', s.engine?.playing ? (s.engine?.rafId ? 'RAF' : 'SIN RAF') : 'STOP');
         setText('dbg-pause', s.engine?.debugPaused ? 'DEBUG' : (s.engine?.gamePaused ? 'GAME' : 'NO'));
         setText('dbg-fps', fmt(s.performance.fps, 1));
-        setText('dbg-frame-ms', fmt(s.performance.frameMs, 2));
+        setText('dbg-frame-ms', fmt(s.performance.workMs ?? s.performance.frameMs, 2));
+        setText('dbg-frame-interval', `${fmt(s.performance.avgFrameIntervalMs, 2)}ms`);
+        setText('dbg-raf-range', `${fmt(s.performance.minIntervalMs, 1)} / ${fmt(s.performance.maxIntervalMs, 1)}`);
         setText('dbg-update-draw', `${fmt(s.performance.updateMs,1)} / ${fmt(s.performance.drawMs,1)}`);
         setText('dbg-frame', D.frameCount);
         setText('dbg-raf', s.engine?.rafId || 0);
         setText('dbg-errors', s.errors);
+        setText('dbg-event-total', `${s.events}/${s.rawEvents || s.events}`);
+        setText('dbg-event-collapsed', s.suppressedEvents || 0);
 
         const p = s.player;
         if (p) {
@@ -231,9 +243,13 @@
         setText('dbg-nav-truncated', np.truncated || enemyNav.some(e => e.truncated) ? 'SI' : 'NO');
         setText('dbg-nav-mode', nav.mode || '—');
         setText('dbg-nav-note', nav.note || 'Sin datos.');
+        setText('dbg-nav-diagnostic', nav.available ? 'REFERENCIA + ESTADO REAL' : 'SIN DATOS');
+        setText('dbg-nav-player-state', np.movementState || '—');
+        setText('dbg-nav-player-center', np.distanceToCenter != null ? `${fmt(np.distanceToCenter,1)}px` : '—');
         const enemyLines = enemyNav.map(e => {
             const route = e.canReachPlayer ? `${e.routeLength} celdas` : 'SIN RUTA';
-            return `E${e.index} · tile ${e.tile.x},${e.tile.y} · ${e.behavior}/${e.alert} · ${e.currentDirection}→${e.desiredDirection} · ruta ${route} · alcanzables ${e.reachableTiles} · opciones ${e.options.join(',') || '—'}`;
+            const flags = [e.stuckLikely ? 'ATASCADO' : null, e.currentPassable === false ? 'BLOQUEADO' : null, e.turnReady ? 'CENTRO' : null].filter(Boolean).join(',') || 'OK';
+            return `E${e.index} · tile ${e.tile.x},${e.tile.y} · ${e.behavior}/${e.alert} · actual ${e.currentDirection} · deseada ${e.desiredDirection} · real ${e.actualDirection} · estado ${e.movementState} · ruta ${route} · ref ${e.routeNextDirection}/${e.routeAlignment} · centro ${fmt(e.distanceToCenter,1)}px · ${flags} · target ${e.target?.x},${e.target?.y}`;
         });
         const navNode = document.getElementById('dbg-nav-enemies');
         if (navNode) navNode.textContent = enemyLines.length ? enemyLines.join('\n') : 'Sin enemigos en la escena.';
@@ -262,7 +278,8 @@
         if (eventNode) {
             eventNode.textContent = D.eventLog.slice(-100).map(item => {
                 const suffix = item.data ? ` · ${safeInlineJson(item.data)}` : '';
-                return `[${item.wallTime}] ${item.type.padEnd(8)} ${item.message}${suffix}`;
+                const repeat = Number(item.repeatCount || 1);
+                return `[${item.wallTime}] ${item.type.padEnd(8)} ${item.message}${repeat > 1 ? ` · ×${repeat}` : ''}${suffix}`;
             }).join('\n') || 'Sin eventos.';
         }
         setText('dbg-event-count', D.eventLog.length);

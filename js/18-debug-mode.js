@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.16.3 — Debug Engine
+// Bomberman Roguelike v3.16.5 — Debug Engine
 // Depuración interna del mismo runtime. Se activa solo con ?debug=1.
 (() => {
     'use strict';
@@ -18,6 +18,8 @@
     const MAX_ERRORS = 100;
     const MAX_TEST_RESULTS = 30;
     const MAX_NAV_NODES = 900;
+    const EVENT_DEDUPE_MS = 850;
+    const EVENT_DEDUPE_TYPES = new Set(['AI', 'DEBUG', 'VISUAL', 'INFO', 'WORLD']);
 
     const getState = () => window.BOMBER_ENGINE?.getState?.() || null;
     const getPlayer = () => window.BOMBER_ENGINE?.getPlayer?.() || null;
@@ -38,6 +40,13 @@
         loopMs: 0,
         frameWindowStart: 0,
         frameWindowCount: 0,
+        lastFrameTimestamp: 0,
+        frameIntervalMs: 0,
+        avgFrameIntervalMs: 0,
+        minFrameIntervalMs: Infinity,
+        maxFrameIntervalMs: 0,
+        eventCountRaw: 0,
+        suppressedEvents: 0,
         eventLog: [],
         runtimeErrors: [],
         testResults: [],
@@ -46,6 +55,7 @@
         navigationCache: null,
         navigationSignature: '',
         navigationAt: 0,
+        enemyProgress: new WeakMap(),
         selectedVisuals: {
             grid: false,
             collision: false,
@@ -69,6 +79,21 @@
             this.minFrameMs = Math.min(this.minFrameMs, this.loopMs);
             this.maxFrameMs = Math.max(this.maxFrameMs, this.loopMs);
 
+            // "loopMs" es tiempo de trabajo del JS, no tiempo entre frames.
+            // La cadencia real se mide usando los timestamps de requestAnimationFrame.
+            if (this.lastFrameTimestamp > 0) {
+                const interval = Math.max(0, timestamp - this.lastFrameTimestamp);
+                if (interval < 1000) {
+                    this.frameIntervalMs = interval;
+                    this.avgFrameIntervalMs = this.avgFrameIntervalMs
+                        ? this.avgFrameIntervalMs * 0.90 + interval * 0.10
+                        : interval;
+                    this.minFrameIntervalMs = Math.min(this.minFrameIntervalMs, interval);
+                    this.maxFrameIntervalMs = Math.max(this.maxFrameIntervalMs, interval);
+                }
+            }
+            this.lastFrameTimestamp = timestamp;
+
             if (!this.frameWindowStart) this.frameWindowStart = timestamp;
             const elapsed = timestamp - this.frameWindowStart;
             if (elapsed >= 500) {
@@ -81,13 +106,37 @@
         recordEvent(type, message, data = null) {
             if (!this.enabled) return;
             const normalizedType = String(type || 'INFO').toUpperCase();
+            const normalizedMessage = String(message || '');
+            const normalizedData = data && typeof data === 'object' ? data : null;
+            const now = performance.now();
+            this.eventCountRaw += 1;
+
+            // La IA puede llamar debugRecordEvent() muchas veces por segundo sin
+            // haber cambiado realmente de estado. Colapsamos solo repeticiones
+            // idénticas y conservamos el último contador. Los cambios reales
+            // (tile, dirección, alerta, etc.) siguen apareciendo como eventos nuevos.
+            const previous = this.eventLog[this.eventLog.length - 1];
+            const fingerprint = normalizedType + '|' + normalizedMessage + '|' + safeJson(normalizedData);
+            if (previous && EVENT_DEDUPE_TYPES.has(normalizedType) && previous.fingerprint === fingerprint && now - previous.time <= EVENT_DEDUPE_MS) {
+                previous.repeatCount = Number(previous.repeatCount || 1) + 1;
+                previous.lastTime = now;
+                previous.lastWallTime = new Date().toLocaleTimeString('es-AR', { hour12: false });
+                this.suppressedEvents += 1;
+                dispatchUpdate();
+                return;
+            }
+
             const item = {
                 id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                time: performance.now(),
+                time: now,
                 wallTime: new Date().toLocaleTimeString('es-AR', { hour12: false }),
                 type: normalizedType,
-                message: String(message || ''),
-                data: data && typeof data === 'object' ? data : null
+                message: normalizedMessage,
+                data: normalizedData,
+                fingerprint,
+                repeatCount: 1,
+                lastTime: now,
+                lastWallTime: new Date().toLocaleTimeString('es-AR', { hour12: false })
             };
             this.eventLog.push(item);
             if (this.eventLog.length > MAX_EVENTS) this.eventLog.splice(0, this.eventLog.length - MAX_EVENTS);
@@ -225,11 +274,16 @@
                 performance: {
                     fps: this.fps,
                     frameMs: this.avgFrameMs,
+                    workMs: this.avgFrameMs,
+                    frameIntervalMs: this.frameIntervalMs,
+                    avgFrameIntervalMs: this.avgFrameIntervalMs,
                     loopMs: this.loopMs,
                     updateMs: this.updateMs,
                     drawMs: this.drawMs,
                     minMs: Number.isFinite(this.minFrameMs) ? this.minFrameMs : 0,
-                    maxMs: this.maxFrameMs
+                    maxMs: this.maxFrameMs,
+                    minIntervalMs: Number.isFinite(this.minFrameIntervalMs) ? this.minFrameIntervalMs : 0,
+                    maxIntervalMs: this.maxFrameIntervalMs
                 },
                 tests: {
                     passed: this.testResults.filter(r => r.status === 'PASS').length,
@@ -240,6 +294,8 @@
                 },
                 errors: this.runtimeErrors.length,
                 events: this.eventLog.length,
+                rawEvents: this.eventCountRaw,
+                suppressedEvents: this.suppressedEvents,
                 navigation: this.getNavigationSnapshot()
             };
         },
@@ -265,22 +321,41 @@
                 const path = shortestPathTo(tile, playerTile, 'enemy', enemy, reach);
                 const options = cellOptions('enemy', enemy, tile);
                 const junctions = countJunctions(reach.cells, 'enemy', enemy);
+                const ai = enemy.ai || {};
+                const currentDirection = String(ai.direction || enemy.lastDirection || '—').toUpperCase();
+                const desiredDirection = String(ai.desiredDirection || enemy.desiredDirection || '—').toUpperCase();
+                const routeNextDirection = path.length >= 2 ? directionBetween(path[0], path[1]) : '—';
+                const progress = observeEnemyProgress(enemy, index, tile, currentDirection, desiredDirection, options);
+                const target = inferEnemyTarget(ai, playerTile, enemy, tile);
+                const currentPassable = enemyCurrentDirectionPassable(enemy, currentDirection, ai.alert);
                 return {
                     index,
                     tile,
-                    behavior: enemy.ai?.behavior || '—',
-                    alert: enemy.ai?.alert || '—',
-                    currentDirection: enemy.ai?.direction || enemy.lastDirection || '—',
-                    desiredDirection: enemy.ai?.desiredDirection || enemy.desiredDirection || '—',
-                    seesPlayer: !!enemy.ai?.seesPlayer,
+                    behavior: ai.behavior || '—',
+                    alert: ai.alert || '—',
+                    currentDirection,
+                    desiredDirection,
+                    actualDirection: progress.actualDirection,
+                    actualSpeed: progress.actualSpeed,
+                    movementState: progress.movementState,
+                    distanceToCenter: progress.distanceToCenter,
+                    sameTileMs: progress.sameTileMs,
+                    noProgressMs: progress.noProgressMs,
+                    stuckLikely: progress.stuckLikely,
+                    turnReady: progress.turnReady,
+                    currentPassable,
+                    nextTile: progress.nextTile,
+                    seesPlayer: !!ai.seesPlayer,
                     options,
                     reachableTiles: reach.cells.length,
                     truncated: reach.truncated,
                     junctions,
                     route: path,
                     routeLength: Math.max(0, path.length - 1),
+                    routeNextDirection,
+                    routeAlignment: compareRouteAlignment(routeNextDirection, currentDirection, desiredDirection),
                     canReachPlayer: path.length > 0,
-                    target: { ...playerTile }
+                    target
                 };
             });
 
@@ -298,6 +373,11 @@
                     junctions: playerJunctions,
                     deadEnds: countDeadEnds(playerReach.cells, 'player', player),
                     options: playerOptions,
+                    currentDirection: String(player.dir || '—').toUpperCase(),
+                    desiredDirection: String(player.desiredDirection || player.inputAxis || '—').toUpperCase(),
+                    actualSpeed: Math.hypot(Number(player.vx) || 0, Number(player.vy) || 0),
+                    movementState: playerMovementState(player, playerOptions),
+                    distanceToCenter: distanceToTileCenter(player, playerTile),
                     treeEdges: playerReach.edges,
                     cells: playerReach.cells
                 },
@@ -312,6 +392,7 @@
 
         resetNavigation() {
             this.navigationCache = null;
+            this.enemyProgress = new WeakMap();
             this.navigationSignature = '';
             this.navigationAt = 0;
         },
@@ -380,6 +461,8 @@
 
         clearEvents() {
             this.eventLog.length = 0;
+            this.eventCountRaw = 0;
+            this.suppressedEvents = 0;
             this.recordEvent('DEBUG', 'Event Log limpiado.');
         },
 
@@ -388,61 +471,54 @@
             const total = this.testResults.length;
             const passed = this.testResults.filter(r => r.status === 'PASS').length;
             const failed = this.testResults.filter(r => r.status === 'FAIL').length;
-            const started = this.testResults[0]?.name || '—';
-
             const lines = [
                 'BOMBERMAN ROGUELIKE — DEBUG TEST COMPLETO',
                 `Fecha: ${new Date().toLocaleString('es-AR')}`,
                 `Suite: ${total} pruebas registradas · ${passed} PASS · ${failed} FAIL`,
-                `Primera prueba: ${started}`,
                 '',
-                '=== RESUMEN ===',
-                ...this.testResults.map((r, index) => {
-                    const ms = Number(r.ms || 0).toFixed(1);
-                    return `${index + 1}. ${String(r.name || 'TEST').toUpperCase()} — ${r.status} — ${ms} ms — ${r.summary || r.result || 'Sin resumen'}`;
-                }),
+                '=== RESUMEN TESTS ===',
+                ...this.testResults.map((r, index) => `${index + 1}. ${String(r.name || 'TEST').toUpperCase()} — ${r.status} — ${Number(r.ms || 0).toFixed(1)} ms — ${r.summary || r.result || 'Sin resumen'}`),
                 '',
                 '=== INSPECTOR DE TEST ===',
-                this.lastTest
-                    ? JSON.stringify({
-                        name: this.lastTest.name,
-                        status: this.lastTest.status,
-                        summary: this.lastTest.summary,
-                        ms: Number(this.lastTest.ms || 0),
-                        details: this.lastTest.details || {}
-                    }, null, 2)
-                    : 'Sin prueba seleccionada.',
+                this.lastTest ? JSON.stringify({
+                    name: this.lastTest.name,
+                    status: this.lastTest.status,
+                    summary: this.lastTest.summary,
+                    ms: Number(this.lastTest.ms || 0).toFixed(1),
+                    details: this.lastTest.details || {}
+                }, null, 2) : 'Sin prueba seleccionada.',
                 '',
-                '=== ESTADO DEL MOTOR ===',
-                JSON.stringify({
-                    status: snapshot.status,
-                    engine: snapshot.engine,
-                    performance: snapshot.performance,
-                    player: snapshot.player,
-                    world: snapshot.world,
-                    navigation: snapshot.navigation,
-                    relics: snapshot.relics,
-                    errors: snapshot.errors,
-                    events: snapshot.events
-                }, null, 2),
+                '=== ESTADO ===',
+                `status=${snapshot.status} · playing=${snapshot.engine?.playing} · gamePaused=${snapshot.engine?.gamePaused} · debugPaused=${snapshot.engine?.debugPaused}`,
+                `RAF=${snapshot.engine?.rafId || 0} · frame=${this.frameCount} · errors=${snapshot.errors} · eventos=${snapshot.events}/${snapshot.rawEvents || snapshot.events} · repetidos colapsados=${snapshot.suppressedEvents || 0}`,
                 '',
-                '=== EVENT LOG ===',
-                this.eventLog.length
-                    ? this.eventLog.map(item => {
-                        const suffix = item.data ? ` · ${safeJson(item.data)}` : '';
-                        return `[${item.wallTime}] ${item.type} ${item.message}${suffix}`;
-                    }).join('\n')
-                    : 'Sin eventos.',
+                '=== PERFORMANCE ===',
+                `FPS=${Number(snapshot.performance.fps || 0).toFixed(1)} · intervalo RAF=${Number(snapshot.performance.avgFrameIntervalMs || 0).toFixed(2)}ms`,
+                `trabajo JS/frame=${Number(snapshot.performance.workMs || 0).toFixed(2)}ms · update=${Number(snapshot.performance.updateMs || 0).toFixed(2)}ms · draw=${Number(snapshot.performance.drawMs || 0).toFixed(2)}ms`,
+                `trabajo min/max=${Number(snapshot.performance.minMs || 0).toFixed(2)}/${Number(snapshot.performance.maxMs || 0).toFixed(2)}ms · intervalo min/max=${Number(snapshot.performance.minIntervalMs || 0).toFixed(2)}/${Number(snapshot.performance.maxIntervalMs || 0).toFixed(2)}ms`,
+                '',
+                '=== PLAYER ===',
+                compactPlayerLine(snapshot.player),
+                '',
+                '=== WORLD ===',
+                compactWorldLine(snapshot.world),
+                '',
+                '=== NAVEGACIÓN ===',
+                compactNavigationReport(snapshot.navigation),
+                '',
+                '=== EVENT LOG (AGRUPADO) ===',
+                this.eventLog.length ? this.eventLog.map(item => {
+                    const repeat = Number(item.repeatCount || 1);
+                    const suffix = item.data ? ` · ${safeJson(item.data)}` : '';
+                    return `[${item.wallTime}] ${item.type} ${item.message}${repeat > 1 ? ` · ×${repeat}` : ''}${suffix}`;
+                }).join('\n') : 'Sin eventos.',
                 '',
                 '=== RUNTIME ERRORS ===',
-                this.runtimeErrors.length
-                    ? this.runtimeErrors.map((e, index) => {
-                        const loc = e.url ? ` · ${e.url}` : '';
-                        return `${index + 1}. [${e.wallTime}] ${e.source}: ${e.message}${loc}${e.stack ? `\n${e.stack}` : ''}`;
-                    }).join('\n\n')
-                    : 'Sin errores de runtime.'
+                this.runtimeErrors.length ? this.runtimeErrors.map((e, index) => {
+                    const loc = e.url ? ` · ${e.url}` : '';
+                    return `${index + 1}. [${e.wallTime}] ${e.source}: ${e.message}${loc}${e.stack ? `\n${e.stack.split('\n').slice(0,4).join('\n')}` : ''}`;
+                }).join('\n\n') : 'Sin errores de runtime.'
             ];
-
             return lines.join('\n');
         },
 
@@ -532,6 +608,133 @@
             }
         }
     };
+
+    function distanceToTileCenter(entity, tile) {
+        if (!entity || !tile) return 0;
+        const cx = tile.x * TILE_SIZE + TILE_SIZE / 2;
+        const cy = tile.y * TILE_SIZE + TILE_SIZE / 2;
+        const ex = Number(entity.x) + (entity.width ? Number(entity.width) / 2 : 0);
+        const ey = Number(entity.y) + (entity.height ? Number(entity.height) / 2 : 0);
+        return Math.hypot(ex - cx, ey - cy);
+    }
+
+    function movementDirection(vx, vy) {
+        const x = Number(vx) || 0;
+        const y = Number(vy) || 0;
+        if (Math.abs(x) < 0.01 && Math.abs(y) < 0.01) return '—';
+        return Math.abs(x) >= Math.abs(y) ? (x > 0 ? 'RIGHT' : 'LEFT') : (y > 0 ? 'DOWN' : 'UP');
+    }
+
+    function playerMovementState(player, options = []) {
+        const speed = Math.hypot(Number(player?.vx) || 0, Number(player?.vy) || 0);
+        if (speed > 0.08) return 'MOVIÉNDOSE';
+        if (player?.isMoving) return 'INPUT';
+        if ((player?.desiredDirection || player?.inputAxis) && options.length) return 'LISTO PARA GIRAR';
+        return 'DETENIDO';
+    }
+
+    function enemyCurrentDirectionPassable(enemy, currentDirection, alert) {
+        if (typeof enemyDirectionV312 !== 'function' || typeof enemyDirectionPassableV312 !== 'function') return null;
+        try { return !!enemyDirectionPassableV312(enemy, enemyDirectionV312(String(currentDirection || '').toLowerCase()), alert === 'flee'); } catch (_) { return null; }
+    }
+
+    function observeEnemyProgress(enemy, index, tile, currentDirection, desiredDirection, options) {
+        const now = performance.now();
+        const previous = DEBUG_MODE.enemyProgress.get(enemy);
+        const x = Number(enemy?.x) || 0;
+        const y = Number(enemy?.y) || 0;
+        const speed = Math.hypot(Number(enemy?.vx) || 0, Number(enemy?.vy) || 0);
+        const center = { x: tile.x * TILE_SIZE + TILE_SIZE / 2, y: tile.y * TILE_SIZE + TILE_SIZE / 2 };
+        const distanceToCenter = Math.hypot((x) - center.x, (y) - center.y);
+        const actualDirection = movementDirection(enemy?.vx, enemy?.vy);
+        const currentKey = `${tile.x},${tile.y}`;
+        let sameTileSince = previous?.tileKey === currentKey ? previous.sameTileSince : now;
+        let noProgressSince = previous?.movementDistance > 0.4 ? now : (previous?.noProgressSince || now);
+        if (previous && Math.hypot(x - previous.x, y - previous.y) > 0.4) noProgressSince = now;
+        DEBUG_MODE.enemyProgress.set(enemy, { x, y, tileKey: currentKey, sameTileSince, noProgressSince, movementDistance: previous ? Math.hypot(x - previous.x, y - previous.y) : 0 });
+
+        const ai = enemy?.ai || {};
+        const blockedMs = Number(ai.blockedTimer) || 0;
+        const stuckMs = Number(ai.stuckTimer) || 0;
+        const turnReady = distanceToCenter <= 9;
+        const sameTileMs = now - sameTileSince;
+        const noProgressMs = now - noProgressSince;
+        const wantsTurn = desiredDirection !== '—' && desiredDirection !== currentDirection;
+        const currentPassable = enemyCurrentDirectionPassable(enemy, currentDirection, ai.alert);
+        const stuckLikely = speed < 0.08 && (blockedMs >= 45 || stuckMs >= 45 || (wantsTurn && turnReady && currentPassable === false));
+        let movementState = 'MOVIÉNDOSE';
+        if (stuckLikely) movementState = 'ATASCADO';
+        else if (currentPassable === false) movementState = 'BLOQUEADO';
+        else if (wantsTurn && turnReady) movementState = 'LISTO PARA GIRAR';
+        else if (speed < 0.08) movementState = 'DETENIDO';
+
+        let nextTile = null;
+        const dir = String(currentDirection || '').toLowerCase();
+        if (dir === 'up') nextTile = { x: tile.x, y: tile.y - 1 };
+        if (dir === 'down') nextTile = { x: tile.x, y: tile.y + 1 };
+        if (dir === 'left') nextTile = { x: tile.x - 1, y: tile.y };
+        if (dir === 'right') nextTile = { x: tile.x + 1, y: tile.y };
+
+        return { actualDirection, actualSpeed: speed, movementState, distanceToCenter, sameTileMs, noProgressMs, stuckLikely, turnReady, blockedMs, stuckMs, nextTile, options };
+    }
+
+    function inferEnemyTarget(ai, playerTile, enemy, enemyTile) {
+        const alert = ai?.alert || ai?.behavior || '—';
+        if (alert === 'flee') {
+            const offsetX = playerTile.x >= enemyTile.x ? -4 : 4;
+            const offsetY = playerTile.y >= enemyTile.y ? -4 : 4;
+            return { x: playerTile.x + offsetX, y: playerTile.y + offsetY, reason: 'flee' };
+        }
+        if (alert === 'surround') {
+            if (Number.isFinite(Number(ai?.surroundX)) && ai.surroundX >= 0 && Number.isFinite(Number(ai?.surroundY)) && ai.surroundY >= 0) {
+                return { x: ai.surroundX, y: ai.surroundY, reason: 'surround' };
+            }
+            return { x: playerTile.x, y: playerTile.y, reason: 'surround-pending' };
+        }
+        if (alert === 'chase' || ai?.seesPlayer) return { x: playerTile.x, y: playerTile.y, reason: 'player' };
+        if ((ai?.memoryTimer || 0) > 0 && Number.isFinite(Number(ai?.lastSeenX)) && ai.lastSeenX >= 0) return { x: ai.lastSeenX, y: ai.lastSeenY, reason: 'last-seen' };
+        if (Number.isFinite(Number(ai?.patrolX)) && ai.patrolX >= 0 && Number.isFinite(Number(ai?.patrolY)) && ai.patrolY >= 0) return { x: ai.patrolX, y: ai.patrolY, reason: 'patrol' };
+        return { x: playerTile.x, y: playerTile.y, reason: 'debug-target' };
+    }
+
+    function directionBetween(a, b) {
+        if (!a || !b) return '—';
+        const dx = Number(b.x) - Number(a.x);
+        const dy = Number(b.y) - Number(a.y);
+        if (dx > 0) return 'RIGHT';
+        if (dx < 0) return 'LEFT';
+        if (dy > 0) return 'DOWN';
+        if (dy < 0) return 'UP';
+        return '—';
+    }
+
+    function compareRouteAlignment(routeNextDirection, currentDirection, desiredDirection) {
+        if (routeNextDirection === '—') return 'SIN RUTA';
+        if (routeNextDirection === desiredDirection && routeNextDirection === currentDirection) return 'ALINEADA';
+        if (routeNextDirection === desiredDirection) return 'DESEADA';
+        if (routeNextDirection === currentDirection) return 'ACTUAL';
+        return 'DESVIADA';
+    }
+
+    function compactPlayerLine(player) {
+        if (!player) return 'player=NO DISPONIBLE';
+        return `tile=${player.tile.x},${player.tile.y} · pos=${player.x.toFixed(1)},${player.y.toFixed(1)} · dir=${player.currentDirection || player.dir} · deseada=${player.desiredDirection || '—'} · speed=${Number(player.actualSpeed || 0).toFixed(2)} · estado=${player.movementState} · alcanzables=${player.reachableTiles}`;
+    }
+
+    function compactWorldLine(world) {
+        if (!world) return 'world=NO DISPONIBLE';
+        return `mapa=${world.width}×${world.height} · depth=${world.depth} · room=${world.room} · threat=${world.threat} · enemies=${world.enemies} · bombs=${world.bombs} · explosions=${world.explosions} · traps=${world.traps} · projectiles=${world.projectiles} · boss=${world.boss}`;
+    }
+
+    function compactNavigationReport(nav) {
+        if (!nav?.available) return `DISPONIBLE=NO · ${nav?.note || 'sin datos'}`;
+        const lines = [];
+        lines.push(`modo=${nav.mode} · jugador alcanzables=${nav.player?.reachableTiles || 0} · junctions=${nav.player?.junctions || 0} · deadEnds=${nav.player?.deadEnds || 0} · opciones=${(nav.player?.options || []).join(',') || '—'}`);
+        for (const e of (nav.enemies || [])) {
+            lines.push(`E${e.index} tile=${e.tile.x},${e.tile.y} · ${e.behavior}/${e.alert} · actual=${e.currentDirection} · deseada=${e.desiredDirection} · real=${e.actualDirection} · estado=${e.movementState} · centro=${Number(e.distanceToCenter || 0).toFixed(1)}px · bloqueado=${e.currentPassable === false ? 'SI' : 'NO'} · atascado=${e.stuckLikely ? 'SI' : 'NO'} · ruta=${e.routeLength} · nextRuta=${e.routeNextDirection} · alineación=${e.routeAlignment} · target=${e.target?.x},${e.target?.y}`);
+        }
+        return lines.join('\n');
+    }
 
     function num(value) {
         return Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -1090,6 +1293,6 @@
         }
     });
 
-    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.16.3 cargado en el mismo runtime.');
+    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.16.5 cargado en el mismo runtime.');
     DEBUG_MODE.recordEvent('DEBUG', 'Usá RESET para activar una escena de depuración limpia.');
 })();

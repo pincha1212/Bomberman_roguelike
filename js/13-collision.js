@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.12 — Grid Motion & Collision
+// Bomberman Roguelike v3.16.8 — Grid Motion & Collision
 // Una única fuente de verdad para colisiones contra la rejilla.
 // El movimiento sigue siendo continuo, pero paredes/bloques se resuelven por celdas.
 
@@ -8,7 +8,9 @@ const GRID_COLLISION_V312 = {
     playerPadding: 1.5,
     entityInsetRatio: 0.47,
     defaultMaxStep: 2.0,
-    centerSnapRadius: 7.0
+    centerSnapRadius: 7.0,
+    enemyLaneTolerance: 2.0,
+    enemyLaneCorrectionStep: 1.8
 };
 
 function gridGetEntityRect(entity, x, y, kind = null) {
@@ -120,7 +122,7 @@ function gridCanOccupy(entity, x, y, options = {}) {
 }
 
 function gridMoveCardinal(entity, dx, dy, options = {}) {
-    if (!dx && !dy) return { moved: false, blocked: false };
+    if (!dx && !dy) return { moved: false, blocked: false, laneCorrected: false };
 
     // La navegación del juego es estrictamente cardinal.
     if (dx && dy) {
@@ -135,8 +137,61 @@ function gridMoveCardinal(entity, dx, dy, options = {}) {
     const step = amount / steps;
     let moved = false;
     let blocked = false;
+    let laneCorrected = false;
 
     for (let i = 0; i < steps; i++) {
+        // Enemigos: un corredor tiene un eje de avance y otro eje bloqueado al
+        // centro de su celda. Así no pueden quedar "entre dos pisos/celdas" ni
+        // cortar una esquina mientras siguen desplazándose. La corrección es
+        // gradual y cardinal; nunca combina X e Y en el mismo paso.
+        if (options.kind === 'enemy' && options.laneLock) {
+            const tile = gridCurrentTile(entity, 'enemy');
+            const center = gridTileCenter(tile.x, tile.y);
+            const laneAxis = axis === 'x' ? 'y' : 'x';
+            const currentLane = entity[laneAxis];
+            const targetLane = center[laneAxis];
+            const offset = targetLane - currentLane;
+            const tolerance = options.laneTolerance ?? GRID_COLLISION_V312.enemyLaneTolerance;
+
+            if (Math.abs(offset) > tolerance) {
+                const correctionStep = options.laneCorrectionStep || GRID_COLLISION_V312.enemyLaneCorrectionStep;
+                const correction = Math.sign(offset) * Math.min(Math.abs(offset), correctionStep, maxStep);
+                const nextX = laneAxis === 'x' ? entity.x + correction : entity.x;
+                const nextY = laneAxis === 'y' ? entity.y + correction : entity.y;
+                if (!gridCanOccupy(entity, nextX, nextY, options)) {
+                    blocked = true;
+                    break;
+                }
+                entity.x = nextX;
+                entity.y = nextY;
+                moved = true;
+                laneCorrected = true;
+                // Primero centramos el corredor; en este paso todavía no
+                // avanzamos hacia la siguiente celda.
+                continue;
+            }
+
+            // Dentro de tolerancia, dejamos la posición exactamente en el
+            // centro antes de cruzar una intersección. Esto evita acumular
+            // errores de flotación que luego producen un falso "entre celdas".
+            const snapX = axis === 'x' ? entity.x : center.x;
+            const snapY = axis === 'y' ? entity.y : center.y;
+            if (Math.abs((laneAxis === 'x' ? entity.x : entity.y) - targetLane) > 0.001) {
+                if (!gridCanOccupy(entity, snapX, snapY, options)) {
+                    blocked = true;
+                    break;
+                }
+                entity.x = snapX;
+                entity.y = snapY;
+                moved = true;
+                laneCorrected = true;
+                // El centrado consume este paso completo. No combinamos
+                // corrección transversal + avance longitudinal en el mismo
+                // frame porque eso produciría un desplazamiento diagonal.
+                continue;
+            }
+        }
+
         const nextX = axis === 'x' ? entity.x + step : entity.x;
         const nextY = axis === 'y' ? entity.y + step : entity.y;
         if (!gridCanOccupy(entity, nextX, nextY, options)) {
@@ -148,7 +203,7 @@ function gridMoveCardinal(entity, dx, dy, options = {}) {
         moved = true;
     }
 
-    return { moved, blocked };
+    return { moved, blocked, laneCorrected };
 }
 
 function gridIsNearTileCenter(entity, radius = GRID_COLLISION_V312.centerSnapRadius) {

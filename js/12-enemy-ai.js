@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.16.7 — Enemy self-recovery update
+// Bomberman Roguelike v3.16.8 — Enemy lane-lock update
 // Navegación local tipo corredor/intersección: la IA decide una dirección
 // y 13-collision.js se ocupa del movimiento y las paredes.
 
@@ -702,8 +702,22 @@ function moveEnemyV312(e, dt) {
         kind: 'enemy',
         canFly: !!e.type.canFly,
         maxStep: 2.0,
+        laneLock: true,
+        laneTolerance: 2.0,
+        laneCorrectionStep: 1.8,
         allowCurrentBombTile: true
     });
+
+    if (result.laneCorrected && !result.blocked) {
+        // La corrección de carril es un movimiento cardinal de alineación; no
+        // contamos ese frame como avance en la dirección anterior. Esto evita
+        // que el diagnóstico confunda "se está corrigiendo" con "está atascado".
+        e.vx = 0;
+        e.vy = 0;
+        ai.lastX = e.x;
+        ai.lastY = e.y;
+        return;
+    }
 
     if (result.moved) {
         ai.stuckTimer = 0;

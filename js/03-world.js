@@ -313,4 +313,41 @@
         // V3.12.3: el sistema de trampas/hazards vive en js/14-traps.js.
         // Este módulo mantiene la generación del nivel y delega allí la lógica
         // de generación, activación, efectos y renderizado de trampas.
+        function spawnReinforcement(count = 1) {
+            const candidates = [];
+            const px = Math.floor((player.x + player.width / 2) / TILE_SIZE);
+            const py = Math.floor((player.y + player.height / 2) / TILE_SIZE);
+            for (let y = 1; y < gameState.gridHeight - 1; y++) {
+                for (let x = 1; x < gameState.gridWidth - 1; x++) {
+                    if (gameState.grid[y][x] !== TYPES.EMPTY) continue;
+                    const distance = Math.abs(x - px) + Math.abs(y - py);
+                    if (distance >= 6 && !gameState.enemies.some(e => Math.floor(e.x/TILE_SIZE) === x && Math.floor(e.y/TILE_SIZE) === y)) candidates.push({x,y,distance});
+                }
+            }
+            candidates.sort((a,b) => b.distance - a.distance);
+            for (let i = 0; i < Math.min(count, candidates.length); i++) {
+                const c = candidates[i];
+                const roll = Math.random();
+                let type = ENEMY_TYPES.RASTRERO;
+                if (gameState.level >= 3 && roll > .68) type = ENEMY_TYPES.ESPECIAL;
+                else if (gameState.level >= 2 && roll > .38) type = ENEMY_TYPES.VOLADOR;
+                const speed = type.speed * gameState.roomType.enemySpeedMult * (1 + gameState.threatLevel * .04);
+                gameState.enemies.push({ x:c.x*TILE_SIZE+TILE_SIZE/2, y:c.y*TILE_SIZE+TILE_SIZE/2, width:TILE_SIZE*.75, height:TILE_SIZE*.75, type, vx:speed*(Math.random()<.5?-1:1), vy:0, baseSpeed:speed, changeTimer:15+Math.random()*35, elite:false, reinforcement:true });
+                addFloatingText('REFUERZO', c.x*TILE_SIZE+TILE_SIZE/2, c.y*TILE_SIZE+TILE_SIZE/2, '#fb7185');
+            }
+            if (count > 0) sfx('alarm');
+        }
+
+        function updateRoomThreat(dt) {
+            gameState.roomTime -= dt;
+            gameState.nextReinforcement -= dt;
+            if (gameState.roomType.id === 'BOSS') return;
+            if (gameState.nextReinforcement <= 0) {
+                gameState.threatLevel++;
+                const amount = Math.min(1 + Math.floor(gameState.threatLevel / 2), 3);
+                spawnReinforcement(amount);
+                gameState.nextReinforcement = Math.max(12000, 24000 - gameState.level * 500);
+                triggerScreenShake(3, 140);
+            }
+        }
 

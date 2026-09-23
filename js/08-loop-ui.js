@@ -64,7 +64,7 @@
                 UI['room-banner'].style.setProperty('--room-accent', gameState.roomType.color);
             }
             updateRoguePresentation();
-            if (UI['relic-strip']) UI['relic-strip'].innerHTML = gameState.relics.map(r => `<span class="relic-chip" title="${r.desc}">${r.icon} ${r.name}</span>`).join('');
+            if (UI['relic-strip']) UI['relic-strip'].innerHTML = gameState.relics.map(r => { const meta = getRelicCategoryMeta(r.category); return `<span class="relic-chip" title="${r.desc}" style="--relic-category:${meta.color}">${r.icon} ${r.name} <small>${meta.label}</small></span>`; }).join('');
         }
 
         function updateRoguePresentation() {
@@ -89,6 +89,9 @@
             gameState.killScoreMult = 1;
             gameState.rerollDiscount = 0;
             gameState.rerolls = 1;
+            gameState.fireScoreMult = 1;
+            gameState.hitInvulnerabilityBonus = 0;
+            if (typeof resetRelicModifiers === 'function') resetRelicModifiers();
             gameState.blocksBroken = 0;
             gameState.totalKills = 0;
             gameState.hazards = [];
@@ -126,7 +129,7 @@
             const choices = [];
             const availableRelics = getAvailableRelics().map(relic => ({
                 id: `relic_${relic.id}`, kind: 'RELIC', rarity: relic.rarity,
-                name: `${relic.icon} ${relic.name}`, desc: relic.desc, relic
+                name: `${relic.icon} ${relic.name}`, desc: relic.desc, category: relic.category, relic
             }));
             const pool = [...REWARDS, ...availableRelics];
             for (let i = pool.length - 1; i > 0; i--) {
@@ -191,6 +194,7 @@
                 card.style.setProperty('--rarity', RARITY_COLORS[reward.rarity]);
                 card.innerHTML = `
                     <div class="reward-rarity">${reward.rarity}</div>
+                    ${reward.category ? `<div class="relic-category-badge" style="--relic-category:${getRelicCategoryColor(reward.category)}">${getRelicCategoryLabel(reward.category)}</div>` : ''}
                     <div class="reward-name">${reward.name}</div>
                     <div class="reward-desc">${reward.desc}</div>
                 `;
@@ -238,7 +242,7 @@
                 card.type = 'button';
                 card.className = 'upgrade-card reward-card';
                 card.style.setProperty('--rarity', RARITY_COLORS[reward.rarity]);
-                card.innerHTML = `<div class="reward-rarity">${reward.rarity}</div><div class="reward-name">${reward.name}</div><div class="reward-desc">${reward.desc}</div>`;
+                card.innerHTML = `<div class="reward-rarity">${reward.rarity}</div>${reward.category ? `<div class="relic-category-badge" style="--relic-category:${getRelicCategoryColor(reward.category)}">${getRelicCategoryLabel(reward.category)}</div>` : ''}<div class="reward-name">${reward.name}</div><div class="reward-desc">${reward.desc}</div>`;
                 card.addEventListener('click', () => { applyReward(reward); startNextDepth(); }, { once: true });
                 options.appendChild(card);
             });

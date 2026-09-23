@@ -114,7 +114,8 @@ function placeBomb(reason='manual'){
     if (getBombAtTile(gx, gy)) return false;
     if (!gameState.grid[gy] || gameState.grid[gy][gx] === TYPES.WALL || gameState.grid[gy][gx] === TYPES.BLOCK) return false;
 
-    const fuseTotal = gameState.roomType.id === 'CURSED' ? BOMB_HANDLING.cursedFuse : BOMB_HANDLING.normalFuse;
+    const baseFuse = gameState.roomType.id === 'CURSED' ? BOMB_HANDLING.cursedFuse : BOMB_HANDLING.normalFuse;
+    const fuseTotal = Math.max(700, Math.round(baseFuse * (typeof getBombFuseMultiplier === 'function' ? getBombFuseMultiplier() : 1)));
     const bomb = {
         id: `bomb-${gameState.animFrame}-${Math.random().toString(36).slice(2,7)}`,
         owner: 'player',

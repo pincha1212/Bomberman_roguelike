@@ -52,12 +52,14 @@
             const current = axis === 'x' ? player.y : player.x;
             const delta = target - current;
             const abs = Math.abs(delta);
-            if (abs > MOTION.turnAssistRadius) return false;
+            const assistRadius = MOTION.turnAssistRadius + (Number(gameState.relicMods?.turnAssistBonus) || 0);
+            const snapRadius = MOTION.turnSnapRadius + (Number(gameState.relicMods?.turnSnapBonus) || 0);
+            if (abs > assistRadius) return false;
 
             // Corrección asistida por etapas: el jugador se detiene en su eje
             // actual y se centra suavemente en el carril. Nunca se aplican X e Y
             // en el mismo paso, por lo que no existe movimiento diagonal.
-            if (abs <= MOTION.turnSnapRadius) {
+            if (abs <= snapRadius) {
                 const candidateX = axis === 'x' ? player.x : target;
                 const candidateY = axis === 'x' ? target : player.y;
                 if (!rectCollidesSolid(candidateX, candidateY, player.width, player.height)) {
@@ -71,7 +73,7 @@
             const moved = axis === 'x'
                 ? moveAxisWithCollision('y', Math.sign(delta) * correction)
                 : moveAxisWithCollision('x', Math.sign(delta) * correction);
-            return moved && Math.abs(target - (axis === 'x' ? player.y : player.x)) <= MOTION.turnSnapRadius;
+            return moved && Math.abs(target - (axis === 'x' ? player.y : player.x)) <= snapRadius;
         }
 
         function getCardinalInput() {
@@ -104,7 +106,7 @@
 
             if (input.axis) {
                 player.inputBuffer = input;
-                player.inputBufferTimer = MOTION.inputBufferMs;
+                player.inputBufferTimer = MOTION.inputBufferMs + (Number(gameState.relicMods?.inputBufferBonus) || 0);
             } else if (player.inputBufferTimer > 0) {
                 player.inputBufferTimer -= dt;
                 if (player.inputBufferTimer <= 0) player.inputBuffer = null;

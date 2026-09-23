@@ -136,7 +136,7 @@
                 
                 // Reducimos un poquito el hitbox de la explosión para que sea más justo
                 // Contacto estricto: tocar apenas una esquina/borde de la celda no cuenta como golpe.
-                if (explosionOverlapsRect(pHurtbox, exp, 5)) {
+                if (explosionOverlapsRect(pHurtbox, exp, typeof getPlayerExplosionInset === 'function' ? getPlayerExplosionInset(exp) : 5)) {
                     const damageSource = exp.owner === 'trap' ? 'trap' : 'explosion';
                     takeDamage(damageSource, (exp.x + .5) * TILE_SIZE, (exp.y + .5) * TILE_SIZE);
                 }
@@ -156,7 +156,8 @@
                     if (explosionOverlapsRect(eFullRect, exp, 5)) {
                         triggerEnemyDefeatFeedback(e);
                         gameState.enemies.splice(j, 1);
-                        const killScore = Math.round(100 * gameState.killScoreMult * (e.elite ? 1.25 : 1));
+                        const fireScoreMult = gameState.fireScoreMult || 1;
+                        const killScore = Math.round(100 * gameState.killScoreMult * fireScoreMult * (e.elite ? 1.25 : 1));
                         const killCoins = Math.max(2, Math.round((2 + Math.random() * 3) * (1 + gameState.coinBonus) * gameState.roomType.coinMult));
                         gameState.score += killScore;
                         gameState.coins += killCoins;
@@ -259,7 +260,7 @@
             if (player.hasShield) {
                 player.hasShield = false;
                 player.isInvincible = true;
-                player.invincibleTimer = 1000;
+                player.invincibleTimer = 1000 + (Number(gameState.hitInvulnerabilityBonus) || 0);
                 addFloatingText('ESCUDO ROTO!', player.x, player.y, '#38bdf8');
                 addParticles(player.x, player.y, '#38bdf8', 16);
                 triggerPlayerDamageFeedback(source, sourceX, sourceY, false, true);
@@ -270,7 +271,7 @@
 
             player.health--;
             player.isInvincible = true;
-            player.invincibleTimer = 1500;
+            player.invincibleTimer = 1500 + (Number(gameState.hitInvulnerabilityBonus) || 0);
             const lethal = player.health <= 0;
             addParticles(player.x, player.y, '#ef4444', lethal ? 26 : 15);
             triggerPlayerDamageFeedback(source, sourceX, sourceY, lethal, false);

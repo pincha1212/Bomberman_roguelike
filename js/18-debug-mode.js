@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.28.3 — Unified Debug Mode
+// Bomberman Roguelike v3.28.4 — Unified Debug Mode
 // Depuración interna del mismo runtime. Se activa solo con ?debug=1.
 (() => {
     'use strict';
@@ -18,6 +18,7 @@
     const MAX_ERRORS = 100;
     const MAX_TEST_RESULTS = 30;
     const MAX_NAV_NODES = 900;
+    const NAV_CACHE_MS = 700;
     const MAX_MOTION_TRAIL = 24;
     const MAX_SNAPSHOT_HISTORY = 12;
     const MAX_TIMELINE_SAMPLES = 120;
@@ -86,7 +87,8 @@
             ai: false,
             camera: false,
             spawns: false,
-            paths: true
+            paths: true,
+            reachable: true
         },
 
         recordFrame(timestamp, frameMs, updateMs, drawMs) {
@@ -355,7 +357,7 @@
 
             const signature = buildNavigationSignature(state, player);
             const now = performance.now();
-            if (!force && this.navigationCache && signature === this.navigationSignature && now - this.navigationAt < 250) {
+            if (!force && this.navigationCache && signature === this.navigationSignature && now - this.navigationAt < NAV_CACHE_MS) {
                 return this.navigationCache;
             }
 
@@ -610,7 +612,7 @@
             const hw = checks.filter(c => c.status === 'WARN').length;
             const hf = checks.filter(c => c.status === 'FAIL').length;
             return [
-                'BOMBERMAN ROGUELIKE — DEBUG MODE v3.28.3',
+                'BOMBERMAN ROGUELIKE — DEBUG MODE v3.28.4',
                 `SUITE: ${results.length}/${getAvailableTestNames().length} · ${passed} PASS · ${failed} FAIL`,
                 ...results.map(r => `${String(r.name || 'TEST').toUpperCase()}: ${r.status} — ${compactCopyText(r.summary || r.result || 'Sin resultado')}`),
                 `DIAGNOSTICO: ${this.lastHealth?.status || 'PENDIENTE'} — ${hp} PASS · ${hw} WARN · ${hf} FAIL`,
@@ -1855,7 +1857,7 @@
 
     function lightweightSnapshot() {
         const state = getState(), player = getPlayer(), enemies = Array.isArray(state?.enemies) ? state.enemies : [];
-        return { engine: { stateAvailable: !!state, playerAvailable: !!player, playing: !!state?.isPlaying, frame: unifiedNum(state?.animFrame) }, player: player ? { x: unifiedRound(player.x), y: unifiedRound(player.y), vx: unifiedRound(player.vx), vy: unifiedRound(player.vy), hp: unifiedNum(player.health), maxHp: unifiedNum(player.maxHealth), direction: unifiedDirection(player.vx, player.vy) } : null, world: state ? { width: unifiedNum(state.gridWidth), height: unifiedNum(state.gridHeight), depth: unifiedNum(state.level), score: unifiedNum(state.score), coins: unifiedNum(state.coins), enemies: enemies.length, bombs: Array.isArray(state.bombs) ? state.bombs.length : 0, explosions: Array.isArray(state.explosions) ? state.explosions.length : 0, projectiles: Array.isArray(state.bossProjectiles) ? state.bossProjectiles.length : 0, threat: Object.prototype.hasOwnProperty.call(state, 'threat') ? state.threat : 'NO EXPUESTO' } : null, errors: DEBUG_MODE.runtimeErrors.length };
+        return { engine: { stateAvailable: !!state, playerAvailable: !!player, playing: !!state?.isPlaying, frame: unifiedNum(state?.animFrame) }, player: player ? { x: unifiedRound(player.x), y: unifiedRound(player.y), vx: unifiedRound(player.vx), vy: unifiedRound(player.vy), hp: unifiedNum(player.health), maxHp: unifiedNum(player.maxHealth), direction: unifiedDirection(player.vx, player.vy) } : null, world: state ? { width: unifiedNum(state.gridWidth), height: unifiedNum(state.gridHeight), depth: unifiedNum(state.level), score: unifiedNum(state.score), coins: unifiedNum(state.coins), enemies: enemies.length, bombs: Array.isArray(state.bombs) ? state.bombs.length : 0, explosions: Array.isArray(state.explosions) ? state.explosions.length : 0, projectiles: Array.isArray(state.bossProjectiles) ? state.bossProjectiles.length : 0, threat: Object.prototype.hasOwnProperty.call(state, 'threatLevel') ? Number(state.threatLevel || 0) : (Object.prototype.hasOwnProperty.call(state, 'threat') ? state.threat : 'NO EXPUESTO') } : null, errors: DEBUG_MODE.runtimeErrors.length };
     }
 
     function flattenSnapshot(obj, prefix = '', out = {}) {

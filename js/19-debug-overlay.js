@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.28.3 — Unified Debug Overlay
+// Bomberman Roguelike v3.28.4 — Unified Debug Overlay
 // Panel reconstruido para inspección en vivo. Solo se crea con ?debug=1.
 (() => {
     'use strict';
@@ -12,7 +12,7 @@
     root.innerHTML = `
         <div class="debug-header">
             <div>
-                <div class="debug-kicker">BOMBERMAN ENGINE · v3.28.3</div>
+                <div class="debug-kicker">BOMBERMAN ENGINE · v3.28.4</div>
                 <h2>DEBUG MODE <span id="debug-status" class="debug-status">CARGANDO</span></h2>
             </div>
             <button type="button" class="debug-icon-btn" data-debug-action="toggle" title="Mostrar/ocultar panel">F3</button>
@@ -27,7 +27,17 @@
             <button type="button" data-debug-action="copy-tests" title="Copia resultados de tests y diagnóstico en texto plano">COPIAR RESULTADOS</button>
         </div>
 
-        <section class="debug-section">
+        <nav class="debug-jump" aria-label="Navegar por Debug Mode">
+            <button type="button" data-debug-jump="dbg-section-state">ESTADO</button>
+            <button type="button" data-debug-jump="dbg-section-player">PLAYER</button>
+            <button type="button" data-debug-jump="dbg-section-world">WORLD</button>
+            <button type="button" data-debug-jump="dbg-section-navigation">NAVEGACIÓN</button>
+            <button type="button" data-debug-jump="dbg-section-tests">TESTS</button>
+            <button type="button" data-debug-jump="dbg-section-diagnostic">DIAGNÓSTICO</button>
+            <button type="button" data-debug-jump="dbg-section-events">LOG</button>
+        </nav>
+
+        <section id="dbg-section-state" class="debug-section">
             <div class="debug-section-head"><div class="debug-section-title">ESTADO</div><span id="dbg-state-status">—</span></div>
             <div class="debug-grid debug-grid-3">
                 <div><span>ENGINE</span><strong id="dbg-engine">—</strong></div>
@@ -46,7 +56,7 @@
             </div>
         </section>
 
-        <section class="debug-section">
+        <section id="dbg-section-profile" class="debug-section">
             <div class="debug-section-head"><div class="debug-section-title">REAL PROFILING</div><span id="dbg-profiler-status">OFF</span></div>
             <div class="debug-action-grid">
                 <button type="button" data-debug-action="profile">ACTIVAR / PAUSAR <kbd>F8</kbd></button>
@@ -66,7 +76,7 @@
             <pre id="dbg-prof-systems" class="debug-log">Activa PROFILE para medir los sistemas reales.</pre>
         </section>
 
-        <section class="debug-section">
+        <section id="dbg-section-player" class="debug-section">
             <div class="debug-section-title">PLAYER · MOVIMIENTO REAL</div>
             <div class="debug-grid debug-grid-4">
                 <div><span>X</span><strong id="dbg-px">—</strong></div>
@@ -96,7 +106,7 @@
             </div>
         </section>
 
-        <section class="debug-section">
+        <section id="dbg-section-world" class="debug-section">
             <div class="debug-section-head"><div class="debug-section-title">WORLD</div><span id="dbg-world-room">—</span></div>
             <div class="debug-grid debug-grid-4">
                 <div><span>DEPTH</span><strong id="dbg-depth">—</strong></div>
@@ -122,10 +132,15 @@
             </div>
         </section>
 
-        <section class="debug-section">
+        <section id="dbg-section-navigation" class="debug-section debug-section-navigation">
             <div class="debug-section-title">NAVEGACIÓN</div>
+            <div class="debug-nav-controls">
+                <label>OBJETIVO <select id="dbg-nav-selected"><option value="player">JUGADOR</option></select></label>
+                <button type="button" data-debug-action="navigation-refresh">ACTUALIZAR NAVEGACIÓN</button>
+            </div>
             <div class="debug-checks">
-                <label><input type="checkbox" data-debug-visual="paths" checked> Rutas / alcance</label>
+                <label><input type="checkbox" data-debug-visual="paths" checked> Rutas</label>
+                <label><input type="checkbox" data-debug-visual="reachable" checked> Alcance</label>
                 <label><input type="checkbox" data-debug-visual="grid"> Grid</label>
                 <label><input type="checkbox" data-debug-visual="collision"> Colisión</label>
                 <label><input type="checkbox" data-debug-visual="hitboxes"> Hitboxes</label>
@@ -134,6 +149,10 @@
                 <label><input type="checkbox" data-debug-visual="ai"> IA</label>
                 <label><input type="checkbox" data-debug-visual="camera"> Cámara</label>
                 <label><input type="checkbox" data-debug-visual="spawns"> Spawns</label>
+            </div>
+            <div class="debug-nav-visual-wrap">
+                <canvas id="dbg-nav-map" width="420" height="420" aria-label="Mapa de navegación del nivel"></canvas>
+                <div id="dbg-nav-map-status" class="debug-nav-map-status">MAPA: esperando datos</div>
             </div>
             <div class="debug-grid debug-grid-4">
                 <div><span>PLAYER TILE</span><strong id="dbg-nav-player-tile">—</strong></div>
@@ -153,24 +172,24 @@
             <pre id="dbg-nav-enemies" class="debug-log">Sin datos de navegación.</pre>
         </section>
 
-        <section class="debug-section">
+        <section id="dbg-section-inspector" class="debug-section">
             <div class="debug-section-head"><div class="debug-section-title">INSPECTOR DE TEST</div><span id="dbg-last-test">—</span></div>
             <div id="dbg-test-summary" class="debug-note">Todavía no hay una prueba seleccionada.</div>
             <pre id="dbg-test-data" class="debug-log">Los detalles aparecerán acá al ejecutar un test.</pre>
         </section>
 
-        <section class="debug-section debug-tests">
+        <section id="dbg-section-tests" class="debug-section debug-tests">
             <div class="debug-section-head"><div class="debug-section-title">TEST RUNNER</div><span id="dbg-suite">0/${Object.keys(window.DEBUG_TESTS || {}).length}</span></div>
             <div id="dbg-test-list" class="debug-test-list"></div>
         </section>
 
-        <section class="debug-section">
+        <section id="dbg-section-stress" class="debug-section">
             <div class="debug-section-head"><div class="debug-section-title">AI STRESS</div><span id="dbg-stress-head">PENDIENTE</span></div>
             <div id="dbg-stress-summary" class="debug-note">Ejecutá AI STRESS para probar movimiento, giros, rutas, bloqueos y evasión.</div>
             <pre id="dbg-stress-cases" class="debug-log">Sin resultados.</pre>
         </section>
 
-        <section class="debug-section">
+        <section id="dbg-section-stress-detail" class="debug-section">
             <div class="debug-section-head"><div class="debug-section-title">COLLISION STRESS</div><span id="dbg-collision-stress-head">PENDIENTE</span></div>
             <div id="dbg-collision-stress-summary" class="debug-note">Ejecutá COLLISION STRESS para probar esquinas, corredores, obstáculos, bombas, overlaps y lane-lock.</div>
 
@@ -181,7 +200,7 @@
             <div id="dbg-difficulty-stress-summary" class="debug-note">Ejecutá DIFFICULTY STRESS para validar progresión por profundidad.</div>
         </section>
 
-        <section class="debug-section">
+        <section id="dbg-section-diagnostic" class="debug-section">
             <div class="debug-section-head"><div class="debug-section-title">DIAGNÓSTICO UNIFICADO</div><span id="dbg-health-status">PENDIENTE</span></div>
             <div class="debug-action-grid">
                 <button type="button" data-debug-action="health">DIAGNÓSTICO</button>
@@ -196,7 +215,7 @@
             <pre id="dbg-copy-preview" class="debug-log">La copia será texto plano.</pre>
         </section>
 
-        <section class="debug-section">
+        <section id="dbg-section-events" class="debug-section">
             <div class="debug-section-head"><div class="debug-section-title">EVENT LOG</div><span id="dbg-event-count">0</span></div>
             <div class="debug-action-grid">
                 <button type="button" data-debug-action="clear-events">LIMPIAR EVENTOS</button>
@@ -204,7 +223,7 @@
             <pre id="dbg-events" class="debug-log">Sin eventos.</pre>
         </section>
 
-        <section class="debug-section">
+        <section id="dbg-section-errors" class="debug-section">
             <div class="debug-section-head"><div class="debug-section-title">RUNTIME ERRORS</div><span id="dbg-error-count">0</span></div>
             <div class="debug-action-grid">
                 <button type="button" data-debug-action="clear-errors">LIMPIAR ERRORES</button>
@@ -212,7 +231,7 @@
             <pre id="dbg-error-log" class="debug-log debug-error-log">Sin errores.</pre>
         </section>
 
-        <section class="debug-section">
+        <section id="dbg-section-actions" class="debug-section">
             <div class="debug-section-title">ACCIONES</div>
             <div class="debug-action-grid">
                 <button type="button" data-debug-action="bomb">💣 BOMBA</button>
@@ -226,8 +245,161 @@
     document.body.classList.add('debug-page');
     document.getElementById('game-container')?.classList.add('debug-enabled');
 
+    const style = document.createElement('style');
+    style.id = 'debug-v3284-inline-style';
+    style.textContent = `
+#debug-overlay{position:fixed;top:12px;right:12px;bottom:12px;width:min(500px,calc(100vw - 24px));z-index:99999;display:flex;flex-direction:column;overflow:hidden;background:rgba(7,12,22,.97);color:#e5e7eb;border:1px solid rgba(148,163,184,.35);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.55);font:12px/1.4 Inter,system-ui,sans-serif;backdrop-filter:blur(10px)}
+#debug-overlay.hidden{display:none}
+#debug-overlay .debug-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:14px 16px 10px;border-bottom:1px solid rgba(148,163,184,.18)}
+#debug-overlay .debug-kicker{font-size:10px;letter-spacing:.08em;opacity:.65}
+#debug-overlay h2{margin:3px 0 0;font-size:18px;letter-spacing:.04em}
+#debug-overlay .debug-toolbar,#debug-overlay .debug-action-grid{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px}
+#debug-overlay button,#debug-overlay select{font:600 11px/1.1 Inter,system-ui,sans-serif;color:#e5e7eb;background:#111827;border:1px solid #334155;border-radius:7px;padding:7px 9px;cursor:pointer}
+#debug-overlay button:hover{border-color:#64748b;background:#172033}
+#debug-overlay .debug-jump{position:sticky;top:0;z-index:4;display:flex;gap:5px;overflow-x:auto;padding:7px 12px;background:rgba(7,12,22,.98);border-top:1px solid rgba(148,163,184,.12);border-bottom:1px solid rgba(148,163,184,.16)}
+#debug-overlay .debug-jump button{white-space:nowrap;padding:6px 8px;font-size:10px}
+#debug-overlay .debug-section{padding:12px;border-bottom:1px solid rgba(148,163,184,.12)}
+#debug-overlay .debug-section-navigation{scroll-margin-top:52px}
+#debug-overlay .debug-section-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+#debug-overlay .debug-section-title{font-weight:800;letter-spacing:.08em;font-size:11px}
+#debug-overlay .debug-grid{display:grid;gap:5px}
+#debug-overlay .debug-grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+#debug-overlay .debug-grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+#debug-overlay .debug-grid>div{min-width:0;padding:7px 8px;border:1px solid rgba(148,163,184,.14);border-radius:7px;background:rgba(15,23,42,.72)}
+#debug-overlay .debug-grid span{display:block;font-size:9px;opacity:.55;text-transform:uppercase}
+#debug-overlay .debug-grid strong{display:block;margin-top:2px;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#debug-overlay .debug-checks{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+#debug-overlay .debug-checks label,#debug-overlay .debug-nav-controls label{display:flex;align-items:center;gap:5px;font-size:10px}
+#debug-overlay .debug-nav-controls{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:7px 0;flex-wrap:wrap}
+#debug-overlay .debug-nav-controls select{padding:6px 8px}
+#debug-overlay .debug-nav-visual-wrap{position:relative;width:100%;display:grid;place-items:center;margin:8px 0 10px;padding:8px;border:1px solid rgba(148,163,184,.16);border-radius:10px;background:#050a12}
+#debug-overlay #dbg-nav-map{width:min(100%,420px);height:auto;aspect-ratio:1;display:block;image-rendering:pixelated}
+#debug-overlay .debug-nav-map-status{width:100%;margin-top:7px;text-align:center;font:10px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.72}
+#debug-overlay .debug-note{margin:7px 0;padding:7px 8px;border-left:2px solid #475569;background:rgba(15,23,42,.65);font-size:10px}
+#debug-overlay .debug-log{margin:8px 0 0;max-height:190px;overflow:auto;padding:8px;border:1px solid rgba(148,163,184,.14);border-radius:7px;background:#030712;color:#cbd5e1;white-space:pre-wrap;word-break:break-word;font:10px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace}
+#debug-overlay .debug-test-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+#debug-overlay .debug-test-list button{display:flex;justify-content:space-between;align-items:center;text-align:left;gap:6px}
+#debug-overlay .debug-test-list em{font-style:normal;font-size:9px;opacity:.7}
+#debug-overlay .is-pass{border-color:#3f8f5d!important}
+#debug-overlay .is-fail{border-color:#b24b4b!important}
+@media(max-width:700px){#debug-overlay{top:6px;right:6px;bottom:6px;width:calc(100vw - 12px)}#debug-overlay .debug-grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}#debug-overlay .debug-grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+`;
+    document.head.appendChild(style);
+
     const fmt = (value, decimals = 1) => Number.isFinite(Number(value)) ? Number(value).toFixed(decimals) : '—';
     const setText = (id, value) => { const node = document.getElementById(id); if (node) node.textContent = String(value); };
+
+    let selectedNavTarget = 'player';
+
+    function refreshNavSelector(enemyNav) {
+        const select = document.getElementById('dbg-nav-selected');
+        if (!select) return;
+        const wanted = selectedNavTarget;
+        const options = ['<option value="player">JUGADOR</option>'];
+        for (const e of enemyNav) options.push(`<option value="enemy:${e.index}">ENEMIGO E${e.index} · ${e.archetypeLabel || e.behavior || 'ENEMY'}</option>`);
+        select.innerHTML = options.join('');
+        const valid = Array.from(select.options).some(o => o.value === wanted);
+        selectedNavTarget = valid ? wanted : 'player';
+        select.value = selectedNavTarget;
+    }
+
+    function drawNavigationMap(snapshot) {
+        const canvas = document.getElementById('dbg-nav-map');
+        const status = document.getElementById('dbg-nav-map-status');
+        const state = window.BOMBER_ENGINE?.getState?.();
+        if (!canvas || !state || !Array.isArray(state.grid)) {
+            if (status) status.textContent = 'MAPA: sin rejilla';
+            return;
+        }
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const cols = Number(state.gridWidth || state.grid[0]?.length || 0);
+        const rows = Number(state.gridHeight || state.grid.length || 0);
+        if (!cols || !rows) return;
+        const cw = canvas.width / cols;
+        const ch = canvas.height / rows;
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = '#050a12';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+
+        const tileType = (x,y) => state.grid[y]?.[x];
+        for (let y=0;y<rows;y++) for (let x=0;x<cols;x++) {
+            const type = tileType(x,y);
+            if (type === window.TYPES?.WALL) ctx.fillStyle = '#263245';
+            else if (type === window.TYPES?.BLOCK) ctx.fillStyle = '#4b3a2a';
+            else ctx.fillStyle = '#0d1522';
+            ctx.fillRect(x*cw+1,y*ch+1,Math.max(1,cw-2),Math.max(1,ch-2));
+        }
+
+        const nav = snapshot?.navigation || {};
+        const reachable = new Set((nav.player?.cells || []).map(c => `${c.x},${c.y}`));
+        if (D.selectedVisuals.reachable !== false) {
+            ctx.fillStyle = 'rgba(34,197,94,.12)';
+            for (const key of reachable) {
+                const [x,y] = key.split(',').map(Number);
+                ctx.fillRect(x*cw+2,y*ch+2,Math.max(1,cw-4),Math.max(1,ch-4));
+            }
+        }
+
+        const drawRoute = (route) => {
+            if (!D.selectedVisuals.paths || !Array.isArray(route) || route.length < 2) return;
+            ctx.beginPath();
+            route.forEach((p,i)=>{ const px=(p.x+.5)*cw, py=(p.y+.5)*ch; if(i===0)ctx.moveTo(px,py); else ctx.lineTo(px,py); });
+            ctx.strokeStyle = 'rgba(56,189,248,.9)';
+            ctx.lineWidth = Math.max(2,Math.min(5,cw*.18));
+            ctx.stroke();
+        };
+
+        const selectedEnemy = selectedNavTarget.startsWith('enemy:') ? nav.enemies?.find(e => `enemy:${e.index}`===selectedNavTarget) : null;
+        if (selectedEnemy) drawRoute(selectedEnemy.route);
+        else if (D.selectedVisuals.paths && Array.isArray(nav.player?.trail) && nav.player.trail.length > 1) {
+            drawRoute(nav.player.trail.map(t=>({x:t.x,y:t.y})));
+        }
+
+        if (D.selectedVisuals.bombs) {
+            for (const b of state.bombs || []) {
+                ctx.beginPath(); ctx.arc((b.x+.5)*cw,(b.y+.5)*ch,Math.max(3,cw*.23),0,Math.PI*2); ctx.fillStyle='#f59e0b'; ctx.fill();
+            }
+        }
+        if (D.selectedVisuals.explosions) {
+            for (const e of state.explosions || []) {
+                ctx.fillStyle='rgba(249,115,22,.75)'; ctx.fillRect(e.x*cw+2,e.y*ch+2,Math.max(1,cw-4),Math.max(1,ch-4));
+            }
+        }
+
+        const playerTile = nav.player?.tile || {x:-1,y:-1};
+        if (playerTile.x >= 0) {
+            ctx.beginPath(); ctx.arc((playerTile.x+.5)*cw,(playerTile.y+.5)*ch,Math.max(4,cw*.27),0,Math.PI*2); ctx.fillStyle='#22c55e'; ctx.fill();
+            ctx.strokeStyle='#dcfce7'; ctx.lineWidth=1.5; ctx.stroke();
+        }
+
+        for (const e of nav.enemies || []) {
+            const x=e.tile?.x, y=e.tile?.y; if(!Number.isFinite(x)||!Number.isFinite(y))continue;
+            const size=Math.max(5,cw*.32); const px=x*cw+cw/2-size/2, py=y*ch+ch/2-size/2;
+            ctx.fillStyle = e.stuckLikely ? '#ef4444' : (e.physicalBlocked || e.currentPassable === false ? '#f59e0b' : '#a855f7');
+            ctx.fillRect(px,py,size,size);
+            if (D.selectedVisuals.ai) {
+                const dir=e.actualDirection||'STILL';
+                const vec={UP:[0,-1],DOWN:[0,1],LEFT:[-1,0],RIGHT:[1,0]}[dir]||[0,0];
+                ctx.beginPath(); ctx.moveTo((x+.5)*cw,(y+.5)*ch); ctx.lineTo((x+.5+vec[0]*.34)*cw,(y+.5+vec[1]*.34)*ch); ctx.strokeStyle='#f8fafc'; ctx.lineWidth=1.5; ctx.stroke();
+            }
+        }
+
+        if (D.selectedVisuals.grid) {
+            ctx.strokeStyle='rgba(148,163,184,.14)'; ctx.lineWidth=1;
+            for(let x=0;x<=cols;x++){ctx.beginPath();ctx.moveTo(x*cw,0);ctx.lineTo(x*cw,canvas.height);ctx.stroke();}
+            for(let y=0;y<=rows;y++){ctx.beginPath();ctx.moveTo(0,y*ch);ctx.lineTo(canvas.width,y*ch);ctx.stroke();}
+        }
+
+        if (D.selectedVisuals.camera && snapshot.camera) {
+            const cam=snapshot.camera; const viewportW=600, viewportH=600;
+            ctx.strokeStyle='rgba(236,72,153,.85)'; ctx.lineWidth=2; ctx.strokeRect((cam.x/48)*cw,(cam.y/48)*ch,(viewportW/48)*cw,(viewportH/48)*ch);
+        }
+        if (D.selectedVisuals.spawns) {
+            const exit=state.exitPos; if(exit){ctx.strokeStyle='#38bdf8';ctx.lineWidth=2;ctx.strokeRect(exit.x*cw+cw*.2,exit.y*ch+ch*.2,cw*.6,ch*.6);}
+        }
+        if (status) status.textContent = `MAPA ${cols}×${rows} · ${selectedNavTarget==='player'?'JUGADOR':selectedNavTarget.replace('enemy:','E')} · ${nav.available?'DATOS ACTUALES':'SIN DATOS DE NAVEGACIÓN'}`;
+    }
 
     function refresh() {
         const s = D.snapshot();
@@ -353,6 +525,8 @@
         });
         const navNode = document.getElementById('dbg-nav-enemies');
         if (navNode) navNode.textContent = enemyLines.length ? enemyLines.join('\n') : 'Sin enemigos en la escena.';
+        refreshNavSelector(enemyNav);
+        drawNavigationMap(s);
 
         const stress = s.aiStress;
         if (stress?.cases?.length) {
@@ -478,6 +652,7 @@
         else if (name === 'step') D.requestStep();
         else if (name === 'run-tests') D.runAllTests();
         else if (name === 'health') D.runHealthChecks();
+        else if (name === 'navigation-refresh') { D.getNavigationSnapshot(true); refresh(); }
         else if (name === 'snapshot') D.captureSnapshot();
         else if (name === 'timeline') D.toggleTimeline();
         else if (name === 'copy-tests') D.copyTestReport().then(result => {
@@ -522,6 +697,17 @@
         if (!checkbox) return;
         D.setVisual(checkbox.dataset.debugVisual, checkbox.checked);
         refresh();
+    });
+
+    root.addEventListener('change', event => {
+        const select = event.target.closest('#dbg-nav-selected');
+        if (select) { selectedNavTarget = select.value; drawNavigationMap(D.snapshot()); }
+    });
+
+    root.addEventListener('click', event => {
+        const jump = event.target.closest('[data-debug-jump]');
+        if (!jump) return;
+        document.getElementById(jump.dataset.debugJump)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
     window.addEventListener('bomber-debug-updated', refresh);

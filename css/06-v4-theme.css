@@ -127,8 +127,6 @@ body.v4-theme::before{
 }
 .v4-game-label span{color:var(--v4-red-bright);}
 .v4-game-label b{color:var(--v4-yellow);font-weight:400;margin-left:4px;}
-.v4-game-status{display:flex;align-items:center;gap:6px;color:#7e8796;}
-.v4-game-status i{width:5px;height:5px;background:var(--v4-green);box-shadow:0 0 8px var(--v4-green);}
 
 .v4-theme #run-banner,.v4-theme #room-banner{
     border:1px solid #4a515e;

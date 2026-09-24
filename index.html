@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOMBERMAN ROGUELIKE — v4.4.0</title>
+    <title>BOMBERMAN ROGUELIKE — v4.5.0</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/main.css">
 </head>
@@ -14,7 +14,7 @@
             <aside class="menu-rail menu-rail-left" aria-label="Resumen de la aventura">
                 <div class="menu-rail-top">
                     <span class="menu-kicker">BOMBERMAN ROGUELIKE</span>
-                    <span class="menu-version">v4.4.0</span>
+                    <span class="menu-version">v4.5.0</span>
                 </div>
                 <div class="menu-rail-content">
                     <div class="menu-mark">💣</div>
@@ -118,6 +118,27 @@
                     <div><b>LOOT</b><span>Monedas, powerups y reliquias para construir tu run.</span></div>
                     <div><b>RIESGO</b><span>Trampas, presión, refuerzos y jefes te obligan a moverte.</span></div>
                 </div>
+                <section class="quality-selector" aria-label="Calidad gráfica">
+                    <div class="quality-selector-head">
+                        <div>
+                            <span class="quality-selector-kicker">CONFIGURACIÓN</span>
+                            <strong>DETALLES GRÁFICOS</strong>
+                        </div>
+                        <span id="quality-selected-summary" class="quality-selected-summary">DETALLES MEDIOS · Gama media</span>
+                    </div>
+                    <div class="quality-options" role="radiogroup" aria-label="Nivel de detalles">
+                        <button class="quality-option" type="button" data-quality-option="low" role="radio" aria-checked="false">
+                            <strong>BAJO</strong><span>Gama baja</span>
+                        </button>
+                        <button class="quality-option" type="button" data-quality-option="medium" role="radio" aria-checked="false">
+                            <strong>MEDIO</strong><span>Gama media</span>
+                        </button>
+                        <button class="quality-option" type="button" data-quality-option="high" role="radio" aria-checked="false">
+                            <strong>MÁXIMO</strong><span>Gama alta</span>
+                        </button>
+                    </div>
+                    <p class="quality-selector-note">Elegí el nivel antes de comenzar la partida.</p>
+                </section>
                 <div class="menu-actions">
                     <button id="btn-start" class="btn-pixel menu-start-button">INICIAR RUN</button>
                     <button id="btn-debug-mode" class="btn-debug-mode" type="button">🧪 ABRIR DEBUG MODE</button>
@@ -145,13 +166,14 @@
     </script>
 
     <!-- v3.28 modular JavaScript. Feedback is layered over the existing combat/runtime systems. -->
-    <script src="js/01-core.js?v=4.4.0"></script>
+    <script src="js/01-core.js?v=4.5.0"></script>
+    <script src="js/35-device-quality.js?v=4.5.0"></script>
     <script src="js/16-relics.js?v=3.27.0"></script>
     <script src="js/02-input.js?v=3.27.0"></script>
     <script src="js/15-room-design.js?v=4.4.0"></script>
     <script src="js/24-difficulty.js?v=3.27.0"></script>
     <script src="js/03-world.js?v=4.4.0"></script>
-    <script src="js/04-enemies.js?v=4.4.0"></script>
+    <script src="js/04-enemies.js?v=4.5.0"></script>
     <script src="js/11-bombs.js?v=4.2.0"></script>
     <script src="js/13-collision.js?v=3.27.0"></script>
     <script src="js/14-traps.js?v=3.27.0"></script>
@@ -171,7 +193,7 @@
     <script src="js/08-loop-ui.js?v=3.29.0"></script>
     <script src="js/27-boss-system.js?v=4.2.0"></script>
     <script src="js/28-boss-stress.js?v=4.2.0"></script>
-    <script src="js/29-feedback-system.js?v=3.27.0"></script>
+    <script src="js/29-feedback-system.js?v=4.5.0"></script>
     <script src="js/30-feedback-stress.js?v=3.27.0"></script>
     <script src="js/31-roguelike-update.js?v=3.27.0"></script>
     <script src="js/32-roguelike-stress.js?v=3.27.0"></script>

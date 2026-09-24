@@ -12,7 +12,7 @@
     root.innerHTML = `
         <div class="debug-header">
             <div>
-                <div class="debug-kicker">BOMBERMAN ENGINE · v3.16.7</div>
+                <div class="debug-kicker">BOMBERMAN ENGINE · v3.17</div>
                 <h2>DEBUG MODE <span id="debug-status" class="debug-status">CARGANDO</span></h2>
             </div>
             <button type="button" class="debug-icon-btn" data-debug-action="toggle" title="Mostrar/ocultar panel">F3</button>
@@ -23,6 +23,7 @@
             <button type="button" data-debug-action="pause">PAUSA <kbd>F4</kbd></button>
             <button type="button" data-debug-action="step">STEP <kbd>F6</kbd></button>
             <button type="button" data-debug-action="run-tests">TESTS <kbd>F7</kbd></button>
+            <button type="button" data-debug-action="profile">PROFILE <kbd>F8</kbd></button>
             <button type="button" data-debug-action="copy-tests" title="Copia el informe completo de tests, estado, eventos y errores">COPIAR TEST</button>
         </div>
 
@@ -43,6 +44,26 @@
                 <div><span>EVENTOS</span><strong id="dbg-event-total">0/0</strong></div>
                 <div><span>COLAPSADOS</span><strong id="dbg-event-collapsed">0</strong></div>
             </div>
+        </section>
+
+        <section class="debug-section">
+            <div class="debug-section-head"><div class="debug-section-title">REAL PROFILING</div><span id="dbg-profiler-status">OFF</span></div>
+            <div class="debug-action-grid">
+                <button type="button" data-debug-action="profile">ACTIVAR / PAUSAR <kbd>F8</kbd></button>
+                <button type="button" data-debug-action="profile-reset">RESETEAR MUESTRAS</button>
+            </div>
+            <div class="debug-grid debug-grid-4">
+                <div><span>FPS</span><strong id="dbg-prof-fps">0</strong></div>
+                <div><span>TRABAJO/FRAME</span><strong id="dbg-prof-work">0ms</strong></div>
+                <div><span>P95 FRAME</span><strong id="dbg-prof-p95">0ms</strong></div>
+                <div><span>MÁX FRAME</span><strong id="dbg-prof-max">0ms</strong></div>
+                <div><span>SOBRE 16.67ms</span><strong id="dbg-prof-budget">0%</strong></div>
+                <div><span>FRAME >33.4ms</span><strong id="dbg-prof-slow">0</strong></div>
+                <div><span>HITCH >50ms</span><strong id="dbg-prof-hitch">0</strong></div>
+                <div><span>MUESTRAS</span><strong id="dbg-prof-samples">0</strong></div>
+            </div>
+            <div class="debug-note" id="dbg-prof-memory">MEMORIA · N/D</div>
+            <pre id="dbg-prof-systems" class="debug-log">Activa PROFILE para medir los sistemas reales.</pre>
         </section>
 
         <section class="debug-section">
@@ -199,6 +220,33 @@
         setText('dbg-errors', s.errors);
         setText('dbg-event-total', `${s.events}/${s.rawEvents || s.events}`);
         setText('dbg-event-collapsed', s.suppressedEvents || 0);
+
+        const profiler = window.BOMBER_PROFILER?.snapshot?.() || null;
+        if (profiler) {
+            setText('dbg-profiler-status', profiler.enabled ? 'ON' : 'OFF');
+            setText('dbg-prof-fps', profiler.frame.fps ? profiler.frame.fps.toFixed(1) : '0');
+            setText('dbg-prof-work', `${profiler.frame.avgMs.toFixed(2)}ms`);
+            setText('dbg-prof-p95', `${profiler.frame.p95Ms.toFixed(2)}ms`);
+            setText('dbg-prof-max', `${profiler.frame.maxMs.toFixed(2)}ms`);
+            setText('dbg-prof-budget', `${profiler.overBudgetPercent.toFixed(1)}%`);
+            setText('dbg-prof-slow', profiler.slowFrames);
+            setText('dbg-prof-hitch', profiler.hitchFrames);
+            setText('dbg-prof-samples', profiler.totalFrames);
+            if (profiler.memory.available) {
+                setText('dbg-prof-memory', `MEMORIA · heap usada ${profiler.memory.usedMB.toFixed(1)}MB · total ${profiler.memory.totalMB.toFixed(1)}MB · límite ${profiler.memory.limitMB.toFixed(0)}MB`);
+            } else {
+                setText('dbg-prof-memory', 'MEMORIA · N/D en este navegador');
+            }
+            const systemLines = profiler.systems.slice(0, 14).map((item, index) =>
+                `${String(index + 1).padStart(2, '0')} · ${item.label.padEnd(28)} avg ${item.avgMs.toFixed(3)}ms · p95 ${item.p95Ms.toFixed(3)}ms · max ${item.maxMs.toFixed(3)}ms · calls/f ${item.callsPerFrame.toFixed(1)}`
+            );
+            setText('dbg-prof-systems', profiler.enabled
+                ? (systemLines.length ? systemLines.join('\n') : 'Recolectando muestras...')
+                : 'Profiler OFF · activá PROFILE/F8 para recolectar muestras.');
+        } else {
+            setText('dbg-profiler-status', 'NO DISPONIBLE');
+            setText('dbg-prof-systems', 'Profiler no cargado.');
+        }
 
         const p = s.player;
         if (p) {
@@ -368,6 +416,8 @@
         else if (name === 'enemy') D.manualEnemy();
         else if (name === 'clear-events') D.clearEvents();
         else if (name === 'clear-errors') D.clearErrors();
+        else if (name === 'profile') window.BOMBER_PROFILER?.toggle?.();
+        else if (name === 'profile-reset') window.BOMBER_PROFILER?.reset?.();
         else if (name === 'exit') window.location.href = './';
     }
 

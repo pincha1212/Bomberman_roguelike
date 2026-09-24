@@ -3,6 +3,7 @@
             if (!gameState.isPlaying) { gameState.rafId = 0; return; }
 
             const debugEnabled = !!window.DEBUG_MODE?.enabled;
+            window.BOMBER_PROFILER?.beginFrame(timestamp);
             const frameStart = debugEnabled ? performance.now() : 0;
             let dt = timestamp - gameState.lastTime;
             gameState.lastTime = timestamp;
@@ -31,6 +32,8 @@
             const drawStart = debugEnabled ? performance.now() : 0;
             draw();
             const drawMs = debugEnabled ? performance.now() - drawStart : 0;
+
+            window.BOMBER_PROFILER?.endFrame(timestamp);
 
             if (debugEnabled) {
                 const frameMs = performance.now() - frameStart;
@@ -247,7 +250,7 @@
         document.getElementById('btn-resume')?.addEventListener('click', togglePause);
         document.getElementById('btn-debug-mode')?.addEventListener('click', () => {
             const base = window.location.href.split('?')[0].split('#')[0];
-            window.location.href = `${base}?debug=1`;
+            window.location.href = `${base}?debug=1&profile=1`;
         });
 
         // Initial setup

@@ -315,7 +315,8 @@
                 rawEvents: this.eventCountRaw,
                 suppressedEvents: this.suppressedEvents,
                 navigation,
-                aiStress: this.aiStress
+                aiStress: this.aiStress,
+                profiler: window.BOMBER_PROFILER?.snapshot?.() || null
             };
         },
 
@@ -539,6 +540,10 @@
                 `FPS=${Number(snapshot.performance.fps || 0).toFixed(1)} · intervalo RAF=${Number(snapshot.performance.avgFrameIntervalMs || 0).toFixed(2)}ms`,
                 `trabajo JS/frame=${Number(snapshot.performance.workMs || 0).toFixed(2)}ms · update=${Number(snapshot.performance.updateMs || 0).toFixed(2)}ms · draw=${Number(snapshot.performance.drawMs || 0).toFixed(2)}ms`,
                 `trabajo min/max=${Number(snapshot.performance.minMs || 0).toFixed(2)}/${Number(snapshot.performance.maxMs || 0).toFixed(2)}ms · intervalo min/max=${Number(snapshot.performance.minIntervalMs || 0).toFixed(2)}/${Number(snapshot.performance.maxIntervalMs || 0).toFixed(2)}ms`,
+                '',
+                '=== REAL PROFILING ===',
+                snapshot.profiler ? `estado=${snapshot.profiler.enabled ? 'ON' : 'OFF'} · muestras=${snapshot.profiler.totalFrames} · FPS=${Number(snapshot.profiler.frame?.fps || 0).toFixed(1)} · avg=${Number(snapshot.profiler.frame?.avgMs || 0).toFixed(2)}ms · p95=${Number(snapshot.profiler.frame?.p95Ms || 0).toFixed(2)}ms · max=${Number(snapshot.profiler.frame?.maxMs || 0).toFixed(2)}ms · sobre presupuesto=${Number(snapshot.profiler.overBudgetPercent || 0).toFixed(1)}%` : 'Profiler sin datos.',
+                snapshot.profiler?.systems?.length ? snapshot.profiler.systems.slice(0, 12).map((item, index) => `${index + 1}. ${item.label} · avg=${Number(item.avgMs || 0).toFixed(3)}ms · p95=${Number(item.p95Ms || 0).toFixed(3)}ms · max=${Number(item.maxMs || 0).toFixed(3)}ms`).join('\n') : 'Sin muestras de sistemas.',
                 '',
                 '=== PLAYER ===',
                 compactPlayerLine(snapshot.player),
@@ -1733,6 +1738,10 @@
         } else if (event.code === 'F7') {
             event.preventDefault();
             DEBUG_MODE.runAllTests();
+        } else if (event.code === 'F8') {
+            event.preventDefault();
+            window.BOMBER_PROFILER?.toggle?.();
+            dispatchUpdate();
         }
     });
 

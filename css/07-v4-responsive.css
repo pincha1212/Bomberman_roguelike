@@ -1,0 +1,231 @@
+/* ================================================================
+   BOMBERMAN ROGUELIKE v4.2 — SMART INFORMATION LAYOUT
+   Una sola capa de información, sin superposición y adaptada al viewport.
+   ================================================================ */
+.v4-theme #game-container{
+    container-type:size;
+    isolation:isolate;
+    overflow:hidden;
+    --v42-edge:clamp(6px,1.15cqw,11px);
+    --v42-side-width:31%;
+    --v42-center-width:32%;
+    --v42-top:42px;
+    --v42-gap:5px;
+}
+
+.v4-theme #ui-layer{
+    position:absolute;
+    inset:0;
+    padding:0;
+    display:block;
+    z-index:20;
+}
+
+.v4-theme #ui-layer > .flex:first-child,
+.v4-theme #ui-layer > .flex:last-child{
+    position:absolute;
+    top:var(--v42-top);
+    bottom:auto;
+    width:var(--v42-side-width);
+    max-width:var(--v42-side-width);
+    min-width:0;
+    display:flex;
+    flex-wrap:wrap;
+    gap:var(--v42-gap);
+    align-content:flex-start;
+    pointer-events:none;
+}
+.v4-theme #ui-layer > .flex:first-child{
+    left:var(--v42-edge);
+    right:auto;
+    align-items:flex-start;
+    justify-content:flex-start;
+}
+.v4-theme #ui-layer > .flex:last-child{
+    left:auto;
+    right:var(--v42-edge);
+    align-items:flex-start;
+    justify-content:flex-end;
+}
+.v4-theme #ui-layer > .flex:first-child > .flex,
+.v4-theme #ui-layer > .flex:last-child > .flex{
+    width:100%;
+    min-width:0;
+    flex-wrap:wrap;
+    gap:var(--v42-gap);
+}
+.v4-theme .stat-badge{
+    min-width:0;
+    max-width:100%;
+    white-space:nowrap;
+    line-height:1.15;
+}
+
+.v4-theme #run-banner,
+.v4-theme #room-banner,
+.v4-theme .boss-hud{
+    left:50%;
+    width:var(--v42-center-width);
+    max-width:var(--v42-center-width);
+    min-width:0;
+    margin:0;
+    text-align:center;
+    box-sizing:border-box;
+}
+.v4-theme #run-banner{
+    top:var(--v42-top);
+    font-size:clamp(4px,.9cqw,7px);
+    padding:5px 7px;
+    white-space:normal;
+    line-height:1.45;
+}
+.v4-theme #room-banner{
+    top:calc(var(--v42-top) + 31px);
+    font-size:clamp(3.8px,.8cqw,6px);
+    padding:5px 7px;
+    white-space:normal;
+    line-height:1.45;
+}
+.v4-theme .boss-hud{
+    top:7px;
+    padding:5px 7px 6px;
+}
+.v4-theme .boss-hud-top{font-size:clamp(5px,.9cqw,8px);}
+
+/* Jugador arriba-centro: la información contextual baja al centro inferior. */
+.v4-theme #game-container.ui-player-tc #run-banner{top:auto;bottom:42px;}
+.v4-theme #game-container.ui-player-tc #room-banner{top:auto;bottom:10px;}
+.v4-theme #game-container.ui-player-tc #danger-indicator{bottom:56px;}
+
+/* Boss: jerarquía central fija y compacta: BOSS > RUN > ROOM. */
+.v4-theme #game-container.ui-boss-active #run-banner{top:43px;}
+.v4-theme #game-container.ui-boss-active #room-banner{top:72px;}
+.v4-theme #game-container.ui-boss-active .boss-hud{top:7px;}
+.v4-theme #game-container.ui-boss-active .v4-game-frame{opacity:.28;}
+.v4-theme #game-container.ui-boss-active.ui-player-tc #run-banner{top:43px;bottom:auto;}
+.v4-theme #game-container.ui-boss-active.ui-player-tc #room-banner{top:72px;bottom:auto;}
+
+/* Perfiles calculados por JS para que el layout sea válido también en browsers
+   sin container-query completo. */
+.v4-theme #game-container.ui-size-tablet{
+    --v42-edge:7px;
+    --v42-side-width:30%;
+    --v42-center-width:34%;
+    --v42-top:40px;
+    --v42-gap:4px;
+}
+.v4-theme #game-container.ui-size-mobile{
+    --v42-edge:5px;
+    --v42-side-width:30%;
+    --v42-center-width:36%;
+    --v42-top:38px;
+    --v42-gap:3px;
+}
+.v4-theme #game-container.ui-size-small{
+    --v42-edge:4px;
+    --v42-side-width:32%;
+    --v42-center-width:32%;
+    --v42-top:35px;
+    --v42-gap:2px;
+}
+.v4-theme #game-container.ui-size-tiny{
+    --v42-edge:3px;
+    --v42-side-width:33%;
+    --v42-center-width:30%;
+    --v42-top:32px;
+    --v42-gap:2px;
+}
+.v4-theme #game-container.ui-orientation-landscape{
+    --v42-top:34px;
+    --v42-side-width:28%;
+    --v42-center-width:38%;
+}
+
+.v4-theme #game-container.ui-size-mobile .stat-badge{
+    font-size:clamp(.42rem,1.65cqw,.58rem);
+    padding:3px 4px;
+    gap:3px;
+}
+.v4-theme #game-container.ui-size-small .stat-badge{
+    font-size:clamp(.39rem,1.8cqw,.50rem);
+    padding:2px 3px;
+}
+.v4-theme #game-container.ui-size-tiny .stat-badge{
+    font-size:.39rem;
+    padding:2px 2px;
+}
+.v4-theme #game-container.ui-size-mobile #run-banner{font-size:clamp(3.7px,1cqw,5.5px);}
+.v4-theme #game-container.ui-size-mobile #room-banner{font-size:clamp(3.5px,.9cqw,5px);}
+.v4-theme #game-container.ui-size-small #run-banner{font-size:4px;padding:3px 4px;}
+.v4-theme #game-container.ui-size-small #room-banner{font-size:3.8px;top:58px;padding:3px 4px;}
+.v4-theme #game-container.ui-size-tiny #run-banner{font-size:3.5px;padding:3px 3px;}
+.v4-theme #game-container.ui-size-tiny #room-banner{font-size:3.3px;top:54px;padding:3px 3px;}
+.v4-theme #game-container.ui-size-mobile .boss-hud,
+.v4-theme #game-container.ui-size-small .boss-hud,
+.v4-theme #game-container.ui-size-tiny .boss-hud{top:5px;padding:4px 5px;}
+.v4-theme #game-container.ui-size-mobile .boss-hud-top{font-size:clamp(4.5px,.95cqw,6px);}
+.v4-theme #game-container.ui-size-small .boss-hud-top,
+.v4-theme #game-container.ui-size-tiny .boss-hud-top{font-size:5px;}
+
+/* En pantallas pequeñas, las dos columnas laterales mantienen su propia caja y
+   nunca fuerzan al centro a crecer horizontalmente. */
+.v4-theme #game-container.ui-size-mobile #ui-layer > .flex:first-child,
+.v4-theme #game-container.ui-size-mobile #ui-layer > .flex:last-child,
+.v4-theme #game-container.ui-size-small #ui-layer > .flex:first-child,
+.v4-theme #game-container.ui-size-small #ui-layer > .flex:last-child,
+.v4-theme #game-container.ui-size-tiny #ui-layer > .flex:first-child,
+.v4-theme #game-container.ui-size-tiny #ui-layer > .flex:last-child{
+    overflow:visible;
+}
+
+/* Controles táctiles separados del canvas y respetando safe areas. */
+.v4-theme #mobile-controls{
+    left:max(6px,env(safe-area-inset-left));
+    right:max(6px,env(safe-area-inset-right));
+    bottom:max(6px,env(safe-area-inset-bottom));
+    width:auto;
+    margin:0;
+    min-height:74px;
+    padding:7px 9px;
+    gap:12px;
+}
+@media (pointer:coarse),(max-width:900px){
+    .v4-theme #mobile-controls{position:fixed;z-index:100;}
+}
+@media (max-width:480px){
+    .v4-theme #mobile-controls{min-height:70px;padding:6px 7px;}
+    .v4-theme #joystick-zone{width:82px;height:82px;}
+    .v4-theme #joystick-knob{width:36px;height:36px;}
+    .v4-theme .bomb-btn{width:68px;height:68px;font-size:24px;}
+}
+@media (orientation:landscape) and (max-height:620px){
+    .v4-theme #mobile-controls{min-height:58px;padding:4px 7px;bottom:max(4px,env(safe-area-inset-bottom));}
+    .v4-theme #joystick-zone{width:58px;height:58px;}
+    .v4-theme #joystick-knob{width:26px;height:26px;}
+    .v4-theme .bomb-btn{width:56px;height:56px;font-size:20px;}
+}
+
+/* Pantallas de resultado: el contenido se desplaza dentro del propio overlay. */
+.v4-theme .screen{
+    overflow:auto;
+    overscroll-behavior:contain;
+    padding:max(14px,3cqw) max(12px,3cqw);
+}
+.v4-theme .screen > *{flex:0 0 auto;}
+
+/* Debug Mode respeta safe-area y viewport dinámico. */
+.v4-theme #debug-overlay{
+    top:max(6px,env(safe-area-inset-top));
+    right:max(6px,env(safe-area-inset-right));
+    bottom:max(6px,env(safe-area-inset-bottom));
+    width:min(520px,calc(100vw - max(12px,env(safe-area-inset-left) + env(safe-area-inset-right))));
+    max-height:calc(100dvh - max(12px,env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+}
+@media (orientation:landscape) and (max-height:620px){
+    .v4-theme #debug-overlay{width:min(560px,58vw);}
+}
+@media (max-width:700px){
+    .v4-theme #debug-overlay{font-size:11px;}
+    .v4-theme #debug-overlay .debug-jump{position:sticky;top:0;z-index:3;}
+    .v4-theme #debug-overlay .debug-test-list{grid-template-columns:1fr;}
+}

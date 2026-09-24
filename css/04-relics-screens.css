@@ -1,0 +1,77 @@
+/* V3.14 — Powerups & Relics 2 */
+.relic-category-badge{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    align-self:center;
+    width:max-content;
+    max-width:100%;
+    padding:3px 6px;
+    margin:-3px auto 7px;
+    border:1px solid color-mix(in srgb, var(--relic-category, #94a3b8) 55%, transparent);
+    color:var(--relic-category, #94a3b8);
+    background:color-mix(in srgb, var(--relic-category, #94a3b8) 10%, transparent);
+    border-radius:999px;
+    font:5px 'Press Start 2P';
+    letter-spacing:.05em;
+}
+.relic-chip small{
+    color:var(--relic-category, #cbd5e1);
+    opacity:.86;
+    margin-left:4px;
+    font-size:.78em;
+}
+@media(max-width:640px){
+    .relic-category-badge{font-size:4px;padding:2px 5px;margin-bottom:5px;}
+}
+
+
+/* V3.15 — DEATH & RESTART UPDATE */
+.death-screen {
+    justify-content: flex-start;
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #475569 transparent;
+    padding: 18px 16px 20px;
+    background:
+        radial-gradient(circle at 50% 12%, rgba(127,29,29,.32), transparent 35%),
+        linear-gradient(180deg, rgba(5,8,15,.97), rgba(2,6,14,.99));
+}
+.death-kicker { margin-top: 2px; color:#94a3b8; font-size:7px; letter-spacing:.18em; }
+.death-icon { margin-top:10px; font-size:28px; filter: drop-shadow(0 0 16px rgba(239,68,68,.28)); }
+.death-title { margin-top:8px; font-size:18px; color:#fecaca; text-shadow:0 0 18px rgba(239,68,68,.25); }
+.death-record { margin-top:9px; min-height:24px; display:flex; align-items:center; justify-content:center; padding:5px 8px; border:1px solid #334155; background:rgba(15,23,42,.68); color:#cbd5e1; font:6px 'Press Start 2P'; letter-spacing:.08em; }
+.death-record.record-new { border-color:#facc15; color:#fde68a; box-shadow:0 0 16px rgba(250,204,21,.12); }
+.death-cause { margin-top:7px; color:#64748b; font:6px 'Press Start 2P'; letter-spacing:.06em; }
+.death-cause strong { color:#fda4af; }
+.death-summary-grid { margin-top:12px; width:min(100%,470px); display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+.death-stat { min-height:56px; padding:8px 6px; border:1px solid #243041; background:rgba(15,23,42,.74); display:flex; flex-direction:column; justify-content:center; gap:6px; }
+.death-stat span, .death-records span, .death-section-label { color:#64748b; font:5px 'Press Start 2P'; letter-spacing:.08em; }
+.death-stat strong { color:#f8fafc; font:9px 'Press Start 2P'; }
+.death-stat:nth-child(2) strong { color:#fde68a; }
+.death-stat:nth-child(3) strong { color:#67e8f9; }
+.death-stat:nth-child(4) strong { color:#fda4af; }
+.death-stat:nth-child(5) strong { color:#fcd34d; }
+.death-stat:nth-child(6) strong { color:#a5f3fc; }
+.death-records { width:min(100%,470px); margin-top:6px; display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.death-records > div { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 8px; border:1px solid #273244; background:rgba(2,6,23,.62); }
+.death-records strong { color:#fde68a; font:8px 'Press Start 2P'; }
+.death-relics-wrap { width:min(100%,470px); margin-top:10px; border-top:1px solid #1e293b; padding-top:9px; }
+.death-section-label { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.death-section-label span { color:#c4b5fd; font:7px 'Press Start 2P'; }
+.death-relic-list { margin-top:6px; display:flex; flex-wrap:wrap; gap:5px; min-height:24px; max-height:86px; overflow:auto; }
+.death-relic { border:1px solid var(--relic-category,#475569); background:rgba(2,6,23,.72); color:#e2e8f0; padding:5px 6px; border-radius:3px; font:6px 'Press Start 2P'; }
+.death-relic small { color:var(--relic-category,#94a3b8); }
+.death-empty { color:#64748b; font:6px 'Press Start 2P'; padding:6px 0; }
+.death-restart { margin-top:14px; width:min(100%,260px); }
+@media(max-width:600px){
+    .death-screen { padding:12px 10px 16px; }
+    .death-icon { font-size:24px; margin-top:7px; }
+    .death-title { font-size:14px; }
+    .death-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); max-width:330px; }
+    .death-stat { min-height:50px; }
+    .death-stat strong { font-size:8px; }
+    .death-records { grid-template-columns:1fr; max-width:330px; }
+    .death-relics-wrap { max-width:330px; }
+}
+

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.19.0 — Debug Overlay
+// Bomberman Roguelike v3.20.0 — Debug Overlay
 // Panel reconstruido para inspección en vivo. Solo se crea con ?debug=1.
 (() => {
     'use strict';
@@ -160,7 +160,7 @@
         <section class="debug-section debug-tests">
             <div class="debug-section-head"><div class="debug-section-title">TEST RUNNER</div><span id="dbg-suite">0/${Object.keys(window.DEBUG_TESTS || {}).length}</span></div>
             <div class="debug-test-list">
-                ${Object.keys(window.DEBUG_TESTS || {}).map(name => `<button type="button" data-debug-test="${name}"><span>${name.replace('ai-stress','AI STRESS').toUpperCase()}</span><em id="dbg-test-${name}">PENDIENTE</em></button>`).join('')}
+                ${Object.keys(window.DEBUG_TESTS || {}).map(name => `<button type="button" data-debug-test="${name}"><span>${name.replace('ai-stress','AI STRESS').replace('collision-stress','COLLISION STRESS').toUpperCase()}</span><em id="dbg-test-${name}">PENDIENTE</em></button>`).join('')}
             </div>
         </section>
 
@@ -168,6 +168,12 @@
             <div class="debug-section-head"><div class="debug-section-title">AI STRESS</div><span id="dbg-stress-head">PENDIENTE</span></div>
             <div id="dbg-stress-summary" class="debug-note">Ejecutá AI STRESS para probar movimiento, giros, rutas, bloqueos y evasión.</div>
             <pre id="dbg-stress-cases" class="debug-log">Sin resultados.</pre>
+        </section>
+
+        <section class="debug-section">
+            <div class="debug-section-head"><div class="debug-section-title">COLLISION STRESS</div><span id="dbg-collision-stress-head">PENDIENTE</span></div>
+            <div id="dbg-collision-stress-summary" class="debug-note">Ejecutá COLLISION STRESS para probar esquinas, corredores, obstáculos, bombas, overlaps y lane-lock.</div>
+            <pre id="dbg-collision-stress-data" class="debug-log">Sin resultados.</pre>
         </section>
 
         <section class="debug-section">
@@ -347,6 +353,19 @@
             setText('dbg-stress-summary', 'Ejecutá AI STRESS para probar movimiento, giros, rutas, bloqueos y evasión.');
             const stressNode = document.getElementById('dbg-stress-cases');
             if (stressNode) stressNode.textContent = 'Sin resultados.';
+        }
+
+        const collisionStress = D.testResults.slice().reverse().find(r => r.name === 'collision-stress');
+        if (collisionStress) {
+            setText('dbg-collision-stress-head', collisionStress.status || '—');
+            setText('dbg-collision-stress-summary', collisionStress.summary || 'Sin resumen.');
+            const collisionNode = document.getElementById('dbg-collision-stress-data');
+            if (collisionNode) collisionNode.textContent = JSON.stringify(collisionStress.details || {}, null, 2);
+        } else {
+            setText('dbg-collision-stress-head', 'PENDIENTE');
+            setText('dbg-collision-stress-summary', 'Ejecutá COLLISION STRESS para probar esquinas, corredores, obstáculos, bombas, overlaps y lane-lock.');
+            const collisionNode = document.getElementById('dbg-collision-stress-data');
+            if (collisionNode) collisionNode.textContent = 'Sin resultados.';
         }
 
         const last = D.lastTest;

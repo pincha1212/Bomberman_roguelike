@@ -166,7 +166,7 @@
             gameState.grid[gameState.exitPos.y][gameState.exitPos.x] = TYPES.EXIT_OPEN;
             gameState.coins += 30;
             gameState.score += 1500;
-            addParticles(b.x, b.y, '#f43f5e', 55);
+            addParticles(b.x, b.y, 'particleBoss', 55);
             addFloatingText('☠ JEFE DERROTADO', b.x, b.y - 50, '#facc15');
             addFloatingText('+30¢  +1500', b.x, b.y + 20, '#fbbf24');
             sfx('boom');

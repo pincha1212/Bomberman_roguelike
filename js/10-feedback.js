@@ -57,19 +57,19 @@ function triggerBombPlacedFeedback(bomb){
     combatFeedback.lastBomb = bomb;
     triggerCombatFlash('rgba(251,191,36,1)', .12, 70);
     sfx('bombReady');
-    addParticles((bomb.x + .5) * TILE_SIZE, (bomb.y + .5) * TILE_SIZE, '#fbbf24', 8);
+    addParticles((bomb.x + .5) * TILE_SIZE, (bomb.y + .5) * TILE_SIZE, 'particleImpact', 8);
 }
 
 function triggerEnemyDefeatFeedback(e){
-    const color = e.elite ? '#fb7185' : '#38bdf8';
-    addParticles(e.x, e.y, color, e.elite ? 22 : 15);
+    const color = e.elite ? (typeof themeColorV46 === 'function' ? themeColorV46('particleEnemyElite', '#fb7185') : '#fb7185') : (typeof themeColorV46 === 'function' ? themeColorV46('particleEnemy', '#38bdf8') : '#38bdf8');
+    addParticles(e.x, e.y, e.elite ? 'particleEnemyElite' : 'particleEnemy', e.elite ? 22 : 15);
     addFloatingText(e.elite ? '★ KO ELITE' : 'KO', e.x, e.y - e.height * .55, color);
     triggerCombatFlash('rgba(56,189,248,1)', e.elite ? .16 : .09, 75);
     sfx('enemyKill');
 }
 
 function triggerBossHitFeedback(b){
-    addParticles(b.x, b.y, '#fb7185', 12);
+    addParticles(b.x, b.y, 'particleBoss', 12);
     triggerCombatFlash('rgba(244,63,94,1)', .12, 80);
     triggerHitStop(70);
 }

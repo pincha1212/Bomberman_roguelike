@@ -157,7 +157,7 @@ function triggerHazard(h, reason = 'player') {
     h.effectConsumed = true;
 
     const c = trapCenter(h);
-    addParticles(c.x, c.y, def.color, h.type === TRAP_TYPES.DELAYED ? 14 : 18);
+    addParticles(c.x, c.y, 'particleDanger', h.type === TRAP_TYPES.DELAYED ? 14 : 18);
     addFloatingText(def.effectText, c.x, c.y - 8, def.color);
     sfx('trap');
     triggerScreenShake(h.type === TRAP_TYPES.DELAYED ? 3 : 4, 120);
@@ -223,7 +223,7 @@ function spawnHazardExplosion(h) {
     }
 
     const c = trapCenter(h);
-    addParticles(c.x, c.y, '#f97316', 20);
+    addParticles(c.x, c.y, 'particleFire', 20);
     addFloatingText('¡TRAMPA EXPLOTA!', c.x, c.y - 18, '#fb923c');
     sfx('boom');
     triggerScreenShake(7, 240);

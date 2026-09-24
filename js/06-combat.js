@@ -20,7 +20,7 @@
                 triggerScreenShake(detonatedCount === 1 ? 7 : 5, detonatedCount === 1 ? 300 : 220);
                 sfx('boom');
                 if (typeof feedbackExplosion === 'function') feedbackExplosion(bomb.x, bomb.y);
-                addParticles((bomb.x + 0.5) * TILE_SIZE, (bomb.y + 0.5) * TILE_SIZE, '#f97316', detonatedCount === 1 ? 15 : 12);
+                addParticles((bomb.x + 0.5) * TILE_SIZE, (bomb.y + 0.5) * TILE_SIZE, 'particleFire', detonatedCount === 1 ? 15 : 12);
                 if (gameState.relics.some(r => r.id === 'ember_core')) gameState.score += 25;
 
                 const blastId = ++gameState.blastSerial;
@@ -40,7 +40,7 @@
                     const coins = Math.max(1, Math.round((1 + Math.random() * 2) * (1 + gameState.coinBonus) * gameState.roomType.coinMult));
                     gameState.coins += coins;
                     addFloatingText(`+10  +${coins}¢`, (tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#fbbf24');
-                    addParticles((tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#b45309', 12);
+                    addParticles((tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, 'particleBlock', 12);
 
                     if (gameState.exitPos && gameState.exitPos.x === tx && gameState.exitPos.y === ty) {
                         // v4.4: destruir el bloque de salida no alcanza para abrirla.
@@ -87,7 +87,7 @@
 
             if (detonatedCount > 1) {
                 addFloatingText(`CADENA ×${detonatedCount}`, (first.x + 0.5) * TILE_SIZE, (first.y - 0.15) * TILE_SIZE, '#fbbf24');
-                addParticles((first.x + 0.5) * TILE_SIZE, (first.y + 0.5) * TILE_SIZE, '#fde68a', 8 + detonatedCount * 2);
+                addParticles((first.x + 0.5) * TILE_SIZE, (first.y + 0.5) * TILE_SIZE, 'particleImpact', 8 + detonatedCount * 2);
             }
             updateUI(true);
         }
@@ -212,7 +212,7 @@
                         if (relic) grantRelic(relic);
                     }
                     
-                    addParticles((it.x + 0.5) * TILE_SIZE, (it.y + 0.5) * TILE_SIZE, '#ffffff', 10);
+                    addParticles((it.x + 0.5) * TILE_SIZE, (it.y + 0.5) * TILE_SIZE, 'particleLoot', 10);
                     gameState.items.splice(i, 1);
                     sfx('pickup');
                     updateUI();
@@ -280,7 +280,7 @@
                 p.isInvincible = true;
                 p.invincibleTimer = 1000 + (Number(gs.hitInvulnerabilityBonus) || 0);
                 addFloatingText('ESCUDO ROTO!', p.x, p.y, '#38bdf8');
-                addParticles(p.x, p.y, '#38bdf8', 16);
+                addParticles(p.x, p.y, 'particleShield', 16);
                 triggerPlayerDamageFeedback(source, sx, sy, false, true);
                 triggerScreenShake(5, 200);
                 updateUI(true);
@@ -291,7 +291,7 @@
             p.isInvincible = true;
             p.invincibleTimer = 1500 + (Number(gs.hitInvulnerabilityBonus) || 0);
             const lethal = p.health <= 0;
-            addParticles(p.x, p.y, '#ef4444', lethal ? 26 : 15);
+            addParticles(p.x, p.y, 'particleDanger', lethal ? 26 : 15);
             triggerPlayerDamageFeedback(source, sx, sy, lethal, false);
             triggerScreenShake(lethal ? 14 : 10, lethal ? 520 : 400);
             if (lethal) sfx('death');

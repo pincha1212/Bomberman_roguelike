@@ -167,7 +167,8 @@ function feedbackV326Flash(alpha, durationMs) {
     FeedbackV326.flashDuration = Math.max(1, durationMs);
 }
 
-function feedbackV326Impact(x, y, color = '#fde68a', scale = 1) {
+function feedbackV326Impact(x, y, color = null, scale = 1) {
+    color = color || (typeof themeColorV46 === 'function' ? themeColorV46('particleImpact', '#fde68a') : '#fde68a');
     FeedbackV326.impactCount += 1;
     feedbackV326SpawnParticles(x, y, color, Math.round(7 * scale), scale);
     feedbackV326SpawnRing(x, y, color, 0.8 * scale);
@@ -176,10 +177,11 @@ function feedbackV326Impact(x, y, color = '#fde68a', scale = 1) {
     feedbackV326PlaySound('impact', scale);
 }
 
-function feedbackV326Explosion(x, y, color = '#fb923c', scale = 1) {
+function feedbackV326Explosion(x, y, color = null, scale = 1) {
+    color = color || (typeof themeColorV46 === 'function' ? themeColorV46('particleFire', '#fb923c') : '#fb923c');
     FeedbackV326.explosionCount += 1;
     feedbackV326SpawnParticles(x, y, color, Math.round(14 * scale), 1.15 * scale);
-    feedbackV326SpawnRing(x, y, '#fed7aa', 1.25 * scale);
+    feedbackV326SpawnRing(x, y, typeof themeColorV46 === 'function' ? themeColorV46('feedbackRingSoft', '#fed7aa') : '#fed7aa', 1.25 * scale);
     feedbackV326SpawnRing(x, y, color, 0.8 * scale);
     feedbackV326Flash(typeof deviceQualityV45FeedbackFlash === 'function' ? deviceQualityV45FeedbackFlash(0.18 * scale) : 0.18 * scale, FEEDBACK_V326_CONFIG.explosionFlashMs);
     feedbackV326KickCamera(typeof deviceQualityV45CameraKick === 'function' ? deviceQualityV45CameraKick(FEEDBACK_V326_CONFIG.cameraKickExplosion * scale) : FEEDBACK_V326_CONFIG.cameraKickExplosion * scale);
@@ -188,8 +190,10 @@ function feedbackV326Explosion(x, y, color = '#fb923c', scale = 1) {
 
 function feedbackV326Damage(x, y) {
     FeedbackV326.damageCount += 1;
-    feedbackV326SpawnParticles(x, y, '#f87171', 8, 0.9);
-    feedbackV326SpawnRing(x, y, '#fecaca', 0.75);
+    const dangerColor = typeof themeColorV46 === 'function' ? themeColorV46('particleDanger', '#f87171') : '#f87171';
+    const softColor = typeof themeColorV46 === 'function' ? themeColorV46('feedbackRingSoft', '#fecaca') : '#fecaca';
+    feedbackV326SpawnParticles(x, y, dangerColor, 8, 0.9);
+    feedbackV326SpawnRing(x, y, softColor, 0.75);
     feedbackV326Flash(typeof deviceQualityV45FeedbackFlash === 'function' ? deviceQualityV45FeedbackFlash(0.16) : 0.16, FEEDBACK_V326_CONFIG.impactFlashMs);
     feedbackV326KickCamera(typeof deviceQualityV45CameraKick === 'function' ? deviceQualityV45CameraKick(2.2) : 2.2);
     feedbackV326PlaySound('damage', 0.9);
@@ -342,7 +346,7 @@ function drawFeedbackV326() {
         ctx.save();
         ctx.globalCompositeOperation = 'screen';
         ctx.globalAlpha = FeedbackV326.flashAlpha;
-        ctx.fillStyle = '#fff7ed';
+        ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('feedbackFlash', '#fff7ed') : '#fff7ed';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.restore();
     }
@@ -396,7 +400,7 @@ function feedbackV326Wrap() {
         window.explodeBomb = function explodeBombV326(indexOrBomb, ...rest) {
             const point = feedbackV326CaptureBombPosition(indexOrBomb);
             const result = FeedbackV326.originalExplodeBomb(indexOrBomb, ...rest);
-            if (point) feedbackV326Explosion(point.x, point.y, '#fb923c', 1);
+            if (point) feedbackV326Explosion(point.x, point.y, null, 1);
             return result;
         };
     }

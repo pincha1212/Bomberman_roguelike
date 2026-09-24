@@ -492,7 +492,7 @@ function draw() {
             ctx.fill();
             
             // Reflejo
-            ctx.fillStyle = 'rgba(255,255,255,0.2)';
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('bombReflect', 'rgba(255,255,255,0.2)') : 'rgba(255,255,255,0.2)';
             ctx.beginPath();
             ctx.arc(-6, -6, TILE_SIZE*0.1, 0, Math.PI*2);
             ctx.fill();

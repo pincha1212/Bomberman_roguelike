@@ -87,7 +87,8 @@
             });
         }
 
-        function addParticles(x, y, color, count = 8) {
+        function addParticles(x, y, colorOrThemeKey, count = 8) {
+            const color = typeof themeParticleColorV46 === 'function' ? themeParticleColorV46(colorOrThemeKey, colorOrThemeKey) : colorOrThemeKey;
             const requested = typeof deviceQualityV45ParticleCount === 'function' ? deviceQualityV45ParticleCount(count) : count;
             const room = Math.max(0, largeSupport.particleBudget - gameState.particles.length);
             count = Math.min(requested, room, perf.lowQuality ? 5 : requested);

@@ -65,18 +65,47 @@ function updatePerfSceneV329(){
 function drawAmbientDust(){
     const heavy=updatePerfSceneV329();
     const configured = typeof getDeviceQualityV45 === 'function' ? getDeviceQualityV45().ambientDust : null;
-    const count = configured !== null ? Math.min(configured, heavy ? Math.max(6, configured) : configured) : (perf.lowQuality ? 8 : (heavy ? 12 : 24));
+    const theme = typeof getThemeV46 === 'function' ? getThemeV46() : null;
+    const ambience = theme?.ambiente || { tipo:'dust', color:'ambientDust', densidad:1, velocidad:.35, sizeMin:1, sizeMax:2, alpha:.45 };
+    const density = Math.max(0, Number(ambience.densidad) || 1);
+    const baseCount = configured !== null ? Math.min(configured, heavy ? Math.max(6, configured) : configured) : (perf.lowQuality ? 8 : (heavy ? 12 : 24));
+    const count = Math.round(baseCount * density);
     if (count <= 0) return;
+
+    ctx.save();
+    ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46(ambience.color, 'rgba(226,232,240,.06)') : 'rgba(226,232,240,.06)';
+
     for(let i=0;i<count;i++){
         const seed=(i*97)%1000;
-        const x=((seed*3.71+gameState.animFrame*.09*(i%3+1))%(canvas.width+80))-40;
-        const y=((seed*1.83+gameState.animFrame*.035*(i%2+1))%(canvas.height+80))-40;
-        const a=.025+(i%4)*.012;
-        const ambientColor = typeof themeColorV46 === 'function' ? themeColorV46('ambientDust', 'rgba(226,232,240,0.06)') : `rgba(226,232,240,${a})`;
-        if (typeof themeColorV46 === 'function') ctx.globalAlpha = Math.min(1, a / 0.061);
-        ctx.fillStyle=ambientColor; ctx.fillRect(x,y,1+(i%2),1+(i%2));
-        if (typeof themeColorV46 === 'function') ctx.globalAlpha = 1; 
+        const speed=Math.max(.05, Number(ambience.velocidad)||.35);
+        const sizeMin=Math.max(.5, Number(ambience.sizeMin)||1);
+        const sizeMax=Math.max(sizeMin, Number(ambience.sizeMax)||sizeMin);
+        const size=sizeMin + ((i*37)%100)/100*(sizeMax-sizeMin);
+        const alpha=Math.min(1, Math.max(.05, Number(ambience.alpha)||.45) * (.72 + (i%4)*.08));
+        const travel=gameState.animFrame*speed*(i%3+1);
+        const rangeW=canvas.width+80, rangeH=canvas.height+80;
+        let x,y;
+
+        if (ambience.tipo === 'snow') {
+            x=((seed*3.71 + Math.sin((gameState.animFrame+i)*.025)*12 + travel*.18)%rangeW)-40;
+            y=((seed*1.83 + travel)%rangeH)-40;
+            ctx.globalAlpha=alpha;
+            ctx.beginPath();
+            ctx.arc(x,y,Math.max(.7,size*.55),0,Math.PI*2);
+            ctx.fill();
+        } else if (ambience.tipo === 'ember') {
+            x=((seed*3.71 + Math.sin((gameState.animFrame+i)*.045)*9 + travel*.12)%rangeW)-40;
+            y=canvas.height+40-((seed*1.83 + travel)%rangeH);
+            ctx.globalAlpha=alpha;
+            ctx.fillRect(x,y,size,Math.max(1,size*1.5));
+        } else {
+            x=((seed*3.71+gameState.animFrame*.09*(i%3+1))%rangeW)-40;
+            y=((seed*1.83+gameState.animFrame*.035*(i%2+1))%rangeH)-40;
+            ctx.globalAlpha=alpha;
+            ctx.fillRect(x,y,size,size);
+        }
     }
+    ctx.restore();
 }
 function drawLighting(){
     // La iluminación es visual, no gameplay: en calidad reducida o escenas
@@ -89,7 +118,7 @@ function drawLighting(){
     const pcx=player.x+player.width/2-gameState.camera.x;
     const pcy=player.y+player.height/2-gameState.camera.y;
     const grad=ctx.createRadialGradient(pcx,pcy,35,pcx,pcy,240);
-    grad.addColorStop(0,'rgba(0,0,0,0)'); grad.addColorStop(.65,'rgba(0,0,0,.12)'); grad.addColorStop(1,'rgba(0,0,0,.52)');
+    grad.addColorStop(0, typeof themeColorV46 === 'function' ? themeColorV46('lightingTransparent', 'rgba(0,0,0,0)') : 'rgba(0,0,0,0)'); grad.addColorStop(.65, typeof themeColorV46 === 'function' ? themeColorV46('lightingMid', 'rgba(0,0,0,.12)') : 'rgba(0,0,0,.12)'); grad.addColorStop(1, typeof themeColorV46 === 'function' ? themeColorV46('lightingDark', 'rgba(0,0,0,.52)') : 'rgba(0,0,0,.52)');
     ctx.fillStyle=grad; ctx.fillRect(0,0,canvas.width,canvas.height);
     if (typeof deviceQualityV45ShouldBombGlow === 'function' ? deviceQualityV45ShouldBombGlow() : (!perf.lowQuality || gameState.animFrame % 2 === 0)) {
         for(let i=0;i<gameState.bombs.length;i++){

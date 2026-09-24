@@ -26,7 +26,13 @@ function showRoomIntro(){
 function renderImmersion(){
     const danger=UI['danger-indicator'];
     if(!danger) return;
-    const nearestBomb=gameState.bombs.some(b=>Math.abs(b.x-Math.floor((player.x+player.width/2)/TILE_SIZE))+Math.abs(b.y-Math.floor((player.y+player.height/2)/TILE_SIZE))<=2 && b.timer<900);
+    const ptx=Math.floor((player.x+player.width/2)/TILE_SIZE);
+    const pty=Math.floor((player.y+player.height/2)/TILE_SIZE);
+    let nearestBomb=false;
+    for(let i=0;i<gameState.bombs.length;i++){
+        const b=gameState.bombs[i];
+        if(b && b.timer<900 && Math.abs(b.x-ptx)+Math.abs(b.y-pty)<=2){ nearestBomb=true; break; }
+    }
     const pressureDanger = gameState.roomTime < 15000 || gameState.threatLevel >= 2;
     danger.textContent = pressureDanger ? `⚠ PRESIÓN ${gameState.threatLevel}` : 'PELIGRO';
     danger.classList.toggle('hidden', (!nearestBomb && !pressureDanger) || gameState.paused);
@@ -36,8 +42,23 @@ function renderImmersion(){
         vignette.style.background=`radial-gradient(circle at 50% 48%, transparent 25%, rgba(2,6,23,${pulse}) 62%, rgba(2,6,23,${low?.62:.38}) 100%)`;
     }
 }
+function updatePerfSceneV329(){
+    const frame=Number(gameState.animFrame||0);
+    if(perf.heavySceneFrame===frame) return perf.heavyScene;
+    perf.heavySceneFrame=frame;
+    const projectileCount = (gameState.bossProjectiles?.length || 0) + (gameState.bossProjectilesV325?.length || 0);
+    perf.heavyScene =
+        gameState.enemies.length >= 12 ||
+        gameState.particles.length >= 80 ||
+        gameState.bombs.length >= 5 ||
+        gameState.explosions.length >= 8 ||
+        projectileCount >= 5;
+    return perf.heavyScene;
+}
+
 function drawAmbientDust(){
-    const count=perf.lowQuality ? 8 : 24;
+    const heavy=updatePerfSceneV329();
+    const count=perf.lowQuality ? 8 : (heavy ? 12 : 24);
     for(let i=0;i<count;i++){
         const seed=(i*97)%1000;
         const x=((seed*3.71+gameState.animFrame*.09*(i%3+1))%(canvas.width+80))-40;
@@ -47,17 +68,27 @@ function drawAmbientDust(){
     }
 }
 function drawLighting(){
-    // Localized darkness with soft light around the player and bombs.
+    // La iluminación es visual, no gameplay: en calidad reducida o escenas
+    // realmente cargadas se actualiza cada 2 frames para contener el coste de
+    // los gradientes sin tocar la simulación.
+    updatePerfSceneV329();
+    if(!perfRenderEveryV329(2)) return;
     ctx.save();
-    const grad=ctx.createRadialGradient(player.x+player.width/2-gameState.camera.x,player.y+player.height/2-gameState.camera.y,35,player.x+player.width/2-gameState.camera.x,player.y+player.height/2-gameState.camera.y,240);
+    const pcx=player.x+player.width/2-gameState.camera.x;
+    const pcy=player.y+player.height/2-gameState.camera.y;
+    const grad=ctx.createRadialGradient(pcx,pcy,35,pcx,pcy,240);
     grad.addColorStop(0,'rgba(0,0,0,0)'); grad.addColorStop(.65,'rgba(0,0,0,.12)'); grad.addColorStop(1,'rgba(0,0,0,.52)');
     ctx.fillStyle=grad; ctx.fillRect(0,0,canvas.width,canvas.height);
-    if (!perf.lowQuality || gameState.animFrame % 2 === 0) gameState.bombs.forEach(b=>{
-        const x=(b.x+.5)*TILE_SIZE-gameState.camera.x, y=(b.y+.5)*TILE_SIZE-gameState.camera.y;
-        const radius=75+Math.sin(gameState.animFrame*.3)*8;
-        const g=ctx.createRadialGradient(x,y,4,x,y,radius); g.addColorStop(0,'rgba(255,170,50,.20)'); g.addColorStop(1,'rgba(255,80,20,0)');
-        ctx.fillStyle=g; ctx.fillRect(x-radius,y-radius,radius*2,radius*2);
-    });
+    if (!perf.lowQuality || gameState.animFrame % 2 === 0) {
+        for(let i=0;i<gameState.bombs.length;i++){
+            const b=gameState.bombs[i];
+            if(!b) continue;
+            const x=(b.x+.5)*TILE_SIZE-gameState.camera.x, y=(b.y+.5)*TILE_SIZE-gameState.camera.y;
+            const radius=75+Math.sin(gameState.animFrame*.3)*8;
+            const g=ctx.createRadialGradient(x,y,4,x,y,radius); g.addColorStop(0,'rgba(255,170,50,.20)'); g.addColorStop(1,'rgba(255,80,20,0)');
+            ctx.fillStyle=g; ctx.fillRect(x-radius,y-radius,radius*2,radius*2);
+        }
+    }
     ctx.restore();
 }
 
@@ -70,7 +101,13 @@ const perf = {
     slowFrames: 0,
     fastFrames: 0,
     frameCount: 0,
-    lastUi: 0
+    lastUi: 0,
+    lastQualityChangeFrame: 0,
+    qualityFloor: 0,
+    lightingFrame: -1,
+    heavyScene: false,
+    heavySceneFrame: -1,
+    adaptiveRoot: null
 };
 // V3.2.2 LARGE SUPPORT LAYER
 // Optimiza entidades grandes y evita que los efectos escalen sin control.
@@ -78,6 +115,8 @@ const largeSupport = {
     maxBossProjectiles: 34,
     maxEnemies: 22,
     particleBudget: 150,
+    maxFloaters: 48,
+    renderParticleBudget: 96,
     shadowEffects: true,
     lastBossDraw: 0
 };
@@ -92,6 +131,15 @@ function clampLargeEntities(){
     if(gameState.particles.length > largeSupport.particleBudget){
         gameState.particles.splice(0, gameState.particles.length - largeSupport.particleBudget);
     }
+    if(gameState.floaters.length > largeSupport.maxFloaters){
+        gameState.floaters.splice(0, gameState.floaters.length - largeSupport.maxFloaters);
+    }
+}
+
+function perfRenderEveryV329(interval = 1){
+    if(interval <= 1) return true;
+    if(!perf.lowQuality && !updatePerfSceneV329()) return true;
+    return (gameState.animFrame % interval) === 0;
 }
 
 function drawLargeBossShadow(b){

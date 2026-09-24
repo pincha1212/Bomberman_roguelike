@@ -77,10 +77,41 @@ window.BOMBER_ENGINE = window.BOMBER_ENGINE || {};
 window.BOMBER_ENGINE.getRenderStats = () => ({
     terrainCacheBuilds: renderCacheV317.builds,
     terrainCacheLastBuildMs: renderCacheV317.lastBuildMs,
-    terrainCacheReady: !!renderCacheV317.canvas && renderCacheV317.grid === gameState.grid && renderCacheV317.gridRevision === (gameState.gridRevision || 0)
+    terrainCacheReady: !!renderCacheV317.canvas && renderCacheV317.grid === gameState.grid && renderCacheV317.gridRevision === (gameState.gridRevision || 0),
+    visible: { ...renderStatsV329 }
 });
 
+const renderViewportV329 = { left: 0, top: 0, right: 0, bottom: 0, frame: -1 };
+const renderStatsV329 = { items: 0, bombs: 0, explosions: 0, enemies: 0, particles: 0, floaters: 0 };
+
+function updateRenderViewportV329(){
+    renderViewportV329.left = Number(gameState.camera?.x) || 0;
+    renderViewportV329.top = Number(gameState.camera?.y) || 0;
+    renderViewportV329.right = renderViewportV329.left + canvas.width;
+    renderViewportV329.bottom = renderViewportV329.top + canvas.height;
+    renderViewportV329.frame = Number(gameState.animFrame || 0);
+    renderStatsV329.items = 0;
+    renderStatsV329.bombs = 0;
+    renderStatsV329.explosions = 0;
+    renderStatsV329.enemies = 0;
+    renderStatsV329.particles = 0;
+    renderStatsV329.floaters = 0;
+}
+
+function isWorldRectVisibleV329(x, y, width, height, margin = TILE_SIZE){
+    const left = renderViewportV329.frame >= 0 ? renderViewportV329.left : (Number(gameState.camera?.x) || 0);
+    const top = renderViewportV329.frame >= 0 ? renderViewportV329.top : (Number(gameState.camera?.y) || 0);
+    const right = renderViewportV329.frame >= 0 ? renderViewportV329.right : left + canvas.width;
+    const bottom = renderViewportV329.frame >= 0 ? renderViewportV329.bottom : top + canvas.height;
+    return x + width >= left - margin && x <= right + margin && y + height >= top - margin && y <= bottom + margin;
+}
+
+function isWorldTileVisibleV329(tileX, tileY, margin = 1){
+    return isWorldRectVisibleV329(tileX*TILE_SIZE, tileY*TILE_SIZE, TILE_SIZE, TILE_SIZE, margin*TILE_SIZE);
+}
+
 function draw() {
+            updateRenderViewportV329();
             ctx.fillStyle = '#090d16';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -116,26 +147,32 @@ function draw() {
             drawHazards();
 
             // Draw Items / Powerups
-            gameState.items.forEach(it => {
-                drawPowerupSprite(it);
-            });
+            for(let i=0;i<gameState.items.length;i++){
+                const it=gameState.items[i];
+                if(it && isWorldTileVisibleV329(it.x, it.y, 1)){ renderStatsV329.items++; drawPowerupSprite(it); }
+            }
 
             // Draw Bombs
-            gameState.bombs.forEach(b => {
+            for(let i=0;i<gameState.bombs.length;i++){
+                const b=gameState.bombs[i];
+                if(!b || !isWorldTileVisibleV329(b.x, b.y, 1)) continue;
+                renderStatsV329.bombs++;
                 renderBombRangePreview(b);
                 drawBombSprite((b.x + 0.5) * TILE_SIZE, (b.y + 0.5) * TILE_SIZE, b);
-            });
+            }
             drawBombChainLinks();
 
             // Draw Explosions
-            gameState.explosions.forEach(exp => {
-                drawExplosionSprite(exp.x * TILE_SIZE, exp.y * TILE_SIZE);
-            });
+            for(let i=0;i<gameState.explosions.length;i++){
+                const exp=gameState.explosions[i];
+                if(exp && isWorldTileVisibleV329(exp.x, exp.y, 1)){ renderStatsV329.explosions++; drawExplosionSprite(exp.x * TILE_SIZE, exp.y * TILE_SIZE); }
+            }
 
             // Draw Enemies
-            gameState.enemies.forEach(e => {
-                drawEnemySprite(e);
-            });
+            for(let i=0;i<gameState.enemies.length;i++){
+                const e=gameState.enemies[i];
+                if(e && isWorldRectVisibleV329(e.x-e.width/2, e.y-e.height/2, e.width, e.height, TILE_SIZE)){ renderStatsV329.enemies++; drawEnemySprite(e); }
+            }
             if (typeof drawEnemyAISignals === 'function') drawEnemyAISignals();
 
             // Draw Boss
@@ -146,20 +183,27 @@ function draw() {
                 drawBombermanSprite(player.x, player.y);
             }
 
-            // Draw Particles
-            gameState.particles.forEach(p => {
+            // Draw Particles: el presupuesto visual es menor que el de simulación.
+            const particleLimit = Math.min(gameState.particles.length, largeSupport.renderParticleBudget || gameState.particles.length);
+            for(let i=Math.max(0, gameState.particles.length-particleLimit); i<gameState.particles.length; i++){
+                const p=gameState.particles[i];
+                if(!p || !isWorldRectVisibleV329(p.x, p.y, p.size || 1, p.size || 1, TILE_SIZE)) continue;
+                renderStatsV329.particles++;
                 ctx.fillStyle = p.color;
                 ctx.fillRect(p.x, p.y, p.size, p.size);
-            });
+            }
 
             // Draw Floater Texts
             if (gameState.floaters.length) ctx.font = '10px "Press Start 2P"';
-            gameState.floaters.forEach(f => {
+            for(let i=Math.max(0, gameState.floaters.length-24); i<gameState.floaters.length; i++){
+                const f=gameState.floaters[i];
+                if(!f || !isWorldRectVisibleV329(f.x, f.y-16, 80, 20, TILE_SIZE)) continue;
+                renderStatsV329.floaters++;
                 ctx.fillStyle = f.color;
                 ctx.globalAlpha = Math.max(0, f.opacity);
                 ctx.fillText(f.text, f.x, f.y);
                 ctx.globalAlpha = 1.0;
-            });
+            }
 
             ctx.restore();
 

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.28.5 — Unified Debug Mode
+// Bomberman Roguelike v3.29.0 — Unified Debug Mode
 // Depuración interna del mismo runtime. Se activa solo con ?debug=1.
 (() => {
     'use strict';
@@ -21,6 +21,19 @@
     const NAV_CACHE_MS = 700;
     const MAX_MOTION_TRAIL = 24;
     const MAX_SNAPSHOT_HISTORY = 12;
+    const PROFILER_CACHE_MS_V329 = 450;
+    let cachedProfilerSnapshotV329 = null;
+    let cachedProfilerAtV329 = 0;
+
+    function getProfilerSnapshotV329(force = false) {
+        const profiler = window.BOMBER_PROFILER;
+        if (!profiler?.snapshot) return null;
+        const now = performance.now();
+        if (!force && cachedProfilerSnapshotV329 && now - cachedProfilerAtV329 < PROFILER_CACHE_MS_V329) return cachedProfilerSnapshotV329;
+        cachedProfilerSnapshotV329 = profiler.snapshot();
+        cachedProfilerAtV329 = now;
+        return cachedProfilerSnapshotV329;
+    }
     const MAX_TIMELINE_SAMPLES = 120;
     const MAX_DIFF_KEYS = 80;
     const TIMELINE_INTERVAL_MS = 250;
@@ -28,6 +41,7 @@
     const NAVIGATION_STRESS_CASES = 5;
     const EVENT_DEDUPE_MS = 850;
     const EVENT_DEDUPE_TYPES = new Set(['AI', 'DEBUG', 'VISUAL', 'INFO', 'WORLD']);
+    const DEBUG_DISPATCH_INTERVAL_MS = 120;
 
     const getState = () => window.BOMBER_ENGINE?.getState?.() || null;
     const getPlayer = () => window.BOMBER_ENGINE?.getPlayer?.() || null;
@@ -78,6 +92,8 @@
         timelineTimer: 0,
         timelineRecording: false,
         testRunner: { available: false, method: null, source: null },
+        lastDebugDispatchAt: 0,
+        debugDispatchTimer: 0,
         selectedVisuals: {
             grid: false,
             collision: false,
@@ -165,7 +181,7 @@
             };
             this.eventLog.push(item);
             if (this.eventLog.length > MAX_EVENTS) this.eventLog.splice(0, this.eventLog.length - MAX_EVENTS);
-            dispatchUpdate();
+            dispatchUpdate(true);
         },
 
         captureError(error, source = 'runtime', extra = null) {
@@ -344,7 +360,7 @@
                 aiStress: this.aiStress,
                 roomStress: this.roomStress,
                 difficultyStress: this.difficultyStress,
-                profiler: window.BOMBER_PROFILER?.snapshot?.() || null
+                profiler: getProfilerSnapshotV329()
             };
         },
 
@@ -612,7 +628,7 @@
             const hw = checks.filter(c => c.status === 'WARN').length;
             const hf = checks.filter(c => c.status === 'FAIL').length;
             return [
-                'BOMBERMAN ROGUELIKE — DEBUG MODE v3.28.5',
+                'BOMBERMAN ROGUELIKE — DEBUG MODE v3.29.0',
                 `SUITE: ${results.length}/${getAvailableTestNames().length} · ${passed} PASS · ${failed} FAIL`,
                 ...results.map(r => `${String(r.name || 'TEST').toUpperCase()}: ${r.status} — ${compactCopyText(r.summary || r.result || 'Sin resultado')}`),
                 `DIAGNOSTICO: ${this.lastHealth?.status || 'PENDIENTE'} — ${hp} PASS · ${hw} WARN · ${hf} FAIL`,
@@ -2086,9 +2102,22 @@
         if (typeof resetCameraToPlayer === 'function') resetCameraToPlayer();
     }
 
-    function dispatchUpdate() {
+    function dispatchUpdate(force = false) {
         if (!enabled) return;
-        window.dispatchEvent(new CustomEvent('bomber-debug-updated'));
+        const now = performance.now();
+        const elapsed = now - DEBUG_MODE.lastDebugDispatchAt;
+        if (force || elapsed >= DEBUG_DISPATCH_INTERVAL_MS) {
+            DEBUG_MODE.lastDebugDispatchAt = now;
+            window.dispatchEvent(new CustomEvent('bomber-debug-updated'));
+            return;
+        }
+        if (DEBUG_MODE.debugDispatchTimer) return;
+        DEBUG_MODE.debugDispatchTimer = window.setTimeout(() => {
+            DEBUG_MODE.debugDispatchTimer = 0;
+            if (!enabled) return;
+            DEBUG_MODE.lastDebugDispatchAt = performance.now();
+            window.dispatchEvent(new CustomEvent('bomber-debug-updated'));
+        }, Math.max(0, DEBUG_DISPATCH_INTERVAL_MS - elapsed));
     }
 
     instrumentRuntime();
@@ -2124,6 +2153,6 @@
         }
     });
 
-    DEBUG_MODE.recordEvent('DEBUG', 'Debug Mode v3.28.5 unificado cargado en el mismo runtime.');
+    DEBUG_MODE.recordEvent('DEBUG', 'Debug Mode v3.29.0 unificado cargado en el mismo runtime.');
     DEBUG_MODE.recordEvent('DEBUG', 'Usá RESET para activar una escena de depuración limpia.');
 })();

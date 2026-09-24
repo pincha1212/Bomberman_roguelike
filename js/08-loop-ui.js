@@ -38,7 +38,6 @@
             if (debugEnabled) {
                 const frameMs = performance.now() - frameStart;
                 window.DEBUG_MODE.recordFrame(timestamp, frameMs, updateMs, drawMs);
-                window.dispatchEvent(new CustomEvent('bomber-debug-updated'));
             }
 
             if (gameState.isPlaying) {

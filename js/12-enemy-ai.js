@@ -7,7 +7,13 @@ const enemyAI_V312 = {
     roomKey: '',
     dangerCooldown: 0,
     dangerSignature: '',
+    dangerBombCount: -1,
+    dangerExplosionCount: -1,
+    dangerBlastSerial: -1,
     danger: new Set(),
+    playerTileFrame: -1,
+    playerTileX: -1,
+    playerTileY: -1,
     visionInterval: 75,
     decisionInterval: 62,
     memoryMs: 900,
@@ -47,23 +53,46 @@ const ENEMY_DIRS_V312 = [
 const ENEMY_DIR_INDEX_V312 = new Map(ENEMY_DIRS_V312.map((d, i) => [d.dir, i]));
 const ENEMY_OPPOSITE_V312 = { up: 'down', down: 'up', left: 'right', right: 'left' };
 
+let enemyBehaviorProfileMapV329 = null;
+let enemyBehaviorProfileSourceV329 = null;
+
+function getEnemyBehaviorProfileMapV329() {
+    const source = window.ENEMY_BEHAVIORS_V324 || {};
+    if (source === enemyBehaviorProfileSourceV329 && enemyBehaviorProfileMapV329) return enemyBehaviorProfileMapV329;
+    enemyBehaviorProfileSourceV329 = source;
+    enemyBehaviorProfileMapV329 = new Map();
+    for (const profile of Object.values(source)) {
+        if (profile?.id) enemyBehaviorProfileMapV329.set(profile.id, profile);
+    }
+    return enemyBehaviorProfileMapV329;
+}
+
 function enemyBehaviorProfileV324(e, index = 0) {
     const id = String(e?.aiBehavior || e?.ai?.archetype || '').toLowerCase();
-    const profiles = Object.values(window.ENEMY_BEHAVIORS_V324 || {});
-    const direct = profiles.find(profile => profile?.id === id);
-    if (direct) return direct;
-    if (e?.type === ENEMY_TYPES.VOLADOR || e?.type?.canFly) return profiles.find(profile => profile?.id === 'flyer') || profiles[0];
-    if (e?.type === ENEMY_TYPES.ESPECIAL) return profiles.find(profile => profile?.id === 'aggressive') || profiles[0];
     const fallbackId = ['chaser','patroller','evasive'][Math.abs(Number(index) || 0) % 3];
-    return profiles.find(profile => profile?.id === fallbackId) || profiles.find(profile => profile?.id === 'chaser') || profiles[0];
+    const cacheKey = id || (e?.type === ENEMY_TYPES.VOLADOR || e?.type?.canFly ? 'flyer' : e?.type === ENEMY_TYPES.ESPECIAL ? 'aggressive' : fallbackId);
+    if (e?.ai && e.ai.__behaviorProfileKey === cacheKey && e.ai.__behaviorProfile) return e.ai.__behaviorProfile;
+    const profiles = getEnemyBehaviorProfileMapV329();
+    let profile = profiles.get(cacheKey);
+    if (!profile && (e?.type === ENEMY_TYPES.VOLADOR || e?.type?.canFly)) profile = profiles.get('flyer');
+    if (!profile && e?.type === ENEMY_TYPES.ESPECIAL) profile = profiles.get('aggressive');
+    profile = profile || profiles.get('chaser') || profiles.values().next().value || null;
+    if (e?.ai) {
+        e.ai.__behaviorProfileKey = cacheKey;
+        e.ai.__behaviorProfile = profile;
+    }
+    return profile;
 }
 
 
 function enemyTileV312(e) {
-    return {
-        x: Math.max(0, Math.min(gameState.gridWidth - 1, Math.floor(e.x / TILE_SIZE))),
-        y: Math.max(0, Math.min(gameState.gridHeight - 1, Math.floor(e.y / TILE_SIZE)))
-    };
+    const x = Math.max(0, Math.min(gameState.gridWidth - 1, Math.floor(e.x / TILE_SIZE)));
+    const y = Math.max(0, Math.min(gameState.gridHeight - 1, Math.floor(e.y / TILE_SIZE)));
+    const cache = e.__v329TileCache;
+    if (cache && cache.x === x && cache.y === y && cache.w === gameState.gridWidth && cache.h === gameState.gridHeight) return cache.tile;
+    const tile = { x, y };
+    e.__v329TileCache = { x, y, w: gameState.gridWidth, h: gameState.gridHeight, tile };
+    return tile;
 }
 
 function enemyTileKeyV312(x, y) {
@@ -97,13 +126,16 @@ function rebuildEnemyDangerV312() {
 }
 
 function updateEnemyDangerV312(dt) {
-    const bombSig = gameState.bombs.map(b => `${b.x},${b.y},${Math.floor(b.timer / 100)}`).join('|');
-    const expSig = gameState.explosions.map(e => `${e.x},${e.y}`).join('|');
-    const signature = `${bombSig}#${expSig}`;
+    const bombCount = gameState.bombs.length;
+    const explosionCount = gameState.explosions.length;
+    const blastSerial = Number(gameState.blastSerial || 0);
     enemyAI_V312.dangerCooldown -= dt;
-    if (signature !== enemyAI_V312.dangerSignature || enemyAI_V312.dangerCooldown <= 0) {
-        enemyAI_V312.dangerSignature = signature;
+    const structureChanged = bombCount !== enemyAI_V312.dangerBombCount || explosionCount !== enemyAI_V312.dangerExplosionCount || blastSerial !== enemyAI_V312.dangerBlastSerial;
+    if (structureChanged || enemyAI_V312.dangerCooldown <= 0) {
         enemyAI_V312.dangerCooldown = 95;
+        enemyAI_V312.dangerBombCount = bombCount;
+        enemyAI_V312.dangerExplosionCount = explosionCount;
+        enemyAI_V312.dangerBlastSerial = blastSerial;
         rebuildEnemyDangerV312();
     }
 }
@@ -160,23 +192,28 @@ function ensureEnemyMotionStateV312(e, index) {
 
     const ai = e.ai;
     const profile = enemyBehaviorProfileV324(e, index);
-    ai.archetype = profile.id;
-    ai.archetypeLabel = profile.label;
+    ai.archetype = profile?.id || ai.archetype || 'chaser';
+    ai.archetypeLabel = profile?.label || ai.archetypeLabel || ai.archetype;
 
-    // v3.19: compatibilidad con enemigos creados antes de este update.
-    ai.turnLockTimer = Number.isFinite(Number(ai.turnLockTimer)) ? Number(ai.turnLockTimer) : 0;
-    ai.lastTurnTileKey = Number.isFinite(Number(ai.lastTurnTileKey)) ? Number(ai.lastTurnTileKey) : -1;
-    ai.lastTurnDirection = ai.lastTurnDirection || null;
-    ai.recoveryCooldownTimer = Number.isFinite(Number(ai.recoveryCooldownTimer)) ? Number(ai.recoveryCooldownTimer) : 0;
-    ai.recoveryPathCalls = Number.isFinite(Number(ai.recoveryPathCalls)) ? Number(ai.recoveryPathCalls) : 0;
-    ai.blockedDirection = ai.blockedDirection || null;
-    ai.blockedDirectionFrames = Number.isFinite(Number(ai.blockedDirectionFrames)) ? Number(ai.blockedDirectionFrames) : 0;
-    ai.recentTileKeys = Array.isArray(ai.recentTileKeys) ? ai.recentTileKeys.filter(Number.isFinite).slice(-enemyAI_V312.navigationMemoryTiles) : [];
-    ai.navigationMemoryTimer = Number.isFinite(Number(ai.navigationMemoryTimer)) ? Number(ai.navigationMemoryTimer) : 0;
-    ai.lastNavigationTileKey = Number.isFinite(Number(ai.lastNavigationTileKey)) ? Number(ai.lastNavigationTileKey) : -1;
-    ai.navigationTurnCount = Number.isFinite(Number(ai.navigationTurnCount)) ? Number(ai.navigationTurnCount) : 0;
-    ai.lastTurnFromDirection = ai.lastTurnFromDirection || null;
-    ai.lastTurnAtTileKey = Number.isFinite(Number(ai.lastTurnAtTileKey)) ? Number(ai.lastTurnAtTileKey) : -1;
+    // Compatibilidad de estados antiguos: se normaliza una sola vez por enemigo.
+    if (!ai.__compatNormalizedV329) {
+        ai.turnLockTimer = Number.isFinite(Number(ai.turnLockTimer)) ? Number(ai.turnLockTimer) : 0;
+        ai.lastTurnTileKey = Number.isFinite(Number(ai.lastTurnTileKey)) ? Number(ai.lastTurnTileKey) : -1;
+        ai.lastTurnDirection = ai.lastTurnDirection || null;
+        ai.recoveryCooldownTimer = Number.isFinite(Number(ai.recoveryCooldownTimer)) ? Number(ai.recoveryCooldownTimer) : 0;
+        ai.recoveryPathCalls = Number.isFinite(Number(ai.recoveryPathCalls)) ? Number(ai.recoveryPathCalls) : 0;
+        ai.blockedDirection = ai.blockedDirection || null;
+        ai.blockedDirectionFrames = Number.isFinite(Number(ai.blockedDirectionFrames)) ? Number(ai.blockedDirectionFrames) : 0;
+        ai.recentTileKeys = Array.isArray(ai.recentTileKeys) ? ai.recentTileKeys.filter(Number.isFinite).slice(-enemyAI_V312.navigationMemoryTiles) : [];
+        ai.navigationMemoryTimer = Number.isFinite(Number(ai.navigationMemoryTimer)) ? Number(ai.navigationMemoryTimer) : 0;
+        ai.lastNavigationTileKey = Number.isFinite(Number(ai.lastNavigationTileKey)) ? Number(ai.lastNavigationTileKey) : -1;
+        ai.navigationTurnCount = Number.isFinite(Number(ai.navigationTurnCount)) ? Number(ai.navigationTurnCount) : 0;
+        ai.lastTurnFromDirection = ai.lastTurnFromDirection || null;
+        ai.lastTurnAtTileKey = Number.isFinite(Number(ai.lastTurnAtTileKey)) ? Number(ai.lastTurnAtTileKey) : -1;
+        ai.__compatNormalizedV329 = true;
+    }
+    if (!Array.isArray(ai.recentTileKeys)) ai.recentTileKeys = [];
+    if (ai.recentTileKeys.length > enemyAI_V312.navigationMemoryTiles) ai.recentTileKeys.splice(0, ai.recentTileKeys.length - enemyAI_V312.navigationMemoryTiles);
     if (!ai.recentTileKeys.length) {
         const initialTile = enemyTileV312(e);
         const initialKey = enemyTileKeyV312(initialTile.x, initialTile.y);
@@ -247,8 +284,20 @@ function enemyCanSeePlayerV312(e) {
     return enemyAxisLineClearV312(ex, ey, px, py);
 }
 
+function enemyPlayerTileV312() {
+    const frame = Number(gameState.animFrame || 0);
+    if (enemyAI_V312.playerTileFrame === frame) return { x: enemyAI_V312.playerTileX, y: enemyAI_V312.playerTileY };
+    const px = player.x + player.width / 2;
+    const py = player.y + player.height / 2;
+    enemyAI_V312.playerTileFrame = frame;
+    enemyAI_V312.playerTileX = Math.max(0, Math.min(gameState.gridWidth - 1, Math.floor(px / TILE_SIZE)));
+    enemyAI_V312.playerTileY = Math.max(0, Math.min(gameState.gridHeight - 1, Math.floor(py / TILE_SIZE)));
+    return { x: enemyAI_V312.playerTileX, y: enemyAI_V312.playerTileY };
+}
+
 function enemyDirectionV312(dir) {
-    return ENEMY_DIRS_V312.find(d => d.dir === dir) || ENEMY_DIRS_V312[1];
+    const index = ENEMY_DIR_INDEX_V312.get(String(dir || '').toLowerCase());
+    return ENEMY_DIRS_V312[index == null ? 1 : index];
 }
 
 function enemyImmediateDirectionPassableV312(e, dir, avoidDanger = false, probe = 1.0) {
@@ -388,13 +437,6 @@ function enemyIsNearCenterV312(e) {
 
 function enemyDistanceToV312(x1, y1, x2, y2) {
     return Math.abs(x1 - x2) + Math.abs(y1 - y2);
-}
-
-function enemyPlayerTileV312() {
-    return {
-        x: Math.floor((player.x + player.width / 2) / TILE_SIZE),
-        y: Math.floor((player.y + player.height / 2) / TILE_SIZE)
-    };
 }
 
 function enemyProjectedTileV312(e, dir, steps = 1) {
@@ -857,10 +899,19 @@ function updateEnemyIntentV312(e, index, dt) {
 
     const tile = enemyTileV312(e);
     const dangerHere = enemyDangerV312(tile.x, tile.y);
-    const imminentDanger = enemyAvailableDirectionsV312(e, false).some(dir => {
-        const next = enemyProjectedTileV312(e, dir, 1);
-        return enemyDangerV312(next.x, next.y);
-    });
+    if (!Number.isFinite(ai.dangerCheckTimer)) ai.dangerCheckTimer = 0;
+    ai.dangerCheckTimer -= dt;
+    let imminentDanger = false;
+    if (enemyAI_V312.danger.size > 0 && ai.dangerCheckTimer <= 0) {
+        ai.dangerCheckTimer = 75 + (index % 3) * 12;
+        imminentDanger = enemyAvailableDirectionsV312(e, false).some(dir => {
+            const next = enemyProjectedTileV312(e, dir, 1);
+            return enemyDangerV312(next.x, next.y);
+        });
+        ai.imminentDanger = imminentDanger;
+    } else {
+        imminentDanger = !!ai.imminentDanger;
+    }
 
     const profile = enemyBehaviorProfileV324(e, index);
     const playerTile = enemyPlayerTileV312();
@@ -1093,6 +1144,9 @@ function updateEnemyAI(dt) {
         enemyAI_V312.roomKey = roomKey;
         enemyAI_V312.dangerCooldown = 0;
         enemyAI_V312.dangerSignature = '';
+        enemyAI_V312.dangerBombCount = -1;
+        enemyAI_V312.dangerExplosionCount = -1;
+        enemyAI_V312.dangerBlastSerial = -1;
         enemyAI_V312.danger.clear();
         enemyAI_V312.cursor = 0;
         enemyAI_V312.decisionCursor = 0;
@@ -1118,8 +1172,10 @@ function updateEnemyAI(dt) {
 
 function drawEnemyAISignals() {
     if (!gameState.enemies.length) return;
+    if (!perfRenderEveryV329(2)) return;
     for (const e of gameState.enemies) {
         if (!e.ai || e.ai.alert === 'patrol') continue;
+        if (typeof isWorldRectVisibleV329 === 'function' && !isWorldRectVisibleV329(e.x - e.width, e.y - e.height, e.width * 2, e.height * 2, TILE_SIZE)) continue;
         let color = '#facc15';
         let label = '';
         if (e.ai.alert === 'flee') { color = '#f97316'; label = '!'; }

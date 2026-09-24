@@ -1,10 +1,15 @@
-// Bomberman Roguelike v3.28.5 — Unified Debug Overlay
+// Bomberman Roguelike v3.29.0 — Unified Debug Overlay
 // Panel reconstruido para inspección en vivo. Solo se crea con ?debug=1.
 (() => {
     'use strict';
     if (!window.DEBUG_MODE?.enabled) return;
 
     const D = window.DEBUG_MODE;
+    const DEBUG_REFRESH_MS_V329 = 140;
+    let refreshTimer = 0;
+    let lastRefreshAt = 0;
+    let refreshQueued = false;
+    let lastNavigationDrawKey = '';
 
     const root = document.createElement('aside');
     root.id = 'debug-overlay';
@@ -12,7 +17,7 @@
     root.innerHTML = `
         <div class="debug-header">
             <div>
-                <div class="debug-kicker">BOMBERMAN ENGINE · v3.28.5</div>
+                <div class="debug-kicker">BOMBERMAN ENGINE · v3.29.0</div>
                 <h2>DEBUG MODE <span id="debug-status" class="debug-status">CARGANDO</span></h2>
             </div>
             <button type="button" class="debug-icon-btn" data-debug-action="toggle" title="Mostrar/ocultar panel">F3</button>
@@ -410,7 +415,7 @@
         if (status) status.textContent = `MAPA ${cols}×${rows} · ${selectedNavTarget==='player'?'JUGADOR':selectedNavTarget.replace('enemy:','E')} · ${nav.available?'DATOS ACTUALES':'SIN DATOS DE NAVEGACIÓN'}`;
     }
 
-    function refresh() {
+    function refreshNow() {
         const s = D.snapshot();
         setText('debug-status', s.status);
         setText('dbg-state-status', s.status);
@@ -428,7 +433,7 @@
         setText('dbg-event-total', `${s.events}/${s.rawEvents || s.events}`);
         setText('dbg-event-collapsed', s.suppressedEvents || 0);
 
-        const profiler = window.BOMBER_PROFILER?.snapshot?.() || null;
+        const profiler = s.profiler;
         if (profiler) {
             setText('dbg-profiler-status', profiler.enabled ? 'ON' : 'OFF');
             setText('dbg-prof-fps', profiler.frame.fps ? profiler.frame.fps.toFixed(1) : '0');
@@ -535,7 +540,16 @@
         const navNode = document.getElementById('dbg-nav-enemies');
         if (navNode) navNode.textContent = enemyLines.length ? enemyLines.join('\n') : 'Sin enemigos en la escena.';
         refreshNavSelector(enemyNav);
-        drawNavigationMap(s);
+        const navDrawKey = [
+            D.selectedVisuals.paths, D.selectedVisuals.reachable, D.selectedVisuals.grid, D.selectedVisuals.ai, D.selectedVisuals.bombs, D.selectedVisuals.explosions, D.selectedVisuals.camera, D.selectedVisuals.spawns,
+            s.world?.depth, s.world?.map, s.world?.blocksBroken, np.tile?.x, np.tile?.y, np.reachableTiles,
+            ...(enemyNav.slice(0, 22).map(e => `${e.index}:${e.tile?.x},${e.tile?.y}:${e.actualDirection}:${e.stuckLikely}:${e.physicalBlocked}`)),
+            ...(s.world ? [s.world.bombs, s.world.explosions, s.world.exit] : [])
+        ].join('|');
+        if (navDrawKey !== lastNavigationDrawKey) {
+            lastNavigationDrawKey = navDrawKey;
+            drawNavigationMap(s);
+        }
 
         const stress = s.aiStress;
         if (stress?.cases?.length) {
@@ -651,6 +665,27 @@
         setText('dbg-error-count', D.runtimeErrors.length);
     }
 
+
+    function refresh(force = false) {
+        const now = performance.now();
+        const elapsed = now - lastRefreshAt;
+        if (force || elapsed >= DEBUG_REFRESH_MS_V329) {
+            lastRefreshAt = now;
+            refreshQueued = false;
+            refreshNow();
+            return;
+        }
+        if (refreshQueued) return;
+        refreshQueued = true;
+        if (refreshTimer) window.clearTimeout(refreshTimer);
+        refreshTimer = window.setTimeout(() => {
+            refreshTimer = 0;
+            refreshQueued = false;
+            lastRefreshAt = performance.now();
+            refreshNow();
+        }, Math.max(0, DEBUG_REFRESH_MS_V329 - elapsed));
+    }
+
     function safeInlineJson(value) {
         try { return JSON.stringify(value); } catch (_) { return '[datos]'; }
     }
@@ -691,12 +726,12 @@
         const actionButton = event.target.closest('[data-debug-action]');
         if (actionButton) {
             action(actionButton.dataset.debugAction);
-            refresh();
+            refresh(true);
             return;
         }
         const testButton = event.target.closest('[data-debug-test]');
         if (testButton) {
-            D.runTest(testButton.dataset.debugTest).then(refresh);
+            D.runTest(testButton.dataset.debugTest).then(() => refresh(true));
             return;
         }
     });
@@ -705,12 +740,13 @@
         const checkbox = event.target.closest('[data-debug-visual]');
         if (!checkbox) return;
         D.setVisual(checkbox.dataset.debugVisual, checkbox.checked);
-        refresh();
+        lastNavigationDrawKey = '';
+        refresh(true);
     });
 
     root.addEventListener('change', event => {
         const select = event.target.closest('#dbg-nav-selected');
-        if (select) { selectedNavTarget = select.value; drawNavigationMap(D.snapshot()); }
+        if (select) { selectedNavTarget = select.value; lastNavigationDrawKey = ''; refresh(true); }
     });
 
     function setActiveJump(id) {
@@ -738,7 +774,7 @@
         root.querySelectorAll('.debug-section').forEach(section => observer.observe(section));
     }
 
-    window.addEventListener('bomber-debug-updated', refresh);
-    window.setInterval(refresh, 120);
-    refresh();
+    window.addEventListener('bomber-debug-updated', () => refresh(false));
+    window.setInterval(() => { if (!document.hidden && D.visible) refresh(false); }, 250);
+    refresh(true);
 })();

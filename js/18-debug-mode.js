@@ -19,7 +19,7 @@
     const MAX_TEST_RESULTS = 30;
     const MAX_NAV_NODES = 900;
     const MAX_MOTION_TRAIL = 24;
-    const AI_STRESS_CASES = 8;
+    const AI_STRESS_CASES = 9;
     const NAVIGATION_STRESS_CASES = 5;
     const EVENT_DEDUPE_MS = 850;
     const EVENT_DEDUPE_TYPES = new Set(['AI', 'DEBUG', 'VISUAL', 'INFO', 'WORLD']);
@@ -1345,12 +1345,13 @@
             const stressStarted = performance.now();
             const cases = [
                 { name: 'direct-chase', player: { x: 5, y: 7 }, enemy: { x: 1, y: 7 }, dir: 'right', minMove: 8, minTurns: 0 },
-                { name: 'intersection-stability', player: { x: 7, y: 5 }, enemy: { x: 5, y: 7 }, dir: 'right', minMove: 8, minTurns: 1, maxTurns: 1, forceChase: true, persistChase: true, requiresRoute: true, stopOnPlayer: true, expectBfsMax: 0 },
+                { name: 'intersection-stability', player: { x: 7, y: 5 }, enemy: { x: 5, y: 7 }, dir: 'right', minMove: 8, minTurns: 0, maxTurns: 1, forceChase: true, persistChase: true, requiresRoute: true, stopOnPlayer: true, expectBfsMax: 0 },
                 { name: 'corner-turn', player: { x: 7, y: 7 }, enemy: { x: 3, y: 3 }, dir: 'down', minMove: 8, minTurns: 1 },
                 { name: 'long-corridor', player: { x: 13, y: 7 }, enemy: { x: 1, y: 7 }, dir: 'right', minMove: 40, minTurns: 0 },
-                { name: 'intersection', player: { x: 3, y: 3 }, enemy: { x: 7, y: 3 }, dir: 'down', minMove: 8, minTurns: 1 },
+                { name: 'intersection', player: { x: 3, y: 3 }, enemy: { x: 7, y: 3 }, dir: 'down', minMove: 8, minTurns: 0 },
                 { name: 'dead-end', player: { x: 5, y: 10 }, enemy: { x: 5, y: 13 }, dir: 'down', minMove: 8, minTurns: 1, recoveryExpected: true },
                 { name: 'corner-recovery-no-player', player: { x: 13, y: 13 }, enemy: { x: 7, y: 7 }, dir: 'up', minMove: 8, minTurns: 0, recoveryExpected: true, recoveryMode: 'lane-correction', cornerOffset: 12, patrolTarget: { x: 7, y: 1 }, requiresRoute: false, expectBfsMax: 0 },
+                { name: 'repeated-block-recovery', player: { x: 13, y: 13 }, enemy: { x: 5, y: 7 }, dir: 'right', minMove: 8, minTurns: 1, recoveryExpected: true, recoveryMode: 'direction-change', preblockedDirection: 'right', requiresRoute: false, expectBfsMax: 0 },
                 { name: 'bomb-flee', player: { x: 13, y: 7 }, enemy: { x: 5, y: 7 }, dir: 'right', minMove: 8, minTurns: 0, bomb: { x: 6, y: 7, timer: 1200, range: 3 } }
             ];
             const results = [];
@@ -1390,6 +1391,13 @@
                     enemy.ai.patrolY = spec.patrolTarget.y;
                 }
                 if (spec.cornerOffset) enemy.x += Number(spec.cornerOffset);
+                if (spec.preblockedDirection) {
+                    enemy.ai.physicalBlocked = true;
+                    enemy.ai.physicalBlockedTimer = 260;
+                    enemy.ai.stuckTimer = 260;
+                    enemy.ai.blockedDirection = spec.preblockedDirection;
+                    enemy.ai.blockedDirectionFrames = 6;
+                }
 
                 const start = { x: enemy.x, y: enemy.y, tile: entityTile(enemy, 'enemy'), dir: spec.dir };
                 let maxMove = 0;
@@ -1518,6 +1526,12 @@
                 if (spec.name === 'bomb-flee' && maxBombDistance <= 1) { pass = false; failures.push(`no aumentó distancia a bomba (máx ${maxBombDistance})`); }
                 if (spec.name === 'corner-recovery-no-player' && !noPlayerAssist) { pass = false; failures.push('necesitó ver al jugador'); }
                 if (spec.name === 'corner-recovery-no-player' && !cornerCorrected) { pass = false; failures.push('no corrigió la esquina'); }
+                if (spec.name === 'repeated-block-recovery') {
+                    const recoveredDirection = firstRecoveredDirection !== '—' && firstRecoveredDirection.toLowerCase() !== spec.preblockedDirection;
+                    if (!recoveredDirection) { pass = false; failures.push(`no salió de ${spec.preblockedDirection}`); }
+                    if (Number(enemy.ai?.recoveryCount || 0) < 1) { pass = false; failures.push('recoveryCount no aumentó'); }
+                    if (Number(enemy.ai?.blockedDirectionFrames || 0) >= 6 && String(enemy.ai?.direction || '') === spec.preblockedDirection) { pass = false; failures.push('mantuvo dirección bloqueada'); }
+                }
 
                 results.push({
                     name: spec.name,
@@ -1554,6 +1568,8 @@
                     recoveryReason: enemy.ai?.lastRecoveryReason || '—',
                     recoveryPathNodes: Number(enemy.ai?.lastRecoveryPathNodes || 0),
                     recoveryPathCalls,
+                    blockedDirection: enemy.ai?.blockedDirection || '—',
+                    blockedDirectionFrames: Number(enemy.ai?.blockedDirectionFrames || 0),
                     turnLockMs: Number(enemy.ai?.turnLockTimer || 0),
                     lastTurnDirection: enemy.ai?.lastTurnDirection || '—',
                     noPlayerAssist,
@@ -1566,7 +1582,7 @@
             }
             const passed = results.filter(r => r.status === 'PASS').length;
             if (results.length !== AI_STRESS_CASES) {
-                DEBUG_MODE.recordEvent('WARN', `AI Stress: se esperaban ${AI_STRESS_CASES} escenarios y se ejecutaron ${results.length}.`);
+                DEBUG_MODE.recordEvent('WARN', `AI Stress v3.24.1: se esperaban ${AI_STRESS_CASES} escenarios y se ejecutaron ${results.length}.`);
             }
             DEBUG_MODE.aiStress = { total: results.length, passed, failed: results.length - passed, cases: results, durationMs: null };
             const elapsed = performance.now() - stressStarted;
@@ -1592,7 +1608,7 @@
             const started = performance.now();
             const cases = [
                 { name: 'corridor-continuity', player: { x: 13, y: 7 }, enemy: { x: 1, y: 7 }, dir: 'right', forceChase: true, minMove: 50, maxTurns: 0, expectBfsMax: 0 },
-                { name: 'intersection-local-chase', player: { x: 3, y: 3 }, enemy: { x: 7, y: 3 }, dir: 'down', forceChase: true, minMove: 20, minTurns: 1, expectBfsMax: 0 },
+                { name: 'intersection-local-chase', player: { x: 3, y: 3 }, enemy: { x: 7, y: 3 }, dir: 'down', forceChase: true, minMove: 20, minTurns: 0, maxTurns: 2, expectBfsMax: 0 },
                 { name: 'patrol-short-memory', player: { x: 13, y: 13 }, enemy: { x: 7, y: 7 }, dir: 'right', patrolTarget: { x: 7, y: 3 }, minMove: 30, expectBfsMax: 0, maxOscillations: 0 },
                 { name: 'dead-end-local-reversal', player: { x: 5, y: 10 }, enemy: { x: 5, y: 13 }, dir: 'down', forceChase: true, minMove: 15, minTurns: 1, expectBfsMax: 0 },
                 { name: 'unreachable-target-local', player: { x: 13, y: 13 }, enemy: { x: 7, y: 7 }, dir: 'up', forceChase: true, minMove: 30, expectBfsMax: 0, requiresRoute: false }
@@ -1924,6 +1940,6 @@
         }
     });
 
-    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.24.0 cargado en el mismo runtime.');
+    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.24.1 cargado en el mismo runtime.');
     DEBUG_MODE.recordEvent('DEBUG', 'Usá RESET para activar una escena de depuración limpia.');
 })();

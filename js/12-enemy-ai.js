@@ -24,6 +24,9 @@ const enemyAI_V312 = {
     turnCommitMs: 150,
     recoveryCooldownMs: 280,
     recoveryTriggerMs: 220,
+    // v3.24.1: una dirección que falla repetidamente queda temporalmente vetada
+    // para evitar que el recovery seleccione de nuevo el mismo bloqueo físico.
+    repeatedBlockTriggerFrames: 6,
     // v3.21: memoria corta de navegación y protección contra ciclos locales.
     navigationMemoryMs: 900,
     navigationMemoryTiles: 6,
@@ -31,7 +34,7 @@ const enemyAI_V312 = {
     repeatedTilePenalty: 3.2,
     branchPreference: 0.45,
     navigationTurnCommitMs: 240,
-    behaviorVersion: '3.24.0'
+    behaviorVersion: '3.24.1'
 };
 
 const ENEMY_DIRS_V312 = [
@@ -143,6 +146,8 @@ function ensureEnemyMotionStateV312(e, index) {
             lastTurnDirection: null,
             recoveryCooldownTimer: 0,
             recoveryPathCalls: 0,
+            blockedDirection: null,
+            blockedDirectionFrames: 0,
             // v3.21: memoria corta de tiles visitados para evitar ciclos locales.
             recentTileKeys: [],
             navigationMemoryTimer: 0,
@@ -164,6 +169,8 @@ function ensureEnemyMotionStateV312(e, index) {
     ai.lastTurnDirection = ai.lastTurnDirection || null;
     ai.recoveryCooldownTimer = Number.isFinite(Number(ai.recoveryCooldownTimer)) ? Number(ai.recoveryCooldownTimer) : 0;
     ai.recoveryPathCalls = Number.isFinite(Number(ai.recoveryPathCalls)) ? Number(ai.recoveryPathCalls) : 0;
+    ai.blockedDirection = ai.blockedDirection || null;
+    ai.blockedDirectionFrames = Number.isFinite(Number(ai.blockedDirectionFrames)) ? Number(ai.blockedDirectionFrames) : 0;
     ai.recentTileKeys = Array.isArray(ai.recentTileKeys) ? ai.recentTileKeys.filter(Number.isFinite).slice(-enemyAI_V312.navigationMemoryTiles) : [];
     ai.navigationMemoryTimer = Number.isFinite(Number(ai.navigationMemoryTimer)) ? Number(ai.navigationMemoryTimer) : 0;
     ai.lastNavigationTileKey = Number.isFinite(Number(ai.lastNavigationTileKey)) ? Number(ai.lastNavigationTileKey) : -1;
@@ -666,24 +673,32 @@ function enemyIsIntersectionNodeV319(e, possible, currentDir) {
 function enemyChooseLocalRecoveryDirectionV319(e) {
     const ai = e.ai;
     ai.lastRecoveryPathNodes = 0;
-    const physical = enemyPhysicalDirectionChoicesV312(e, ai.alert === 'flee');
+    const avoidDanger = ai.alert === 'flee';
+    const physical = enemyPhysicalDirectionChoicesV312(e, avoidDanger);
     if (!physical.length) return null;
 
     const current = enemyDirectionV312(ai.direction);
+    const blockedDirection = ai.blockedDirection || current.dir;
     const target = enemyTargetForStateV312(e) || enemyPlayerTileV312();
-    const alternatives = physical.filter(dir =>
-        dir.dir !== current.dir && dir.dir !== ENEMY_OPPOSITE_V312[current.dir]
+
+    // v3.24.1: no permitir que el recovery vuelva a elegir la dirección que
+    // acaba de quedar físicamente bloqueada. Además exigimos una pequeña holgura
+    // física, no solo un probe de 1 px, para evitar falsos positivos en esquinas.
+    const executable = physical.filter(dir =>
+        dir.dir !== blockedDirection &&
+        enemyImmediateDirectionPassableV312(e, dir, avoidDanger, 2.0)
     );
-    // En recovery no devolvemos la misma dirección que acaba de fallar. Si no
-    // existe otra salida física, dejamos que el BFS excepcional lo determine.
+    if (!executable.length) return null;
+
+    const alternatives = executable.filter(dir => dir.dir !== current.dir && dir.dir !== ENEMY_OPPOSITE_V312[current.dir]);
     const options = alternatives.length
         ? alternatives
-        : physical.filter(dir => dir.dir !== current.dir);
+        : executable.filter(dir => dir.dir !== current.dir);
     if (!options.length) return null;
 
     let best = null;
     for (const dir of options) {
-        const score = enemyDirectionScoreV312(e, dir, target, { allowReverse: true, urgent: true, recovery: true, flee: ai.alert === 'flee' });
+        const score = enemyDirectionScoreV312(e, dir, target, { allowReverse: true, urgent: true, recovery: true, flee: avoidDanger });
         if (!best || score < best.score) best = { dir, score };
     }
     return best?.dir || null;
@@ -704,7 +719,20 @@ function enemyChooseDirectionAtIntersectionV312(e) {
     const currentPassable = possible.some(dir => dir.dir === currentDir.dir);
     const exceptionalRecovery =
         Number(ai.physicalBlockedTimer || 0) >= enemyAI_V312.recoveryTriggerMs ||
-        Number(ai.stuckTimer || 0) >= enemyAI_V312.stuckMs;
+        Number(ai.stuckTimer || 0) >= enemyAI_V312.stuckMs ||
+        Number(ai.blockedDirectionFrames || 0) >= enemyAI_V312.repeatedBlockTriggerFrames;
+
+    const repeatedSameBlock =
+        !!ai.blockedDirection &&
+        ai.blockedDirection === currentDir.dir &&
+        Number(ai.blockedDirectionFrames || 0) >= enemyAI_V312.repeatedBlockTriggerFrames;
+
+    // v3.24.1: si el mismo vector ya falló suficientes veces, forzar una salida
+    // local distinta antes de permitir que el scoring normal lo vuelva a escoger.
+    if (repeatedSameBlock) {
+        const forcedRecovery = enemyChooseLocalRecoveryDirectionV319(e);
+        if (forcedRecovery) return forcedRecovery;
+    }
 
     // v3.19: recovery local primero. BFS queda reservado para un bloqueo físico
     // persistente donde las alternativas inmediatas no permiten salir.
@@ -714,11 +742,11 @@ function enemyChooseDirectionAtIntersectionV312(e) {
 
         if (ai.recoveryCooldownTimer <= 0) {
             const recovery = enemyRecoveryDirectionByPathV312(e);
-            if (recovery?.dir) {
+            if (recovery?.dir && recovery.dir !== ai.blockedDirection && recovery.dir !== currentDir.dir) {
                 ai.lastRecoveryPathNodes = recovery.nodes;
                 ai.recoveryCooldownTimer = enemyAI_V312.recoveryCooldownMs;
                 const recoveryDir = enemyDirectionV312(recovery.dir);
-                if (enemyImmediateDirectionPassableV312(e, recoveryDir, ai.alert === 'flee', 0.75)) {
+                if (enemyImmediateDirectionPassableV312(e, recoveryDir, ai.alert === 'flee', 2.0)) {
                     return recoveryDir;
                 }
             }
@@ -867,7 +895,8 @@ function updateEnemyIntentV312(e, index, dt) {
     if (!currentPassable) ai.blockedTimer += dt;
     else ai.blockedTimer = 0;
 
-    const shouldDecide = atCenter || !currentPassable || ai.physicalBlockedTimer >= enemyAI_V312.physicalRecoveryMs || ai.decisionTimer <= 0 || ai.alert === 'flee';
+    const repeatedBlock = Number(ai.blockedDirectionFrames || 0) >= enemyAI_V312.repeatedBlockTriggerFrames;
+    const shouldDecide = atCenter || !currentPassable || repeatedBlock || ai.physicalBlockedTimer >= enemyAI_V312.physicalRecoveryMs || ai.decisionTimer <= 0 || ai.alert === 'flee';
     if (!shouldDecide) return;
 
     if (ai.patrolX >= 0 && tile.x === ai.patrolX && tile.y === ai.patrolY && ai.alert === 'patrol') {
@@ -875,8 +904,13 @@ function updateEnemyIntentV312(e, index, dt) {
         ai.patrolY = -1;
     }
 
-    const chosen = enemyChooseDirectionAtIntersectionV312(e);
+    let chosen = enemyChooseDirectionAtIntersectionV312(e);
     if (!chosen) return;
+
+    if (repeatedBlock && ai.blockedDirection === currentDir.dir && chosen.dir === currentDir.dir) {
+        const recovery = enemyChooseLocalRecoveryDirectionV319(e);
+        if (recovery) chosen = recovery;
+    }
 
     ai.desiredDirection = chosen.dir;
     ai.decisionTimer = enemyAI_V312.decisionInterval + (index % 3) * 10;
@@ -913,7 +947,7 @@ function updateEnemyIntentV312(e, index, dt) {
         debugRecordEvent('AI', `Enemy ${index} · ${ai.alert} · ${currentDir.dir || '?'} → ${chosen.dir}`, {
             index, behavior: ai.behavior, alert: ai.alert, desired: chosen.dir, tile,
             physicalBlocked: !!ai.physicalBlocked, physicalBlockedMs: Number(ai.physicalBlockedTimer.toFixed(1)),
-            recoveryCount: Number(ai.recoveryCount || 0), recoveryReason: ai.lastRecoveryReason || '—', recoveryPathNodes: Number(ai.lastRecoveryPathNodes || 0), navigationMemory: ai.recentTileKeys?.length || 0, navigationTurns: Number(ai.navigationTurnCount || 0)
+            recoveryCount: Number(ai.recoveryCount || 0), recoveryReason: ai.lastRecoveryReason || '—', recoveryPathNodes: Number(ai.lastRecoveryPathNodes || 0), blockedDirection: ai.blockedDirection || '—', blockedDirectionFrames: Number(ai.blockedDirectionFrames || 0), navigationMemory: ai.recentTileKeys?.length || 0, navigationTurns: Number(ai.navigationTurnCount || 0)
         });
         ai.lastRecoveryReason = '';
         ai.lastRecoveryPathNodes = 0;
@@ -994,6 +1028,8 @@ function moveEnemyV312(e, dt) {
         ai.physicalBlockedTimer = 0;
         ai.physicalBlocked = false;
         ai.cornerCorrectionMs = 0;
+        ai.blockedDirection = null;
+        ai.blockedDirectionFrames = 0;
         ai.lastX = e.x;
         ai.lastY = e.y;
         if (dir.x) e.vx = dir.x * speed, e.vy = 0;
@@ -1009,6 +1045,14 @@ function moveEnemyV312(e, dt) {
     ai.physicalBlocked = true;
     ai.physicalBlockedTimer += dt;
 
+    // v3.24.1: contar bloqueos consecutivos por dirección. La recuperación
+    // cambia de candidato cuando el mismo vector falla repetidamente.
+    if (ai.blockedDirection === dir.dir) ai.blockedDirectionFrames += 1;
+    else {
+        ai.blockedDirection = dir.dir;
+        ai.blockedDirectionFrames = 1;
+    }
+
     // Primero corregimos la alineación lateral de forma gradual. No hace snap
     // ni movimiento diagonal: solo desplaza el eje perpendicular del corredor.
     if (ai.physicalBlockedTimer <= enemyAI_V312.physicalRecoveryMs) {
@@ -1021,7 +1065,7 @@ function moveEnemyV312(e, dt) {
 
     // Si el corredor sigue bloqueado, hacemos una decisión de recuperación
     // basada en la posición física actual, no en la presencia del jugador.
-    if (ai.physicalBlockedTimer >= enemyAI_V312.recoveryTriggerMs || ai.stuckTimer >= enemyAI_V312.stuckMs) {
+    if (ai.physicalBlockedTimer >= enemyAI_V312.recoveryTriggerMs || ai.stuckTimer >= enemyAI_V312.stuckMs || ai.blockedDirectionFrames >= enemyAI_V312.repeatedBlockTriggerFrames) {
         ai.stuckTimer = 0;
         ai.blockedTimer = 0;
         const fallback = enemyChooseDirectionAtIntersectionV312(e);
@@ -1034,6 +1078,8 @@ function moveEnemyV312(e, dt) {
             ai.physicalBlockedTimer = 0;
             ai.physicalBlocked = false;
             ai.cornerCorrectionMs = 0;
+            ai.blockedDirection = null;
+            ai.blockedDirectionFrames = 0;
             ai.recoveryCooldownTimer = enemyAI_V312.recoveryCooldownMs;
         }
     }

@@ -1,6 +1,11 @@
-// Bomberman Roguelike v4.5 — Core, configuration, state, audio, performance and adaptive interface
+// Bomberman Roguelike v4.6 — Core, configuration, state, audio, performance and adaptive interface
 // V2.0 IMMERSIVE SYSTEMS
 let audioCtx = null;
+
+function getThemePaletteSafeV46(){
+    return typeof getThemePaletteV46 === 'function' ? getThemePaletteV46() : null;
+}
+
 const ambient = { dustTimer: 0, lastFoot: 0, introTimer: 0 };
 function initAudio(){
     if(audioCtx) return;
@@ -10,7 +15,8 @@ function sfx(type){
     if(!audioCtx) return;
     const now=audioCtx.currentTime, o=audioCtx.createOscillator(), g=audioCtx.createGain();
     const presets={bomb:[70,.08,'square'],boom:[55,.28,'sawtooth'],pickup:[520,.10,'sine'],hurt:[110,.18,'square'],exit:[330,.35,'triangle'],click:[220,.05,'square'],trap:[90,.22,'sawtooth'],alarm:[180,.16,'square'],boss:[62,.5,'sawtooth'],bossHit:[240,.10,'square'],bossRoar:[48,.65,'sawtooth'],bossCharge:[120,.22,'square'],bossWave:[75,.38,'triangle'],damageHit:[135,.12,'square'],enemyKill:[420,.08,'square'],death:[65,.58,'sawtooth'],bombReady:[150,.07,'square']};
-    const [freq,dur,wave]=presets[type]||presets.click;
+    const audioKey = typeof themeAudioV46 === 'function' ? themeAudioV46(type, type) : type;
+    const [freq,dur,wave]=presets[audioKey]||presets.click;
     o.type=wave; o.frequency.setValueAtTime(freq,now); o.frequency.exponentialRampToValueAtTime(Math.max(35,freq*.55),now+dur);
     g.gain.setValueAtTime(.0001,now); g.gain.exponentialRampToValueAtTime(.06,now+.008); g.gain.exponentialRampToValueAtTime(.0001,now+dur);
     o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now+dur+.02);
@@ -66,7 +72,10 @@ function drawAmbientDust(){
         const x=((seed*3.71+gameState.animFrame*.09*(i%3+1))%(canvas.width+80))-40;
         const y=((seed*1.83+gameState.animFrame*.035*(i%2+1))%(canvas.height+80))-40;
         const a=.025+(i%4)*.012;
-        ctx.fillStyle=`rgba(226,232,240,${a})`; ctx.fillRect(x,y,1+(i%2),1+(i%2));
+        const ambientColor = typeof themeColorV46 === 'function' ? themeColorV46('ambientDust', 'rgba(226,232,240,0.06)') : `rgba(226,232,240,${a})`;
+        if (typeof themeColorV46 === 'function') ctx.globalAlpha = Math.min(1, a / 0.061);
+        ctx.fillStyle=ambientColor; ctx.fillRect(x,y,1+(i%2),1+(i%2));
+        if (typeof themeColorV46 === 'function') ctx.globalAlpha = 1; 
     }
 }
 function drawLighting(){
@@ -88,7 +97,7 @@ function drawLighting(){
             if(!b) continue;
             const x=(b.x+.5)*TILE_SIZE-gameState.camera.x, y=(b.y+.5)*TILE_SIZE-gameState.camera.y;
             const radius=75+Math.sin(gameState.animFrame*.3)*8;
-            const g=ctx.createRadialGradient(x,y,4,x,y,radius); g.addColorStop(0,'rgba(255,170,50,.20)'); g.addColorStop(1,'rgba(255,80,20,0)');
+            const g=ctx.createRadialGradient(x,y,4,x,y,radius); g.addColorStop(0, typeof themeColorV46 === 'function' ? themeColorV46('bombGlow', 'rgba(255,170,50,.20)') : 'rgba(255,170,50,.20)'); g.addColorStop(1, typeof themeColorV46 === 'function' ? themeColorV46('bombGlowOuter', 'rgba(255,80,20,0)') : 'rgba(255,80,20,0)');
             ctx.fillStyle=g; ctx.fillRect(x-radius,y-radius,radius*2,radius*2);
         }
     }
@@ -148,7 +157,7 @@ function perfRenderEveryV329(interval = 1){
 function drawLargeBossShadow(b){
     if(!largeSupport.shadowEffects || perf.lowQuality) return;
     ctx.save();
-    ctx.fillStyle='rgba(0,0,0,.42)';
+    ctx.fillStyle=typeof themeColorV46 === 'function' ? themeColorV46('bossShadow', 'rgba(0,0,0,.42)') : 'rgba(0,0,0,.42)';
     ctx.beginPath();
     ctx.ellipse(b.x,b.y+b.height*.44,b.width*.46,Math.max(7,b.height*.10),0,0,Math.PI*2);
     ctx.fill();

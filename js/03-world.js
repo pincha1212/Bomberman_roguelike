@@ -211,22 +211,22 @@
             aura.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=aura;ctx.beginPath();ctx.arc(0,0,b.width*.8,0,Math.PI*2);ctx.fill();
             ctx.fillStyle='rgba(0,0,0,.58)';ctx.beginPath();ctx.ellipse(0,b.height*.43,b.width*.48,10,0,0,Math.PI*2);ctx.fill();
             // Massive armored body
-            ctx.fillStyle=rage?'#581c1c':'#312e81';
-            ctx.strokeStyle=rage?'#fb7185':'#a78bfa';ctx.lineWidth=5;
+            ctx.fillStyle=rage ? (typeof themeColorV46 === 'function' ? themeColorV46('bossRageBase', '#581c1c') : '#581c1c') : (typeof themeColorV46 === 'function' ? themeColorV46('bossBase', '#312e81') : '#312e81');
+            ctx.strokeStyle=rage ? (typeof themeColorV46 === 'function' ? themeColorV46('bossRageOutline', '#fb7185') : '#fb7185') : (typeof themeColorV46 === 'function' ? themeColorV46('bossOutline', '#a78bfa') : '#a78bfa');ctx.lineWidth=5;
             ctx.beginPath();ctx.roundRect(-b.width*.43,-b.height*.42,b.width*.86,b.height*.84,18);ctx.fill();ctx.stroke();
             // Shoulder armor
-            ctx.fillStyle=rage?'#991b1b':'#4c1d95';
+            ctx.fillStyle=rage ? (typeof themeColorV46 === 'function' ? themeColorV46('bossRageShoulder', '#991b1b') : '#991b1b') : (typeof themeColorV46 === 'function' ? themeColorV46('bossShoulder', '#4c1d95') : '#4c1d95');
             ctx.beginPath();ctx.arc(-b.width*.40,-b.height*.12,b.width*.22,0,Math.PI*2);ctx.arc(b.width*.40,-b.height*.12,b.width*.22,0,Math.PI*2);ctx.fill();
             // Face plate
-            ctx.fillStyle='#111827';ctx.fillRect(-b.width*.25,-b.height*.19,b.width*.50,b.height*.30);
-            ctx.fillStyle=rage?'#fda4af':'#e9d5ff';ctx.shadowBlur=14;ctx.shadowColor=ctx.fillStyle;
+            ctx.fillStyle=typeof themeColorV46 === 'function' ? themeColorV46('bossFacePlate', '#111827') : '#111827';ctx.fillRect(-b.width*.25,-b.height*.19,b.width*.50,b.height*.30);
+            ctx.fillStyle=rage ? (typeof themeColorV46 === 'function' ? themeColorV46('bossRageEye', '#fda4af') : '#fda4af') : (typeof themeColorV46 === 'function' ? themeColorV46('bossEye', '#e9d5ff') : '#e9d5ff');ctx.shadowBlur=14;ctx.shadowColor=ctx.fillStyle;
             ctx.fillRect(-b.width*.16,-b.height*.10,b.width*.10,7);ctx.fillRect(b.width*.06,-b.height*.10,b.width*.10,7);ctx.shadowBlur=0;
             // Crown / horns
-            ctx.fillStyle='#facc15';ctx.beginPath();ctx.moveTo(-b.width*.28,-b.height*.38);ctx.lineTo(-b.width*.17,-b.height*.62);ctx.lineTo(-b.width*.04,-b.height*.38);ctx.lineTo(b.width*.08,-b.height*.62);ctx.lineTo(b.width*.25,-b.height*.38);ctx.closePath();ctx.fill();
+            ctx.fillStyle=typeof themeColorV46 === 'function' ? themeColorV46('bossCrown', '#facc15') : '#facc15';ctx.beginPath();ctx.moveTo(-b.width*.28,-b.height*.38);ctx.lineTo(-b.width*.17,-b.height*.62);ctx.lineTo(-b.width*.04,-b.height*.38);ctx.lineTo(b.width*.08,-b.height*.62);ctx.lineTo(b.width*.25,-b.height*.38);ctx.closePath();ctx.fill();
             // Core
-            ctx.fillStyle=rage?'#ef4444':'#c084fc';ctx.shadowBlur=18;ctx.shadowColor=ctx.fillStyle;ctx.beginPath();ctx.arc(0,b.height*.15,b.width*.10,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+            ctx.fillStyle=rage ? (typeof themeColorV46 === 'function' ? themeColorV46('bossRageCore', '#ef4444') : '#ef4444') : (typeof themeColorV46 === 'function' ? themeColorV46('bossCore', '#c084fc') : '#c084fc');ctx.shadowBlur=18;ctx.shadowColor=ctx.fillStyle;ctx.beginPath();ctx.arc(0,b.height*.15,b.width*.10,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
             // Phase markers
-            ctx.fillStyle='#fef08a';for(let i=0;i<b.phase;i++){ctx.beginPath();ctx.arc(-10+(i-1)*10,b.height*.34,3,0,Math.PI*2);ctx.fill();}
+            ctx.fillStyle=typeof themeColorV46 === 'function' ? themeColorV46('bossPhaseMarker', '#fef08a') : '#fef08a';for(let i=0;i<b.phase;i++){ctx.beginPath();ctx.arc(-10+(i-1)*10,b.height*.34,3,0,Math.PI*2);ctx.fill();}
             ctx.restore();
         }
 

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.17 — Canvas rendering and sprite drawing
+// Bomberman Roguelike v4.6 — Canvas rendering and theme-backed sprite drawing
 // V3.17: cache de terreno estático para evitar reconstruir la cuadrícula completa
 // en cada frame. El mapa se regenera solo cuando cambia la referencia/revisión.
 const renderCacheV317 = {
@@ -39,12 +39,12 @@ function buildTerrainCacheV317() {
             const py = y * TILE_SIZE;
             const isAlt = (x + y) % 2 === 0;
 
-            cacheCtx.fillStyle = isAlt ? '#0f172a' : '#1e293b';
+            cacheCtx.fillStyle = isAlt ? (typeof themeColorV46 === 'function' ? themeColorV46('floorA') : '#0f172a') : (typeof themeColorV46 === 'function' ? themeColorV46('floorB') : '#1e293b');
             cacheCtx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-            cacheCtx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+            cacheCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('floorHighlight') : 'rgba(255, 255, 255, 0.03)';
             cacheCtx.fillRect(px, py, TILE_SIZE, 2);
             cacheCtx.fillRect(px, py, 2, TILE_SIZE);
-            cacheCtx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            cacheCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('floorShadow') : 'rgba(0, 0, 0, 0.2)';
             cacheCtx.fillRect(px, py + TILE_SIZE - 2, TILE_SIZE, 2);
             cacheCtx.fillRect(px + TILE_SIZE - 2, py, 2, TILE_SIZE);
 
@@ -75,6 +75,8 @@ function ensureTerrainCacheV317() {
 
 window.BOMBER_ENGINE = window.BOMBER_ENGINE || {};
 window.BOMBER_ENGINE.getRenderStats = () => ({
+    themeId: typeof getThemeV46 === 'function' ? getThemeV46().id : 'legacy',
+    themeSprites: typeof themeSpriteV46 === 'function' ? { floor: themeSpriteV46('floor'), wall: themeSpriteV46('wall'), brick: themeSpriteV46('brick'), bomb: themeSpriteV46('bomb'), fire: themeSpriteV46('fire'), player: themeSpriteV46('player'), enemy: themeSpriteV46('enemy'), powerup: themeSpriteV46('powerup'), exit: themeSpriteV46('exit'), boss: themeSpriteV46('boss') } : {},
     terrainCacheBuilds: renderCacheV317.builds,
     terrainCacheLastBuildMs: renderCacheV317.lastBuildMs,
     terrainCacheReady: !!renderCacheV317.canvas && renderCacheV317.grid === gameState.grid && renderCacheV317.gridRevision === (gameState.gridRevision || 0),
@@ -112,7 +114,7 @@ function isWorldTileVisibleV329(tileX, tileY, margin = 1){
 
 function draw() {
             updateRenderViewportV329();
-            ctx.fillStyle = '#090d16';
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('background') : '#090d16';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             ctx.save();
@@ -217,42 +219,42 @@ function draw() {
 
         function drawSteelWall(x, y, targetCtx = ctx) {
             // Pilar 3D Reforzado
-            targetCtx.fillStyle = '#475569'; // Top Base
+            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('wallBase') : '#475569'; // Top Base
             targetCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-            targetCtx.fillStyle = '#94a3b8'; // Top Highlight
+            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('wallHighlight') : '#94a3b8'; // Top Highlight
             targetCtx.fillRect(x, y, TILE_SIZE, 3);
             targetCtx.fillRect(x, y, 3, TILE_SIZE);
-            targetCtx.fillStyle = '#334155'; // Sombra inferior/derecha
+            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('wallShadow') : '#334155'; // Sombra inferior/derecha
             targetCtx.fillRect(x, y + TILE_SIZE - 4, TILE_SIZE, 4);
             targetCtx.fillRect(x + TILE_SIZE - 4, y, 4, TILE_SIZE);
             
             // Bisel interior
-            targetCtx.fillStyle = '#1e293b';
+            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('wallInset') : '#1e293b';
             targetCtx.fillRect(x + 6, y + 6, TILE_SIZE - 12, TILE_SIZE - 12);
-            targetCtx.fillStyle = '#0f172a';
+            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('wallDeep') : '#0f172a';
             targetCtx.fillRect(x + 8, y + 8, TILE_SIZE - 16, TILE_SIZE - 16);
             
             // Remaches
-            targetCtx.fillStyle = '#38bdf8';
+            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('wallAccent') : '#38bdf8';
             targetCtx.fillRect(x + 10, y + 10, 2, 2);
             targetCtx.fillRect(x + TILE_SIZE - 12, y + TILE_SIZE - 12, 2, 2);
         }
 
         function drawBrickBlock(x, y, targetCtx = ctx) {
             // Cajas de madera (Crates) destructibles
-            targetCtx.fillStyle = '#b45309'; // Marrón base
+            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('blockBase') : '#b45309'; // Marrón base
             targetCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
             
             // Bordes de madera
-            targetCtx.fillStyle = '#f59e0b'; // Borde claro
+            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('blockHighlight') : '#f59e0b'; // Borde claro
             targetCtx.fillRect(x, y, TILE_SIZE, 3);
             targetCtx.fillRect(x, y, 3, TILE_SIZE);
-            targetCtx.fillStyle = '#78350f'; // Borde oscuro
+            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('blockShadow') : '#78350f'; // Borde oscuro
             targetCtx.fillRect(x, y + TILE_SIZE - 4, TILE_SIZE, 4);
             targetCtx.fillRect(x + TILE_SIZE - 4, y, 4, TILE_SIZE);
 
             // Patrón de cruz
-            targetCtx.strokeStyle = '#92400e';
+            targetCtx.strokeStyle = typeof themeColorV46 === 'function' ? themeColorV46('blockPattern') : '#92400e';
             targetCtx.lineWidth = 4;
             targetCtx.beginPath();
             targetCtx.moveTo(x + 6, y + 6);
@@ -262,17 +264,17 @@ function draw() {
             targetCtx.stroke();
             
             // Refuerzo central
-            targetCtx.fillStyle = '#451a03';
+            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('blockCore') : '#451a03';
             targetCtx.fillRect(x + TILE_SIZE/2 - 4, y + TILE_SIZE/2 - 4, 8, 8);
         }
 
         function drawExitPortal(x, y) {
             let pulse = Math.sin(gameState.animFrame * 0.1) * 3;
-            ctx.fillStyle = '#facc15';
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('exit') : '#facc15';
             ctx.beginPath();
             ctx.arc(x + TILE_SIZE/2, y + TILE_SIZE/2, TILE_SIZE*0.35 + pulse, 0, Math.PI*2);
             ctx.fill();
-            ctx.fillStyle = '#000000';
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('enemyPupil') : '#000000';
             ctx.font = '16px "Press Start 2P"';
             ctx.fillText('🚪', x + 10, y + 32);
         }
@@ -284,14 +286,14 @@ function draw() {
             let px = x + recoil.x, py = y + bounce + recoil.y;
 
             // Sombra
-            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('bombShadow') : 'rgba(0,0,0,0.5)';
             ctx.beginPath();
             ctx.ellipse(px + player.width/2, y + player.height, player.width/2.2, 5, 0, 0, Math.PI*2);
             ctx.fill();
 
             // Burbuja de Escudo
             if (player.hasShield) {
-                ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+                ctx.strokeStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerShield') : 'rgba(56, 189, 248, 0.8)';
                 ctx.lineWidth = 4;
                 ctx.beginPath();
                 ctx.arc(px + player.width/2, py + player.height/2, player.width*0.8, 0, Math.PI*2);
@@ -299,14 +301,14 @@ function draw() {
             }
 
             // Traje (Azul)
-            ctx.fillStyle = '#2563eb';
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerSuit') : '#2563eb';
             ctx.fillRect(px + 6, py + 12, player.width - 12, player.height - 16);
             
             // Cinturón
-            ctx.fillStyle = '#0f172a';
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerDark') : '#0f172a';
             ctx.fillRect(px + 6, py + 22, player.width - 12, 4);
             // Hebilla
-            ctx.fillStyle = '#facc15';
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerBuckle') : '#facc15';
             if (player.dir === 'down') {
                 ctx.fillRect(px + player.width/2 - 4, py + 21, 8, 6);
             } else if (player.dir === 'left') {
@@ -316,40 +318,40 @@ function draw() {
             }
 
             // Casco (Blanco)
-            ctx.fillStyle = '#f8fafc';
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerHelmet') : '#f8fafc';
             ctx.beginPath();
             ctx.arc(px + player.width/2, py + 10, 14, 0, Math.PI*2);
             ctx.fill();
 
             // Rostro Direccional
             if (player.dir === 'down') {
-                ctx.fillStyle = '#ffedd5';
+                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerFace') : '#ffedd5';
                 ctx.fillRect(px + player.width/2 - 9, py + 4, 18, 11);
-                ctx.fillStyle = '#0f172a';
+                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerDark') : '#0f172a';
                 ctx.fillRect(px + player.width/2 - 5, py + 7, 3, 6);
                 ctx.fillRect(px + player.width/2 + 2, py + 7, 3, 6);
             } else if (player.dir === 'left') {
-                ctx.fillStyle = '#ffedd5';
+                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerFace') : '#ffedd5';
                 ctx.fillRect(px + player.width/2 - 12, py + 4, 14, 11);
-                ctx.fillStyle = '#0f172a';
+                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerDark') : '#0f172a';
                 ctx.fillRect(px + player.width/2 - 7, py + 7, 3, 6);
             } else if (player.dir === 'right') {
-                ctx.fillStyle = '#ffedd5';
+                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerFace') : '#ffedd5';
                 ctx.fillRect(px + player.width/2 - 2, py + 4, 14, 11);
-                ctx.fillStyle = '#0f172a';
+                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerDark') : '#0f172a';
                 ctx.fillRect(px + player.width/2 + 4, py + 7, 3, 6);
             }
 
             // Antena
-            ctx.fillStyle = '#94a3b8'; 
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerMetal') : '#94a3b8'; 
             ctx.fillRect(px + player.width/2 - 2, py - 6, 4, 4);
-            ctx.fillStyle = '#ec4899'; 
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerAccent') : '#ec4899'; 
             ctx.beginPath();
             ctx.arc(px + player.width/2, py - 8, 5, 0, Math.PI*2);
             ctx.fill();
 
             // Guantes
-            ctx.fillStyle = '#ec4899';
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerAccent') : '#ec4899';
             if (player.dir !== 'right') { 
                 ctx.beginPath(); ctx.arc(px + 2, py + 18, 5, 0, Math.PI*2); ctx.fill();
             }
@@ -358,7 +360,7 @@ function draw() {
             }
 
             // Pies (Zapatos Rojos) animando
-            ctx.fillStyle = '#dc2626';
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerBoot') : '#dc2626';
             let leftFootY = py + player.height - 4 + (player.isMoving && Math.floor(player.walkCycle*4)%2===0 ? -4 : 0);
             let rightFootY = py + player.height - 4 + (player.isMoving && Math.floor(player.walkCycle*4)%2===1 ? -4 : 0);
             
@@ -390,13 +392,14 @@ function draw() {
             let floaty = e.type.canFly ? Math.sin((gameState.animFrame + e.x) * 0.1) * 4 : Math.sin((gameState.animFrame + e.x) * 0.3) * 2;
             
             // Sombra
-            ctx.fillStyle = 'rgba(0,0,0,0.4)';
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('enemyShadow') : 'rgba(0,0,0,0.4)';
             ctx.beginPath();
             ctx.ellipse(e.x, e.y + e.height/2, e.width/2, 4, 0, 0, Math.PI*2);
             ctx.fill();
 
             // Cuerpo
-            ctx.fillStyle = e.type.color;
+            const enemyThemeKey = e?.type?.name === 'Rastrero' ? 'enemyRastrero' : e?.type?.name === 'Volador' ? 'enemyVolador' : e?.type?.name === 'Especial' ? 'enemyEspecial' : null;
+            ctx.fillStyle = enemyThemeKey && typeof themeColorV46 === 'function' ? themeColorV46(enemyThemeKey, e.type.color) : e.type.color;
             ctx.beginPath();
             if (e.type.canFly) {
                 // Cola de fantasma
@@ -415,13 +418,13 @@ function draw() {
             // Ojos mirando a la dirección de movimiento
             let eyeOffsetX = e.vx > 0 ? 3 : (e.vx < 0 ? -3 : 0);
             
-            ctx.fillStyle = '#ffffff'; 
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('enemyEye') : '#ffffff'; 
             ctx.beginPath();
             ctx.arc(e.x - 4 + eyeOffsetX, e.y - 2 + floaty, 4, 0, Math.PI*2);
             ctx.arc(e.x + 4 + eyeOffsetX, e.y - 2 + floaty, 4, 0, Math.PI*2);
             ctx.fill();
 
-            ctx.fillStyle = '#000000'; 
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('enemyPupil') : '#000000'; 
             ctx.beginPath();
             ctx.arc(e.x - 3 + eyeOffsetX, e.y - 2 + floaty, 2, 0, Math.PI*2);
             ctx.arc(e.x + 5 + eyeOffsetX, e.y - 2 + floaty, 2, 0, Math.PI*2);
@@ -429,7 +432,7 @@ function draw() {
 
             // Cejas enojadas para los Rastreros (Rojos)
             if (e.type.name === 'Rastrero') {
-                ctx.strokeStyle = '#000000';
+                ctx.strokeStyle = typeof themeColorV46 === 'function' ? themeColorV46('enemyPupil') : '#000000';
                 ctx.lineWidth = 2;
                 ctx.beginPath();
                 ctx.moveTo(e.x - 8 + eyeOffsetX, e.y - 6 + floaty);
@@ -455,14 +458,14 @@ function draw() {
             const bossBomb = (b.owner || 'player') === 'boss';
             // La bomba del jugador usa un aro cian; la bomba del boss usa identidad roja.
             if (!bossBomb) {
-                ctx.strokeStyle = 'rgba(34,211,238,.78)';
+                ctx.strokeStyle = typeof themeColorV46 === 'function' ? themeColorV46('bombPlayerRing') : 'rgba(34,211,238,.78)';
                 ctx.lineWidth = 2;
                 ctx.beginPath();
                 ctx.arc(0, 0, TILE_SIZE * .42, 0, Math.PI * 2);
                 ctx.stroke();
             }
             if (bossBomb) {
-                ctx.strokeStyle = 'rgba(248,113,113,.82)';
+                ctx.strokeStyle = typeof themeColorV46 === 'function' ? themeColorV46('bombBossRing') : 'rgba(248,113,113,.82)';
                 ctx.lineWidth = 2.5;
                 ctx.beginPath();
                 ctx.arc(0, 0, TILE_SIZE * .44, 0, Math.PI * 2);
@@ -470,9 +473,9 @@ function draw() {
             }
             renderBombFuseFeedback(0, 0, b);
             if (moving) {
-                ctx.fillStyle = 'rgba(255,210,63,.14)';
+                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('bombMovingFill') : 'rgba(255,210,63,.14)';
                 ctx.beginPath(); ctx.arc(0, 0, TILE_SIZE * .49, 0, Math.PI * 2); ctx.fill();
-                ctx.strokeStyle = 'rgba(255,138,0,.7)';
+                ctx.strokeStyle = typeof themeColorV46 === 'function' ? themeColorV46('bombMovingStroke') : 'rgba(255,138,0,.7)';
                 ctx.lineWidth = 2;
                 ctx.setLineDash([4,4]);
                 ctx.beginPath(); ctx.arc(0, 0, TILE_SIZE * .43, -Math.PI*.25, Math.PI*1.2); ctx.stroke();
@@ -480,11 +483,11 @@ function draw() {
             }
 
             // Sombra bomba
-            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('bombShadow') : 'rgba(0,0,0,0.5)';
             ctx.beginPath(); ctx.ellipse(0, TILE_SIZE*0.3, TILE_SIZE*0.3, 4, 0, 0, Math.PI*2); ctx.fill();
 
             // Cuerpo brillante
-            ctx.fillStyle = '#0f172a';
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('bombBody') : '#0f172a';
             ctx.beginPath();
             ctx.arc(0, 0, TILE_SIZE*0.35, 0, Math.PI*2);
             ctx.fill();
@@ -496,16 +499,16 @@ function draw() {
             ctx.fill();
 
             // Tapa y mecha
-            ctx.fillStyle = '#64748b';
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('bombCap') : '#64748b';
             ctx.fillRect(-4, -TILE_SIZE*0.38, 8, 6);
 
-            let sparkColor = gameState.animFrame % 4 < 2 ? '#facc15' : '#ef4444';
+            let sparkColor = gameState.animFrame % 4 < 2 ? (typeof themeColorV46 === 'function' ? themeColorV46('bombSparkHot') : '#facc15') : (typeof themeColorV46 === 'function' ? themeColorV46('bombSparkDanger') : '#ef4444');
             ctx.fillStyle = sparkColor;
             ctx.beginPath();
             ctx.arc(0, -TILE_SIZE*0.45, 5 + (b.timer < 650 ? Math.sin(gameState.animFrame*.8)*2 : 0), 0, Math.PI*2);
             ctx.fill();
             if(b.timer < 650){
-                ctx.strokeStyle='#fee2e2';
+                ctx.strokeStyle=typeof themeColorV46 === 'function' ? themeColorV46('bombFuse') : '#fee2e2';
                 ctx.lineWidth=2;
                 ctx.beginPath();
                 ctx.moveTo(0,-TILE_SIZE*.47);
@@ -520,13 +523,13 @@ function draw() {
             let size = TILE_SIZE;
             let pulse = Math.sin(gameState.animFrame * 0.5) * 4;
             
-            ctx.fillStyle = 'rgba(220, 38, 38, 0.8)'; // Fuego exterior
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('fireOuter') : 'rgba(220, 38, 38, 0.8)'; // Fuego exterior
             ctx.fillRect(x + 2 - pulse/2, y + 2 - pulse/2, size - 4 + pulse, size - 4 + pulse);
             
-            ctx.fillStyle = '#f97316'; // Fuego medio
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('fireMiddle') : '#f97316'; // Fuego medio
             ctx.fillRect(x + 6 - pulse/2, y + 6 - pulse/2, size - 12 + pulse, size - 12 + pulse);
             
-            ctx.fillStyle = '#fef08a'; // Núcleo
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('fireCore') : '#fef08a'; // Núcleo
             ctx.fillRect(x + 12 - pulse/2, y + 12 - pulse/2, size - 24 + pulse, size - 24 + pulse);
         }
 
@@ -536,20 +539,20 @@ function draw() {
             const type = item.type;
             let floaty = Math.sin((gameState.animFrame + x) * 0.1) * 3;
             if (type === 'RELIC') {
-                ctx.fillStyle = '#3b1d6b';
+                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('relicBase') : '#3b1d6b';
                 ctx.fillRect(x + 6, y + 6 + floaty, TILE_SIZE - 12, TILE_SIZE - 12);
-                ctx.strokeStyle = '#c084fc';
+                ctx.strokeStyle = typeof themeColorV46 === 'function' ? themeColorV46('relicAccent') : '#c084fc';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(x + 6, y + 6 + floaty, TILE_SIZE - 12, TILE_SIZE - 12);
                 const relic = RELICS.find(r => r.id === item.relicId);
                 ctx.font = '14px "Press Start 2P"';
-                ctx.fillStyle = '#ffffff';
+                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('white') : '#ffffff';
                 ctx.fillText(relic?.icon || '✦', x + 11, y + 31 + floaty);
                 return;
             }
-            ctx.fillStyle = '#0284c7';
+            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('powerupBase') : '#0284c7';
             ctx.fillRect(x + 8, y + 8 + floaty, TILE_SIZE - 16, TILE_SIZE - 16);
-            ctx.strokeStyle = '#38bdf8';
+            ctx.strokeStyle = typeof themeColorV46 === 'function' ? themeColorV46('powerupAccent') : '#38bdf8';
             ctx.strokeRect(x + 8, y + 8 + floaty, TILE_SIZE - 16, TILE_SIZE - 16);
 
             ctx.font = '14px "Press Start 2P"';

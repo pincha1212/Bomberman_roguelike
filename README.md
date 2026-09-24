@@ -279,3 +279,34 @@ La salida v3.28.2 mostraba `ENEMY-BEHAVIOR-STRESS: FAIL` y simultáneamente `RUN
 - Unified Debug Mode references: PASS.
 - Harness: PASS.
 - No se afirma validación visual en GitHub Pages.
+
+==================================================
+v3.28.5 — DEBUG MODE NAVIGATION FIX
+==================================================
+
+Corrección del Debug Mode unificado.
+
+Problema auditado:
+- La barra de navegación rápida existía en el HTML, pero el overlay no tenía un contenedor interno de scroll vertical.
+- `#debug-overlay` usaba `overflow:hidden`, por lo que los botones no controlaban de forma fiable el desplazamiento por sectores y el contenido inferior podía quedar fuera de la zona visible.
+- Además, el reporte podía seguir mostrando la versión anterior desde `18-debug-mode.js`.
+
+Cambios:
+- contenedor interno `.debug-scroll` para todas las secciones;
+- barra superior persistente con saltos a todos los sectores principales;
+- scroll interno mediante `scrollTo()`;
+- indicador visual del sector activo mediante `IntersectionObserver`;
+- navegación horizontal de botones cuando el ancho es reducido;
+- cache-busters de `18-debug-mode.js` y `19-debug-overlay.js` a v3.28.5;
+- versión del reporte y del bootstrap de Debug Mode actualizada a v3.28.5.
+
+Validación:
+- suite detectada: 16 tests;
+- health checks: 15 PASS / 0 WARN / 0 FAIL;
+- threat-state: PASS (`threat=0`);
+- navegación visual: presente;
+- entorno único: confirmado;
+- sintaxis JS: PASS.
+
+No se realizó una prueba visual en GitHub Pages dentro de esta validación.
+

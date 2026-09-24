@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.5.1 — Unified Debug Mode
+// Bomberman Roguelike v4.5.3 — Unified Debug Mode
 // Depuración interna del mismo runtime. Se activa solo con ?debug=1.
 (() => {
     'use strict';
@@ -15,7 +15,8 @@
 
     const TEST_NAMES = Object.freeze(['movement', 'bombs', 'damage', 'traps', 'enemies', 'ai-stress', 'navigation-stress', 'room-stress', 'difficulty-stress', 'camera', 'restart', 'enemy-behavior-stress', 'collision-stress', 'boss-stress', 'roguelike-stress', 'debug-lab-stress']);
     const MAX_EVENTS = 220;
-    const MAX_ERRORS = 100;
+    const MAX_ERRORS = 80;
+    const MAX_DEBUG_ERRORS = 40;
     const MAX_TEST_RESULTS = 30;
     const MAX_NAV_NODES = 900;
     const NAV_CACHE_MS = 700;
@@ -71,6 +72,7 @@
         suppressedEvents: 0,
         eventLog: [],
         runtimeErrors: [],
+        debugErrors: [],
         testResults: [],
         lastTest: null,
         lastAction: '—',
@@ -190,9 +192,11 @@
             const stack = error?.stack || '';
             const url = extra?.url || '';
             const fingerprint = `${source}|${message}|${url}|${stack.split('\n')[1] || ''}`;
-            const previous = this.runtimeErrors[this.runtimeErrors.length - 1];
+            const isDebugToolError = /(?:^|[/\\])(?:18-debug-mode|19-debug-overlay|20-debug-visuals|33-debug-lab|34-debug-lab-stress|36-debug-diagnostics)\.js(?:$|[?#])/i.test(url)
+                || /^(?:debug-lab|clipboard\.diagnostic)$/.test(String(source));
+            const previousBucket = isDebugToolError ? this.debugErrors : this.runtimeErrors;
+            const previous = previousBucket[previousBucket.length - 1];
             if (previous?.fingerprint === fingerprint && performance.now() - previous.time < 500) return;
-
             const item = {
                 time: performance.now(),
                 wallTime: new Date().toLocaleTimeString('es-AR', { hour12: false }),
@@ -200,11 +204,14 @@
                 message,
                 stack,
                 url,
-                fingerprint
+                fingerprint,
+                category: isDebugToolError ? 'DEBUG' : 'RUNTIME'
             };
-            this.runtimeErrors.push(item);
-            if (this.runtimeErrors.length > MAX_ERRORS) this.runtimeErrors.splice(0, this.runtimeErrors.length - MAX_ERRORS);
-            this.recordEvent('ERROR', message, { source, url });
+            const bucket = isDebugToolError ? this.debugErrors : this.runtimeErrors;
+            bucket.push(item);
+            const cap = isDebugToolError ? MAX_DEBUG_ERRORS : MAX_ERRORS;
+            if (bucket.length > cap) bucket.splice(0, bucket.length - cap);
+            this.recordEvent(isDebugToolError ? 'DEBUG_ERROR' : 'ERROR', message, { source, url });
         },
 
         requestPause() {
@@ -629,16 +636,19 @@
             const hp = checks.filter(c => c.status === 'PASS').length;
             const hw = checks.filter(c => c.status === 'WARN').length;
             const hf = checks.filter(c => c.status === 'FAIL').length;
+            const perf = this.fps > 0 ? `${Number(this.fps).toFixed(1)} FPS · ${Number(this.loopMs || 0).toFixed(2)}ms JS` : '—';
+            const snapshotLine = this.lastDiff ? `+${this.lastDiff.added.length} · Δ${this.lastDiff.changed.length} · -${this.lastDiff.removed.length}` : '—';
+            const timelineLine = this.timeline.length ? `${this.timeline.length}/${MAX_TIMELINE_SAMPLES}` : '—';
             return [
-                'BOMBERMAN ROGUELIKE — DEBUG MODE v4.2',
+                'BOMBERMAN ROGUELIKE — DEBUG MODE v4.5.3',
                 `SUITE: ${results.length}/${getAvailableTestNames().length} · ${passed} PASS · ${failed} FAIL`,
-                ...results.map(r => `${String(r.name || 'TEST').toUpperCase()}: ${r.status} — ${compactCopyText(r.summary || r.result || 'Sin resultado')}`),
-                `DIAGNOSTICO: ${this.lastHealth?.status || 'PENDIENTE'} — ${hp} PASS · ${hw} WARN · ${hf} FAIL`,
+                ...results.map(r => `${String(r.name || 'TEST').toUpperCase()}: ${r.status} — ${compactCopyText(r.summary || r.result || '—')}`),
+                `DIAGNOSTICO: ${this.lastHealth?.status || '—'} · ${hp}P/${hw}W/${hf}F`,
                 ...checks.filter(c => c.status !== 'PASS').map(c => `DIAG ${String(c.id).toUpperCase()}: ${c.status} — ${compactCopyText(c.detail)}`),
-                `RUNTIME ERRORS: ${snapshot.errors || 0}`,
-                `PERFORMANCE: ${Number(this.fps || 0).toFixed(1)} FPS · JS ${Number(this.loopMs || 0).toFixed(2)}ms/frame`,
-                `SNAPSHOT: ${this.lastDiff ? `+${this.lastDiff.added.length} · Δ${this.lastDiff.changed.length} · -${this.lastDiff.removed.length}` : 'PENDIENTE'}`,
-                `TIMELINE: ${this.timeline.length}/${MAX_TIMELINE_SAMPLES}`
+                `ERRORES: runtime=${snapshot.errors || 0} · debug=${this.debugErrors.length}`,
+                `PERFORMANCE: ${perf}`,
+                `SNAPSHOT: ${snapshotLine}`,
+                `TIMELINE: ${timelineLine}`
             ].join('\n');
         },
 
@@ -673,7 +683,8 @@
 
         clearErrors() {
             this.runtimeErrors.length = 0;
-            this.recordEvent('DEBUG', 'Runtime Errors limpiado.');
+            this.debugErrors.length = 0;
+            this.recordEvent('DEBUG', 'Errores limpiados.');
         },
 
         setVisual(key, value) {
@@ -950,7 +961,7 @@
     }
 
     function compactMotionDiagnostic(nav) {
-        if (!nav?.available) return 'Sin diagnóstico de movimiento.';
+        if (!nav?.available) return '—';
         const p = nav.player || {};
         const lines = [
             `PLAYER · estado=${p.movementState || '—'} · real=${p.actualDirection || '—'} · centro=${Number(p.distanceToCenter || 0).toFixed(1)}px · movimiento=${Number(p.movedPx || 0).toFixed(2)}px/muestra · transiciones=${p.tileTransitions || 0} · sinProgreso=${p.framesSinceProgress || 0}f`
@@ -1928,8 +1939,9 @@
         add('enemy-cardinal', diagonal === 0, diagonal === 0 ? 'sin velocidades diagonales' : `${diagonal} enemigo(s) diagonales`);
         const blocked = enemies.filter(e => e?.ai?.physicalBlocked || e?.physicalBlocked).length;
         add('enemy-blocking', blocked === 0, blocked === 0 ? 'sin bloqueos fisicos activos' : `${blocked} enemigo(s) bloqueados`);
-        const bootErrors = Array.isArray(window.__BOMBER_DEBUG_BOOT_ERRORS) ? window.__BOMBER_DEBUG_BOOT_ERRORS.length : 0;
-        add('runtime-errors', DEBUG_MODE.runtimeErrors.length === 0 && bootErrors === 0, `${DEBUG_MODE.runtimeErrors.length + bootErrors} error(es)`);
+        const bootErrorsRaw = Array.isArray(window.__BOMBER_DEBUG_BOOT_ERRORS) ? window.__BOMBER_DEBUG_BOOT_ERRORS : [];
+        const bootGameErrors = bootErrorsRaw.filter(text => !/(?:18-debug-mode|19-debug-overlay|20-debug-visuals|33-debug-lab|34-debug-lab-stress|36-debug-diagnostics)\.js/i.test(String(text))).length;
+        add('runtime-errors', DEBUG_MODE.runtimeErrors.length === 0 && bootGameErrors === 0, `${DEBUG_MODE.runtimeErrors.length + bootGameErrors} runtime`);
         return checks;
     }
 
@@ -2165,6 +2177,5 @@
         }
     });
 
-    DEBUG_MODE.recordEvent('DEBUG', 'Debug Mode v4.5.1 unificado cargado en el mismo runtime.');
-    DEBUG_MODE.recordEvent('DEBUG', 'Usá RESET para activar una escena de depuración limpia.');
+    DEBUG_MODE.recordEvent('DEBUG', 'Debug 4.5.3 listo.');
 })();

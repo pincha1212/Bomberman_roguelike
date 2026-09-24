@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.5.1 — Real Diagnostic Debug Core
+// Bomberman Roguelike v4.5.3 — Real Diagnostic Debug Core
 // P0/P1 diagnóstico: predicción separada de verificación, invariantes independientes,
 // inspector espacial, input, timestep, trace de colisión y freeze sobre corrupción.
 (() => {
@@ -190,12 +190,12 @@
     const originalSnapshot=D.snapshot.bind(D);
     D.snapshot=function(){ const s=originalSnapshot(); s.diagnostics=buildReport(); return s; };
     const originalBuildReport=D.buildTestReport.bind(D);
-    D.buildTestReport=function(){ const base=originalBuildReport(); return `${base}\nINVARIANTES: ${diagnostics.hardFailures.length} ROJO · ${diagnostics.designWarnings.length} AMARILLO · freeze=${diagnostics.invariantFrozen?'SI':'NO'}\nTIMESTEP: raw=${diagnostics.rawDt.toFixed(2)}ms · dt=${diagnostics.dt.toFixed(2)}ms · clamp=${diagnostics.clamped?'SI':'NO'}`; };
+    D.buildTestReport=function(){ const base=originalBuildReport(); return `${base}\nINVARIANTES: R${diagnostics.hardFailures.length} · A${diagnostics.designWarnings.length} · freeze=${diagnostics.invariantFrozen?'SI':'NO'}\nTIMESTEP: ${diagnostics.rawDt.toFixed(2)}→${diagnostics.dt.toFixed(2)}ms${diagnostics.clamped?' · CLAMP':''}`; };
 
     window.addEventListener('keydown', event=>{
         if(!D.enabled) return;
         if(event.code==='F9'){ event.preventDefault(); D.releaseInvariantFreeze(); }
-        else if(event.code==='F10'){ event.preventDefault(); console.log('[BOMBER DEBUG v4.5.1]',buildReport()); D.recordEvent('DEBUG','Diagnóstico volcado a consola.'); }
+        else if(event.code==='F10'){ event.preventDefault(); console.log('[BOMBER DEBUG v4.5.3]',buildReport()); D.recordEvent('DEBUG','Diagnóstico volcado a consola.'); }
         D.recordInputTrace('keydown',event);
     }, true);
     window.addEventListener('keyup', event=>D.recordInputTrace('keyup',event), true);
@@ -203,5 +203,5 @@
 
     window.DEBUG_DIAGNOSTICS={version:'4.5.1',diagnostics,reset,buildIndependentInvariantChecks:independentChecks,buildCellInspector:cellInspector};
     D.diagnostics=diagnostics;
-    D.recordEvent('DEBUG','v4.5.1 · diagnóstico real habilitado. P0: inspector, invariantes, input, timestep, collision trace y freeze.');
+    D.recordEvent('DEBUG','Debug 4.5.3 listo.');
 })();

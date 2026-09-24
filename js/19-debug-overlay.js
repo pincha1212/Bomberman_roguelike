@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.2 — Unified Debug Overlay
+// Bomberman Roguelike v4.5.3 — Unified Debug Overlay
 // Panel reconstruido para inspección en vivo. Solo se crea con ?debug=1.
 (() => {
     'use strict';
@@ -17,7 +17,7 @@
     root.innerHTML = `
         <div class="debug-header">
             <div>
-                <div class="debug-kicker">BOMBERMAN ENGINE · v4.2</div>
+                <div class="debug-kicker">BOMBERMAN ENGINE · v4.5.3</div>
                 <h2>DEBUG MODE <span id="debug-status" class="debug-status">CARGANDO</span></h2>
             </div>
             <button type="button" class="debug-icon-btn" data-debug-action="toggle" title="Mostrar/ocultar panel">F3</button>
@@ -29,7 +29,7 @@
             <button type="button" data-debug-action="step">STEP <kbd>F6</kbd></button>
             <button type="button" data-debug-action="run-tests">TESTS <kbd>F7</kbd></button>
             <button type="button" data-debug-action="profile">PROFILE <kbd>F8</kbd></button>
-            <button type="button" data-debug-action="copy-tests" title="Copia resultados de tests y diagnóstico en texto plano">COPIAR RESULTADOS</button>
+            <button type="button" data-debug-action="copy-tests" title="Copiar reporte">COPIAR RESULTADOS</button>
         </div>
 
         <nav class="debug-jump" aria-label="Navegación rápida de Debug Mode">
@@ -81,8 +81,8 @@
                 <div><span>HITCH >50ms</span><strong id="dbg-prof-hitch">0</strong></div>
                 <div><span>MUESTRAS</span><strong id="dbg-prof-samples">0</strong></div>
             </div>
-            <div class="debug-note" id="dbg-prof-memory">MEMORIA · N/D</div>
-            <pre id="dbg-prof-systems" class="debug-log">Activa PROFILE para medir los sistemas reales.</pre>
+            <div class="debug-note" id="dbg-prof-memory">MEMORIA —</div>
+            <pre id="dbg-prof-systems" class="debug-log">—</pre>
         </section>
 
         <section id="dbg-section-player" class="debug-section">
@@ -179,7 +179,7 @@
                 <div><span>JUGADOR CENTRO</span><strong id="dbg-nav-player-center">—</strong></div>
             </div>
             <div id="dbg-nav-note" class="debug-note">—</div>
-            <div id="dbg-nav-legend" class="debug-note">RUTA REF = ruta teórica · REAL = velocidad observada · C = dirección actual · D = deseada · LOS = visión · TRAZA = recorrido real.</div>
+            <div id="dbg-nav-legend" class="debug-note">REF=PRED · REAL=EJEC · C=ACT · D=DES · LOS=VIS · TRAZA=REC</div>
             <pre id="dbg-nav-enemies" class="debug-log">Sin datos de navegación.</pre>
         </section>
 
@@ -206,18 +206,18 @@
             <div class="debug-section-title debug-subtitle">INVARIANTES</div>
             <pre id="dbg-diag-invariants" class="debug-log">Sin invariantes reportadas.</pre>
             <div class="debug-section-title debug-subtitle">INPUT</div>
-            <pre id="dbg-diag-input-trace" class="debug-log">Sin eventos de input.</pre>
+            <pre id="dbg-diag-input-trace" class="debug-log">—</pre>
             <div class="debug-section-title debug-subtitle">RESOLUCIÓN DE COLISIÓN</div>
             <pre id="dbg-diag-collision-trace" class="debug-log">Sin trazas de colisión.</pre>
         </section>
 
         <section id="dbg-section-inspector" class="debug-section">
             <div class="debug-section-head"><div class="debug-section-title">INSPECTOR DE CELDA</div><span id="dbg-cell-coord">clic en el mapa</span></div>
-            <div id="dbg-cell-summary" class="debug-note">Seleccioná una celda del mapa de navegación.</div>
+            <div id="dbg-cell-summary" class="debug-note">—</div>
             <pre id="dbg-cell-data" class="debug-log">Sin celda seleccionada.</pre>
             <div class="debug-section-head"><div class="debug-section-title">INSPECTOR DE TEST</div><span id="dbg-last-test">—</span></div>
-            <div id="dbg-test-summary" class="debug-note">Todavía no hay una prueba seleccionada.</div>
-            <pre id="dbg-test-data" class="debug-log">Los detalles aparecerán acá al ejecutar un test.</pre>
+            <div id="dbg-test-summary" class="debug-note">—</div>
+            <pre id="dbg-test-data" class="debug-log">—</pre>
         </section>
 
         <section id="dbg-section-tests" class="debug-section debug-tests">
@@ -227,34 +227,34 @@
 
         <section id="dbg-section-stress" class="debug-section">
             <div class="debug-section-head"><div class="debug-section-title">AI STRESS</div><span id="dbg-stress-head">PENDIENTE</span></div>
-            <div id="dbg-stress-summary" class="debug-note">Ejecutá AI STRESS para probar movimiento, giros, rutas, bloqueos y evasión.</div>
-            <pre id="dbg-stress-cases" class="debug-log">Sin resultados.</pre>
+            <div id="dbg-stress-summary" class="debug-note">—</div>
+            <pre id="dbg-stress-cases" class="debug-log">—</pre>
         </section>
 
         <section id="dbg-section-stress-detail" class="debug-section">
             <div class="debug-section-head"><div class="debug-section-title">COLLISION STRESS</div><span id="dbg-collision-stress-head">PENDIENTE</span></div>
-            <div id="dbg-collision-stress-summary" class="debug-note">Ejecutá COLLISION STRESS para probar esquinas, corredores, obstáculos, bombas, overlaps y lane-lock.</div>
+            <div id="dbg-collision-stress-summary" class="debug-note">—</div>
 
             <div class="debug-section-head"><div class="debug-section-title">ROOM STRESS</div><span id="dbg-room-stress-head">PENDIENTE</span></div>
-            <div id="dbg-room-stress-summary" class="debug-note">Ejecutá ROOM STRESS para validar las seis topologías procedurales y sus rutas.</div>
-            <pre id="dbg-collision-stress-data" class="debug-log">Sin resultados.</pre>
+            <div id="dbg-room-stress-summary" class="debug-note">—</div>
+            <pre id="dbg-collision-stress-data" class="debug-log">—</pre>
             <div class="debug-section-head"><div class="debug-section-title">DIFFICULTY STRESS</div><span id="dbg-difficulty-stress-head">PENDIENTE</span></div>
-            <div id="dbg-difficulty-stress-summary" class="debug-note">Ejecutá DIFFICULTY STRESS para validar progresión por profundidad.</div>
+            <div id="dbg-difficulty-stress-summary" class="debug-note">—</div>
         </section>
 
         <section id="dbg-section-diagnostic" class="debug-section">
-            <div class="debug-section-head"><div class="debug-section-title">DIAGNÓSTICO UNIFICADO</div><span id="dbg-health-status">PENDIENTE</span></div>
+            <div class="debug-section-head"><div class="debug-section-title">DIAGNÓSTICO</div><span id="dbg-health-status">PENDIENTE</span></div>
             <div class="debug-action-grid">
                 <button type="button" data-debug-action="health">DIAGNÓSTICO</button>
                 <button type="button" data-debug-action="snapshot">SNAPSHOT</button>
                 <button type="button" data-debug-action="timeline">TIMELINE</button>
                 <button type="button" data-debug-action="copy-tests">COPIAR RESULTADOS</button>
             </div>
-            <div class="debug-note" id="dbg-health-summary">Sin diagnóstico.</div>
-            <pre id="dbg-health-data" class="debug-log">Ejecutá DIAGNÓSTICO para comprobar el runtime.</pre>
-            <div class="debug-note" id="dbg-snapshot-summary">Snapshot: pendiente.</div>
+            <div class="debug-note" id="dbg-health-summary">—</div>
+            <pre id="dbg-health-data" class="debug-log">—</pre>
+            <div class="debug-note" id="dbg-snapshot-summary">Snapshot: —</div>
             <pre id="dbg-timeline-data" class="debug-log">Timeline: 0/120 muestras.</pre>
-            <pre id="dbg-copy-preview" class="debug-log">La copia será texto plano.</pre>
+            <pre id="dbg-copy-preview" class="debug-log">—</pre>
         </section>
 
         <section id="dbg-section-events" class="debug-section">
@@ -262,15 +262,15 @@
             <div class="debug-action-grid">
                 <button type="button" data-debug-action="clear-events">LIMPIAR EVENTOS</button>
             </div>
-            <pre id="dbg-events" class="debug-log">Sin eventos.</pre>
+            <pre id="dbg-events" class="debug-log">—</pre>
         </section>
 
         <section id="dbg-section-errors" class="debug-section">
-            <div class="debug-section-head"><div class="debug-section-title">RUNTIME ERRORS</div><span id="dbg-error-count">0</span></div>
+            <div class="debug-section-head"><div class="debug-section-title">ERRORES</div><span id="dbg-error-count">0/0</span></div>
             <div class="debug-action-grid">
                 <button type="button" data-debug-action="clear-errors">LIMPIAR ERRORES</button>
             </div>
-            <pre id="dbg-error-log" class="debug-log debug-error-log">Sin errores.</pre>
+            <pre id="dbg-error-log" class="debug-log debug-error-log">—</pre>
         </section>
 
         <section id="dbg-section-actions" class="debug-section">
@@ -607,7 +607,7 @@
         const invariantNode=document.getElementById('dbg-diag-invariants');
         if(invariantNode) invariantNode.textContent=[...hardFailures.map(x=>`RED ${x.id} — ${x.detail}`),...designWarnings.map(x=>`YELLOW ${x.id} — ${x.detail}`)].join('\n')||'Sin invariantes reportadas.';
         const inputNode=document.getElementById('dbg-diag-input-trace');
-        if(inputNode) inputNode.textContent=(D.diagnostics?.inputTrace||[]).slice(-12).map(x=>`F${x.frame} ${x.kind} ${x.code||''} · keys=${safeInlineJson(x.keys)} · axis=${x.axis||'—'} · buffer=${x.buffer?safeInlineJson(x.buffer):'—'} · ${Number(x.bufferMs||0).toFixed(0)}ms`).join('\n')||'Sin eventos de input.';
+        if(inputNode) inputNode.textContent=(D.diagnostics?.inputTrace||[]).slice(-12).map(x=>`F${x.frame} ${x.kind} ${x.code||''} · keys=${safeInlineJson(x.keys)} · axis=${x.axis||'—'} · buffer=${x.buffer?safeInlineJson(x.buffer):'—'} · ${Number(x.bufferMs||0).toFixed(0)}ms`).join('\n')||'—';
         const collisionNode=document.getElementById('dbg-diag-collision-trace');
         if(collisionNode) collisionNode.textContent=(D.diagnostics?.collisionTrace||[]).slice(-16).map(x=>`F${x.frame} ${String(x.kind).toUpperCase()} input=${safeInlineJson(x.input)} moved=${x.moved?'SI':'NO'} blocked=${x.blocked?'SI':'NO'} movedPx=${Number(x.movedPx||0).toFixed(2)}${x.blockedCell?` · blocker=${x.blockedCell.x},${x.blockedCell.y} ${x.blockedReason}`:''}`).join('\n')||'Sin trazas de colisión.';
         const cell=diag.selectedCell;
@@ -615,7 +615,7 @@
         const cellData=document.getElementById('dbg-cell-data');
         const cellSummary=document.getElementById('dbg-cell-summary');
         if(cellData) cellData.textContent=diag.selectedCellDump?JSON.stringify(diag.selectedCellDump,null,2):'Sin celda seleccionada.';
-        if(cellSummary) cellSummary.textContent=diag.selectedCellDump?`${diag.selectedCellDump.terrain.name} · bombas=${diag.selectedCellDump.bombs.length} · fuego=${diag.selectedCellDump.explosions.length} · enemigos=${diag.selectedCellDump.enemies.length} · items=${diag.selectedCellDump.items.length} · overlaps=${diag.selectedCellDump.overlaps.join(', ')||'ninguno'}`:'Seleccioná una celda del mapa de navegación.';
+        if(cellSummary) cellSummary.textContent=diag.selectedCellDump?`${diag.selectedCellDump.terrain.name} · bombas=${diag.selectedCellDump.bombs.length} · fuego=${diag.selectedCellDump.explosions.length} · enemigos=${diag.selectedCellDump.enemies.length} · items=${diag.selectedCellDump.items.length} · overlaps=${diag.selectedCellDump.overlaps.join(', ')||'ninguno'}`:'—';
 
         const nav = s.navigation || {};
         const np = nav.player || {};
@@ -669,9 +669,9 @@
             }).join('\n');
         } else {
             setText('dbg-stress-head', 'PENDIENTE');
-            setText('dbg-stress-summary', 'Ejecutá AI STRESS para probar movimiento, giros, rutas, bloqueos y evasión.');
+            setText('dbg-stress-summary', '—');
             const stressNode = document.getElementById('dbg-stress-cases');
-            if (stressNode) stressNode.textContent = 'Sin resultados.';
+            if (stressNode) stressNode.textContent = '—';
         }
 
         const navigationStressResult = D.testResults.slice().reverse().find(r => r.name === 'navigation-stress');
@@ -685,33 +685,33 @@
             setText('dbg-room-stress-summary', roomStress.summary);
         } else {
             setText('dbg-room-stress-head', 'PENDIENTE');
-            setText('dbg-room-stress-summary', 'Ejecutá ROOM STRESS para validar las seis topologías procedurales y sus rutas.');
+            setText('dbg-room-stress-summary', '—');
         }
 
         const difficultyStress = D.testResults.slice().reverse().find(r => r.name === 'difficulty-stress');
         if (difficultyStress) {
             setText('dbg-difficulty-stress-head', difficultyStress.status || '—');
-            setText('dbg-difficulty-stress-summary', difficultyStress.summary || 'Sin resultados.');
+            setText('dbg-difficulty-stress-summary', difficultyStress.summary || '—');
         }
 
         const collisionStress = D.testResults.slice().reverse().find(r => r.name === 'collision-stress');
         if (collisionStress) {
             setText('dbg-collision-stress-head', collisionStress.status || '—');
-            setText('dbg-collision-stress-summary', collisionStress.summary || 'Sin resumen.');
+            setText('dbg-collision-stress-summary', collisionStress.summary || '—');
             const collisionNode = document.getElementById('dbg-collision-stress-data');
             if (collisionNode) collisionNode.textContent = JSON.stringify(collisionStress.details || {}, null, 2);
         } else {
             setText('dbg-collision-stress-head', 'PENDIENTE');
-            setText('dbg-collision-stress-summary', 'Ejecutá COLLISION STRESS para probar esquinas, corredores, obstáculos, bombas, overlaps y lane-lock.');
+            setText('dbg-collision-stress-summary', '—');
             const collisionNode = document.getElementById('dbg-collision-stress-data');
-            if (collisionNode) collisionNode.textContent = 'Sin resultados.';
+            if (collisionNode) collisionNode.textContent = '—';
         }
 
         const last = D.lastTest;
         setText('dbg-last-test', last ? `${last.name.toUpperCase()} · ${last.status} · ${last.ms.toFixed(1)}ms` : '—');
-        setText('dbg-test-summary', last ? last.summary : 'Todavía no hay una prueba seleccionada.');
+        setText('dbg-test-summary', last ? last.summary : '—');
         const dataNode = document.getElementById('dbg-test-data');
-        if (dataNode) dataNode.textContent = last ? (last.output || last.summary || 'Sin resultado.') : 'Los detalles aparecerán acá al ejecutar un test.';
+        if (dataNode) dataNode.textContent = last ? (last.output || last.summary || '—') : '—';
 
         const testNames = D.getAvailableTestNames ? D.getAvailableTestNames() : Object.keys(window.DEBUG_TESTS || {});
         const passed = D.testResults.filter(r => r.status === 'PASS').length;
@@ -736,12 +736,12 @@
         }
         const health = D.lastHealth;
         setText('dbg-health-status', health ? health.status : 'PENDIENTE');
-        setText('dbg-health-summary', health ? `${health.passed} PASS · ${health.warnings} WARN · ${health.failed} FAIL` : 'Sin diagnóstico.');
+        setText('dbg-health-summary', health ? `${health.passed} PASS · ${health.warnings} WARN · ${health.failed} FAIL` : '—');
         const healthNode = document.getElementById('dbg-health-data');
-        if (healthNode) healthNode.textContent = health?.checks?.length ? health.checks.map(c => `${c.status} ${c.id} — ${c.detail}`).join('\n') : 'Ejecutá DIAGNÓSTICO para comprobar el runtime.';
-        setText('dbg-snapshot-summary', D.lastDiff ? `Snapshot: +${D.lastDiff.added.length} · Δ${D.lastDiff.changed.length} · -${D.lastDiff.removed.length} · historial ${D.snapshotHistory.length}/12` : 'Snapshot: pendiente.');
+        if (healthNode) healthNode.textContent = health?.checks?.length ? health.checks.filter(c => c.status !== 'PASS').map(c => `${c.status} ${c.id} · ${c.detail}`).join('\n') || 'OK' : '—';
+        setText('dbg-snapshot-summary', D.lastDiff ? `Snapshot: +${D.lastDiff.added.length} · Δ${D.lastDiff.changed.length} · -${D.lastDiff.removed.length} · historial ${D.snapshotHistory.length}/12` : 'Snapshot: —');
         const timelineNode = document.getElementById('dbg-timeline-data');
-        if (timelineNode) timelineNode.textContent = D.timeline.length ? D.timeline.slice(-12).map(x => `${x.time} F${x.frame} · ${Number(x.fps || 0).toFixed(1)} FPS · D${x.depth} · E${x.enemies} · B${x.bombs} · X${x.explosions} · ERR${x.runtimeErrors}`).join('\n') : `Timeline: 0/120 muestras.${D.timelineRecording ? ' GRABANDO' : ''}`;
+        if (timelineNode) timelineNode.textContent = D.timeline.length ? D.timeline.slice(-12).map(x => `${x.time} F${x.frame} · ${Number(x.fps || 0).toFixed(1)}fps · E${x.enemies} B${x.bombs} X${x.explosions} R${x.runtimeErrors}`).join('\n') : '—';
         const copyPreview = document.getElementById('dbg-copy-preview');
         if (copyPreview) copyPreview.textContent = D.buildTestReport();
 
@@ -752,18 +752,27 @@
                 const repeat = Number(item.repeatCount || 1);
                 const frame = item.frame != null ? `F${item.frame} ` : '';
                 return `${frame}[${item.wallTime}] ${item.type.padEnd(8)} ${item.message}${repeat > 1 ? ` · ×${repeat}` : ''}${suffix}`;
-            }).join('\n') || 'Sin eventos.';
+            }).join('\n') || '—';
         }
         setText('dbg-event-count', D.eventLog.length);
 
         const errorNode = document.getElementById('dbg-error-log');
         if (errorNode) {
-            errorNode.textContent = D.runtimeErrors.slice(-50).map((e, i) => {
-                const loc = e.url ? ` · ${e.url}` : '';
-                return `${i + 1}. [${e.wallTime}] ${e.source}: ${e.message}${loc}${e.stack ? `\n   ${e.stack.split('\n').slice(0,3).join('\n   ')}` : ''}`;
-            }).join('\n\n') || 'Sin errores.';
+            const runtime = D.runtimeErrors.slice(-25);
+            const debug = (D.debugErrors || []).slice(-10);
+            const lines = [];
+            if (runtime.length) {
+                lines.push('RUNTIME');
+                lines.push(...runtime.map((e, i) => `${i + 1}. [${e.wallTime}] ${e.source}: ${e.message}${e.url ? ` · ${e.url}` : ''}`));
+            }
+            if (debug.length) {
+                lines.push(lines.length ? '' : 'DEBUG');
+                lines.push('DEBUG TOOL');
+                lines.push(...debug.map((e, i) => `${i + 1}. [${e.wallTime}] ${e.source}: ${e.message}`));
+            }
+            errorNode.textContent = lines.join('\n') || '—';
         }
-        setText('dbg-error-count', D.runtimeErrors.length);
+        setText('dbg-error-count', `${D.runtimeErrors.length}/${D.debugErrors?.length || 0}`);
     }
 
 

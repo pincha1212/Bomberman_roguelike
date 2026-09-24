@@ -1,4 +1,4 @@
-# BOMBERMAN // DESCENT — Roguelike v3.16.1
+# BOMBERMAN // DESCENT — Roguelike v3.17.0
 
 Videojuego web estático desarrollado con HTML, CSS y JavaScript vanilla. Preparado para GitHub Pages, sin backend ni bundler.
 
@@ -27,3 +27,12 @@ Desde el menú principal también está disponible el botón **ABRIR DEBUG MODE*
 - Tests aislados de movimiento, bombas, daño, trampas, enemigos, cámara y reinicio.
 
 El Debug Mode se carga sobre el mismo `index.html` y conserva la estructura de módulos `js/` del juego.
+
+
+## v3.17.0 — Optimization Update
+
+- Cache de terreno estático del mapa; reconstrucción solo al cambiar sala/geometría.
+- Preview de alcance de bombas cacheado mientras el terreno permanezca sin cambios.
+- Claves numéricas para el conjunto de peligro de IA, evitando strings temporales por consulta.
+- Contador de revisión de grid para invalidación segura de caches.
+- Sin cambios en la lógica cardinal/lane-lock de v3.16.8.

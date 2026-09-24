@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.29.0 — Unified Debug Overlay
+// Bomberman Roguelike v4.0 — Unified Debug Overlay
 // Panel reconstruido para inspección en vivo. Solo se crea con ?debug=1.
 (() => {
     'use strict';
@@ -17,7 +17,7 @@
     root.innerHTML = `
         <div class="debug-header">
             <div>
-                <div class="debug-kicker">BOMBERMAN ENGINE · v3.29.0</div>
+                <div class="debug-kicker">BOMBERMAN ENGINE · v4.0</div>
                 <h2>DEBUG MODE <span id="debug-status" class="debug-status">CARGANDO</span></h2>
             </div>
             <button type="button" class="debug-icon-btn" data-debug-action="toggle" title="Mostrar/ocultar panel">F3</button>

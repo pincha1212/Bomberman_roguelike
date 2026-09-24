@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.16.6 — Debug visualizers
+// Bomberman Roguelike v4.0 — Debug visualizers
 // Las capas de navegación se dibujan sobre el mismo canvas del juego.
 (() => {
     'use strict';
@@ -43,6 +43,7 @@
         if (typeof gridGetEntityRect === 'function') {
             drawRect(screenRect(gridGetEntityRect(player, player.x, player.y, 'player')), 'rgba(34,211,238,.95)');
             for (const enemy of gameState.enemies) {
+                if (typeof isWorldRectVisibleV329 === 'function' && !isWorldRectVisibleV329(enemy.x - enemy.width, enemy.y - enemy.height, enemy.width * 2, enemy.height * 2, TILE_SIZE)) continue;
                 drawRect(screenRect(gridGetEntityRect(enemy, enemy.x, enemy.y, 'enemy')), 'rgba(248,113,113,.95)');
             }
         }
@@ -51,13 +52,27 @@
     function drawHitboxes() {
         drawRect(screenRect({ left: player.x, right: player.x + player.width, top: player.y, bottom: player.y + player.height }), 'rgba(255,255,255,.8)', null, 1.5);
         for (const enemy of gameState.enemies) {
+            if (typeof isWorldRectVisibleV329 === 'function' && !isWorldRectVisibleV329(enemy.x - enemy.width, enemy.y - enemy.height, enemy.width * 2, enemy.height * 2, TILE_SIZE)) continue;
             drawRect(screenRect({ left: enemy.x-enemy.width/2, right: enemy.x+enemy.width/2, top: enemy.y-enemy.height/2, bottom: enemy.y+enemy.height/2 }), 'rgba(250,204,21,.85)');
         }
     }
 
+    const bombBlastCacheV329 = new WeakMap();
+    function getDebugBombBlastV329(bomb) {
+        if (!bomb || typeof bomb !== 'object') return [];
+        const range = Number(bomb.range ?? bomb.blastRange ?? bomb.radius ?? 1);
+        const gridRevision = Number(gameState.gridRevision || 0);
+        const cached = bombBlastCacheV329.get(bomb);
+        if (cached && cached.x === bomb.x && cached.y === bomb.y && cached.range === range && cached.gridRevision === gridRevision) return cached.cells;
+        const cells = typeof calculateBombBlastCells === 'function' ? calculateBombBlastCells(bomb) : [];
+        bombBlastCacheV329.set(bomb, { x:bomb.x, y:bomb.y, range, gridRevision, cells });
+        return cells;
+    }
+
     function drawBombs() {
         for (const bomb of gameState.bombs) {
-            const cells = typeof calculateBombBlastCells === 'function' ? calculateBombBlastCells(bomb) : [];
+            if (!bomb || (typeof isWorldTileVisibleV329 === 'function' && !isWorldTileVisibleV329(bomb.x, bomb.y, 1))) continue;
+            const cells = getDebugBombBlastV329(bomb);
             ctx.save();
             ctx.fillStyle = 'rgba(251,191,36,.07)';
             ctx.strokeStyle = 'rgba(251,191,36,.85)';
@@ -66,10 +81,12 @@
                 ctx.fillRect(p.x+3,p.y+3,TILE_SIZE-6,TILE_SIZE-6);
                 ctx.strokeRect(p.x+3,p.y+3,TILE_SIZE-6,TILE_SIZE-6);
             }
-            const c = tileCenter(bomb.x,bomb.y);
-            ctx.fillStyle = '#fbbf24';
+            const renderPos = typeof getBombV4WorldPosition === 'function' ? getBombV4WorldPosition(bomb) : {x:(bomb.x+.5)*TILE_SIZE,y:(bomb.y+.5)*TILE_SIZE};
+            const c = toScreen(renderPos.x, renderPos.y);
+            ctx.fillStyle = bomb.owner === 'boss' ? '#ff5b57' : '#fbbf24';
             ctx.font = '8px Consolas,monospace';
-            ctx.fillText(`${Math.ceil(Math.max(0,bomb.timer))}ms`, c.x-18, c.y-20);
+            const state = typeof bombV4StateSummary === 'function' ? bombV4StateSummary(bomb) : (bomb.state || '—');
+            ctx.fillText(`${state} ${Math.ceil(Math.max(0,bomb.timer))}ms`, c.x-30, c.y-20);
             ctx.restore();
         }
     }
@@ -271,6 +288,7 @@
     function drawSpawns() {
         ctx.save();
         for(const enemy of gameState.enemies){
+            if (typeof isWorldRectVisibleV329 === 'function' && !isWorldRectVisibleV329(enemy.x - enemy.width, enemy.y - enemy.height, enemy.width * 2, enemy.height * 2, TILE_SIZE)) continue;
             const p = toScreen(enemy.x,enemy.y);
             ctx.strokeStyle='rgba(168,85,247,.82)';
             ctx.strokeRect(p.x-12,p.y-12,24,24);

@@ -155,10 +155,12 @@ function draw() {
             // Draw Bombs
             for(let i=0;i<gameState.bombs.length;i++){
                 const b=gameState.bombs[i];
-                if(!b || !isWorldTileVisibleV329(b.x, b.y, 1)) continue;
+                if(!b) continue;
+                const bombPos = typeof getBombV4WorldPosition === 'function' ? getBombV4WorldPosition(b) : {x:(b.x + .5) * TILE_SIZE, y:(b.y + .5) * TILE_SIZE};
+                if(!isWorldRectVisibleV329(bombPos.x - TILE_SIZE * .55, bombPos.y - TILE_SIZE * .55, TILE_SIZE * 1.1, TILE_SIZE * 1.1, TILE_SIZE)) continue;
                 renderStatsV329.bombs++;
                 renderBombRangePreview(b);
-                drawBombSprite((b.x + 0.5) * TILE_SIZE, (b.y + 0.5) * TILE_SIZE, b);
+                drawBombSprite(bombPos.x, bombPos.y, b);
             }
             drawBombChainLinks();
 
@@ -441,9 +443,13 @@ function draw() {
         }
 
         function drawBombSprite(cx, cy, b) {
-            let scale = 1.0 + Math.sin(gameState.animFrame * 0.2) * 0.08;
+            if (typeof ensureBombV4State === 'function') ensureBombV4State(b);
+            const moving = b?.motionState === 'moving' || b?.state === 'moving';
+            const pulse = Math.sin(gameState.animFrame * 0.2 + (b?.bobPhase || 0)) * 0.08;
+            let scale = 1.0 + pulse + (moving ? 0.04 * Math.sin((b.motionProgress || 0) * Math.PI * 2) : 0);
             ctx.save();
             ctx.translate(cx, cy);
+            if (moving) ctx.rotate((b.motionRotation || 0) * 0.35);
             ctx.scale(scale, scale);
 
             // La bomba del jugador usa un aro cian de identidad; la mecha sigue en ámbar/rojo.
@@ -455,6 +461,15 @@ function draw() {
                 ctx.stroke();
             }
             renderBombFuseFeedback(0, 0, b);
+            if (moving) {
+                ctx.fillStyle = 'rgba(255,210,63,.14)';
+                ctx.beginPath(); ctx.arc(0, 0, TILE_SIZE * .49, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = 'rgba(255,138,0,.7)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4,4]);
+                ctx.beginPath(); ctx.arc(0, 0, TILE_SIZE * .43, -Math.PI*.25, Math.PI*1.2); ctx.stroke();
+                ctx.setLineDash([]);
+            }
 
             // Sombra bomba
             ctx.fillStyle = 'rgba(0,0,0,0.5)';

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.15 — Bombs, explosions, damage and gameplay simulation
+// Bomberman Roguelike v4.0 — Bombs, explosions, damage and gameplay simulation
         function explodeBomb(bombIndex) {
             const first = gameState.bombs[bombIndex];
             if (!first) return;
@@ -6,7 +6,7 @@
             // La cola evita recursión y hace que toda la cadena pase por la misma
             // lógica de explosión: bloques, botín, salida, puntuación y feedback.
             gameState.bombs.splice(bombIndex, 1);
-            player.bombsPlaced = Math.max(0, player.bombsPlaced - 1);
+            if (first.countsTowardPlayerCapacity !== false) player.bombsPlaced = Math.max(0, player.bombsPlaced - 1);
 
             const queue = [{ bomb: first, parent: null }];
             let detonatedCount = 0;
@@ -62,8 +62,9 @@
                 for (let i = gameState.bombs.length - 1; i >= 0; i--) {
                     const other = gameState.bombs[i];
                     if (!other || !blastKeys.has(`${other.x},${other.y}`)) continue;
+                    if (other.state === 'moving' || other.motionState === 'moving') continue;
                     gameState.bombs.splice(i, 1);
-                    player.bombsPlaced = Math.max(0, player.bombsPlaced - 1);
+                    if (other.countsTowardPlayerCapacity !== false) player.bombsPlaced = Math.max(0, player.bombsPlaced - 1);
                     registerBombChainLink(bomb, other, detonatedCount + 1, detonatedCount + 1);
                     queue.push({ bomb: other, parent: bomb });
                 }

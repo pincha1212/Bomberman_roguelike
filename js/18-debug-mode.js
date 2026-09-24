@@ -310,6 +310,8 @@
                     blocksBroken: Number(state.blocksBroken || 0),
                     enemies: enemies.length,
                     bombs: bombs.length,
+                    bossBombs: bombs.filter(b => b?.owner === 'boss').length,
+                    bombStates: bombs.reduce((acc, b) => { const key = String(b?.state || 'N/D'); acc[key] = (acc[key] || 0) + 1; return acc; }, {}),
                     explosions: explosions.length,
                     traps: hazards.length,
                     activeTraps: hazards.filter(h => !!h?.triggered).length,
@@ -628,7 +630,7 @@
             const hw = checks.filter(c => c.status === 'WARN').length;
             const hf = checks.filter(c => c.status === 'FAIL').length;
             return [
-                'BOMBERMAN ROGUELIKE — DEBUG MODE v3.29.0',
+                'BOMBERMAN ROGUELIKE — DEBUG MODE v4.0',
                 `SUITE: ${results.length}/${getAvailableTestNames().length} · ${passed} PASS · ${failed} FAIL`,
                 ...results.map(r => `${String(r.name || 'TEST').toUpperCase()}: ${r.status} — ${compactCopyText(r.summary || r.result || 'Sin resultado')}`),
                 `DIAGNOSTICO: ${this.lastHealth?.status || 'PENDIENTE'} — ${hp} PASS · ${hw} WARN · ${hf} FAIL`,
@@ -2153,6 +2155,6 @@
         }
     });
 
-    DEBUG_MODE.recordEvent('DEBUG', 'Debug Mode v3.29.0 unificado cargado en el mismo runtime.');
+    DEBUG_MODE.recordEvent('DEBUG', 'Debug Mode v4.0 unificado cargado en el mismo runtime.');
     DEBUG_MODE.recordEvent('DEBUG', 'Usá RESET para activar una escena de depuración limpia.');
 })();

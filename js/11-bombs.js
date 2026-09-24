@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.10 — Bomb Handling
+// Bomberman Roguelike v4.0 — Bomb Handling + shared bomb states
 // Núcleo de colocación, retención segura, ocupación, mecha y cadenas.
 
 const BOMB_HANDLING = {
@@ -21,8 +21,114 @@ const bombInputState = {
 
 const bombHandlingFx = { chainLinks: [] };
 
+
+// v4.0: todas las bombas comparten una pequeña máquina de estados.
+// Separamos lógica de detonación (tile x/y) de su posición visual (worldX/worldY)
+// para permitir bombas lanzadas, empujadas, atrapadas o desviadas en futuras habilidades.
+const BOMB_V4_STATES = Object.freeze({ MOVING: 'moving', ARMED: 'armed', EXPLODING: 'exploding' });
+
+function ensureBombV4State(bomb){
+    if (!bomb || typeof bomb !== 'object') return null;
+    if (!bomb.state) bomb.state = bomb.owner === 'boss' ? BOMB_V4_STATES.MOVING : BOMB_V4_STATES.ARMED;
+    if (!bomb.motionState) bomb.motionState = bomb.state === BOMB_V4_STATES.MOVING ? BOMB_V4_STATES.MOVING : 'idle';
+    if (!Number.isFinite(bomb.worldX)) bomb.worldX = (Number(bomb.x) + .5) * TILE_SIZE;
+    if (!Number.isFinite(bomb.worldY)) bomb.worldY = (Number(bomb.y) + .5) * TILE_SIZE;
+    if (!Number.isFinite(bomb.motionProgress)) bomb.motionProgress = bomb.state === BOMB_V4_STATES.MOVING ? 0 : 1;
+    if (!Number.isFinite(bomb.motionTimer)) bomb.motionTimer = 0;
+    if (!Number.isFinite(bomb.motionDuration)) bomb.motionDuration = 0;
+    if (!Number.isFinite(bomb.motionStartX)) bomb.motionStartX = bomb.worldX;
+    if (!Number.isFinite(bomb.motionStartY)) bomb.motionStartY = bomb.worldY;
+    if (!Number.isFinite(bomb.motionTargetX)) bomb.motionTargetX = bomb.worldX;
+    if (!Number.isFinite(bomb.motionTargetY)) bomb.motionTargetY = bomb.worldY;
+    if (!Number.isFinite(bomb.motionArc)) bomb.motionArc = 0;
+    if (!Number.isFinite(bomb.motionRotation)) bomb.motionRotation = 0;
+    if (!Number.isFinite(bomb.motionRotationSpeed)) bomb.motionRotationSpeed = 0;
+    if (!Number.isFinite(bomb.bobPhase)) bomb.bobPhase = 0;
+    if (!Number.isFinite(bomb.timer)) bomb.timer = Number(bomb.fuseTotal || 0);
+    return bomb;
+}
+
+function startBombV4Motion(bomb, targetX, targetY, durationMs = 360, arc = 18){
+    if (!bomb) return false;
+    ensureBombV4State(bomb);
+    bomb.state = BOMB_V4_STATES.MOVING;
+    bomb.motionState = BOMB_V4_STATES.MOVING;
+    bomb.motionProgress = 0;
+    bomb.motionTimer = Math.max(80, Number(durationMs) || 360);
+    bomb.motionDuration = bomb.motionTimer;
+    bomb.motionStartX = Number.isFinite(bomb.worldX) ? bomb.worldX : (bomb.x + .5) * TILE_SIZE;
+    bomb.motionStartY = Number.isFinite(bomb.worldY) ? bomb.worldY : (bomb.y + .5) * TILE_SIZE;
+    bomb.motionTargetX = Number(targetX);
+    bomb.motionTargetY = Number(targetY);
+    bomb.motionArc = Number.isFinite(arc) ? arc : 18;
+    bomb.motionRotation = 0;
+    bomb.motionRotationSpeed = 0.18;
+    bomb.playerPassThrough = true;
+    return true;
+}
+
+function armBombV4(bomb){
+    if (!bomb) return false;
+    ensureBombV4State(bomb);
+    bomb.state = BOMB_V4_STATES.ARMED;
+    bomb.motionState = 'idle';
+    bomb.motionProgress = 1;
+    bomb.motionTimer = 0;
+    bomb.motionDuration = 0;
+    bomb.worldX = (Number(bomb.x) + .5) * TILE_SIZE;
+    bomb.worldY = (Number(bomb.y) + .5) * TILE_SIZE;
+    bomb.playerPassThrough = false;
+    bomb.justArmed = true;
+    bomb.timer = Math.max(120, Number(bomb.fuseTotal || bomb.timer || 120));
+    bomb.warnBucket = Math.ceil(bomb.timer / 300);
+    return true;
+}
+
+function getBombV4WorldPosition(bomb){
+    ensureBombV4State(bomb);
+    return { x: Number(bomb.worldX), y: Number(bomb.worldY) };
+}
+
+function updateBombV4Motion(bomb, dt){
+    if (!bomb) return false;
+    ensureBombV4State(bomb);
+    bomb.bobPhase += dt * 0.009;
+    if (bomb.state !== BOMB_V4_STATES.MOVING) return false;
+
+    bomb.motionTimer = Math.max(0, bomb.motionTimer - dt);
+    const duration = Math.max(1, bomb.motionDuration);
+    const raw = 1 - bomb.motionTimer / duration;
+    const t = Math.max(0, Math.min(1, raw));
+    bomb.motionProgress = t;
+    const eased = t * t * (3 - 2 * t);
+    const baseX = bomb.motionStartX + (bomb.motionTargetX - bomb.motionStartX) * eased;
+    const baseY = bomb.motionStartY + (bomb.motionTargetY - bomb.motionStartY) * eased;
+    const arc = Math.sin(Math.PI * eased) * bomb.motionArc;
+    bomb.worldX = baseX;
+    bomb.worldY = baseY - arc;
+    bomb.motionRotation += (bomb.motionRotationSpeed || 0) * Math.max(0.5, Math.min(2, dt / 16.6667));
+
+    if (bomb.motionTimer <= 0) {
+        bomb.x = Math.round(bomb.motionTargetX / TILE_SIZE - .5);
+        bomb.y = Math.round(bomb.motionTargetY / TILE_SIZE - .5);
+        armBombV4(bomb);
+        return true;
+    }
+    return false;
+}
+
+function bombV4StateSummary(bomb){
+    if (!bomb) return 'N/D';
+    ensureBombV4State(bomb);
+    return `${bomb.state}/${bomb.motionState}`;
+}
+
 function getBombAtTile(gx, gy){
-    return gameState.bombs.find(b => b.x === gx && b.y === gy) || null;
+    return gameState.bombs.find(b => {
+        if (!b || b.x !== gx || b.y !== gy) return false;
+        ensureBombV4State(b);
+        return b.state !== BOMB_V4_STATES.MOVING;
+    }) || null;
 }
 
 function isBombSolidForPlayer(gx, gy){
@@ -132,7 +238,23 @@ function placeBomb(reason='manual'){
         placementReason: reason,
         previewCells: calculateBombBlastCells({ x: gx, y: gy, range: Math.max(1, player.bombRange) }),
         previewGrid: gameState.grid,
-        previewGridRevision: gameState.gridRevision || 0
+        previewGridRevision: gameState.gridRevision || 0,
+        state: BOMB_V4_STATES.ARMED,
+        motionState: 'idle',
+        worldX: (gx + .5) * TILE_SIZE,
+        worldY: (gy + .5) * TILE_SIZE,
+        motionProgress: 1,
+        motionTimer: 0,
+        motionDuration: 0,
+        motionStartX: (gx + .5) * TILE_SIZE,
+        motionStartY: (gy + .5) * TILE_SIZE,
+        motionTargetX: (gx + .5) * TILE_SIZE,
+        motionTargetY: (gy + .5) * TILE_SIZE,
+        motionArc: 0,
+        motionRotation: 0,
+        motionRotationSpeed: 0,
+        bobPhase: 0,
+        countsTowardPlayerCapacity: true
     };
 
     gameState.bombs.push(bomb);
@@ -216,6 +338,10 @@ function updateBombHandling(dt){
 
     for(let i=gameState.bombs.length-1;i>=0;i--){
         const bomb=gameState.bombs[i];
+        if(!bomb) continue;
+        updateBombV4Motion(bomb, dt);
+        ensureBombV4State(bomb);
+        if(bomb.state !== BOMB_V4_STATES.ARMED) continue;
         bomb.timer-=dt;
         if(bomb.timer>0 && bomb.timer<=BOMB_HANDLING.warningStart){
             const bucket=Math.ceil(bomb.timer/300);
@@ -246,3 +372,10 @@ function drawBombChainLinks(){
     }
     ctx.restore();
 }
+
+window.BOMB_V4_STATES = BOMB_V4_STATES;
+window.ensureBombV4State = ensureBombV4State;
+window.startBombV4Motion = startBombV4Motion;
+window.armBombV4 = armBombV4;
+window.getBombV4WorldPosition = getBombV4WorldPosition;
+window.bombV4StateSummary = bombV4StateSummary;

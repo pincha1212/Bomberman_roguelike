@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.15 — Death & Restart Lifecycle
+// Bomberman Roguelike v4.0 — Death & Restart Lifecycle
 // Mantiene estadísticas de la run, cierre de muerte y reinicio limpio.
 
 const RUN_LIFECYCLE = {

@@ -1,5 +1,5 @@
 /*
- * BOMBERMAN ROGUELIKE v3.25.0
+ * BOMBERMAN ROGUELIKE v4.0
  * Boss System Update
  *
  * Purpose:
@@ -26,6 +26,22 @@ const BOSS_V325_CONFIG = Object.freeze({
     }),
     telegraphMs: 260,
     damage: 1,
+    bossBombCap: 6,
+    bombFuseMs: 2100,
+    bombMoveMs: 420,
+    bombArcPx: 22,
+    bombThrowCount: Object.freeze({
+        1: 1,
+        2: 2,
+        3: 3
+    }),
+    bombIntervalMs: Object.freeze({
+        phase1: 2500,
+        phase2: 2050,
+        phase3: 1650
+    }),
+    bombMinFromPlayer: 3,
+    bombMinFromBoss: 2,
     phaseSpeedMultiplier: Object.freeze({
         1: 1.00,
         2: 1.08,
@@ -83,12 +99,15 @@ function bossV325EnsureState() {
             phase: 1,
             pattern: 'aimed',
             patternTimer: 0,
+            bombTimer: 0,
             telegraphTimer: 0,
             patternCount: 0,
             phaseTransitions: 0,
             shotsFired: 0,
             hits: 0,
             blockedByCap: 0,
+            bombShotsFired: 0,
+            lastBombTarget: null,
             active: false
         };
     }
@@ -101,12 +120,15 @@ function bossV325Reset() {
         phase: 1,
         pattern: 'aimed',
         patternTimer: 0,
+        bombTimer: 0,
         telegraphTimer: 0,
         patternCount: 0,
         phaseTransitions: 0,
         shotsFired: 0,
         hits: 0,
         blockedByCap: 0,
+        bombShotsFired: 0,
+        lastBombTarget: null,
         active: false
     };
     try {
@@ -136,6 +158,13 @@ function bossV325SetHUD(boss, phase) {
         barEl.style.width = `${Math.round(ratio * 100)}%`;
     }
     if (hudEl) hudEl.classList.toggle('hidden', !bossV325IsActive());
+    const bombBadge = document.getElementById('ui-boss-bombs');
+    if (bombBadge) {
+        const count = bossV4BombCount();
+        bombBadge.classList.toggle('hidden', !bossV325IsActive());
+        const value = bombBadge.querySelector('span');
+        if (value) value.textContent = String(count);
+    }
 }
 
 function bossV325DirectionToPlayer(boss) {
@@ -147,6 +176,107 @@ function bossV325DirectionToPlayer(boss) {
     const dy = py - bp.y;
     const len = Math.hypot(dx, dy) || 1;
     return { x: dx / len, y: dy / len };
+}
+
+
+function bossV4BombCount(){
+    try {
+        return Array.isArray(gameState.bombs) ? gameState.bombs.filter(b => b && b.owner === 'boss').length : 0;
+    } catch (_) { return 0; }
+}
+
+function bossV4IsBombTargetValid(x, y, bossCell, playerCell){
+    if (!gameState.grid[y] || gameState.grid[y][x] !== TYPES.EMPTY) return false;
+    if (x <= 0 || y <= 0 || x >= gameState.gridWidth - 1 || y >= gameState.gridHeight - 1) return false;
+    const bombHere = Array.isArray(gameState.bombs) && gameState.bombs.some(b => b && b.x === x && b.y === y);
+    if (bombHere) return false;
+    if (Math.abs(x - bossCell.x) + Math.abs(y - bossCell.y) < BOSS_V325_CONFIG.bombMinFromBoss) return false;
+    if (Math.abs(x - playerCell.x) + Math.abs(y - playerCell.y) < BOSS_V325_CONFIG.bombMinFromPlayer) return false;
+    return true;
+}
+
+function bossV4FindBombTarget(){
+    const boss = gameState.boss;
+    if (!boss) return null;
+    const bx = Math.floor(boss.x / TILE_SIZE);
+    const by = Math.floor(boss.y / TILE_SIZE);
+    const px = Math.floor((player.x + player.width / 2) / TILE_SIZE);
+    const py = Math.floor((player.y + player.height / 2) / TILE_SIZE);
+    const bossCell = {x:bx,y:by};
+    const playerCell = {x:px,y:py};
+
+    // Muestreo aleatorio para que el boss no haga un barrido de mapa por frame.
+    for (let attempt = 0; attempt < 36; attempt++) {
+        const x = 1 + Math.floor(Math.random() * Math.max(1, gameState.gridWidth - 2));
+        const y = 1 + Math.floor(Math.random() * Math.max(1, gameState.gridHeight - 2));
+        if (bossV4IsBombTargetValid(x, y, bossCell, playerCell)) return {x,y};
+    }
+
+    // Fallback determinista: mantiene el ataque vivo si el mapa está muy cargado.
+    for (let radius = 3; radius <= Math.max(gameState.gridWidth, gameState.gridHeight); radius++) {
+        for (let y = 1; y < gameState.gridHeight - 1; y++) {
+            for (let x = 1; x < gameState.gridWidth - 1; x++) {
+                if (Math.abs(x - bx) + Math.abs(y - by) < radius) continue;
+                if (bossV4IsBombTargetValid(x, y, bossCell, playerCell)) return {x,y};
+            }
+        }
+    }
+    return null;
+}
+
+function bossV4SpawnBomb(){
+    const state = bossV325EnsureState();
+    if (!gameState?.isPlaying || !gameState.boss || gameState.boss.defeated) return false;
+    if (bossV4BombCount() >= BOSS_V325_CONFIG.bossBombCap) return false;
+    const target = bossV4FindBombTarget();
+    if (!target) return false;
+    const boss = gameState.boss;
+    const bomb = {
+        id: `boss-bomb-${gameState.animFrame}-${Math.random().toString(36).slice(2,6)}`,
+        owner: 'boss',
+        bombType: 'boss-throw',
+        x: target.x,
+        y: target.y,
+        range: Math.max(1, Math.min(4, 1 + Math.floor(state.phase / 2))),
+        timer: BOSS_V325_CONFIG.bombFuseMs,
+        fuseTotal: BOSS_V325_CONFIG.bombFuseMs,
+        warnBucket: Math.ceil(BOSS_V325_CONFIG.bombFuseMs / 300),
+        scalePulse: 1,
+        previewTimer: 0,
+        playerPassThrough: true,
+        justArmed: false,
+        placedAtFrame: gameState.animFrame,
+        placementReason: 'boss-throw',
+        countsTowardPlayerCapacity: false,
+        state: BOMB_V4_STATES.MOVING,
+        motionState: BOMB_V4_STATES.MOVING,
+        worldX: boss.x,
+        worldY: boss.y,
+        motionProgress: 0,
+        motionTimer: BOSS_V325_CONFIG.bombMoveMs,
+        motionDuration: BOSS_V325_CONFIG.bombMoveMs,
+        motionStartX: boss.x,
+        motionStartY: boss.y,
+        motionTargetX: (target.x + .5) * TILE_SIZE,
+        motionTargetY: (target.y + .5) * TILE_SIZE,
+        motionArc: BOSS_V325_CONFIG.bombArcPx,
+        motionRotation: 0,
+        motionRotationSpeed: .22,
+        bobPhase: 0
+    };
+    if (typeof ensureBombV4State === 'function') ensureBombV4State(bomb);
+    gameState.bombs.push(bomb);
+    state.bombShotsFired = (state.bombShotsFired || 0) + 1;
+    state.lastBombTarget = { ...target };
+    return true;
+}
+
+function bossV4FireBombVolley(){
+    const state = bossV325EnsureState();
+    const count = Number(BOSS_V325_CONFIG.bombThrowCount[state.phase] || 1);
+    let spawned = 0;
+    for (let i=0; i<count; i++) if (bossV4SpawnBomb()) spawned++;
+    return spawned;
 }
 
 function bossV325ProjectileCount() {
@@ -302,6 +432,8 @@ function bossV325ApplyPhase(boss, phase) {
         state.patternTimer = 0;
         state.telegraphTimer = 0;
         state.patternCount = 0;
+        state.bombShotsFired = 0;
+        state.lastBombTarget = null;
         state.active = true;
     }
 
@@ -309,6 +441,7 @@ function bossV325ApplyPhase(boss, phase) {
         state.phase = phase;
         state.phaseTransitions += 1;
         state.patternTimer = 0;
+        state.bombTimer = BOSS_V325_CONFIG.bombIntervalMs[`phase${phase}`] * 0.6;
         state.telegraphTimer = BOSS_V325_CONFIG.telegraphMs;
         state.pattern = phase === 1 ? 'aimed' : (phase === 2 ? 'cross' : 'tri-shot');
     }
@@ -336,6 +469,11 @@ function updateBossV325(dt) {
     if (state.telegraphTimer > 0) state.telegraphTimer = Math.max(0, state.telegraphTimer - dt);
 
     const interval = BOSS_V325_CONFIG.patternIntervalMs[`phase${phase}`];
+    state.bombTimer = Number.isFinite(state.bombTimer) ? state.bombTimer - dt : BOSS_V325_CONFIG.bombIntervalMs[`phase${phase}`];
+    if (state.bombTimer <= 0) {
+        bossV4FireBombVolley();
+        state.bombTimer = BOSS_V325_CONFIG.bombIntervalMs[`phase${phase}`];
+    }
     if (state.patternTimer <= 0) {
         state.patternTimer = interval;
         state.patternCount += 1;
@@ -403,5 +541,8 @@ window.updateBossV325 = updateBossV325;
 window.resetBossV325 = bossV325Reset;
 window.bossV325GetPhase = bossV325GetPhase;
 window.bossV325SpawnProjectile = bossV325SpawnProjectile;
+window.bossV4SpawnBomb = bossV4SpawnBomb;
+window.bossV4BombVolley = bossV4FireBombVolley;
+window.BOSS_V4_CONFIG = BOSS_V325_CONFIG;
 
 bossV325Bootstrap();

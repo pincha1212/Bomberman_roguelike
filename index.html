@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOMBERMAN ROGUELIKE — v4.8</title>
+    <title>BOMBERMAN ROGUELIKE — v4.9</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/main.css">
 </head>
@@ -14,7 +14,7 @@
             <aside class="menu-rail menu-rail-left" aria-label="Resumen de la aventura">
                 <div class="menu-rail-top">
                     <span class="menu-kicker">BOMBERMAN ROGUELIKE</span>
-                    <span class="menu-version">v4.8</span>
+                    <span class="menu-version">v4.9</span>
                 </div>
                 <div class="menu-rail-content">
                     <div class="menu-mark">💣</div>
@@ -139,25 +139,28 @@
                     </div>
                     <p class="quality-selector-note">Elegí el nivel antes de comenzar la partida.</p>
                 </section>
-                <section class="theme-selector" aria-label="Tema y mecánicas">
+                <section class="theme-selector" aria-label="Progresión de biomas">
                     <div class="theme-selector-head">
                         <div>
-                            <span class="theme-selector-kicker">APARIENCIA</span>
-                            <strong>TEMA VISUAL</strong>
+                            <span class="theme-selector-kicker">PROGRESIÓN</span>
+                            <strong>BIOMAS DE LA RUN</strong>
                         </div>
-                        <span id="theme-selected-summary" class="theme-selected-summary">CLÁSICO · SOLO VISUAL</span>
+                        <span id="theme-selected-summary" class="theme-selected-summary">INVIERNO 1 · 44 PROFUNDIDADES</span>
                     </div>
-                    <div class="theme-options" role="radiogroup" aria-label="Tema visual">
-                        <button class="theme-option theme-option-winter" type="button" data-theme-option="winter" role="radio" aria-checked="false">
-                            <span class="theme-preview theme-preview-winter" aria-hidden="true"></span>
-                            <strong>INVIERNO</strong><span>Hielo · nieve · deslizamiento · viento · ventisca</span>
-                        </button>
-                        <button class="theme-option theme-option-inferno" type="button" data-theme-option="inferno" role="radio" aria-checked="false">
-                            <span class="theme-preview theme-preview-inferno" aria-hidden="true"></span>
-                            <strong>INFIERNO</strong><span>Basalto · brasas · oscuridad · lava · rayos · derrumbes</span>
-                        </button>
+                    <div class="biome-progression-list" aria-label="Orden de biomas">
+                        <div class="biome-progress-item" data-biome-id="winter"><strong>01 · INVIERNO</strong><span>1–4</span></div>
+                        <div class="biome-progress-item" data-biome-id="autumn"><strong>02 · OTOÑO</strong><span>5–8</span></div>
+                        <div class="biome-progress-item" data-biome-id="spring"><strong>03 · PRIMAVERA</strong><span>9–12</span></div>
+                        <div class="biome-progress-item" data-biome-id="summer"><strong>04 · VERANO</strong><span>13–16</span></div>
+                        <div class="biome-progress-item" data-biome-id="underground"><strong>05 · BAJO TIERRA</strong><span>17–20</span></div>
+                        <div class="biome-progress-item" data-biome-id="clouds"><strong>06 · NUBES</strong><span>21–24</span></div>
+                        <div class="biome-progress-item" data-biome-id="mountains"><strong>07 · MONTAÑAS</strong><span>25–28</span></div>
+                        <div class="biome-progress-item" data-biome-id="beach"><strong>08 · PLAYA</strong><span>29–32</span></div>
+                        <div class="biome-progress-item" data-biome-id="space"><strong>09 · ESPACIO</strong><span>33–36</span></div>
+                        <div class="biome-progress-item" data-biome-id="sky"><strong>10 · CIELO</strong><span>37–40</span></div>
+                        <div class="biome-progress-item" data-biome-id="inferno"><strong>11 · INFIERNO</strong><span>41–44</span></div>
                     </div>
-                    <p class="theme-selector-note">Las mecánicas y hazards se resuelven desde sus registries; el tema solo declara sus IDs.</p>
+                    <p class="biome-progression-note">La run recorre los biomas en orden. Cada bioma contiene 4 profundidades; las mecánicas y hazards se reutilizan desde sus registries.</p>
                 </section>
                 <div class="menu-actions">
                     <button id="btn-start" class="btn-pixel menu-start-button" type="button">INICIAR RUN</button>
@@ -176,10 +179,10 @@
         </div>
     </div>
 <!-- v3.28 modular JavaScript. Feedback is layered over the existing combat/runtime systems. -->
-    <script src="js/01-core.js?v=4.7.1"></script>
+    <script src="js/01-core.js?v=4.9.0"></script>
     <script src="js/35-device-quality.js?v=4.5.0"></script>
-    <script src="js/37-theme.js?v=4.7.1"></script>
-    <script src="js/38-mechanics-registry.js?v=4.7.1"></script>
+    <script src="js/37-theme.js?v=4.9.0"></script>
+    <script src="js/38-mechanics-registry.js?v=4.9.0"></script>
     <script src="js/16-relics.js?v=3.27.0"></script>
     <script src="js/02-input.js?v=3.27.0"></script>
     <script src="js/15-room-design.js?v=4.5.2"></script>
@@ -189,7 +192,7 @@
     <script src="js/11-bombs.js?v=4.6.2"></script>
     <script src="js/13-collision.js?v=3.27.0"></script>
     <script src="js/14-traps.js?v=4.6.2"></script>
-    <script src="js/05-player.js?v=4.7.1"></script>
+    <script src="js/05-player.js?v=4.9.0"></script>
     <script src="js/12-enemy-ai.js?v=3.29.0"></script>
     <script src="js/06-combat.js?v=4.6.2"></script>
     <script src="js/07-render.js?v=4.6.2"></script>
@@ -200,6 +203,7 @@
     <script src="js/27-boss-system.js?v=4.2.0"></script>
     <script src="js/29-feedback-system.js?v=4.6.2"></script>
     <script src="js/31-roguelike-update.js?v=3.27.0"></script>
-    <script src="js/39-hazards.js?v=4.8.0"></script>
+    <script src="js/39-hazards.js?v=4.9.0"></script>
+    <script src="js/40-biome-progression.js?v=4.9.0"></script>
 </body>
 </html>

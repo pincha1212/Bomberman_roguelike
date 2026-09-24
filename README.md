@@ -1,4 +1,4 @@
-# BOMBERMAN // DESCENT — Roguelike v3.20.0
+# BOMBERMAN // DESCENT — Roguelike v3.20.1
 
 Videojuego web estático desarrollado con HTML, CSS y JavaScript vanilla. Preparado para GitHub Pages, sin backend ni bundler.
 
@@ -50,7 +50,7 @@ El Debug Mode se carga sobre el mismo `index.html` y conserva la estructura de m
 - Debug expone lock de giro y llamadas BFS por enemigo.
 
 
-## v3.20.0 — Robust Collision Update
+## v3.20.1 — Robust Collision Update
 
 - Lane-lock tolerante: evita snap exacto dentro de la tolerancia normal.
 - Correcciones laterales limitadas a `enemyLaneCorrectionStep`.

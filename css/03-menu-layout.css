@@ -45,7 +45,7 @@ body{
 .menu-panel{
     position:relative;
     min-width:0;
-    overflow:hidden;
+    overflow-x:hidden;
     border:1px solid var(--menu-line);
     background:
         linear-gradient(180deg, rgba(15,23,42,.82), rgba(2,6,23,.94));
@@ -151,10 +151,15 @@ body{
 
 .menu-panel{
     min-height:min(76dvh, 650px);
+    max-height:calc(100dvh - 16px);
     padding:clamp(18px,2.5vw,32px);
     display:flex;
     flex-direction:column;
-    justify-content:space-between;
+    justify-content:flex-start;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-gutter:stable;
     isolation:isolate;
 }
 .menu-panel-glow{
@@ -206,7 +211,14 @@ body{
 .menu-rules b{color:#fbbf24;font:7px 'Press Start 2P',monospace;}
 .menu-rules span{color:#cbd5e1;font-size:.77rem;line-height:1.45;}
 
-.menu-actions{position:relative;z-index:1;}
+.menu-actions{
+    position:sticky;
+    bottom:0;
+    z-index:2;
+    margin-top:12px;
+    padding-top:8px;
+    background:linear-gradient(180deg,rgba(7,9,13,0),rgba(7,9,13,.96) 22%,rgba(7,9,13,.99) 100%);
+}
 .menu-start-button{width:100%;margin-top:4px;padding:17px 20px;font-size:.78rem;}
 .menu-hint{
     display:flex;

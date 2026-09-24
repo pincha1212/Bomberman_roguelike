@@ -79,7 +79,7 @@ body.v4-theme::before{
     height:min(76dvh,680px);
     padding:20px;
 }
-.v4-theme .menu-panel{padding:24px;}
+.v4-theme .menu-panel{padding:24px;overflow-y:auto;}
 .v4-theme .menu-kicker{color:#777f90;}
 .v4-theme .menu-version{color:var(--v4-yellow);}
 .v4-theme .menu-mark{
@@ -170,7 +170,7 @@ body.v4-theme::before{
     .v4-theme .menu-rail-content{display:none;}
     .v4-theme .menu-rail{height:auto;padding:14px 16px;}
     .v4-theme .menu-feature-list{display:none;}
-    .v4-theme .menu-panel{padding:20px;}
+    .v4-theme .menu-panel{padding:20px;max-height:calc(100dvh - 20px);overflow-y:auto;}
     .v4-theme .menu-footer{font-size:5px;line-height:1.5;}
 }
 
@@ -178,7 +178,7 @@ body.v4-theme::before{
     .v4-theme #app-wrapper{padding:6px;}
     .v4-theme .main-menu{gap:8px;}
     .v4-theme #game-container{width:calc(100vw - 12px);}
-    .v4-theme #start-screen{padding:16px;}
+    .v4-theme #start-screen{padding:16px;max-height:calc(100dvh - 12px);overflow-y:auto;}
     .v4-theme .menu-title{font-size:20px;}
     .v4-theme .menu-subtitle{font-size:6px;line-height:1.6;}
     .v4-theme .menu-hero-icon{font-size:24px;}

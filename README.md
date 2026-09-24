@@ -1,4 +1,4 @@
-# BOMBERMAN // DESCENT — Roguelike v3.23.0
+# BOMBERMAN // DESCENT — Roguelike v3.24.1
 
 Videojuego web estático desarrollado con HTML, CSS y JavaScript vanilla. Preparado para GitHub Pages, sin backend ni bundler.
 
@@ -68,7 +68,7 @@ Se agregaron seis topologías procedurales: `corridors`, `intersection`, `small-
 Debug Engine: `ROOM STRESS` valida las seis topologías, cantidad de celdas alcanzables, longitud de ruta y registro de reparación.
 
 
-## v3.23.0 — Progressive Difficulty
+## v3.25.0 — Progressive Difficulty
 - Escalado centralizado por profundidad para enemigos, presión, trampas y densidad.
 - Límites: 22 enemigos, 1.24x velocidad, +6 trampas, +0.08 densidad de bloques.
 - Nuevo `js/24-difficulty.js`.
@@ -112,3 +112,24 @@ Debug Engine: `ROOM STRESS` valida las seis topologías, cantidad de celdas alca
 - Recovery stress: dirección bloqueada repetidamente no vuelve a seleccionarse.
 - BFS: 0 en recovery con salida local.
 - Movimiento cardinal conservado.
+
+
+## v3.25.0 — Boss Update
+- Tres fases de boss según porcentaje de vida: 1, 2 y 3.
+- Patrones de bajo coste: `aimed`, `cross`, `tri-shot`.
+- Telegraph corto antes de cada patrón.
+- Cap de 6 proyectiles propios del sistema v3.25.
+- Proyectiles con vida limitada y eliminación por impacto, borde o expiración.
+- Velocidad de patrón progresiva por fase.
+- Integración por wrapper sobre `update`, `draw`, `initLevel` y `startGame`; no reemplaza el resto del motor.
+- Sin A*, BFS ni búsquedas de ruta para el boss.
+- Nuevo `js/27-boss-system.js`.
+- Nuevo `js/28-boss-stress.js`.
+- Stress: fases, umbrales y límite de proyectiles.
+
+## Validación v3.25.0
+- `node --check`: JS afectado PASS.
+- Boss Stress: 5/5 fases PASS.
+- Cap de proyectiles: PASS.
+- O(1) por trigger de patrón; sin pathfinding por frame.
+- Prueba visual en navegador/GitHub Pages: no realizada.

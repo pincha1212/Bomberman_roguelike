@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.7 — Visual Themes + Mechanics contract
+// Bomberman Roguelike v4.7.1 — Visual Themes + Mechanics contract
 // Los temas declaran datos visuales y IDs de mecánicas.
 // La lógica de las mecánicas vive exclusivamente en 38-mechanics-registry.js.
 (function initThemeFoundationV47(global) {
@@ -147,6 +147,7 @@
             ...CLASSIC_THEME,
             id,
             nombre,
+            tipo: mechanicIds.length ? 'gameplay-theme' : 'visual-only',
             paleta: Object.freeze({ ...CLASSIC_THEME.paleta, ...paletteOverrides }),
             sprites: Object.freeze({ ...CLASSIC_THEME.sprites, ...spriteOverrides }),
             ambiente: Object.freeze({ ...CLASSIC_THEME.ambiente, ...ambientOverrides }),
@@ -210,7 +211,7 @@
             bomb: 'procedural:ice-bomb', fire: 'procedural:frost-fire'
         },
         { tipo: 'snow', color: 'ambientDust', densidad: 1, velocidad: 0.42, sizeMin: 1, sizeMax: 3, alpha: 0.55 },
-        ['slippery']
+        ['slippery', 'wind_push']
     );
 
     const INFERNO_THEME = createVisualThemeV47(
@@ -267,7 +268,8 @@
             floor: 'procedural:scorched-floor', wall: 'procedural:basalt-wall', brick: 'procedural:charred-block',
             bomb: 'procedural:inferno-bomb', fire: 'procedural:inferno-flame'
         },
-        { tipo: 'ember', color: 'ambientDust', densidad: 0.9, velocidad: 0.52, sizeMin: 1, sizeMax: 2, alpha: 0.58 }
+        { tipo: 'ember', color: 'ambientDust', densidad: 0.9, velocidad: 0.52, sizeMin: 1, sizeMax: 2, alpha: 0.58 },
+        ['darkness']
     );
 
     const registry = Object.freeze({ classic: CLASSIC_THEME, winter: WINTER_THEME, inferno: INFERNO_THEME });

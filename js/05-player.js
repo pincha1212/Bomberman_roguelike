@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.7 — Cardinal movement + Mechanics Registry
+// Bomberman Roguelike v4.7.1 — Cardinal movement + Mechanics Registry
         // V3.2.4 — MOVEMENT UPDATE
         // Movimiento continuo cardinal asistido. La cuadrícula SOLO define las paredes.
         // El personaje usa una hurtbox de movimiento más pequeña que el sprite,
@@ -274,6 +274,22 @@
                 if (player.vx) player.vx = 0;
                 if (player.vy) player.vy = 0;
             }
+
+            // Mechanics Registry: un vendaval toma el control SOLO cuando el
+            // jugador no está dando input ni conserva movimiento. Mantiene la
+            // regla cardinal y evita introducir diagonales artificiales.
+            const wind = typeof getWindPushV471 === 'function' ? getWindPushV471() : null;
+            const canReceiveWind = !!wind?.active && !input.axis && !player.inputBuffer && !player.vx && !player.vy;
+            if (canReceiveWind) {
+                const windMoved = moveAxisWithCollision(wind.axis, wind.dir * wind.strength * frameScale);
+                if (windMoved) {
+                    moved = true;
+                    player.dir = wind.axis === 'x'
+                        ? (wind.dir < 0 ? 'left' : 'right')
+                        : (wind.dir < 0 ? 'up' : 'down');
+                }
+            }
+
             player.isMoving = moved;
             if (moved) player.walkCycle += motionDt * 0.015;
         }

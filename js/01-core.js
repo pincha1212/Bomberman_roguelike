@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.6 — Core, configuration, state, audio, performance and adaptive interface
+// Bomberman Roguelike v4.7.1 — Core, configuration, state, audio, performance and adaptive interface
 // V2.0 IMMERSIVE SYSTEMS
 let audioCtx = null;
 
@@ -108,19 +108,34 @@ function drawAmbientDust(){
     ctx.restore();
 }
 function drawLighting(){
-    // La iluminación es visual, no gameplay: en calidad reducida o escenas
-    // realmente cargadas se actualiza cada 2 frames para contener el coste de
-    // los gradientes sin tocar la simulación.
+    // La iluminación base sigue siendo visual y dependiente del perfil de calidad.
+    // Darkness es una mecánica de visibilidad: no se desactiva por calidad.
     updatePerfSceneV329();
-    if (typeof deviceQualityV45ShouldLighting === 'function' && !deviceQualityV45ShouldLighting()) return;
-    if(!perfRenderEveryV329(2)) return;
+    const shouldDrawBaseLighting =
+        (!deviceQualityV45ShouldLighting || deviceQualityV45ShouldLighting()) && perfRenderEveryV329(2);
+    const darkness = typeof getDarknessProfileV471 === 'function' ? getDarknessProfileV471() : null;
+    if (!shouldDrawBaseLighting && !darkness?.enabled) return;
+
     ctx.save();
     const pcx=player.x+player.width/2-gameState.camera.x;
     const pcy=player.y+player.height/2-gameState.camera.y;
-    const grad=ctx.createRadialGradient(pcx,pcy,35,pcx,pcy,240);
-    grad.addColorStop(0, typeof themeColorV46 === 'function' ? themeColorV46('lightingTransparent', 'rgba(0,0,0,0)') : 'rgba(0,0,0,0)'); grad.addColorStop(.65, typeof themeColorV46 === 'function' ? themeColorV46('lightingMid', 'rgba(0,0,0,.12)') : 'rgba(0,0,0,.12)'); grad.addColorStop(1, typeof themeColorV46 === 'function' ? themeColorV46('lightingDark', 'rgba(0,0,0,.52)') : 'rgba(0,0,0,.52)');
-    ctx.fillStyle=grad; ctx.fillRect(0,0,canvas.width,canvas.height);
-    if (typeof deviceQualityV45ShouldBombGlow === 'function' ? deviceQualityV45ShouldBombGlow() : (!perf.lowQuality || gameState.animFrame % 2 === 0)) {
+
+    if (shouldDrawBaseLighting) {
+        const grad=ctx.createRadialGradient(pcx,pcy,35,pcx,pcy,240);
+        grad.addColorStop(0, typeof themeColorV46 === 'function' ? themeColorV46('lightingTransparent', 'rgba(0,0,0,0)') : 'rgba(0,0,0,0)'); grad.addColorStop(.65, typeof themeColorV46 === 'function' ? themeColorV46('lightingMid', 'rgba(0,0,0,.12)') : 'rgba(0,0,0,.12)'); grad.addColorStop(1, typeof themeColorV46 === 'function' ? themeColorV46('lightingDark', 'rgba(0,0,0,.52)') : 'rgba(0,0,0,.52)');
+        ctx.fillStyle=grad; ctx.fillRect(0,0,canvas.width,canvas.height);
+    }
+
+    if (darkness?.enabled) {
+        const darkGrad = ctx.createRadialGradient(pcx,pcy,18,pcx,pcy,darkness.radius);
+        darkGrad.addColorStop(0, 'rgba(0,0,0,0)');
+        darkGrad.addColorStop(darkness.midStop, `rgba(0,0,0,${darkness.midAlpha})`);
+        darkGrad.addColorStop(1, `rgba(0,0,0,${darkness.outerAlpha})`);
+        ctx.fillStyle = darkGrad;
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+    }
+
+    if (shouldDrawBaseLighting && (typeof deviceQualityV45ShouldBombGlow === 'function' ? deviceQualityV45ShouldBombGlow() : (!perf.lowQuality || gameState.animFrame % 2 === 0))) {
         for(let i=0;i<gameState.bombs.length;i++){
             const b=gameState.bombs[i];
             if(!b) continue;

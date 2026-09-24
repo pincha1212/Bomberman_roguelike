@@ -310,3 +310,42 @@ Validación:
 
 No se realizó una prueba visual en GitHub Pages dentro de esta validación.
 
+
+
+==================================================
+38. v3.29.0 — OPTIMIZACIÓN FINAL PRE-v4
+==================================================
+
+Segunda pasada de rendimiento realizada después de sumar enemigos, feedback visual, partículas, bosses y navegación de debug.
+
+Cambios: 
+- Debug Mode: actualización de UI desacoplada del frame; máximo aproximado 8 refrescos/s.
+- Debug Mode: profiler cacheado para no ordenar muestras en cada refresco.
+- Debug Navigation: el mapa visual solo se redibuja cuando cambia el estado relevante.
+- IA: eliminado el armado de firmas string de bombas/explosiones cada frame.
+- IA: perfiles de comportamiento cacheados por enemigo.
+- IA: normalización de arrays/estado de navegación realizada una sola vez.
+- IA: comprobación de peligro inminente escalonada y omitida cuando no hay peligro.
+- Render: culling de entidades dinámicas fuera de viewport.
+- Render: presupuesto visual de partículas separado del presupuesto de simulación.
+- Render: FX opcionales reducidos automáticamente en baja calidad.
+- Estado: límite para textos flotantes.
+
+Objetivo: dejar v3.29 como base estable de rendimiento para entrar a v4 sin cambiar la lógica de gameplay.
+
+
+==================================================
+39. v3.29.0 — SEGUNDA PASADA DE RENDIMIENTO
+==================================================
+
+Ajustes finales de bajo riesgo antes de v4:
+- se eliminó el evento `bomber-debug-updated` emitido desde cada frame del game loop; Debug Mode se actualiza por su propio throttle;
+- se eliminó una definición duplicada de `enemyPlayerTileV312` y se cachearon coordenadas de tile de enemigos mientras permanezcan en la misma celda;
+- `drawEnemyAISignals` y capas de debug evitan trabajo para enemigos fuera del viewport;
+- el renderer cachea el viewport de cámara una vez por frame y expone entidades visibles en `BOMBER_ENGINE.getRenderStats()`;
+- en escenas realmente cargadas se reduce solo la frecuencia de iluminación y partículas decorativas, sin modificar la simulación ni la velocidad de juego;
+- la vista de bombas del Debug Mode cachea el cálculo de blast mientras no cambien bomba/rango/revisión del mapa.
+
+No se modificó la lógica de gameplay de enemigos, colisiones, bombas, bosses o progresión.
+
+La validación de v3.29 se limita a sintaxis, harnesses y auditoría estática/estructural. No se afirma un FPS concreto sin una ejecución real en navegador.

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.5.3 — Real Diagnostic Debug Core
+// Bomberman Roguelike v4.5.4 — Real Diagnostic Debug Core
 // P0/P1 diagnóstico: predicción separada de verificación, invariantes independientes,
 // inspector espacial, input, timestep, trace de colisión y freeze sobre corrupción.
 (() => {
@@ -17,6 +17,8 @@
         rawDt: 0,
         dt: 0,
         clamped: false,
+        timingReason: null,
+        frameTimeMs: 0,
         invariantChecks: [],
         hardFailures: [],
         designWarnings: [],
@@ -38,6 +40,7 @@
     const state = () => window.BOMBER_ENGINE?.getState?.() || null;
     const player = () => window.BOMBER_ENGINE?.getPlayer?.() || null;
     const finite = n => Number.isFinite(Number(n));
+    const debugTime = () => diagnostics.frameTimeMs > 0 ? diagnostics.frameTimeMs : (Number(D.gameTimeMs) > 0 ? Number(D.gameTimeMs) : performance.now());
     const entityTile = (e, kind='player') => {
         if (!e) return {x:-1,y:-1};
         return kind === 'enemy'
@@ -77,7 +80,7 @@
 
     function frameSnapshot(){
         const s=state(), p=player(); if(!s) return null;
-        return {frame:Number(s.animFrame||0), time:performance.now(), grid:Array.isArray(s.grid)?s.grid.map(r=>Array.isArray(r)?r.slice():[]):[], player:p?{x:Number(p.x),y:Number(p.y),vx:Number(p.vx||0),vy:Number(p.vy||0),tile:entityTile(p,'player'),axis:p.inputAxis||null,dir:Number(p.inputDir||0),buffer:p.inputBuffer?{...p.inputBuffer}:null,bufferMs:Number(p.inputBufferTimer||0)}:null,
+        return {frame:Number(s.animFrame||0), time:debugTime(), timeSource:diagnostics.frameTimeMs > 0 ? 'game-clock' : 'wall-clock', grid:Array.isArray(s.grid)?s.grid.map(r=>Array.isArray(r)?r.slice():[]):[], player:p?{x:Number(p.x),y:Number(p.y),vx:Number(p.vx||0),vy:Number(p.vy||0),tile:entityTile(p,'player'),axis:p.inputAxis||null,dir:Number(p.inputDir||0),buffer:p.inputBuffer?{...p.inputBuffer}:null,bufferMs:Number(p.inputBufferTimer||0)}:null,
             bombs:(s.bombs||[]).map((b,i)=>({i,x:Number(b.x),y:Number(b.y),timer:Number(b.timer||0),owner:b.owner||null,range:Number(b.range||0),state:b.state||null,passThrough:b.playerPassThrough!==false})),
             explosions:(s.explosions||[]).map((e,i)=>({i,x:Number(e.x),y:Number(e.y),timer:Number(e.timer||0),blastId:e.blastId??null})),
             enemies:(s.enemies||[]).map((e,i)=>({index:i,x:Number(e.x),y:Number(e.y),tile:entityTile(e,'enemy'),vx:Number(e.vx||0),vy:Number(e.vy||0),type:e?.type?.name||e?.type||e?.ai?.archetype||'ENEMY'})),
@@ -149,7 +152,7 @@
     if(originalReset) D.resetScene=function(){ const result=originalReset(); reset(); return result; };
 
     function reset(){
-        diagnostics.frame=0; diagnostics.rawDt=0; diagnostics.dt=0; diagnostics.clamped=false; diagnostics.invariantChecks=[]; diagnostics.hardFailures=[]; diagnostics.designWarnings=[]; diagnostics.invariantFrozen=false; diagnostics.freezeFrame=0; diagnostics.freezeReason=''; diagnostics.lastFrameBefore=null; diagnostics.lastFrameCurrent=null; diagnostics.lastFailure=null; diagnostics.selectedCell=null; diagnostics.selectedCellDump=null; diagnostics.selectedCellDiff=null; diagnostics.collisionTrace=[]; diagnostics.inputTrace=[]; diagnostics.lastInput=null; diagnostics.lastDesignWarningSignature='';
+        diagnostics.frame=0; diagnostics.rawDt=0; diagnostics.dt=0; diagnostics.clamped=false; diagnostics.timingReason=null; diagnostics.frameTimeMs=0; diagnostics.invariantChecks=[]; diagnostics.hardFailures=[]; diagnostics.designWarnings=[]; diagnostics.invariantFrozen=false; diagnostics.freezeFrame=0; diagnostics.freezeReason=''; diagnostics.lastFrameBefore=null; diagnostics.lastFrameCurrent=null; diagnostics.lastFailure=null; diagnostics.selectedCell=null; diagnostics.selectedCellDump=null; diagnostics.selectedCellDiff=null; diagnostics.collisionTrace=[]; diagnostics.inputTrace=[]; diagnostics.lastInput=null; diagnostics.lastDesignWarningSignature='';
     }
 
     const originalRecordEvent=D.recordEvent?.bind(D);
@@ -167,12 +170,12 @@
         };
     }
 
-    D.beginDiagnosticFrame=function(rawDt,dt,clamped){ diagnostics.frame=Number(state()?.animFrame||0)+1; diagnostics.rawDt=finite(rawDt)?Number(rawDt):0; diagnostics.dt=finite(dt)?Number(dt):0; diagnostics.clamped=!!clamped; diagnostics.collisionTrace=[]; diagnostics.lastInput=inputSnapshot(); };
-    D.recordTimestep=function(rawDt,dt,clamped){ diagnostics.rawDt=finite(rawDt)?Number(rawDt):0; diagnostics.dt=finite(dt)?Number(dt):0; diagnostics.clamped=!!clamped; };
-    D.recordCollisionTrace=function(trace){ if(!trace)return; diagnostics.collisionTrace.push({frame:Number(state()?.animFrame||diagnostics.frame),time:performance.now(),...trace}); if(diagnostics.collisionTrace.length>MAX_COLLISION_TRACE) diagnostics.collisionTrace.splice(0,diagnostics.collisionTrace.length-MAX_COLLISION_TRACE); };
-    D.recordInputTrace=function(kind,event){ const item={frame:Number(state()?.animFrame||0),time:performance.now(),kind,code:event?.code||null,repeat:!!event?.repeat,keys:cloneKeys(state()?.keys),axis:player()?.inputAxis||null,dir:Number(player()?.inputDir||0),buffer:player()?.inputBuffer?{...player().inputBuffer}:null,bufferMs:Number(player()?.inputBufferTimer||0),touch:state()?.touchControls?{x:Number(state().touchControls.x||0),y:Number(state().touchControls.y||0)}:null}; diagnostics.lastInput=item; diagnostics.inputTrace.push(item); if(diagnostics.inputTrace.length>MAX_INPUT_TRACE) diagnostics.inputTrace.splice(0,diagnostics.inputTrace.length-MAX_INPUT_TRACE); };
+    D.beginDiagnosticFrame=function(rawDt,dt,clamped,reason,timestamp){ diagnostics.frame=Number(state()?.animFrame||0)+1; diagnostics.frameTimeMs=finite(timestamp)?Number(timestamp):debugTime(); diagnostics.rawDt=finite(rawDt)?Number(rawDt):0; diagnostics.dt=finite(dt)&&Number(dt)>=0?Number(dt):16.6667; diagnostics.clamped=!!clamped; diagnostics.timingReason=reason||null; diagnostics.collisionTrace=[]; diagnostics.lastInput=inputSnapshot(); };
+    D.recordTimestep=function(rawDt,dt,clamped,reason){ diagnostics.rawDt=finite(rawDt)?Number(rawDt):0; diagnostics.dt=finite(dt)&&Number(dt)>=0?Number(dt):16.6667; diagnostics.clamped=!!clamped; diagnostics.timingReason=reason||null; };
+    D.recordCollisionTrace=function(trace){ if(!trace)return; diagnostics.collisionTrace.push({frame:Number(state()?.animFrame||diagnostics.frame),time:debugTime(),...trace}); if(diagnostics.collisionTrace.length>MAX_COLLISION_TRACE) diagnostics.collisionTrace.splice(0,diagnostics.collisionTrace.length-MAX_COLLISION_TRACE); };
+    D.recordInputTrace=function(kind,event){ const item={frame:Number(state()?.animFrame||0),time:debugTime(),timeSource:diagnostics.frameTimeMs > 0 ? 'game-clock' : 'wall-clock',kind,code:event?.code||null,repeat:!!event?.repeat,keys:cloneKeys(state()?.keys),axis:player()?.inputAxis||null,dir:Number(player()?.inputDir||0),buffer:player()?.inputBuffer?{...player().inputBuffer}:null,bufferMs:Number(player()?.inputBufferTimer||0),touch:state()?.touchControls?{x:Number(state().touchControls.x||0),y:Number(state().touchControls.y||0)}:null}; diagnostics.lastInput=item; diagnostics.inputTrace.push(item); if(diagnostics.inputTrace.length>MAX_INPUT_TRACE) diagnostics.inputTrace.splice(0,diagnostics.inputTrace.length-MAX_INPUT_TRACE); };
     D.afterLogicalUpdate=function(dt,rawDt){
-        D.recordTimestep(rawDt,dt,rawDt!==dt);
+        D.recordTimestep(rawDt,dt,rawDt!==dt,diagnostics.timingReason);
         const before=diagnostics.lastFrameCurrent, current=frameSnapshot(); diagnostics.lastFrameBefore=before; diagnostics.lastFrameCurrent=current;
         const result=independentChecks(); diagnostics.invariantChecks=result.checks; diagnostics.hardFailures=result.hardFailures; diagnostics.designWarnings=result.designWarnings;
         if(result.hardFailures.length&&!D.busy&&!diagnostics.invariantFrozen){
@@ -190,12 +193,12 @@
     const originalSnapshot=D.snapshot.bind(D);
     D.snapshot=function(){ const s=originalSnapshot(); s.diagnostics=buildReport(); return s; };
     const originalBuildReport=D.buildTestReport.bind(D);
-    D.buildTestReport=function(){ const base=originalBuildReport(); return `${base}\nINVARIANTES: R${diagnostics.hardFailures.length} · A${diagnostics.designWarnings.length} · freeze=${diagnostics.invariantFrozen?'SI':'NO'}\nTIMESTEP: ${diagnostics.rawDt.toFixed(2)}→${diagnostics.dt.toFixed(2)}ms${diagnostics.clamped?' · CLAMP':''}`; };
+    D.buildTestReport=function(){ const base=originalBuildReport(); const raw=diagnostics.rawDt.toFixed(2); const dt=diagnostics.dt.toFixed(2); const adj=diagnostics.timingReason?` · AJUSTE=${diagnostics.timingReason}`:''; return `${base}\nINVARIANTES: R${diagnostics.hardFailures.length} · A${diagnostics.designWarnings.length} · freeze=${diagnostics.invariantFrozen?'SI':'NO'}\nTIMESTEP: raw=${raw}→dt=${dt}ms${diagnostics.clamped?' · CLAMP':''}${adj}`; };
 
     window.addEventListener('keydown', event=>{
         if(!D.enabled) return;
         if(event.code==='F9'){ event.preventDefault(); D.releaseInvariantFreeze(); }
-        else if(event.code==='F10'){ event.preventDefault(); console.log('[BOMBER DEBUG v4.5.3]',buildReport()); D.recordEvent('DEBUG','Diagnóstico volcado a consola.'); }
+        else if(event.code==='F10'){ event.preventDefault(); console.log('[BOMBER DEBUG v4.5.4]',buildReport()); D.recordEvent('DEBUG','Diagnóstico volcado a consola.'); }
         D.recordInputTrace('keydown',event);
     }, true);
     window.addEventListener('keyup', event=>D.recordInputTrace('keyup',event), true);

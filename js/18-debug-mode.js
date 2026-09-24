@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.5.3 — Unified Debug Mode
+// Bomberman Roguelike v4.5.4 — Unified Debug Mode
 // Depuración interna del mismo runtime. Se activa solo con ?debug=1.
 (() => {
     'use strict';
@@ -64,6 +64,8 @@
         frameWindowStart: 0,
         frameWindowCount: 0,
         lastFrameTimestamp: 0,
+        gameTimeMs: 0,
+        gameTimeSource: 'RAF',
         frameIntervalMs: 0,
         avgFrameIntervalMs: 0,
         minFrameIntervalMs: Infinity,
@@ -111,6 +113,10 @@
 
         recordFrame(timestamp, frameMs, updateMs, drawMs) {
             if (!this.enabled) return;
+            if (Number.isFinite(Number(timestamp))) {
+                this.gameTimeMs = Number(timestamp);
+                this.gameTimeSource = 'RAF';
+            }
             this.frameCount += 1;
             this.frameWindowCount += 1;
             this.updateMs = Number(updateMs) || 0;
@@ -151,7 +157,8 @@
             const normalizedType = String(type || 'INFO').toUpperCase();
             const normalizedMessage = String(message || '');
             const normalizedData = data && typeof data === 'object' ? data : null;
-            const now = performance.now();
+            const now = this.gameTimeMs > 0 ? this.gameTimeMs : performance.now();
+            const timeSource = this.gameTimeMs > 0 ? 'game-clock' : 'wall-clock';
             this.eventCountRaw += 1;
 
             // La IA puede llamar debugRecordEvent() muchas veces por segundo sin
@@ -179,7 +186,8 @@
                 fingerprint,
                 repeatCount: 1,
                 lastTime: now,
-                lastWallTime: new Date().toLocaleTimeString('es-AR', { hour12: false })
+                lastWallTime: new Date().toLocaleTimeString('es-AR', { hour12: false }),
+                timeSource
             };
             this.eventLog.push(item);
             if (this.eventLog.length > MAX_EVENTS) this.eventLog.splice(0, this.eventLog.length - MAX_EVENTS);
@@ -196,16 +204,19 @@
                 || /^(?:debug-lab|clipboard\.diagnostic)$/.test(String(source));
             const previousBucket = isDebugToolError ? this.debugErrors : this.runtimeErrors;
             const previous = previousBucket[previousBucket.length - 1];
-            if (previous?.fingerprint === fingerprint && performance.now() - previous.time < 500) return;
+            const now = this.gameTimeMs > 0 ? this.gameTimeMs : performance.now();
+            const timeSource = this.gameTimeMs > 0 ? 'game-clock' : 'wall-clock';
+            if (previous?.fingerprint === fingerprint && now - previous.time < 500) return;
             const item = {
-                time: performance.now(),
+                time: now,
                 wallTime: new Date().toLocaleTimeString('es-AR', { hour12: false }),
                 source: String(source),
                 message,
                 stack,
                 url,
                 fingerprint,
-                category: isDebugToolError ? 'DEBUG' : 'RUNTIME'
+                category: isDebugToolError ? 'DEBUG' : 'RUNTIME',
+                timeSource
             };
             const bucket = isDebugToolError ? this.debugErrors : this.runtimeErrors;
             bucket.push(item);
@@ -640,7 +651,7 @@
             const snapshotLine = this.lastDiff ? `+${this.lastDiff.added.length} · Δ${this.lastDiff.changed.length} · -${this.lastDiff.removed.length}` : '—';
             const timelineLine = this.timeline.length ? `${this.timeline.length}/${MAX_TIMELINE_SAMPLES}` : '—';
             return [
-                'BOMBERMAN ROGUELIKE — DEBUG MODE v4.5.3',
+                'BOMBERMAN ROGUELIKE — DEBUG MODE v4.5.4',
                 `SUITE: ${results.length}/${getAvailableTestNames().length} · ${passed} PASS · ${failed} FAIL`,
                 ...results.map(r => `${String(r.name || 'TEST').toUpperCase()}: ${r.status} — ${compactCopyText(r.summary || r.result || '—')}`),
                 `DIAGNOSTICO: ${this.lastHealth?.status || '—'} · ${hp}P/${hw}W/${hf}F`,

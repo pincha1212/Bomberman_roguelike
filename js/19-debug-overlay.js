@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.5.3 — Unified Debug Overlay
+// Bomberman Roguelike v4.5.4 — Unified Debug Overlay
 // Panel reconstruido para inspección en vivo. Solo se crea con ?debug=1.
 (() => {
     'use strict';
@@ -17,7 +17,7 @@
     root.innerHTML = `
         <div class="debug-header">
             <div>
-                <div class="debug-kicker">BOMBERMAN ENGINE · v4.5.3</div>
+                <div class="debug-kicker">BOMBERMAN ENGINE · v4.5.4</div>
                 <h2>DEBUG MODE <span id="debug-status" class="debug-status">CARGANDO</span></h2>
             </div>
             <button type="button" class="debug-icon-btn" data-debug-action="toggle" title="Mostrar/ocultar panel">F3</button>
@@ -488,11 +488,11 @@
         setText('dbg-engine', s.engine?.stateAvailable ? 'OK' : 'NO');
         setText('dbg-loop', s.engine?.playing ? (s.engine?.rafId ? 'RAF' : 'SIN RAF') : 'STOP');
         setText('dbg-pause', s.engine?.debugPaused ? 'DEBUG' : (s.engine?.gamePaused ? 'GAME' : 'NO'));
-        setText('dbg-fps', fmt(s.performance.fps, 1));
-        setText('dbg-frame-ms', fmt(s.performance.workMs ?? s.performance.frameMs, 2));
-        setText('dbg-frame-interval', `${fmt(s.performance.avgFrameIntervalMs, 2)}ms`);
-        setText('dbg-raf-range', `${fmt(s.performance.minIntervalMs, 1)} / ${fmt(s.performance.maxIntervalMs, 1)}`);
-        setText('dbg-update-draw', `${fmt(s.performance.updateMs,1)} / ${fmt(s.performance.drawMs,1)}`);
+        setText('dbg-fps', Number(s.performance.fps) > 0 ? `${Number(s.performance.fps).toFixed(1)}` : '—');
+        setText('dbg-frame-ms', Number(s.performance.workMs ?? s.performance.frameMs) > 0 ? `${fmt(s.performance.workMs ?? s.performance.frameMs, 2)}ms` : '—');
+        setText('dbg-frame-interval', Number(s.performance.avgFrameIntervalMs) > 0 ? `${fmt(s.performance.avgFrameIntervalMs, 2)}ms` : '—');
+        setText('dbg-raf-range', Number(s.performance.minIntervalMs) > 0 || Number(s.performance.maxIntervalMs) > 0 ? `${fmt(s.performance.minIntervalMs, 1)} / ${fmt(s.performance.maxIntervalMs, 1)}` : '—');
+        setText('dbg-update-draw', Number(s.performance.updateMs) > 0 || Number(s.performance.drawMs) > 0 ? `${fmt(s.performance.updateMs,1)} / ${fmt(s.performance.drawMs,1)}ms` : '—');
         setText('dbg-frame', D.frameCount);
         setText('dbg-raf', s.engine?.rafId || 0);
         setText('dbg-errors', s.errors);
@@ -502,10 +502,10 @@
         const profiler = s.profiler;
         if (profiler) {
             setText('dbg-profiler-status', profiler.enabled ? 'ON' : 'OFF');
-            setText('dbg-prof-fps', profiler.frame.fps ? profiler.frame.fps.toFixed(1) : '0');
-            setText('dbg-prof-work', `${profiler.frame.avgMs.toFixed(2)}ms`);
-            setText('dbg-prof-p95', `${profiler.frame.p95Ms.toFixed(2)}ms`);
-            setText('dbg-prof-max', `${profiler.frame.maxMs.toFixed(2)}ms`);
+            setText('dbg-prof-fps', profiler.totalFrames > 0 && profiler.frame.fps > 0 ? profiler.frame.fps.toFixed(1) : '—');
+            setText('dbg-prof-work', profiler.totalFrames > 0 ? `${profiler.frame.avgMs.toFixed(2)}ms` : '—');
+            setText('dbg-prof-p95', profiler.totalFrames > 0 ? `${profiler.frame.p95Ms.toFixed(2)}ms` : '—');
+            setText('dbg-prof-max', profiler.totalFrames > 0 ? `${profiler.frame.maxMs.toFixed(2)}ms` : '—');
             setText('dbg-prof-budget', `${profiler.overBudgetPercent.toFixed(1)}%`);
             setText('dbg-prof-slow', profiler.slowFrames);
             setText('dbg-prof-hitch', profiler.hitchFrames);

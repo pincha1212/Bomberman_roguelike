@@ -7,10 +7,24 @@
             const frameStart = debugEnabled ? performance.now() : 0;
             const rawDt = timestamp - gameState.lastTime;
             let dt = rawDt;
+            let timingAdjusted = false;
+            let timingReason = null;
             gameState.lastTime = timestamp;
-            if (dt > 100) dt = 16;
 
-            if (debugEnabled) window.DEBUG_MODE.beginDiagnosticFrame?.(rawDt, dt, rawDt !== dt);
+            // El timestamp de requestAnimationFrame puede llegar ligeramente antes
+            // que un performance.now() usado al iniciar/reanudar la escena.
+            // Nunca permitimos que un dt negativo entre en la simulación.
+            if (!Number.isFinite(dt) || dt < 0) {
+                dt = 16.6667;
+                timingAdjusted = true;
+                timingReason = 'RAF_BEFORE_LAST_TIME';
+            } else if (dt > 100) {
+                dt = 16;
+                timingAdjusted = true;
+                timingReason = 'DT_OVER_100MS';
+            }
+
+            if (debugEnabled) window.DEBUG_MODE.beginDiagnosticFrame?.(rawDt, dt, timingAdjusted, timingReason, timestamp);
 
             // Adapt visual effects to the device without changing gameplay speed.
             perf.frameCount++;

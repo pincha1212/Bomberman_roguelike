@@ -298,6 +298,9 @@ const UI = {};
             shakeIntensity: 0,
             animFrame: 0,
             blastSerial: 0,
+            // V3.17: incrementa cuando cambia la geometría destructible del mapa.
+            // Permite invalidar caches visuales sin rehacer el terreno cada frame.
+            gridRevision: 0,
             lastMoveInputAt: 0,
             paused: false,
             coins: 0,

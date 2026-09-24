@@ -1,5 +1,86 @@
-// Bomberman Roguelike v3.6 — Canvas rendering and sprite drawing
-        function draw() {
+// Bomberman Roguelike v3.17 — Canvas rendering and sprite drawing
+// V3.17: cache de terreno estático para evitar reconstruir la cuadrícula completa
+// en cada frame. El mapa se regenera solo cuando cambia la referencia/revisión.
+const renderCacheV317 = {
+    canvas: null,
+    width: 0,
+    height: 0,
+    grid: null,
+    gridRevision: -1,
+    builds: 0,
+    lastBuildMs: 0
+};
+
+function invalidateRenderCacheV317() {
+    renderCacheV317.grid = null;
+    renderCacheV317.gridRevision = -1;
+}
+
+function buildTerrainCacheV317() {
+    const width = Math.max(1, gameState.gridWidth * TILE_SIZE);
+    const height = Math.max(1, gameState.gridHeight * TILE_SIZE);
+    if (!renderCacheV317.canvas) renderCacheV317.canvas = document.createElement('canvas');
+    if (renderCacheV317.width !== width || renderCacheV317.height !== height) {
+        renderCacheV317.canvas.width = width;
+        renderCacheV317.canvas.height = height;
+        renderCacheV317.width = width;
+        renderCacheV317.height = height;
+    }
+
+    const cacheCtx = renderCacheV317.canvas.getContext('2d', { alpha: false });
+    cacheCtx.clearRect(0, 0, width, height);
+    const start = performance.now();
+
+    for (let y = 0; y < gameState.gridHeight; y++) {
+        const row = gameState.grid[y];
+        if (!row) continue;
+        for (let x = 0; x < gameState.gridWidth; x++) {
+            const px = x * TILE_SIZE;
+            const py = y * TILE_SIZE;
+            const isAlt = (x + y) % 2 === 0;
+
+            cacheCtx.fillStyle = isAlt ? '#0f172a' : '#1e293b';
+            cacheCtx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+            cacheCtx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+            cacheCtx.fillRect(px, py, TILE_SIZE, 2);
+            cacheCtx.fillRect(px, py, 2, TILE_SIZE);
+            cacheCtx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            cacheCtx.fillRect(px, py + TILE_SIZE - 2, TILE_SIZE, 2);
+            cacheCtx.fillRect(px + TILE_SIZE - 2, py, 2, TILE_SIZE);
+
+            const tile = row[x];
+            if (tile === TYPES.WALL) drawSteelWall(px, py, cacheCtx);
+            else if (tile === TYPES.BLOCK) drawBrickBlock(px, py, cacheCtx);
+        }
+    }
+
+    renderCacheV317.grid = gameState.grid;
+    renderCacheV317.gridRevision = gameState.gridRevision || 0;
+    renderCacheV317.builds++;
+    renderCacheV317.lastBuildMs = performance.now() - start;
+}
+
+function ensureTerrainCacheV317() {
+    const revision = gameState.gridRevision || 0;
+    if (
+        renderCacheV317.grid !== gameState.grid ||
+        renderCacheV317.gridRevision !== revision ||
+        renderCacheV317.width !== gameState.gridWidth * TILE_SIZE ||
+        renderCacheV317.height !== gameState.gridHeight * TILE_SIZE
+    ) {
+        buildTerrainCacheV317();
+    }
+    return renderCacheV317.canvas;
+}
+
+window.BOMBER_ENGINE = window.BOMBER_ENGINE || {};
+window.BOMBER_ENGINE.getRenderStats = () => ({
+    terrainCacheBuilds: renderCacheV317.builds,
+    terrainCacheLastBuildMs: renderCacheV317.lastBuildMs,
+    terrainCacheReady: !!renderCacheV317.canvas && renderCacheV317.grid === gameState.grid && renderCacheV317.gridRevision === (gameState.gridRevision || 0)
+});
+
+function draw() {
             ctx.fillStyle = '#090d16';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -15,31 +96,16 @@
             // Apply Camera Translation
             ctx.translate(-Math.floor(gameState.camera.x) + shakeX, -Math.floor(gameState.camera.y) + shakeY);
 
-            // Draw Dungeon Floor Grid
-            for (let y = 0; y < gameState.gridHeight; y++) {
-                for (let x = 0; x < gameState.gridWidth; x++) {
-                    if (!gameState.grid[y]) continue;
-                    let px = x * TILE_SIZE, py = y * TILE_SIZE;
-                    let isAlt = (x + y) % 2 === 0;
-                    
-                    // Suelo cuadriculado detallado
-                    ctx.fillStyle = isAlt ? '#0f172a' : '#1e293b';
-                    ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
-                    ctx.fillRect(px, py, TILE_SIZE, 2);
-                    ctx.fillRect(px, py, 2, TILE_SIZE);
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-                    ctx.fillRect(px, py + TILE_SIZE - 2, TILE_SIZE, 2);
-                    ctx.fillRect(px + TILE_SIZE - 2, py, 2, TILE_SIZE);
+            // V3.17: terreno estático pre-renderizado. Solo se reconstruye al cambiar el mapa.
+            const terrainCache = ensureTerrainCacheV317();
+            ctx.drawImage(terrainCache, 0, 0);
 
-                    let tile = gameState.grid[y][x];
-                    if (tile === TYPES.WALL) {
-                        drawSteelWall(px, py);
-                    } else if (tile === TYPES.BLOCK) {
-                        drawBrickBlock(px, py);
-                    } else if (tile === TYPES.EXIT_OPEN) {
-                        drawExitPortal(px, py);
-                    }
+            // Exit portal stays dynamic because it is animated.
+            if (gameState.exitPos) {
+                const ex = gameState.exitPos.x;
+                const ey = gameState.exitPos.y;
+                if (gameState.grid[ey]?.[ex] === TYPES.EXIT_OPEN) {
+                    drawExitPortal(ex * TILE_SIZE, ey * TILE_SIZE);
                 }
             }
 
@@ -51,7 +117,7 @@
 
             // Draw Items / Powerups
             gameState.items.forEach(it => {
-                drawPowerupSprite(it.x * TILE_SIZE, it.y * TILE_SIZE, it.type);
+                drawPowerupSprite(it);
             });
 
             // Draw Bombs
@@ -87,8 +153,8 @@
             });
 
             // Draw Floater Texts
+            if (gameState.floaters.length) ctx.font = '10px "Press Start 2P"';
             gameState.floaters.forEach(f => {
-                ctx.font = '10px "Press Start 2P"';
                 ctx.fillStyle = f.color;
                 ctx.globalAlpha = Math.max(0, f.opacity);
                 ctx.fillText(f.text, f.x, f.y);
@@ -103,55 +169,55 @@
             if (typeof drawDebugWorldOverlay === 'function') drawDebugWorldOverlay();
         }
 
-        function drawSteelWall(x, y) {
+        function drawSteelWall(x, y, targetCtx = ctx) {
             // Pilar 3D Reforzado
-            ctx.fillStyle = '#475569'; // Top Base
-            ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-            ctx.fillStyle = '#94a3b8'; // Top Highlight
-            ctx.fillRect(x, y, TILE_SIZE, 3);
-            ctx.fillRect(x, y, 3, TILE_SIZE);
-            ctx.fillStyle = '#334155'; // Sombra inferior/derecha
-            ctx.fillRect(x, y + TILE_SIZE - 4, TILE_SIZE, 4);
-            ctx.fillRect(x + TILE_SIZE - 4, y, 4, TILE_SIZE);
+            targetCtx.fillStyle = '#475569'; // Top Base
+            targetCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+            targetCtx.fillStyle = '#94a3b8'; // Top Highlight
+            targetCtx.fillRect(x, y, TILE_SIZE, 3);
+            targetCtx.fillRect(x, y, 3, TILE_SIZE);
+            targetCtx.fillStyle = '#334155'; // Sombra inferior/derecha
+            targetCtx.fillRect(x, y + TILE_SIZE - 4, TILE_SIZE, 4);
+            targetCtx.fillRect(x + TILE_SIZE - 4, y, 4, TILE_SIZE);
             
             // Bisel interior
-            ctx.fillStyle = '#1e293b';
-            ctx.fillRect(x + 6, y + 6, TILE_SIZE - 12, TILE_SIZE - 12);
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(x + 8, y + 8, TILE_SIZE - 16, TILE_SIZE - 16);
+            targetCtx.fillStyle = '#1e293b';
+            targetCtx.fillRect(x + 6, y + 6, TILE_SIZE - 12, TILE_SIZE - 12);
+            targetCtx.fillStyle = '#0f172a';
+            targetCtx.fillRect(x + 8, y + 8, TILE_SIZE - 16, TILE_SIZE - 16);
             
             // Remaches
-            ctx.fillStyle = '#38bdf8';
-            ctx.fillRect(x + 10, y + 10, 2, 2);
-            ctx.fillRect(x + TILE_SIZE - 12, y + TILE_SIZE - 12, 2, 2);
+            targetCtx.fillStyle = '#38bdf8';
+            targetCtx.fillRect(x + 10, y + 10, 2, 2);
+            targetCtx.fillRect(x + TILE_SIZE - 12, y + TILE_SIZE - 12, 2, 2);
         }
 
-        function drawBrickBlock(x, y) {
+        function drawBrickBlock(x, y, targetCtx = ctx) {
             // Cajas de madera (Crates) destructibles
-            ctx.fillStyle = '#b45309'; // Marrón base
-            ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+            targetCtx.fillStyle = '#b45309'; // Marrón base
+            targetCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
             
             // Bordes de madera
-            ctx.fillStyle = '#f59e0b'; // Borde claro
-            ctx.fillRect(x, y, TILE_SIZE, 3);
-            ctx.fillRect(x, y, 3, TILE_SIZE);
-            ctx.fillStyle = '#78350f'; // Borde oscuro
-            ctx.fillRect(x, y + TILE_SIZE - 4, TILE_SIZE, 4);
-            ctx.fillRect(x + TILE_SIZE - 4, y, 4, TILE_SIZE);
+            targetCtx.fillStyle = '#f59e0b'; // Borde claro
+            targetCtx.fillRect(x, y, TILE_SIZE, 3);
+            targetCtx.fillRect(x, y, 3, TILE_SIZE);
+            targetCtx.fillStyle = '#78350f'; // Borde oscuro
+            targetCtx.fillRect(x, y + TILE_SIZE - 4, TILE_SIZE, 4);
+            targetCtx.fillRect(x + TILE_SIZE - 4, y, 4, TILE_SIZE);
 
             // Patrón de cruz
-            ctx.strokeStyle = '#92400e';
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(x + 6, y + 6);
-            ctx.lineTo(x + TILE_SIZE - 6, y + TILE_SIZE - 6);
-            ctx.moveTo(x + TILE_SIZE - 6, y + 6);
-            ctx.lineTo(x + 6, y + TILE_SIZE - 6);
-            ctx.stroke();
+            targetCtx.strokeStyle = '#92400e';
+            targetCtx.lineWidth = 4;
+            targetCtx.beginPath();
+            targetCtx.moveTo(x + 6, y + 6);
+            targetCtx.lineTo(x + TILE_SIZE - 6, y + TILE_SIZE - 6);
+            targetCtx.moveTo(x + TILE_SIZE - 6, y + 6);
+            targetCtx.lineTo(x + 6, y + TILE_SIZE - 6);
+            targetCtx.stroke();
             
             // Refuerzo central
-            ctx.fillStyle = '#451a03';
-            ctx.fillRect(x + TILE_SIZE/2 - 4, y + TILE_SIZE/2 - 4, 8, 8);
+            targetCtx.fillStyle = '#451a03';
+            targetCtx.fillRect(x + TILE_SIZE/2 - 4, y + TILE_SIZE/2 - 4, 8, 8);
         }
 
         function drawExitPortal(x, y) {
@@ -397,7 +463,10 @@
             ctx.fillRect(x + 12 - pulse/2, y + 12 - pulse/2, size - 24 + pulse, size - 24 + pulse);
         }
 
-        function drawPowerupSprite(x, y, type) {
+        function drawPowerupSprite(item) {
+            const x = item.x * TILE_SIZE;
+            const y = item.y * TILE_SIZE;
+            const type = item.type;
             let floaty = Math.sin((gameState.animFrame + x) * 0.1) * 3;
             if (type === 'RELIC') {
                 ctx.fillStyle = '#3b1d6b';
@@ -405,7 +474,7 @@
                 ctx.strokeStyle = '#c084fc';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(x + 6, y + 6 + floaty, TILE_SIZE - 12, TILE_SIZE - 12);
-                const relic = RELICS.find(r => gameState.items.find(it => it.x * TILE_SIZE === x && it.y * TILE_SIZE === y && it.relicId === r.id)?.id === r.id);
+                const relic = RELICS.find(r => r.id === item.relicId);
                 ctx.font = '14px "Press Start 2P"';
                 ctx.fillStyle = '#ffffff';
                 ctx.fillText(relic?.icon || '✦', x + 11, y + 31 + floaty);

@@ -124,7 +124,13 @@ function canApplyPlayerDamage(){
 
 function getBombBlastPreviewCells(bomb){
     if(!bomb) return [];
-    if(typeof calculateBombBlastCells === 'function') return calculateBombBlastCells(bomb);
+    if (bomb.previewCells && bomb.previewGrid === gameState.grid && bomb.previewGridRevision === (gameState.gridRevision || 0)) return bomb.previewCells;
+    if(typeof calculateBombBlastCells === 'function') {
+        bomb.previewCells = calculateBombBlastCells(bomb);
+        bomb.previewGrid = gameState.grid;
+        bomb.previewGridRevision = gameState.gridRevision || 0;
+        return bomb.previewCells;
+    }
     const cells = [{x:bomb.x,y:bomb.y}];
     const dirs = [{dx:0,dy:-1},{dx:0,dy:1},{dx:-1,dy:0},{dx:1,dy:0}];
     for(const dir of dirs){

@@ -38,7 +38,8 @@ function enemyTileV312(e) {
 }
 
 function enemyTileKeyV312(x, y) {
-    return `${x},${y}`;
+    // V3.17: keys numéricas evitan crear strings temporales en cada consulta de peligro.
+    return y * gameState.gridWidth + x;
 }
 
 function enemyCenterV312(x, y) {

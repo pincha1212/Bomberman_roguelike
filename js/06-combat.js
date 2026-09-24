@@ -34,6 +34,8 @@
                     if (!cell.block) continue;
                     const tx = cell.x, ty = cell.y;
                     gameState.grid[ty][tx] = TYPES.EMPTY;
+                    gameState.gridRevision = (gameState.gridRevision || 0) + 1;
+                    if (typeof invalidateRenderCacheV317 === 'function') invalidateRenderCacheV317();
                     gameState.score += 10;
                     gameState.blocksBroken++;
                     const coins = Math.max(1, Math.round((1 + Math.random() * 2) * (1 + gameState.coinBonus) * gameState.roomType.coinMult));

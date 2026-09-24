@@ -129,7 +129,10 @@ function placeBomb(reason='manual'){
         playerPassThrough: true,
         justArmed: false,
         placedAtFrame: gameState.animFrame,
-        placementReason: reason
+        placementReason: reason,
+        previewCells: calculateBombBlastCells({ x: gx, y: gy, range: Math.max(1, player.bombRange) }),
+        previewGrid: gameState.grid,
+        previewGridRevision: gameState.gridRevision || 0
     };
 
     gameState.bombs.push(bomb);

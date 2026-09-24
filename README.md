@@ -1,4 +1,4 @@
-# BOMBERMAN // DESCENT — Roguelike v3.17.0
+# BOMBERMAN // DESCENT — Roguelike v3.19.0
 
 Videojuego web estático desarrollado con HTML, CSS y JavaScript vanilla. Preparado para GitHub Pages, sin backend ni bundler.
 
@@ -36,3 +36,15 @@ El Debug Mode se carga sobre el mismo `index.html` y conserva la estructura de m
 - Claves numéricas para el conjunto de peligro de IA, evitando strings temporales por consulta.
 - Contador de revisión de grid para invalidación segura de caches.
 - Sin cambios en la lógica cardinal/lane-lock de v3.16.8.
+
+
+## v3.19.0 — Stable AI Update
+
+- Histéresis de giro en intersecciones: mantener dirección cuando sigue siendo válida y la alternativa no mejora de forma suficiente.
+- Commit breve de dirección para evitar giros consecutivos inútiles en el mismo nodo.
+- Ruido de patrulla determinista para evitar oscilaciones por decisiones aleatorias sucesivas.
+- Recovery local primero: búsqueda de salida física inmediata antes de ejecutar BFS.
+- BFS limitado al recovery excepcional y con cooldown para evitar recalculaciones repetidas.
+- Recuperación física reinicia indicadores transitorios al recuperar movimiento.
+- Stress tests de IA ampliados de 7 a 8 escenarios, incluyendo estabilidad de intersección y control de uso excepcional de BFS.
+- Debug expone lock de giro y llamadas BFS por enemigo.

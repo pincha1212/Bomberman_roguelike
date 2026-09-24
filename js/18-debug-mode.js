@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.21.0 — Debug Engine
+// Bomberman Roguelike v3.24.0 — Debug Engine
 // Depuración interna del mismo runtime. Se activa solo con ?debug=1.
 (() => {
     'use strict';
@@ -359,6 +359,8 @@
                     index,
                     tile,
                     behavior: ai.behavior || '—',
+                    archetype: ai.archetype || enemy.aiBehavior || '—',
+                    archetypeLabel: ai.archetypeLabel || '—',
                     alert: ai.alert || '—',
                     currentDirection,
                     desiredDirection,
@@ -1922,6 +1924,6 @@
         }
     });
 
-    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.21.0 cargado en el mismo runtime.');
+    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.24.0 cargado en el mismo runtime.');
     DEBUG_MODE.recordEvent('DEBUG', 'Usá RESET para activar una escena de depuración limpia.');
 })();

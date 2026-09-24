@@ -178,6 +178,57 @@ const UI = {};
             ESPECIAL: { name: 'Especial', color: '#22c55e', speed: 2.2, canFly: false }
         };
 
+        // v3.24: perfiles de comportamiento separados del tipo visual/fisico.
+        // Cada enemigo conserva un solo arquetipo durante toda la vida de la entidad.
+        const ENEMY_BEHAVIORS_V324 = Object.freeze({
+            CHASER: Object.freeze({
+                id: 'chaser', label: 'Perseguidor', distanceWeight: 2.85, distanceLookaheadWeight: 0.72,
+                sameDirectionBonus: 3.0, reversePenalty: 22, branchPreference: 0.25, recentPenalty: 1.4,
+                loopPenalty: 1.5, turnCommitMs: 220, speedMultiplier: 1.00
+            }),
+            PATROLLER: Object.freeze({
+                id: 'patroller', label: 'Patrullero', distanceWeight: 1.25, distanceLookaheadWeight: 0.42,
+                sameDirectionBonus: 4.4, reversePenalty: 27, branchPreference: 1.5, recentPenalty: 3.0,
+                loopPenalty: 5.0, turnCommitMs: 320, speedMultiplier: 0.95
+            }),
+            EVASIVE: Object.freeze({
+                id: 'evasive', label: 'Evasivo', distanceWeight: 1.4, distanceLookaheadWeight: 0.5,
+                sameDirectionBonus: 2.2, reversePenalty: 10, branchPreference: 0.75, recentPenalty: 2.0,
+                loopPenalty: 2.4, turnCommitMs: 190, speedMultiplier: 0.98, fleeRadius: 5
+            }),
+            AGGRESSIVE: Object.freeze({
+                id: 'aggressive', label: 'Agresivo', distanceWeight: 3.35, distanceLookaheadWeight: 0.9,
+                sameDirectionBonus: 1.8, reversePenalty: 8, branchPreference: 0.15, recentPenalty: 0.9,
+                loopPenalty: 0.8, turnCommitMs: 145, speedMultiplier: 1.08
+            }),
+            FLYER: Object.freeze({
+                id: 'flyer', label: 'Volador', distanceWeight: 3.05, distanceLookaheadWeight: 0.78,
+                sameDirectionBonus: 2.5, reversePenalty: 14, branchPreference: 0.35, recentPenalty: 1.0,
+                loopPenalty: 1.0, turnCommitMs: 180, speedMultiplier: 0.98,
+                aerial: true
+            })
+        });
+
+        function pickEnemyBehaviorV324(type, level = 1, index = 0, roll = Math.random()) {
+            if (type === ENEMY_TYPES.VOLADOR || type?.canFly) return ENEMY_BEHAVIORS_V324.FLYER;
+            if (type === ENEMY_TYPES.ESPECIAL) return ENEMY_BEHAVIORS_V324.AGGRESSIVE;
+
+            const d = Math.max(1, Number(level) || 1);
+            // Los primeros pisos introducen roles gradualmente; desde d3 aparece
+            // el agresivo entre los enemigos terrestres. El roll ocurre solo al spawn.
+            const r = Math.max(0, Math.min(0.999999, Number(roll) || 0));
+            const aggressiveStart = d >= 3 ? 0.15 : 0;
+            if (d >= 3 && r < aggressiveStart) return ENEMY_BEHAVIORS_V324.AGGRESSIVE;
+            const patrolCut = 0.45;
+            const evasiveCut = 0.72;
+            if (r < patrolCut) return ENEMY_BEHAVIORS_V324.CHASER;
+            if (r < evasiveCut) return ENEMY_BEHAVIORS_V324.PATROLLER;
+            return ENEMY_BEHAVIORS_V324.EVASIVE;
+        }
+
+        window.ENEMY_BEHAVIORS_V324 = ENEMY_BEHAVIORS_V324;
+        window.pickEnemyBehaviorV324 = pickEnemyBehaviorV324;
+
         const ROOM_TYPES = {
             STANDARD: {
                 id: 'STANDARD', name: 'NORMAL', subtitle: 'Sin modificadores', icon: '◆',

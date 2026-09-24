@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.21 — Navigation Update
+// Bomberman Roguelike v3.24 — Enemy Behaviors Update
 // Navegación local tipo corredor/intersección: la IA decide una dirección
 // v3.21: decisiones locales + memoria corta + continuidad de ruta; BFS solo para recovery excepcional.
 // y 13-collision.js se ocupa del movimiento y las paredes.
@@ -30,7 +30,8 @@ const enemyAI_V312 = {
     recentTilePenalty: 1.8,
     repeatedTilePenalty: 3.2,
     branchPreference: 0.45,
-    navigationTurnCommitMs: 240
+    navigationTurnCommitMs: 240,
+    behaviorVersion: '3.24.0'
 };
 
 const ENEMY_DIRS_V312 = [
@@ -42,6 +43,18 @@ const ENEMY_DIRS_V312 = [
 
 const ENEMY_DIR_INDEX_V312 = new Map(ENEMY_DIRS_V312.map((d, i) => [d.dir, i]));
 const ENEMY_OPPOSITE_V312 = { up: 'down', down: 'up', left: 'right', right: 'left' };
+
+function enemyBehaviorProfileV324(e, index = 0) {
+    const id = String(e?.aiBehavior || e?.ai?.archetype || '').toLowerCase();
+    const profiles = Object.values(window.ENEMY_BEHAVIORS_V324 || {});
+    const direct = profiles.find(profile => profile?.id === id);
+    if (direct) return direct;
+    if (e?.type === ENEMY_TYPES.VOLADOR || e?.type?.canFly) return profiles.find(profile => profile?.id === 'flyer') || profiles[0];
+    if (e?.type === ENEMY_TYPES.ESPECIAL) return profiles.find(profile => profile?.id === 'aggressive') || profiles[0];
+    const fallbackId = ['chaser','patroller','evasive'][Math.abs(Number(index) || 0) % 3];
+    return profiles.find(profile => profile?.id === fallbackId) || profiles.find(profile => profile?.id === 'chaser') || profiles[0];
+}
+
 
 function enemyTileV312(e) {
     return {
@@ -98,6 +111,7 @@ function ensureEnemyMotionStateV312(e, index) {
         e.ai = {
             behavior: 'patrol',
             alert: 'patrol',
+            archetype: String(e.aiBehavior || ''),
             direction: e.lastDirection || null,
             desiredDirection: e.desiredDirection || e.lastDirection || null,
             decisionTimer: 15 + (index * 19) % 45,
@@ -140,6 +154,9 @@ function ensureEnemyMotionStateV312(e, index) {
     }
 
     const ai = e.ai;
+    const profile = enemyBehaviorProfileV324(e, index);
+    ai.archetype = profile.id;
+    ai.archetypeLabel = profile.label;
 
     // v3.19: compatibilidad con enemigos creados antes de este update.
     ai.turnLockTimer = Number.isFinite(Number(ai.turnLockTimer)) ? Number(ai.turnLockTimer) : 0;
@@ -529,17 +546,24 @@ function enemyDirectionScoreV312(e, dir, target, options = {}) {
     });
     const loopRisk = enemyNavigationLoopRiskV321(e, dir);
 
-    let score = distance * 2.0 + distance2 * 0.55;
+    const profile = enemyBehaviorProfileV324(e);
+    const sameBonus = Number(profile.sameDirectionBonus ?? 2.8);
+    const distanceWeight = Number(profile.distanceWeight ?? 2.0);
+    const lookaheadWeight = Number(profile.distanceLookaheadWeight ?? 0.55);
+    const reversePenalty = Number(profile.reversePenalty ?? 24);
+    const branchWeight = Number(profile.branchPreference ?? enemyAI_V312.branchPreference);
+    const recentWeight = Number(profile.recentPenalty ?? 1.8);
+    const loopWeight = Number(profile.loopPenalty ?? 1.2);
+
+    let score = distance * distanceWeight + distance2 * lookaheadWeight;
     score += danger * 2500 + danger2 * 750;
-    score -= same ? 2.8 : 0;
-    if (same && !reverse) score -= 1.4;
-    score += reverse ? (options.allowReverse ? 3 : 24) : 0;
+    score -= same ? sameBonus : 0;
+    if (same && !reverse) score -= sameBonus * 0.45;
+    score += reverse ? (options.allowReverse ? Math.min(8, reversePenalty * 0.18) : reversePenalty) : 0;
     score -= openAhead * 0.7;
-    // v3.21: preferencia leve por salidas que mantienen opciones locales.
-    // Se mantiene deliberadamente pequeña para no vencer al objetivo de chase.
-    score -= branchScore * enemyAI_V312.branchPreference * (options.patrol ? 1.0 : 0.35);
-    score += recentPenalty;
-    score += loopRisk * (options.patrol ? 3.5 : 1.2);
+    score -= branchScore * branchWeight * (options.patrol ? 1.0 : 0.35);
+    score += recentPenalty * (recentWeight / Math.max(1, enemyAI_V312.recentTilePenalty));
+    score += loopRisk * loopWeight;
 
     if (options.patrol) {
         // v3.19: ruido determinista. Evita que la misma intersección produzca
@@ -568,7 +592,9 @@ function enemyChooseFleeDirectionV312(e) {
         const awayFromPlayer = enemyDistanceToV312(next.x, next.y, playerTile.x, playerTile.y);
         const reverse = ENEMY_OPPOSITE_V312[e.ai.direction] === dir.dir;
         const same = e.ai.direction === dir.dir;
-        const score = dangerNow * 4000 + dangerSoon * 1200 - safety * 30 - awayFromPlayer * 1.8 + (reverse ? 2 : 0) - (same ? 2 : 0);
+        const profile = enemyBehaviorProfileV324(e);
+        const awayWeight = profile.id === 'evasive' ? 3.2 : profile.id === 'flyer' ? 1.6 : 1.8;
+        const score = dangerNow * 4000 + dangerSoon * 1200 - safety * (profile.id === 'evasive' ? 34 : 30) - awayFromPlayer * awayWeight + (reverse ? 2 : 0) - (same ? 2 : 0);
         if (!best || score < best.score) best = { dir, score, tile };
     }
     return best ? best.dir : null;
@@ -577,6 +603,7 @@ function enemyChooseFleeDirectionV312(e) {
 function enemyTargetForStateV312(e) {
     const ai = e.ai;
     const playerTile = enemyPlayerTileV312();
+    const profile = enemyBehaviorProfileV324(e);
 
     if (ai.alert === 'flee') {
         return {
@@ -585,7 +612,20 @@ function enemyTargetForStateV312(e) {
         };
     }
 
+    if (profile.id === 'patroller' && ai.alert === 'patrol') {
+        if (ai.patrolX < 0 || ai.patrolY < 0) {
+            const patrol = enemyChoosePatrolTargetV312(e);
+            ai.patrolX = patrol.x;
+            ai.patrolY = patrol.y;
+        }
+        return { x: ai.patrolX, y: ai.patrolY };
+    }
+
     if (ai.seesPlayer) {
+        if (profile.id === 'evasive') {
+            return { x: playerTile.x + (playerTile.x >= enemyTileV312(e).x ? -4 : 4), y: playerTile.y + (playerTile.y >= enemyTileV312(e).y ? -4 : 4) };
+        }
+        if (profile.id === 'aggressive' || profile.id === 'flyer') return playerTile;
         if (e.type === ENEMY_TYPES.ESPECIAL) {
             if (ai.surroundTimer <= 0 || ai.surroundX < 0 || ai.surroundY < 0) {
                 const surround = enemyChooseSurroundTargetV312(e);
@@ -651,6 +691,7 @@ function enemyChooseLocalRecoveryDirectionV319(e) {
 
 function enemyChooseDirectionAtIntersectionV312(e) {
     const ai = e.ai;
+    const profile = enemyBehaviorProfileV324(e);
     const tile = enemyTileV312(e);
     const dangerHere = enemyDangerV312(tile.x, tile.y);
     const physicalChoices = enemyPhysicalDirectionChoicesV312(e, ai.alert === 'flee');
@@ -705,7 +746,7 @@ function enemyChooseDirectionAtIntersectionV312(e) {
     // Prioridad estable de persecución: si el jugador está en el mismo
     // corredor y el giro requerido está disponible, no dejamos que el
     // scoring general lo reemplace por una dirección lateral equivalente.
-    if (ai.seesPlayer) {
+    if (ai.seesPlayer && ['chaser','aggressive','flyer'].includes(profile.id)) {
         const pt = enemyPlayerTileV312();
         const et = enemyTileV312(e);
         if (pt.x === et.x) {
@@ -726,8 +767,8 @@ function enemyChooseDirectionAtIntersectionV312(e) {
     let bestScore = Infinity;
     for (const dir of options) {
         const score = enemyDirectionScoreV312(e, dir, target, {
-            patrol: !ai.seesPlayer && ai.memoryTimer <= 0,
-            urgent: ai.alert === 'chase' || ai.alert === 'surround',
+            patrol: profile.id === 'patroller' && ai.alert === 'patrol',
+            urgent: ai.alert === 'chase' || ai.alert === 'aggressive' || ai.alert === 'surround',
             recovery: exceptionalRecovery,
             flee: ai.alert === 'flee'
         });
@@ -741,8 +782,8 @@ function enemyChooseDirectionAtIntersectionV312(e) {
     // cuando mejora de forma suficiente la puntuación o existe peligro real.
     if (currentPassable && best.dir !== currentDir.dir && atNode) {
         const currentScore = enemyDirectionScoreV312(e, currentDir, target, {
-            patrol: !ai.seesPlayer && ai.memoryTimer <= 0,
-            urgent: ai.alert === 'chase' || ai.alert === 'surround',
+            patrol: profile.id === 'patroller' && ai.alert === 'patrol',
+            urgent: ai.alert === 'chase' || ai.alert === 'aggressive' || ai.alert === 'surround',
             recovery: false,
             flee: ai.alert === 'flee'
         });
@@ -793,15 +834,24 @@ function updateEnemyIntentV312(e, index, dt) {
         return enemyDangerV312(next.x, next.y);
     });
 
-    if (dangerHere || imminentDanger) {
+    const profile = enemyBehaviorProfileV324(e, index);
+    const playerTile = enemyPlayerTileV312();
+    const playerDistance = enemyDistanceToV312(tile.x, tile.y, playerTile.x, playerTile.y);
+    const evasiveEngaged = profile.id === 'evasive' && (ai.seesPlayer || playerDistance <= Number(profile.fleeRadius || 5));
+    const patrollerEngaged = profile.id === 'patroller' && playerDistance <= 4 && (ai.seesPlayer || ai.memoryTimer > 0);
+
+    if (dangerHere || imminentDanger || evasiveEngaged) {
         ai.alert = 'flee';
-        ai.behavior = 'flee';
-    } else if (ai.seesPlayer || ai.memoryTimer > 0) {
-        ai.alert = e.type === ENEMY_TYPES.ESPECIAL && ai.seesPlayer ? 'surround' : 'chase';
-        ai.behavior = ai.alert;
+        ai.behavior = profile.id;
+    } else if ((ai.seesPlayer || ai.memoryTimer > 0) && profile.id !== 'patroller') {
+        ai.alert = profile.id === 'aggressive' ? 'aggressive' : 'chase';
+        ai.behavior = profile.id;
+    } else if (patrollerEngaged) {
+        ai.alert = 'chase';
+        ai.behavior = profile.id;
     } else {
         ai.alert = 'patrol';
-        ai.behavior = 'patrol';
+        ai.behavior = profile.id;
     }
 
     const currentDir = enemyDirectionV312(ai.direction);
@@ -842,7 +892,7 @@ function updateEnemyIntentV312(e, index, dt) {
             ai.physicalBlocked = false;
             ai.recoveryCooldownTimer = Math.max(Number(ai.recoveryCooldownTimer || 0), enemyAI_V312.recoveryCooldownMs);
         } else {
-            ai.turnLockTimer = enemyAI_V312.navigationTurnCommitMs;
+            ai.turnLockTimer = Number(profile.turnCommitMs || enemyAI_V312.navigationTurnCommitMs);
             ai.lastTurnTileKey = enemyTileKeyV312(tile.x, tile.y);
             ai.lastTurnDirection = chosen.dir;
             ai.lastTurnFromDirection = currentDir.dir;
@@ -909,7 +959,8 @@ function applyEnemyDirectionAtCenterV312(e) {
 
 function moveEnemyV312(e, dt) {
     const ai = e.ai;
-    const speed = e.baseSpeed * (1 + gameState.threatLevel * 0.04);
+    const profile = enemyBehaviorProfileV324(e);
+    const speed = e.baseSpeed * Number(profile.speedMultiplier || 1) * (1 + gameState.threatLevel * 0.04);
     const scale = Math.min(dt / 16.6667, 2);
 
     // La dirección solicitada se aplica en un centro de celda, como en un juego

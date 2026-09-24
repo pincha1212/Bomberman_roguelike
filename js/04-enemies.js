@@ -52,6 +52,7 @@
                 let type = ENEMY_TYPES.RASTRERO;
                 if (gameState.level >= 2 && rand > 0.6) type = ENEMY_TYPES.VOLADOR;
                 if (gameState.level >= 3 && rand > 0.85) type = ENEMY_TYPES.ESPECIAL;
+                const behavior = typeof pickEnemyBehaviorV324 === 'function' ? pickEnemyBehaviorV324(type, gameState.level, i, rand) : null;
                 const speed = type.speed * gameState.roomType.enemySpeedMult * (diff?.enemySpeedMult || 1);
 
                 gameState.enemies.push({
@@ -67,7 +68,8 @@
                     elite: gameState.roomType.id === 'ELITE' || gameState.roomType.id === 'CURSED' || (diff?.eliteBonus || 0) > 0 && Math.random() < diff.eliteBonus,
                     lastDirection: 'down',
                     __gridAnchor: 'center',
-                    desiredDirection: 'down'
+                    desiredDirection: 'down',
+                    aiBehavior: behavior?.id || null
                 });
             }
         }

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.20.0 — Debug Overlay
+// Bomberman Roguelike v3.24.0 — Debug Overlay
 // Panel reconstruido para inspección en vivo. Solo se crea con ?debug=1.
 (() => {
     'use strict';
@@ -12,7 +12,7 @@
     root.innerHTML = `
         <div class="debug-header">
             <div>
-                <div class="debug-kicker">BOMBERMAN ENGINE · v3.17</div>
+                <div class="debug-kicker">BOMBERMAN ENGINE · v3.24</div>
                 <h2>DEBUG MODE <span id="debug-status" class="debug-status">CARGANDO</span></h2>
             </div>
             <button type="button" class="debug-icon-btn" data-debug-action="toggle" title="Mostrar/ocultar panel">F3</button>
@@ -162,7 +162,7 @@
         <section class="debug-section debug-tests">
             <div class="debug-section-head"><div class="debug-section-title">TEST RUNNER</div><span id="dbg-suite">0/${Object.keys(window.DEBUG_TESTS || {}).length}</span></div>
             <div class="debug-test-list">
-                ${Object.keys(window.DEBUG_TESTS || {}).map(name => `<button type="button" data-debug-test="${name}"><span>${name.replace('ai-stress','AI STRESS').replace('collision-stress','COLLISION STRESS').replace('room-stress','ROOM STRESS').toUpperCase()}</span><em id="dbg-test-${name}">PENDIENTE</em></button>`).join('')}
+                ${Object.keys(window.DEBUG_TESTS || {}).map(name => `<button type="button" data-debug-test="${name}"><span>${name.replace('ai-stress','AI STRESS').replace('collision-stress','COLLISION STRESS').replace('room-stress','ROOM STRESS').replace('enemy-behavior-stress','ENEMY BEHAVIOR').toUpperCase()}</span><em id="dbg-test-${name}">PENDIENTE</em></button>`).join('')}
             </div>
         </section>
 
@@ -336,7 +336,7 @@
         const enemyLines = enemyNav.map(e => {
             const route = e.canReachPlayer ? `${e.routeLength} celdas` : 'SIN RUTA';
             const flags = [e.stuckLikely ? 'ATASCADO' : null, e.currentPassable === false ? 'BLOQUEADO-GRID' : null, e.physicalBlocked ? 'BLOQUEADO-HITBOX' : null, e.cornerCorrectionMs > 0 ? 'CORR-ESQUINA' : null, e.recoveryCount > 0 ? `REC#${e.recoveryCount}` : null, e.turnReady ? 'CENTRO' : null].filter(Boolean).join(',') || 'OK';
-            return `E${e.index} · tile ${e.tile.x},${e.tile.y} · prev ${e.previousTile?.x},${e.previousTile?.y} · ${e.behavior}/${e.alert} · actual ${e.currentDirection} · deseada ${e.desiredDirection} · REAL ${e.actualDirection} · estado ${e.movementState} · progreso ${e.progressStatus} · mov ${fmt(e.movedPx,2)}px · trans ${e.tileTransitions || 0} · giros ${e.directionChanges || 0} · ruta ${route} · ref ${e.routeNextDirection}/${e.routeAlignment} · centro ${fmt(e.distanceToCenter,1)}px · fisBloq ${fmt(e.physicalBlockedMs,0)}ms · rec ${e.recoveryCount || 0} · BFS ${e.recoveryPathCalls || 0} · mem ${e.navigationMemoryTiles || 0} · navTurns ${e.navigationTurnCount || 0} · lock ${fmt(e.turnLockMs,0)}ms · sinProg ${e.framesSinceProgress || 0}f · ${flags} · target ${e.target?.x},${e.target?.y}`;
+            return `E${e.index} · tile ${e.tile.x},${e.tile.y} · prev ${e.previousTile?.x},${e.previousTile?.y} · ${e.archetypeLabel || e.archetype || '—'} · ${e.behavior}/${e.alert} · actual ${e.currentDirection} · deseada ${e.desiredDirection} · REAL ${e.actualDirection} · estado ${e.movementState} · progreso ${e.progressStatus} · mov ${fmt(e.movedPx,2)}px · trans ${e.tileTransitions || 0} · giros ${e.directionChanges || 0} · ruta ${route} · ref ${e.routeNextDirection}/${e.routeAlignment} · centro ${fmt(e.distanceToCenter,1)}px · fisBloq ${fmt(e.physicalBlockedMs,0)}ms · rec ${e.recoveryCount || 0} · BFS ${e.recoveryPathCalls || 0} · mem ${e.navigationMemoryTiles || 0} · navTurns ${e.navigationTurnCount || 0} · lock ${fmt(e.turnLockMs,0)}ms · sinProg ${e.framesSinceProgress || 0}f · ${flags} · target ${e.target?.x},${e.target?.y}`;
         });
         const navNode = document.getElementById('dbg-nav-enemies');
         if (navNode) navNode.textContent = enemyLines.length ? enemyLines.join('\n') : 'Sin enemigos en la escena.';

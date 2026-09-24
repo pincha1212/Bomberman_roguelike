@@ -349,3 +349,25 @@ Ajustes finales de bajo riesgo antes de v4:
 No se modificó la lógica de gameplay de enemigos, colisiones, bombas, bosses o progresión.
 
 La validación de v3.29 se limita a sintaxis, harnesses y auditoría estática/estructural. No se afirma un FPS concreto sin una ejecución real en navegador.
+
+
+## v4.0 — Visual + Boss Bomb Foundation
+
+- Nuevo sistema visual responsive con tema arcade pixelado inspirado en Bomberman: negro, rojo, naranja y amarillo.
+- Responsive para escritorio, tablet y móvil.
+- Se mantiene un solo runtime y la estructura modular existente.
+- Las bombas comparten estados: `moving → armed → exploding`.
+- La posición lógica de detonación (`x/y`) se separa de la posición visual (`worldX/worldY`) para habilitar futuras habilidades de interacción con bombas.
+- Los bosses lanzan bombas a celdas vacías aleatorias del mapa, con separación mínima del jugador y del propio boss.
+- Las bombas del boss no consumen `player.bombsPlaced`.
+- El lanzamiento tiene movimiento interpolado y arco visual antes de armarse.
+- Se conserva el sistema anterior de proyectiles y fases.
+- Debug Mode expone cantidad y estados de bombas.
+- Boss Stress incorpora fases, lanzamiento, movimiento y cap de bombas.
+
+### Validación v4.0
+
+- Syntax check PASS en todos los archivos modificados.
+- Debug harness PASS: 16 tests, 15 PASS, 0 WARN, 0 FAIL.
+- Boss Stress PASS: 5/5 fases, bombas aleatorias, movimiento `moving → armed`, cap=6.
+- No se pudo completar una captura headless del juego completo porque Chromium quedó ejecutando el RAF del runtime; por eso la validación visual final sigue siendo navegador real/GitHub Pages.

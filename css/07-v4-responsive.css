@@ -101,7 +101,6 @@
 .v4-theme #game-container.ui-boss-active #run-banner{top:43px;}
 .v4-theme #game-container.ui-boss-active #room-banner{top:72px;}
 .v4-theme #game-container.ui-boss-active .boss-hud{top:7px;}
-.v4-theme #game-container.ui-boss-active .v4-game-frame{opacity:.28;}
 .v4-theme #game-container.ui-boss-active.ui-player-tc #run-banner{top:43px;bottom:auto;}
 .v4-theme #game-container.ui-boss-active.ui-player-tc #room-banner{top:72px;bottom:auto;}
 

@@ -116,18 +116,6 @@ body.v4-theme::before{
 .v4-theme #game-container::before{inset:8px;border-color:rgba(255,210,63,.10);z-index:40;}
 .v4-theme #game-container::after{background:radial-gradient(circle at 50% 45%,transparent 45%,rgba(0,0,0,.12) 75%,rgba(0,0,0,.58) 100%);}
 
-.v4-game-frame{
-    position:absolute;left:12px;right:12px;top:10px;height:24px;z-index:41;
-    display:flex;align-items:center;justify-content:space-between;
-    pointer-events:none;
-    font:7px 'Press Start 2P',monospace;
-    letter-spacing:.08em;text-transform:uppercase;
-    color:#c5cbd5;
-    text-shadow:2px 2px 0 #000;
-}
-.v4-game-label span{color:var(--v4-red-bright);}
-.v4-game-label b{color:var(--v4-yellow);font-weight:400;margin-left:4px;}
-
 .v4-theme #run-banner,.v4-theme #room-banner{
     border:1px solid #4a515e;
     background:rgba(7,9,12,.94);
@@ -181,7 +169,6 @@ body.v4-theme::before{
     .v4-theme .menu-feature-list{display:none;}
     .v4-theme .menu-panel{padding:20px;}
     .v4-theme .menu-footer{font-size:5px;line-height:1.5;}
-    .v4-game-frame{left:8px;right:8px;top:7px;font-size:5px;}
 }
 
 @media(max-width:560px){

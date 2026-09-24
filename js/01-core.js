@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.7.1 — Core, configuration, state, audio, performance and adaptive interface
+// Bomberman Roguelike v4.8 — Core, configuration, state, audio, performance and adaptive interface
 // V2.0 IMMERSIVE SYSTEMS
 let audioCtx = null;
 
@@ -498,6 +498,7 @@ const UI = {};
             particles: [],
             floaters: [],
             hazards: [],
+            environmentHazards: [],
             hazardCooldown: 0,
             boss: null,
             bossProjectiles: [],

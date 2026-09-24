@@ -1,6 +1,6 @@
-// Bomberman Roguelike v4.7.1 — Visual Themes + Mechanics contract
+// Bomberman Roguelike v4.8 — Visual Themes + Gameplay contracts
 // Los temas declaran datos visuales y IDs de mecánicas.
-// La lógica de las mecánicas vive exclusivamente en 38-mechanics-registry.js.
+// La lógica de mecánicas y hazards vive en sus registries independientes.
 (function initThemeFoundationV47(global) {
     'use strict';
 
@@ -142,7 +142,7 @@
         powerups: Object.freeze({ pool: Object.freeze(['BOMB_UP', 'FIRE_UP', 'SPEED_UP', 'HEALTH_UP', 'SHIELD_UP', 'RELIC']) })
     });
 
-    function createVisualThemeV47(id, nombre, paletteOverrides, spriteOverrides, ambientOverrides, mechanicIds = []) {
+    function createVisualThemeV47(id, nombre, paletteOverrides, spriteOverrides, ambientOverrides, mechanicIds = [], hazardIds = []) {
         return Object.freeze({
             ...CLASSIC_THEME,
             id,
@@ -152,7 +152,7 @@
             sprites: Object.freeze({ ...CLASSIC_THEME.sprites, ...spriteOverrides }),
             ambiente: Object.freeze({ ...CLASSIC_THEME.ambiente, ...ambientOverrides }),
             mechanics: Object.freeze([...mechanicIds]),
-            hazards: Object.freeze([])
+            hazards: Object.freeze([...hazardIds])
         });
     }
 
@@ -211,7 +211,8 @@
             bomb: 'procedural:ice-bomb', fire: 'procedural:frost-fire'
         },
         { tipo: 'snow', color: 'ambientDust', densidad: 1, velocidad: 0.42, sizeMin: 1, sizeMax: 3, alpha: 0.55 },
-        ['slippery', 'wind_push']
+        ['slippery', 'wind_push'],
+        ['blizzard']
     );
 
     const INFERNO_THEME = createVisualThemeV47(
@@ -269,7 +270,8 @@
             bomb: 'procedural:inferno-bomb', fire: 'procedural:inferno-flame'
         },
         { tipo: 'ember', color: 'ambientDust', densidad: 0.9, velocidad: 0.52, sizeMin: 1, sizeMax: 2, alpha: 0.58 },
-        ['darkness']
+        ['darkness'],
+        ['lava', 'lightning', 'landslide']
     );
 
     const registry = Object.freeze({ classic: CLASSIC_THEME, winter: WINTER_THEME, inferno: INFERNO_THEME });
@@ -325,8 +327,11 @@
         if (summary) {
             const mechanicsLabel = theme.mechanics.length
                 ? ` · ${theme.mechanics.length} MECÁNICA${theme.mechanics.length === 1 ? '' : 'S'}`
-                : ' · SOLO VISUAL';
-            summary.textContent = `${theme.nombre.toUpperCase()}${mechanicsLabel}`;
+                : '';
+            const hazardsLabel = theme.hazards.length
+                ? ` · ${theme.hazards.length} HAZARD${theme.hazards.length === 1 ? '' : 'S'}`
+                : '';
+            summary.textContent = `${theme.nombre.toUpperCase()}${mechanicsLabel}${hazardsLabel || (!mechanicsLabel ? ' · SOLO VISUAL' : '')}`;
         }
     }
 

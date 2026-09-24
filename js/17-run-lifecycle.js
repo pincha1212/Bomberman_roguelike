@@ -71,6 +71,7 @@ function resetWorldRuntimeState() {
     gameState.particles = [];
     gameState.floaters = [];
     gameState.hazards = [];
+    gameState.environmentHazards = [];
     gameState.hazardCooldown = 0;
     gameState.boss = null;
     gameState.bossProjectiles = [];
@@ -166,6 +167,9 @@ function getDeathCauseLabel(source) {
         'boss-projectile': 'Proyectil del jefe',
         enemy: 'Enemigo',
         'enemy-contact': 'Enemigo',
+        lava: 'Lava',
+        lightning: 'Rayo',
+        landslide: 'Derrumbe',
         'unknown': 'Daño recibido'
     };
     return labels[source] || 'Daño recibido';

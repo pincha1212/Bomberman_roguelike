@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.28.2 — Unified Debug Mode
+// Bomberman Roguelike v3.28.3 — Unified Debug Mode
 // Depuración interna del mismo runtime. Se activa solo con ?debug=1.
 (() => {
     'use strict';
@@ -525,7 +525,9 @@
                             ms: performance.now() - started
                         };
                         this.testResults.push({ ...this.lastTest, result: message });
-                        this.captureError(error, `test:${name}`);
+                        // Un fallo funcional de una prueba no es un runtime error del juego.
+                        // Queda registrado como FAIL y en el bloque de tests, pero no contamina
+                        // el contador de errores de ejecución.
                         this.recordEvent('FAIL', `${name}: ${message}`, this.lastTest.details);
                     }
                     if (this.testResults.length > MAX_TEST_RESULTS) this.testResults.shift();
@@ -537,6 +539,10 @@
                 this.busy = false;
                 this.resetNavigation();
                 restorePlayableDebugScene();
+                // Dejar el reporte inmediatamente utilizable: diagnostico y snapshot
+                // se toman una vez, despues de restaurar la escena jugable.
+                try { this.captureSnapshot(); } catch (error) { this.recordEvent('WARN', `Snapshot automatico no disponible: ${error?.message || error}`); }
+                try { this.runHealthChecks(); } catch (error) { this.recordEvent('WARN', `Diagnostico automatico no disponible: ${error?.message || error}`); }
                 const passed = this.testResults.filter(r => r.status === 'PASS').length;
                 const failed = this.testResults.filter(r => r.status === 'FAIL').length;
                 this.recordEvent(failed === 0 ? 'PASS' : 'WARN', `Suite finalizada: ${passed}/${names.length} PASS · ${failed} FAIL · ${(performance.now() - startedSuite).toFixed(0)}ms.`);
@@ -604,7 +610,7 @@
             const hw = checks.filter(c => c.status === 'WARN').length;
             const hf = checks.filter(c => c.status === 'FAIL').length;
             return [
-                'BOMBERMAN ROGUELIKE — DEBUG MODE v3.28.2',
+                'BOMBERMAN ROGUELIKE — DEBUG MODE v3.28.3',
                 `SUITE: ${results.length}/${getAvailableTestNames().length} · ${passed} PASS · ${failed} FAIL`,
                 ...results.map(r => `${String(r.name || 'TEST').toUpperCase()}: ${r.status} — ${compactCopyText(r.summary || r.result || 'Sin resultado')}`),
                 `DIAGNOSTICO: ${this.lastHealth?.status || 'PENDIENTE'} — ${hp} PASS · ${hw} WARN · ${hf} FAIL`,
@@ -951,6 +957,20 @@
     function normalizeResult(result) {
         if (result && typeof result === 'object' && 'summary' in result) {
             return { summary: String(result.summary), details: result.details ?? {} };
+        }
+        if (result && typeof result === 'object') {
+            if (String(result.status || '').toUpperCase() === 'PASS') {
+                if (Array.isArray(result.activeSynergies) || Array.isArray(result.roomPlans)) {
+                    const relics = Array.isArray(result.activeSynergies) ? result.activeSynergies.length : 0;
+                    const rooms = Array.isArray(result.roomPlans) ? result.roomPlans.length : 0;
+                    return {
+                        summary: `reliquias OK · sinergias ${relics} · salas ${rooms} · economía OK`,
+                        details: result
+                    };
+                }
+                return { summary: 'PASS', details: result };
+            }
+            return { summary: String(result.error || result.status || 'resultado de prueba'), details: result };
         }
         return { summary: String(result ?? 'OK'), details: {} };
     }
@@ -2102,6 +2122,6 @@
         }
     });
 
-    DEBUG_MODE.recordEvent('DEBUG', 'Debug Mode v3.28.2 unificado cargado en el mismo runtime.');
+    DEBUG_MODE.recordEvent('DEBUG', 'Debug Mode v3.28.3 unificado cargado en el mismo runtime.');
     DEBUG_MODE.recordEvent('DEBUG', 'Usá RESET para activar una escena de depuración limpia.');
 })();

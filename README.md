@@ -191,3 +191,48 @@ Debug Engine: `ROOM STRESS` valida las seis topologías, cantidad de celdas alca
 - Exportación de un reporte JSON con snapshot, diff, timeline, eventos y errores.
 - Atajos: `F8` abre/cierra Debug Lab, `F9` captura snapshot, `Shift+F10` inicia/detiene timeline.
 - Nuevo `js/34-debug-lab-stress.js` para verificar snapshot, diff, checks y límites del laboratorio.
+
+
+## v3.28.1 — Debug Lab corrective patch
+
+Correcciones derivadas del reporte real de v3.28.0:
+
+- Eliminado el error repetitivo `No se encontró runner de tests compatible` cuando la suite no expone un runner público.
+- Detección de runners en `DEBUG_TESTS`, namespaces de Debug Engine y globals compatibles.
+- Ausencia del runner ahora se informa como `WARN` cuando existen pruebas individuales, sin generar un `window.error` artificial.
+- Health Checks distinguen `PASS`, `WARN` y `FAIL`.
+- `threat` no expuesto se muestra explícitamente como `NO EXPUESTO`.
+- Se separa `actualDirection` derivada de la velocidad de la propiedad `direction` del enemigo.
+- Los snapshots informan añadidos/cambios/eliminados correctamente.
+- Timeline y snapshots mantienen su función original sin modificar gameplay.
+
+### Validación 3.28.1
+
+- Syntax checks: PASS.
+- Harness de Debug Lab: PASS.
+- Runner ausente: WARN controlado, sin runtime error.
+- Runner compatible simulado: PASS.
+- Health checks con WARN/FAIL: PASS.
+- Snapshot diff: PASS.
+- Integridad del delta: PASS.
+
+
+## v3.28.2 — Debug Mode unificado
+
+- Se elimina la duplicación entre `DEBUG MODE` y `Debug Lab`: la interfaz anterior de Debug Mode queda como único entorno de diagnóstico.
+- Se integran al Debug Mode los nuevos controles de snapshot, diff, health checks y timeline del laboratorio.
+- La lista de tests se resuelve dinámicamente y conserva los 16 tests disponibles de la suite actual.
+- `DEBUG_MODE.runAllTests()` queda como runner único; ya no depende de un runner externo del laboratorio.
+- Se incorpora `DEBUG LAB STRESS` dentro de la suite existente para validar snapshot, diff, health checks y límites de historial/timeline.
+- La salida de cada test para copiar queda reducida a texto plano: `TEST: PASS/FAIL — resultado`. No se copia JSON de detalles.
+- El timeline usa un snapshot liviano y no ejecuta navegación/BFS continuo.
+- La dirección física de enemigos se deriva de `vx/vy` como `actualDirection`, manteniendo separada la dirección declarada por la IA.
+- `33-debug-lab.js` y `34-debug-lab-stress.js` dejan de cargarse; `20-debug-visuals.js` tampoco se referencia.
+- Para actualizar el repositorio, eliminar de la versión anterior `js/33-debug-lab.js` y `js/34-debug-lab-stress.js`.
+
+### Validación v3.28.2
+
+- `node --check`: `18-debug-mode.js` PASS.
+- `node --check`: `19-debug-overlay.js` PASS.
+- Harness unificado: 16 tests detectables, runner único, health checks sin `undefined`, reporte textual simple y `DEBUG LAB STRESS` PASS.
+- Sin prueba visual de GitHub Pages realizada en esta validación.

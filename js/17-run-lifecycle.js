@@ -80,6 +80,7 @@ function resetWorldRuntimeState() {
     gameState.nextReinforcement = 20000;
     gameState.exitPos = null;
     gameState.roomDesign = null;
+    gameState.dungeonV44 = null;
     gameState.lastTime = 0;
     gameState.keys = {};
     gameState.touchControls = { x: 0, y: 0 };

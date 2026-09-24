@@ -49,24 +49,21 @@
                 }
             }
 
-            // Destructible soft blocks
-            const blockDensity = Math.max(0.25, Math.min(0.72, 0.35 + (gameState.level * 0.03) + gameState.roomType.blockBonus + (gameState.difficulty?.blockDensityBonus || 0)));
-            for (let y = 1; y < gameState.gridHeight - 1; y++) {
-                for (let x = 1; x < gameState.gridWidth - 1; x++) {
-                    if (gameState.grid[y][x] === TYPES.EMPTY) {
-                        // Safe spawn zone around player
-                        if ((x <= 2 && y <= 2) || (x === 1 && y === 3) || (x === 3 && y === 1)) {
-                            continue;
-                        }
-                        if (Math.random() < blockDensity) {
-                            gameState.grid[y][x] = TYPES.BLOCK;
+            // v4.4: los niveles normales se generan completamente desde el nuevo
+            // generador Bomberman (figura estructural + bloques destructibles aleatorios).
+            // El boss conserva su arena especializada y utiliza la base clásica.
+            if (gameState.roomType.id === 'BOSS') {
+                const blockDensity = Math.max(0.25, Math.min(0.72, 0.35 + (gameState.level * 0.03) + gameState.roomType.blockBonus + (gameState.difficulty?.blockDensityBonus || 0)));
+                for (let y = 1; y < gameState.gridHeight - 1; y++) {
+                    for (let x = 1; x < gameState.gridWidth - 1; x++) {
+                        if (gameState.grid[y][x] === TYPES.EMPTY) {
+                            if ((x <= 2 && y <= 2) || (x === 1 && y === 3) || (x === 3 && y === 1)) continue;
+                            if (Math.random() < blockDensity) gameState.grid[y][x] = TYPES.BLOCK;
                         }
                     }
                 }
             }
 
-            // V3.13: segunda pasada de generación. Primero creamos el mapa procedural
-            // base y después tallamos salas/corredores con intención espacial.
             applyRoomDesignV313();
 
             // V3.13: el layout diseñado elige una puerta de salida dentro de la sala final.
@@ -265,6 +262,10 @@
 
         function updateRoomThreat(dt) {
             gameState.roomTime -= dt;
+            if (gameState.dungeonV44?.fixedEnemyCount) {
+                gameState.nextReinforcement = Number.MAX_SAFE_INTEGER;
+                return;
+            }
             gameState.nextReinforcement -= dt;
             if (gameState.roomType.id === 'BOSS') return;
             if (gameState.nextReinforcement <= 0) {

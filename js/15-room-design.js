@@ -9,7 +9,7 @@ const roomDesignV313 = {
     secretInterior: new Set(),
     exitGate: null,
     secretRoom: null,
-    version: 2,
+    version: '4.4.0',
     layoutVariant: 'corridors',
     layoutMetrics: null
 };
@@ -484,6 +484,251 @@ function buildProceduralRoomLayoutV322() {
     return { ...built, variant, topology };
 }
 
+
+// v4.4.0 — Dungeon generator: pre-established Bomberman-like hard-wall glyphs
+// + high-variance destructible blocks. The glyph is structural, not a HUD label.
+const BOMBERMAN_DUNGEON_V44 = Object.freeze({
+    version: '4.4.0',
+    digitWidth: 7,
+    digitHeight: 9,
+    maxNormalEnemies: 12,
+    blockDensityMin: 0.58,
+    blockDensityMax: 0.82,
+    // 7×9 pixel-style wall glyphs. 1-cell wall thickness keeps navigation readable.
+    glyphs: Object.freeze({
+        0: Object.freeze(['0111110','1100011','1100011','1100011','1100011','1100011','1100011','1100011','0111110']),
+        1: Object.freeze(['0011000','0111000','0011000','0011000','0011000','0011000','0011000','0011000','1111111']),
+        2: Object.freeze(['0111110','1100011','0000011','0000110','0011000','0110000','1100000','1100011','1111111']),
+        3: Object.freeze(['0111110','1100011','0000011','0001110','0000011','0000011','1100011','1100011','0111110']),
+        4: Object.freeze(['0001110','0011110','0110110','1100110','1100110','1111111','0000110','0000110','0001111']),
+        5: Object.freeze(['1111111','1100000','1100000','1111110','0000011','0000011','0000011','1100011','0111110']),
+        6: Object.freeze(['0011110','0110000','1100000','1100000','1111110','1100011','1100011','1100011','0111110']),
+        7: Object.freeze(['1111111','0000011','0000110','0000110','0001100','0001100','0011000','0011000','0011000']),
+        8: Object.freeze(['0111110','1100011','1100011','0111110','1100011','1100011','1100011','1100011','0111110']),
+        9: Object.freeze(['0111110','1100011','1100011','1100011','0111111','0000011','0000011','0000110','0111100'])
+    })
+});
+
+function getDungeonDigitV44(level = 1) {
+    const n = Math.max(0, Math.floor(Number(level) || 0));
+    return n % 10;
+}
+
+function getDungeonEnemyCountV44(level = 1) {
+    const depth = Math.max(1, Math.floor(Number(level) || 1));
+    // Level 1 = 4, level 2 = 5, ... capped to protect small/older devices.
+    return Math.min(BOMBERMAN_DUNGEON_V44.maxNormalEnemies, 3 + depth);
+}
+
+function v44InBounds(x, y) {
+    return x > 0 && y > 0 && x < gameState.gridWidth - 1 && y < gameState.gridHeight - 1;
+}
+
+function v44RoomKey(x, y) {
+    return `${x},${y}`;
+}
+
+function v44IsStartSafeCell(x, y) {
+    // Preserve the familiar Bomberman starting pocket at the upper-left.
+    return (x <= 2 && y <= 2) || (x === 1 && y === 3) || (x === 3 && y === 1);
+}
+
+function v44DigitBounds(level) {
+    const w = BOMBERMAN_DUNGEON_V44.digitWidth;
+    const h = BOMBERMAN_DUNGEON_V44.digitHeight;
+    return {
+        x: Math.floor((gameState.gridWidth - w) / 2),
+        y: Math.floor((gameState.gridHeight - h) / 2),
+        w,
+        h
+    };
+}
+
+function v44InsideDigitBounds(x, y, bounds) {
+    return x >= bounds.x && x < bounds.x + bounds.w && y >= bounds.y && y < bounds.y + bounds.h;
+}
+
+function v44ApplyDigitHardWalls(level) {
+    const digit = getDungeonDigitV44(level);
+    const glyph = BOMBERMAN_DUNGEON_V44.glyphs[digit] || BOMBERMAN_DUNGEON_V44.glyphs[1];
+    const bounds = v44DigitBounds(level);
+    const hard = new Set();
+
+    for (let row = 0; row < glyph.length; row++) {
+        for (let col = 0; col < glyph[row].length; col++) {
+            if (glyph[row][col] !== '1') continue;
+            const x = bounds.x + col;
+            const y = bounds.y + row;
+            if (!v44InBounds(x, y)) continue;
+            gameState.grid[y][x] = TYPES.WALL;
+            hard.add(v44RoomKey(x, y));
+        }
+    }
+    return { digit, glyph, bounds, hard };
+}
+
+function v44ApplyClassicHardWalls(bounds, hard) {
+    for (let y = 1; y < gameState.gridHeight - 1; y++) {
+        for (let x = 1; x < gameState.gridWidth - 1; x++) {
+            // Outside the number, use the classic Bomberman pillar cadence.
+            if (x % 2 !== 0 || y % 2 !== 0) continue;
+            if (v44InsideDigitBounds(x, y, bounds)) continue;
+            gameState.grid[y][x] = TYPES.WALL;
+            hard.add(v44RoomKey(x, y));
+        }
+    }
+}
+
+function v44CandidateCells(hard, minDistance = 7) {
+    const px = 1;
+    const py = 1;
+    const result = [];
+    for (let y = 1; y < gameState.gridHeight - 1; y++) {
+        for (let x = 1; x < gameState.gridWidth - 1; x++) {
+            const key = v44RoomKey(x, y);
+            if (hard.has(key) || v44IsStartSafeCell(x, y)) continue;
+            const distance = Math.abs(x - px) + Math.abs(y - py);
+            if (distance >= minDistance) result.push({ x, y, distance });
+        }
+    }
+    return result;
+}
+
+function v44EnsureEnemySpace(hard, targetCount) {
+    const need = Math.max(0, Number(targetCount) || 0) + 8;
+    let candidates = v44CandidateCells(hard, 7).filter(c => gameState.grid[c.y]?.[c.x] === TYPES.EMPTY);
+    if (candidates.length >= need) return;
+
+    const openKeys = new Set(candidates.map(c => v44RoomKey(c.x, c.y)));
+    const blockCandidates = [];
+    for (let y = 1; y < gameState.gridHeight - 1; y++) {
+        for (let x = 1; x < gameState.gridWidth - 1; x++) {
+            const key = v44RoomKey(x, y);
+            if (hard.has(key) || v44IsStartSafeCell(x, y) || openKeys.has(key)) continue;
+            if (gameState.grid[y][x] === TYPES.BLOCK) blockCandidates.push({ x, y });
+        }
+    }
+
+    for (let i = blockCandidates.length - 1; i > 0 && candidates.length < need; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [blockCandidates[i], blockCandidates[j]] = [blockCandidates[j], blockCandidates[i]];
+    }
+
+    for (const cell of blockCandidates) {
+        if (candidates.length >= need) break;
+        gameState.grid[cell.y][cell.x] = TYPES.EMPTY;
+        candidates.push(cell);
+    }
+}
+
+function v44PickExitCell() {
+    const candidates = [];
+    const centerX = (gameState.gridWidth - 1) / 2;
+    const centerY = (gameState.gridHeight - 1) / 2;
+    for (let y = 1; y < gameState.gridHeight - 1; y++) {
+        for (let x = 1; x < gameState.gridWidth - 1; x++) {
+            if (gameState.grid[y][x] !== TYPES.BLOCK) continue;
+            if (v44IsStartSafeCell(x, y)) continue;
+            const cornerBias = (x / gameState.gridWidth) * 0.55 + (y / gameState.gridHeight) * 0.45;
+            const centerDistance = Math.abs(x - centerX) + Math.abs(y - centerY);
+            candidates.push({ x, y, score: cornerBias * 100 + centerDistance + Math.random() * 20 });
+        }
+    }
+    candidates.sort((a, b) => b.score - a.score);
+    return candidates[0] || null;
+}
+
+function buildBombermanDungeonV44() {
+    // Self-contained terrain reset: outer shell is always indestructible.
+    for (let y = 0; y < gameState.gridHeight; y++) {
+        for (let x = 0; x < gameState.gridWidth; x++) {
+            if (x === 0 || y === 0 || x === gameState.gridWidth - 1 || y === gameState.gridHeight - 1) {
+                gameState.grid[y][x] = TYPES.WALL;
+            } else {
+                gameState.grid[y][x] = TYPES.EMPTY;
+            }
+        }
+    }
+
+    const digitData = v44ApplyDigitHardWalls(gameState.level);
+    v44ApplyClassicHardWalls(digitData.bounds, digitData.hard);
+
+    const levelFactor = Math.min(0.12, Math.max(0, gameState.level - 1) * 0.008);
+    const roomBonus = Number(gameState.roomType?.blockBonus || 0);
+    const diffBonus = Number(gameState.difficulty?.blockDensityBonus || 0);
+    const density = Math.max(
+        BOMBERMAN_DUNGEON_V44.blockDensityMin,
+        Math.min(BOMBERMAN_DUNGEON_V44.blockDensityMax, 0.60 + levelFactor + roomBonus + diffBonus)
+    );
+
+    let destructible = 0;
+    const empties = [];
+    for (let y = 1; y < gameState.gridHeight - 1; y++) {
+        for (let x = 1; x < gameState.gridWidth - 1; x++) {
+            const key = v44RoomKey(x, y);
+            if (digitData.hard.has(key)) continue;
+            if (v44IsStartSafeCell(x, y)) {
+                gameState.grid[y][x] = TYPES.EMPTY;
+                continue;
+            }
+            if (x % 2 === 0 && y % 2 === 0) continue;
+            if (Math.random() < density) {
+                gameState.grid[y][x] = TYPES.BLOCK;
+                destructible++;
+            } else {
+                gameState.grid[y][x] = TYPES.EMPTY;
+                empties.push({ x, y });
+            }
+        }
+    }
+
+    const targetEnemies = getDungeonEnemyCountV44(gameState.level);
+    v44EnsureEnemySpace(digitData.hard, targetEnemies);
+
+    const exitCell = v44PickExitCell();
+    const exit = exitCell || { x: Math.max(1, gameState.gridWidth - 2), y: Math.max(1, gameState.gridHeight - 2) };
+
+    roomDesignV313.rooms = [];
+    roomDesignV313.riskCells.clear();
+    roomDesignV313.combatCells.clear();
+    roomDesignV313.treasureCells.clear();
+    roomDesignV313.secretCells.clear();
+    roomDesignV313.secretInterior.clear();
+    roomDesignV313.secretRoom = null;
+    roomDesignV313.exitGate = { x: exit.x, y: exit.y };
+    roomDesignV313.layoutVariant = `bomberman-digit-${digitData.digit}`;
+    roomDesignV313.layoutMetrics = {
+        variant: roomDesignV313.layoutVariant,
+        digit: digitData.digit,
+        hardWalls: digitData.hard.size,
+        destructibleBlocks: destructible,
+        emptyCells: v44CandidateCells(digitData.hard, 0).filter(c => gameState.grid[c.y]?.[c.x] === TYPES.EMPTY).length,
+        density: Number(density.toFixed(3)),
+        enemyTarget: targetEnemies,
+        routeValid: true,
+        repairApplied: false
+    };
+
+    // Prefer open cells as enemy spawn/combat candidates.
+    for (const cell of v44CandidateCells(digitData.hard, 7)) {
+        if (gameState.grid[cell.y]?.[cell.x] === TYPES.EMPTY) {
+            roomDesignV313.combatCells.add(v44RoomKey(cell.x, cell.y));
+        }
+    }
+
+    gameState.dungeonV44 = {
+        version: BOMBERMAN_DUNGEON_V44.version,
+        digit: digitData.digit,
+        digitBounds: digitData.bounds,
+        hardWallCells: digitData.hard,
+        enemyTarget: targetEnemies,
+        exitUnlocked: false,
+        fixedEnemyCount: true,
+        blockDensity: density
+    };
+    return gameState.dungeonV44;
+}
+
 function applyRoomDesignV313() {
     roomDesignV313.rooms = [];
     roomDesignV313.riskCells.clear();
@@ -505,31 +750,19 @@ function applyRoomDesignV313() {
         if (!topology.routeLength) carveGuaranteedRouteV322(start, goal);
         roomDesignV313.layoutVariant = 'boss';
         roomDesignV313.layoutMetrics = { variant:'boss', rooms:roomDesignV313.rooms.length, ...collectRoomTopologyV322(start, goal), routeValid:true, repairApplied:!topology.routeLength };
+        gameState.dungeonV44 = {
+            version: BOMBERMAN_DUNGEON_V44.version,
+            digit: null,
+            digitBounds: null,
+            hardWallCells: new Set(),
+            enemyTarget: 0,
+            exitUnlocked: false,
+            fixedEnemyCount: false,
+            blockDensity: null
+        };
     } else {
-        buildProceduralRoomLayoutV322();
+        buildBombermanDungeonV44();
     }
-
-    createSecretRoomV313();
-
-    // Secret-room shell may overlap the network. Revalidate after it exists.
-    const start = { x: 2, y: 2 };
-    const goal = roomDesignV313.exitGate || { x: gameState.gridWidth - 3, y: gameState.gridHeight - 3 };
-    const beforeSecretRepair = collectRoomTopologyV322(start, goal);
-    let postSecretRepair = false;
-    if (!beforeSecretRepair.routeLength) {
-        carveGuaranteedRouteV322(start, goal);
-        postSecretRepair = true;
-    }
-    const finalTopology = collectRoomTopologyV322(start, goal);
-    roomDesignV313.layoutMetrics = {
-        ...(roomDesignV313.layoutMetrics || {}),
-        reachableTiles: finalTopology.reachable,
-        routeLength: Math.max(0, finalTopology.routeLength - 1),
-        junctions: finalTopology.junctions,
-        deadEnds: finalTopology.deadEnds,
-        routeValid: finalTopology.routeLength > 0,
-        repairApplied: !!(roomDesignV313.layoutMetrics?.repairApplied || postSecretRepair)
-    };
 }
 
 function chooseRoomDesignItemCellV313(set, used) {
@@ -604,4 +837,23 @@ function drawRoomDesignLayerV313() {
         ctx.fillText('?', (r.x + r.w / 2) * TILE_SIZE, (r.y + r.h / 2) * TILE_SIZE + 3);
         ctx.restore();
     }
+}
+
+// v4.4.0 — Exit gate is unlocked only after every normal-room enemy is dead.
+function tryUnlockExitV44() {
+    const dungeon = gameState?.dungeonV44;
+    if (!dungeon?.fixedEnemyCount || gameState.roomType?.id === 'BOSS') return false;
+    if (dungeon.exitUnlocked) return true;
+    if (Array.isArray(gameState.enemies) && gameState.enemies.length > 0) return false;
+    if (!gameState.exitPos) return false;
+
+    const { x, y } = gameState.exitPos;
+    if (!gameState.grid[y]) return false;
+    gameState.grid[y][x] = TYPES.EXIT_OPEN;
+    dungeon.exitUnlocked = true;
+    gameState.gridRevision = (gameState.gridRevision || 0) + 1;
+    if (typeof invalidateRenderCacheV317 === 'function') invalidateRenderCacheV317();
+    if (typeof sfx === 'function') sfx('exit');
+    if (typeof addFloatingText === 'function') addFloatingText('🚪 SALIDA DESBLOQUEADA', (x + 0.5) * TILE_SIZE, (y + 0.5) * TILE_SIZE, '#facc15');
+    return true;
 }

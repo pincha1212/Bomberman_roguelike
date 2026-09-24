@@ -1,9 +1,11 @@
 // Bomberman Roguelike v3.11 — Enemy spawning and enemy setup
         function spawnEnemies() {
-            const baseCount = Math.min(3 + Math.floor(gameState.level * 1.5), 12);
             const diff = gameState.difficulty || (typeof getDifficultyV323 === 'function' ? getDifficultyV323(gameState.level) : null);
             const maxEnemies = diff?.maxEnemies || largeSupport.maxEnemies;
-            const count = Math.min(maxEnemies, Math.max(1, Math.round(baseCount * gameState.roomType.enemyMult * (diff?.enemyCountMult || 1))));
+            const fixedV44 = gameState.dungeonV44?.fixedEnemyCount && gameState.roomType.id !== 'BOSS';
+            const count = fixedV44
+                ? Math.min(maxEnemies, getDungeonEnemyCountV44(gameState.level))
+                : Math.min(maxEnemies, Math.max(1, Math.round(Math.min(3 + Math.floor(gameState.level * 1.5), 12) * gameState.roomType.enemyMult * (diff?.enemyCountMult || 1))));
             const candidates = [];
             const px = Math.floor((player.x + player.width / 2) / TILE_SIZE);
             const py = Math.floor((player.y + player.height / 2) / TILE_SIZE);

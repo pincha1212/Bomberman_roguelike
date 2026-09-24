@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.6 — Core, configuration, state, audio, performance and adaptive interface
+// Bomberman Roguelike v4.2 — Core, configuration, state, audio, performance and adaptive interface
 // V2.0 IMMERSIVE SYSTEMS
 let audioCtx = null;
 const ambient = { dustTimer: 0, lastFoot: 0, introTimer: 0 };
@@ -152,45 +152,106 @@ function drawLargeBossShadow(b){
     ctx.restore();
 }
 
-// V3.2.3 ADAPTIVE INTERFACE LAYER
+// V4.2 ADAPTIVE INFORMATION LAYOUT
+// La UI se reubica por perfil de viewport + posición del jugador.
+// El cálculo completo solo ocurre cuando cambia el viewport, la posición relevante
+// del jugador o el estado del boss; no se recalcula toda la geometría por frame.
 const adaptiveUI = {
     lastLayout: '',
-    lastPlayerState: false
+    lastPlayerState: false,
+    lastBossState: false,
+    viewportKey: '',
+    resizeDirty: true,
+    profile: 'wide'
 };
 
-function updateAdaptiveInterface(){
+function getAdaptiveViewportProfile() {
     const root = document.getElementById('game-container');
-    if(!root || !player || !gameState.isPlaying) return;
+    if (!root) return { key: 'none', profile: 'wide', landscape: false };
+    const rect = root.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+    const landscape = width > height * 1.12;
+    let profile = 'wide';
+    if (width <= 340) profile = 'tiny';
+    else if (width <= 460) profile = 'small';
+    else if (width <= 700) profile = 'mobile';
+    else if (width <= 920) profile = 'tablet';
+    const key = `${width}x${height}|${profile}|${landscape ? 'landscape' : 'portrait'}`;
+    return { key, profile, landscape };
+}
+
+function applyAdaptiveViewport(root) {
+    const view = getAdaptiveViewportProfile();
+    if (!adaptiveUI.resizeDirty && adaptiveUI.viewportKey === view.key) return false;
+    adaptiveUI.resizeDirty = false;
+    adaptiveUI.viewportKey = view.key;
+    adaptiveUI.profile = view.profile;
+    root.classList.remove('ui-size-tiny','ui-size-small','ui-size-mobile','ui-size-tablet','ui-size-wide',
+        'ui-orientation-landscape','ui-orientation-portrait');
+    root.classList.add(`ui-size-${view.profile}`);
+    root.classList.add(view.landscape ? 'ui-orientation-landscape' : 'ui-orientation-portrait');
+    root.dataset.uiProfile = view.profile;
+    return true;
+}
+
+function markAdaptiveViewportDirty() {
+    adaptiveUI.resizeDirty = true;
+}
+
+function updateAdaptiveInterface() {
+    const root = document.getElementById('game-container');
+    if (!root || !player || !gameState.isPlaying) return;
+
+    applyAdaptiveViewport(root);
 
     const cx = player.x + player.width / 2 - gameState.camera.x;
     const cy = player.y + player.height / 2 - gameState.camera.y;
     const w = canvas.width;
     const h = canvas.height;
-    const nx = cx / Math.max(1,w);
-    const ny = cy / Math.max(1,h);
+    const nx = cx / Math.max(1, w);
+    const ny = cy / Math.max(1, h);
 
-    // Elegimos una zona opuesta al jugador. El centro queda siempre libre.
+    // Elegimos la esquina opuesta al jugador para el HUD lateral.
     let layout;
-    if(nx < .34 && ny < .40) layout = 'tl';
-    else if(nx > .66 && ny < .40) layout = 'tr';
-    else if(nx < .34 && ny > .60) layout = 'bl';
-    else if(nx > .66 && ny > .60) layout = 'br';
-    else if(ny <= .50) layout = 'tc';
+    if (nx < .34 && ny < .40) layout = 'tl';
+    else if (nx > .66 && ny < .40) layout = 'tr';
+    else if (nx < .34 && ny > .60) layout = 'bl';
+    else if (nx > .66 && ny > .60) layout = 'br';
+    else if (ny <= .50) layout = 'tc';
     else layout = 'bc';
-    const moving = !!player.isMoving;
 
-    if(layout !== adaptiveUI.lastLayout){
+    const moving = !!player.isMoving;
+    const bossActive = !!(gameState.boss && !gameState.boss.defeated);
+
+    if (layout !== adaptiveUI.lastLayout) {
         root.classList.remove('ui-safe-left','ui-safe-right','ui-safe-center','ui-safe-top','ui-safe-bottom',
             'ui-player-tl','ui-player-tr','ui-player-bl','ui-player-br','ui-player-tc','ui-player-bc');
         root.classList.add(`ui-player-${layout}`);
         adaptiveUI.lastLayout = layout;
     }
 
-    if(moving !== adaptiveUI.lastPlayerState){
+    if (moving !== adaptiveUI.lastPlayerState) {
         root.classList.toggle('player-moving', moving);
         adaptiveUI.lastPlayerState = moving;
     }
 
+    if (bossActive !== adaptiveUI.lastBossState) {
+        root.classList.toggle('ui-boss-active', bossActive);
+        adaptiveUI.lastBossState = bossActive;
+    }
+}
+
+if (typeof ResizeObserver === 'function') {
+    const scheduleAdaptiveResize = () => { markAdaptiveViewportDirty(); };
+    window.addEventListener('resize', scheduleAdaptiveResize, { passive: true });
+    window.addEventListener('orientationchange', scheduleAdaptiveResize, { passive: true });
+    window.addEventListener('fullscreenchange', scheduleAdaptiveResize, { passive: true });
+    const gameRoot = document.getElementById('game-container');
+    if (gameRoot) {
+        const observer = new ResizeObserver(scheduleAdaptiveResize);
+        observer.observe(gameRoot);
+    }
 }
 
 const UI = {};
@@ -411,7 +472,8 @@ const UI = {};
             rerolls: 1,
             blocksBroken: 0,
             totalKills: 0,
-            bestDepth: Number(localStorage.getItem('bombermanBestDepth') || 0)
+            bestDepth: Number(localStorage.getItem('bombermanBestDepth') || 0),
+            dungeonV44: null
         };
 
         let player = {

@@ -44,8 +44,14 @@
                     addParticles((tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#b45309', 12);
 
                     if (gameState.exitPos && gameState.exitPos.x === tx && gameState.exitPos.y === ty) {
-                        gameState.grid[ty][tx] = TYPES.EXIT_OPEN;
-                        addFloatingText('🚪 SALIDA!', (tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#facc15');
+                        // v4.4: destruir el bloque de salida no alcanza para abrirla.
+                        // Queda bloqueada hasta eliminar al último enemigo.
+                        gameState.grid[ty][tx] = TYPES.EXIT_LOCKED;
+                        if (typeof tryUnlockExitV44 === 'function') tryUnlockExitV44();
+                        if (gameState.dungeonV44?.exitUnlocked) {
+                            gameState.grid[ty][tx] = TYPES.EXIT_OPEN;
+                            addFloatingText('🚪 SALIDA DESBLOQUEADA', (tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#facc15');
+                        }
                     } else if (Math.random() < gameState.roomType.dropChance) {
                         const ps = Object.keys(POWERUPS);
                         gameState.items.push({ x: tx, y: ty, type: POWERUPS[ps[Math.floor(Math.random() * ps.length)]] });
@@ -168,6 +174,7 @@
                         gameState.coins += killCoins;
                         gameState.totalKills++;
                         addFloatingText(`+${killScore}  +${killCoins}¢`, e.x, e.y, e.elite ? '#fb7185' : '#38bdf8');
+                        if (typeof tryUnlockExitV44 === 'function') tryUnlockExitV44();
                     }
                 }
 

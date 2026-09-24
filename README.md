@@ -1,4 +1,4 @@
-# BOMBERMAN // DESCENT — Roguelike v3.27.0
+# BOMBERMAN // DESCENT — Roguelike v3.28.0
 
 Videojuego web estático desarrollado con HTML, CSS y JavaScript vanilla. Preparado para GitHub Pages, sin backend ni bundler.
 
@@ -177,3 +177,17 @@ Debug Engine: `ROOM STRESS` valida las seis topologías, cantidad de celdas alca
 - Guard de economía: las monedas que ya entrega el sistema base no se vuelven a cobrar; v3.27 suma únicamente el incremento propio.
 - No se modifica el loop principal, pathfinding, colisión ni lógica de boss.
 - Prueba visual en navegador/GitHub Pages: pendiente.
+
+
+## v3.28.0 — Debug Lab
+
+- Nueva capa de diagnóstico sobre el Debug Engine existente, sin reemplazar el runtime ni la suite de tests.
+- Snapshot estructurado de engine, player, world, enemies, economía/reliquias v3.27, feedback v3.26 y boss v3.25.
+- State diff entre snapshots consecutivos para localizar cambios relevantes.
+- Inspector dedicado de enemigo con bloqueo físico, recovery, ruta, memoria corta y detección de velocidad diagonal.
+- Timeline circular de hasta 120 muestras con profundidad, room, monedas, enemigos, bloqueos y errores.
+- Captura local de errores de `window.error`, `unhandledrejection`, `console.error` y `console.warn`.
+- Health checks para estado, grid, economía, reliquias duplicadas, cardinalidad de enemigos, límites de feedback y proyectiles del boss.
+- Exportación de un reporte JSON con snapshot, diff, timeline, eventos y errores.
+- Atajos: `F8` abre/cierra Debug Lab, `F9` captura snapshot, `Shift+F10` inicia/detiene timeline.
+- Nuevo `js/34-debug-lab-stress.js` para verificar snapshot, diff, checks y límites del laboratorio.

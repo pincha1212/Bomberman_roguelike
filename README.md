@@ -1,4 +1,4 @@
-# BOMBERMAN // DESCENT — Roguelike v3.22.0
+# BOMBERMAN // DESCENT — Roguelike v3.23.0
 
 Videojuego web estático desarrollado con HTML, CSS y JavaScript vanilla. Preparado para GitHub Pages, sin backend ni bundler.
 
@@ -66,3 +66,15 @@ El Debug Mode se carga sobre el mismo `index.html` y conserva la estructura de m
 Se agregaron seis topologías procedurales: `corridors`, `intersection`, `small-chambers`, `large-chamber`, `open-zone`, `dead-end`. Cada room revalida la conectividad jugador→salida después de crear la room secreta y aplica un corredor de reparación únicamente si la ruta deja de existir.
 
 Debug Engine: `ROOM STRESS` valida las seis topologías, cantidad de celdas alcanzables, longitud de ruta y registro de reparación.
+
+
+## v3.23.0 — Progressive Difficulty
+- Escalado centralizado por profundidad para enemigos, presión, trampas y densidad.
+- Límites: 22 enemigos, 1.24x velocidad, +6 trampas, +0.08 densidad de bloques.
+- Nuevo `js/24-difficulty.js`.
+- Nuevo `js/25-difficulty-stress.js`.
+- Stress: perfiles monótonos y límites por profundidad.
+- `js/12-enemy-ai.js` queda normalizado bajo `js/` para conservar la actualización de navegación v3.21.
+
+- La primera oleada conserva un intervalo derivado del tiempo de sala; las oleadas siguientes usan el intervalo de amenaza escalado.
+- El escalado no modifica el pathfinding: BFS queda reservado al recovery excepcional.

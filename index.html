@@ -141,7 +141,6 @@
                 </section>
                 <div class="menu-actions">
                     <button id="btn-start" class="btn-pixel menu-start-button">INICIAR RUN</button>
-                    <button id="btn-debug-mode" class="btn-debug-mode" type="button">🧪 ABRIR DEBUG MODE</button>
                     <div class="menu-hint"><span>TECLADO</span><strong>WASD / ↑↓←→</strong><span>· BOMBA</span><strong>ESPACIO</strong></div>
                 </div>
                 <div class="menu-footer"><span>PROCEDURAL COMBAT</span><span>•</span><span>ADAPTIVE MOTION</span><span>•</span><span>DEEPER EVERY RUN</span></div>
@@ -156,16 +155,7 @@
             <div class="bomb-btn" id="btn-bomb-mobile">💣</div>
         </div>
     </div>
-
-    <script>
-        if (new URLSearchParams(window.location.search).get('debug') === '1') {
-            window.__BOMBER_DEBUG_BOOT_ERRORS = [];
-            window.addEventListener('error', event => window.__BOMBER_DEBUG_BOOT_ERRORS.push(`${event.message || 'Error'} @ ${event.filename || 'unknown'}:${event.lineno || 0}`));
-            window.addEventListener('unhandledrejection', event => window.__BOMBER_DEBUG_BOOT_ERRORS.push(`UnhandledPromiseRejection: ${String(event.reason || 'unknown')}`));
-        }
-    </script>
-
-    <!-- v3.28 modular JavaScript. Feedback is layered over the existing combat/runtime systems. -->
+<!-- v3.28 modular JavaScript. Feedback is layered over the existing combat/runtime systems. -->
     <script src="js/01-core.js?v=4.6.0"></script>
     <script src="js/35-device-quality.js?v=4.5.0"></script>
     <script src="js/37-theme.js?v=4.6.0"></script>
@@ -185,21 +175,9 @@
     <script src="js/09-camera.js?v=3.27.0"></script>
     <script src="js/10-feedback.js?v=3.27.0"></script>
     <script src="js/17-run-lifecycle.js?v=4.2.0"></script>
-    <script src="js/21-profiler.js?v=3.27.0"></script>
-    <script src="js/23-room-stress.js?v=4.5.2"></script>
-    <script src="js/25-difficulty-stress.js?v=3.27.0"></script>
-    <script src="js/18-debug-mode.js?v=4.5.1"></script>
-    <script src="js/26-enemy-behavior-stress.js?v=3.28.4"></script>
-    <script src="js/22-collision-stress.js?v=3.27.0"></script>
     <script src="js/08-loop-ui.js?v=3.29.0"></script>
     <script src="js/27-boss-system.js?v=4.2.0"></script>
-    <script src="js/28-boss-stress.js?v=4.2.0"></script>
     <script src="js/29-feedback-system.js?v=4.5.0"></script>
-    <script src="js/30-feedback-stress.js?v=3.27.0"></script>
     <script src="js/31-roguelike-update.js?v=3.27.0"></script>
-    <script src="js/32-roguelike-stress.js?v=3.27.0"></script>
-    <script src="js/19-debug-overlay.js?v=4.5.1"></script>
-    <script src="js/20-debug-visuals.js?v=4.5.1"></script>
-    <script src="js/36-debug-diagnostics.js?v=4.5.1"></script>
 </body>
 </html>

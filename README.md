@@ -18,15 +18,6 @@ Subí la estructura completa del proyecto al repositorio y activá GitHub Pages 
 - Bomba: `ESPACIO`.
 - En dispositivos táctiles: joystick virtual y botón de bomba.
 
-### Debug Mode
-
-Abrí el juego con `?debug=1`, por ejemplo:
-
-```text
-index.html?debug=1
-```
-
-Desde Debug Mode podés consultar el estado del jugador, mundo, navegación, rendimiento y ejecutar las pruebas integradas.
 
 ### Estructura básica
 

@@ -1,4 +1,4 @@
-# BOMBERMAN // DESCENT — Roguelike v3.28.0
+# BOMBERMAN // DESCENT — Roguelike v4.1
 
 Videojuego web estático desarrollado con HTML, CSS y JavaScript vanilla. Preparado para GitHub Pages, sin backend ni bundler.
 
@@ -371,3 +371,13 @@ La validación de v3.29 se limita a sintaxis, harnesses y auditoría estática/e
 - Debug harness PASS: 16 tests, 15 PASS, 0 WARN, 0 FAIL.
 - Boss Stress PASS: 5/5 fases, bombas aleatorias, movimiento `moving → armed`, cap=6.
 - No se pudo completar una captura headless del juego completo porque Chromium quedó ejecutando el RAF del runtime; por eso la validación visual final sigue siendo navegador real/GitHub Pages.
+
+---
+## v4.1 — Bombs as the core combat language
+- Boss attacks reduced to two actions: random bomb throws and ground slam.
+- Removed active boss projectile/charge/summon attack paths from the runtime.
+- Boss throw bombs use wider phase-based ranges: 2 / 3 / 4.
+- Ground slam reuses the shared bomb explosion pipeline with large cross-shaped ranges: 5 / 6 / 7.
+- Boss-owned explosions do not damage the boss itself.
+- Bombs now expose `interactionState`, `canKick`, `canPush`, `canCarry` and `carriedBy` for future player/bomb skills.
+- Existing moving → armed → exploding bomb state model remains the shared foundation.

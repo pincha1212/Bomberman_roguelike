@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOMBERMAN // DESCENT — Roguelike v3.19</title>
+    <title>BOMBERMAN // DESCENT — Roguelike v3.20</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -14,7 +14,7 @@
             <aside class="menu-rail menu-rail-left" aria-label="Resumen de la aventura">
                 <div class="menu-rail-top">
                     <span class="menu-kicker">BOMBERMAN // DESCENT</span>
-                    <span class="menu-version">v3.19</span>
+                    <span class="menu-version">v3.20</span>
                 </div>
                 <div class="menu-rail-content">
                     <div class="menu-mark">💣</div>
@@ -145,27 +145,28 @@
         }
     </script>
 
-    <!-- v3.19 modular JavaScript. Real Profiler loads before the game loop so it can wrap runtime systems. -->
-    <script src="js/01-core.js?v=3.19.0"></script>
-    <script src="js/16-relics.js?v=3.19.0"></script>
-    <script src="js/02-input.js?v=3.19.0"></script>
-    <script src="js/15-room-design.js?v=3.19.0"></script>
-    <script src="js/03-world.js?v=3.19.0"></script>
-    <script src="js/04-enemies.js?v=3.19.0"></script>
-    <script src="js/11-bombs.js?v=3.19.0"></script>
-    <script src="js/13-collision.js?v=3.19.0"></script>
-    <script src="js/14-traps.js?v=3.19.0"></script>
-    <script src="js/05-player.js?v=3.19.0"></script>
-    <script src="js/12-enemy-ai.js?v=3.19.0"></script>
-    <script src="js/06-combat.js?v=3.19.0"></script>
-    <script src="js/07-render.js?v=3.19.0"></script>
-    <script src="js/09-camera.js?v=3.19.0"></script>
-    <script src="js/10-feedback.js?v=3.19.0"></script>
-    <script src="js/17-run-lifecycle.js?v=3.19.0"></script>
-    <script src="js/21-profiler.js?v=3.19.0"></script>
-    <script src="js/18-debug-mode.js?v=3.19.0"></script>
-    <script src="js/19-debug-overlay.js?v=3.19.0"></script>
-    <script src="js/20-debug-visuals.js?v=3.19.0"></script>
-    <script src="js/08-loop-ui.js?v=3.19.0"></script>
+    <!-- v3.20 modular JavaScript. Collision stress test loads after Debug Engine; Real Profiler remains active. -->
+    <script src="js/01-core.js?v=3.20.0"></script>
+    <script src="js/16-relics.js?v=3.20.0"></script>
+    <script src="js/02-input.js?v=3.20.0"></script>
+    <script src="js/15-room-design.js?v=3.20.0"></script>
+    <script src="js/03-world.js?v=3.20.0"></script>
+    <script src="js/04-enemies.js?v=3.20.0"></script>
+    <script src="js/11-bombs.js?v=3.20.0"></script>
+    <script src="js/13-collision.js?v=3.20.0"></script>
+    <script src="js/14-traps.js?v=3.20.0"></script>
+    <script src="js/05-player.js?v=3.20.0"></script>
+    <script src="js/12-enemy-ai.js?v=3.20.0"></script>
+    <script src="js/06-combat.js?v=3.20.0"></script>
+    <script src="js/07-render.js?v=3.20.0"></script>
+    <script src="js/09-camera.js?v=3.20.0"></script>
+    <script src="js/10-feedback.js?v=3.20.0"></script>
+    <script src="js/17-run-lifecycle.js?v=3.20.0"></script>
+    <script src="js/21-profiler.js?v=3.20.0"></script>
+    <script src="js/18-debug-mode.js?v=3.20.0"></script>
+    <script src="js/22-collision-stress.js?v=3.20.0"></script>
+    <script src="js/19-debug-overlay.js?v=3.20.0"></script>
+    <script src="js/20-debug-visuals.js?v=3.20.0"></script>
+    <script src="js/08-loop-ui.js?v=3.20.0"></script>
 </body>
 </html>

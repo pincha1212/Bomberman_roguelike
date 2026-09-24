@@ -1,4 +1,4 @@
-# BOMBERMAN // DESCENT — Roguelike v3.24.1
+# BOMBERMAN // DESCENT — Roguelike v3.26.0
 
 Videojuego web estático desarrollado con HTML, CSS y JavaScript vanilla. Preparado para GitHub Pages, sin backend ni bundler.
 
@@ -133,3 +133,24 @@ Debug Engine: `ROOM STRESS` valida las seis topologías, cantidad de celdas alca
 - Cap de proyectiles: PASS.
 - O(1) por trigger de patrón; sin pathfinding por frame.
 - Prueba visual en navegador/GitHub Pages: no realizada.
+
+## v3.26.0 — Feedback Update
+- Feedback de combate desacoplado en `js/29-feedback-system.js`.
+- Impactos: partículas breves, anillo y flash corto.
+- Explosiones: dos anillos, partículas ampliadas, flash y pequeña respuesta de cámara.
+- Daño: respuesta visual y sonora independiente del sistema de daño existente.
+- Partículas reutilizadas desde un pool de 96 objetos.
+- Anillos reutilizados desde un pool de 12 objetos.
+- Sonido sintetizado con `AudioContext` lazy; sin archivos de audio externos.
+- Límite de 10 sonidos por segundo y cooldown de 55 ms.
+- Actualización de feedback acotada por frame; sin búsqueda de entidades ni pathfinding.
+- Hooks sobre `explodeBomb` y `takeDamage` sin reemplazar sus reglas.
+- `js/30-feedback-stress.js` expone `runFeedbackStressV326()` para validar el presupuesto del sistema.
+
+## Validación v3.26.0
+- `node --check`: módulos v3.26 PASS.
+- Feedback Stress: PASS; 96 partículas máximas, 12 anillos máximos.
+- Benchmark del pool: 10.000 updates ≈ 11,8 ms en harness aislado.
+- Sonido limitado a 10 eventos/segundo y cooldown de 55 ms.
+- Sin audio externo ni assets adicionales.
+- Prueba visual en navegador/GitHub Pages: pendiente.

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOMBERMAN ROGUELIKE — v4.7</title>
+    <title>BOMBERMAN ROGUELIKE — v4.7.1</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/main.css">
 </head>
@@ -14,7 +14,7 @@
             <aside class="menu-rail menu-rail-left" aria-label="Resumen de la aventura">
                 <div class="menu-rail-top">
                     <span class="menu-kicker">BOMBERMAN ROGUELIKE</span>
-                    <span class="menu-version">v4.7</span>
+                    <span class="menu-version">v4.7.1</span>
                 </div>
                 <div class="menu-rail-content">
                     <div class="menu-mark">💣</div>
@@ -139,7 +139,7 @@
                     </div>
                     <p class="quality-selector-note">Elegí el nivel antes de comenzar la partida.</p>
                 </section>
-                <section class="theme-selector" aria-label="Tema visual">
+                <section class="theme-selector" aria-label="Tema y mecánicas">
                     <div class="theme-selector-head">
                         <div>
                             <span class="theme-selector-kicker">APARIENCIA</span>
@@ -150,14 +150,14 @@
                     <div class="theme-options" role="radiogroup" aria-label="Tema visual">
                         <button class="theme-option theme-option-winter" type="button" data-theme-option="winter" role="radio" aria-checked="false">
                             <span class="theme-preview theme-preview-winter" aria-hidden="true"></span>
-                            <strong>INVIERNO</strong><span>Hielo · nieve</span>
+                            <strong>INVIERNO</strong><span>Hielo · nieve · deslizamiento · viento</span>
                         </button>
                         <button class="theme-option theme-option-inferno" type="button" data-theme-option="inferno" role="radio" aria-checked="false">
                             <span class="theme-preview theme-preview-inferno" aria-hidden="true"></span>
-                            <strong>INFIERNO</strong><span>Basalto · brasas</span>
+                            <strong>INFIERNO</strong><span>Basalto · brasas · oscuridad</span>
                         </button>
                     </div>
-                    <p class="theme-selector-note">Invierno añade deslizamiento mediante el Mechanics Registry; Infierno permanece visual.</p>
+                    <p class="theme-selector-note">Las mecánicas se inyectan desde el Mechanics Registry; el tema solo declara sus IDs.</p>
                 </section>
                 <div class="menu-actions">
                     <button id="btn-start" class="btn-pixel menu-start-button" type="button">INICIAR RUN</button>
@@ -176,10 +176,10 @@
         </div>
     </div>
 <!-- v3.28 modular JavaScript. Feedback is layered over the existing combat/runtime systems. -->
-    <script src="js/01-core.js?v=4.6.2"></script>
+    <script src="js/01-core.js?v=4.7.1"></script>
     <script src="js/35-device-quality.js?v=4.5.0"></script>
-    <script src="js/37-theme.js?v=4.7.0"></script>
-    <script src="js/38-mechanics-registry.js?v=4.7.0"></script>
+    <script src="js/37-theme.js?v=4.7.1"></script>
+    <script src="js/38-mechanics-registry.js?v=4.7.1"></script>
     <script src="js/16-relics.js?v=3.27.0"></script>
     <script src="js/02-input.js?v=3.27.0"></script>
     <script src="js/15-room-design.js?v=4.5.2"></script>
@@ -189,7 +189,7 @@
     <script src="js/11-bombs.js?v=4.6.2"></script>
     <script src="js/13-collision.js?v=3.27.0"></script>
     <script src="js/14-traps.js?v=4.6.2"></script>
-    <script src="js/05-player.js?v=4.7.0"></script>
+    <script src="js/05-player.js?v=4.7.1"></script>
     <script src="js/12-enemy-ai.js?v=3.29.0"></script>
     <script src="js/06-combat.js?v=4.6.2"></script>
     <script src="js/07-render.js?v=4.6.2"></script>

@@ -76,6 +76,7 @@ function resetWorldRuntimeState() {
     gameState.bossProjectiles = [];
     gameState.roomTime = 0;
     gameState.threatLevel = 0;
+    gameState.difficulty = null;
     gameState.nextReinforcement = 20000;
     gameState.exitPos = null;
     gameState.roomDesign = null;

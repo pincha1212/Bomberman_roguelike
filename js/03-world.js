@@ -2,6 +2,7 @@
         function initLevel() {
             // Expand map grid size with higher levels
             gameState.roomType = getRoomForDepth(gameState.level);
+            if (typeof applyDifficultyV323 === 'function') applyDifficultyV323();
             gameState.gridWidth = 15 + Math.floor((gameState.level - 1) / 2) * 2;
             gameState.gridHeight = 15 + Math.floor((gameState.level - 1) / 2) * 2;
             gameState.gridWidth = Math.min(gameState.gridWidth, 25);
@@ -23,9 +24,14 @@
             gameState.boss = null;
             gameState.bossProjectiles = [];
             gameState.blastSerial = 0;
-            gameState.roomTime = Math.max(35000, 80000 - gameState.level * 1500);
+            gameState.roomTime = typeof getDifficultyRoomTimeV323 === 'function'
+                ? getDifficultyRoomTimeV323(Math.max(35000, 80000 - gameState.level * 1500))
+                : Math.max(35000, 80000 - gameState.level * 1500);
             gameState.threatLevel = 0;
-            gameState.nextReinforcement = gameState.roomTime - 18000;
+            const firstReinforcementBase = Math.max(10000, gameState.roomTime - 18000);
+            gameState.nextReinforcement = typeof getDifficultyReinforcementIntervalV323 === 'function'
+                ? getDifficultyReinforcementIntervalV323(firstReinforcementBase)
+                : firstReinforcementBase;
 
             // Spawn player top-left corner
             player.x = TILE_SIZE + (TILE_SIZE - player.width)/2;
@@ -44,7 +50,7 @@
             }
 
             // Destructible soft blocks
-            const blockDensity = Math.max(0.25, Math.min(0.72, 0.35 + (gameState.level * 0.03) + gameState.roomType.blockBonus));
+            const blockDensity = Math.max(0.25, Math.min(0.72, 0.35 + (gameState.level * 0.03) + gameState.roomType.blockBonus + (gameState.difficulty?.blockDensityBonus || 0)));
             for (let y = 1; y < gameState.gridHeight - 1; y++) {
                 for (let x = 1; x < gameState.gridWidth - 1; x++) {
                     if (gameState.grid[y][x] === TYPES.EMPTY) {
@@ -232,7 +238,7 @@
                 if(d>=4 && d<10 && !gameState.enemies.some(e=>Math.floor(e.x/TILE_SIZE)===x && Math.floor(e.y/TILE_SIZE)===y)) candidates.push({x,y,d});
             }
             candidates.sort((a,z)=>z.d-a.d);
-            const count=Math.min(2,candidates.length, Math.max(0,largeSupport.maxEnemies-gameState.enemies.length));
+            const count=Math.min(2,candidates.length, Math.max(0,Math.min(largeSupport.maxEnemies, gameState.difficulty?.maxEnemies || largeSupport.maxEnemies)-gameState.enemies.length));
             for(let i=0;i<count;i++) {
                 const c=candidates[i], type=i%2===0?ENEMY_TYPES.RASTRERO:ENEMY_TYPES.VOLADOR;
                 const sp=type.speed*gameState.roomType.enemySpeedMult*(1+gameState.threatLevel*.04)*1.15;
@@ -344,7 +350,8 @@
                 let type = ENEMY_TYPES.RASTRERO;
                 if (gameState.level >= 3 && roll > .68) type = ENEMY_TYPES.ESPECIAL;
                 else if (gameState.level >= 2 && roll > .38) type = ENEMY_TYPES.VOLADOR;
-                const speed = type.speed * gameState.roomType.enemySpeedMult * (1 + gameState.threatLevel * .04);
+                const difficultySpeed = gameState.difficulty?.enemySpeedMult || 1;
+                const speed = type.speed * gameState.roomType.enemySpeedMult * difficultySpeed * (1 + gameState.threatLevel * .04);
                 gameState.enemies.push({ x:c.x*TILE_SIZE+TILE_SIZE/2, y:c.y*TILE_SIZE+TILE_SIZE/2, width:TILE_SIZE*.75, height:TILE_SIZE*.75, type, vx:speed*(Math.random()<.5?-1:1), vy:0, baseSpeed:speed, changeTimer:15+Math.random()*35, elite:false, reinforcement:true });
                 addFloatingText('REFUERZO', c.x*TILE_SIZE+TILE_SIZE/2, c.y*TILE_SIZE+TILE_SIZE/2, '#fb7185');
             }
@@ -357,9 +364,13 @@
             if (gameState.roomType.id === 'BOSS') return;
             if (gameState.nextReinforcement <= 0) {
                 gameState.threatLevel++;
-                const amount = Math.min(1 + Math.floor(gameState.threatLevel / 2), 3);
+                const diff = gameState.difficulty || (typeof getDifficultyV323 === 'function' ? getDifficultyV323(gameState.level) : null);
+                const amount = Math.min(3, 1 + Math.floor(gameState.threatLevel / 2) + (diff?.reinforcementAmountBonus || 0));
                 spawnReinforcement(amount);
-                gameState.nextReinforcement = Math.max(12000, 24000 - gameState.level * 500);
+                const baseInterval = Math.max(12000, 24000 - gameState.level * 500);
+                gameState.nextReinforcement = typeof getDifficultyReinforcementIntervalV323 === 'function'
+                    ? getDifficultyReinforcementIntervalV323(baseInterval)
+                    : baseInterval;
                 triggerScreenShake(3, 140);
             }
         }

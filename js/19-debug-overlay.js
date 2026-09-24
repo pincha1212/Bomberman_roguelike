@@ -103,6 +103,7 @@
                 <div><span>RUN</span><strong id="dbg-run">—</strong></div>
                 <div><span>ROOM</span><strong id="dbg-room">—</strong></div>
                 <div><span>THREAT</span><strong id="dbg-threat">—</strong></div>
+                <div><span>DIFICULTAD</span><strong id="dbg-difficulty">—</strong></div>
                 <div><span>TIME</span><strong id="dbg-time">—</strong></div>
                 <div><span>SCORE</span><strong id="dbg-score">—</strong></div>
                 <div><span>COINS</span><strong id="dbg-coins">—</strong></div>
@@ -178,6 +179,8 @@
             <div class="debug-section-head"><div class="debug-section-title">ROOM STRESS</div><span id="dbg-room-stress-head">PENDIENTE</span></div>
             <div id="dbg-room-stress-summary" class="debug-note">Ejecutá ROOM STRESS para validar las seis topologías procedurales y sus rutas.</div>
             <pre id="dbg-collision-stress-data" class="debug-log">Sin resultados.</pre>
+            <div class="debug-section-head"><div class="debug-section-title">DIFFICULTY STRESS</div><span id="dbg-difficulty-stress-head">PENDIENTE</span></div>
+            <div id="dbg-difficulty-stress-summary" class="debug-note">Ejecutá DIFFICULTY STRESS para validar progresión por profundidad.</div>
         </section>
 
         <section class="debug-section">
@@ -295,6 +298,7 @@
             setText('dbg-run', w.run);
             setText('dbg-room', w.room);
             setText('dbg-threat', w.threat);
+            setText('dbg-difficulty', w.difficulty || '—');
             setText('dbg-time', `${Math.ceil(Math.max(0,w.roomTimeMs)/1000)}s`);
             setText('dbg-score', w.score);
             setText('dbg-coins', w.coins);
@@ -372,6 +376,12 @@
         } else {
             setText('dbg-room-stress-head', 'PENDIENTE');
             setText('dbg-room-stress-summary', 'Ejecutá ROOM STRESS para validar las seis topologías procedurales y sus rutas.');
+        }
+
+        const difficultyStress = D.testResults.slice().reverse().find(r => r.name === 'difficulty-stress');
+        if (difficultyStress) {
+            setText('dbg-difficulty-stress-head', difficultyStress.status || '—');
+            setText('dbg-difficulty-stress-summary', difficultyStress.summary || 'Sin resultados.');
         }
 
         const collisionStress = D.testResults.slice().reverse().find(r => r.name === 'collision-stress');

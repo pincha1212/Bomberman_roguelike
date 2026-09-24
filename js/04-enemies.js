@@ -1,7 +1,9 @@
 // Bomberman Roguelike v3.11 — Enemy spawning and enemy setup
         function spawnEnemies() {
             const baseCount = Math.min(3 + Math.floor(gameState.level * 1.5), 12);
-            const count = Math.max(1, Math.round(baseCount * gameState.roomType.enemyMult));
+            const diff = gameState.difficulty || (typeof getDifficultyV323 === 'function' ? getDifficultyV323(gameState.level) : null);
+            const maxEnemies = diff?.maxEnemies || largeSupport.maxEnemies;
+            const count = Math.min(maxEnemies, Math.max(1, Math.round(baseCount * gameState.roomType.enemyMult * (diff?.enemyCountMult || 1))));
             const candidates = [];
             const px = Math.floor((player.x + player.width / 2) / TILE_SIZE);
             const py = Math.floor((player.y + player.height / 2) / TILE_SIZE);
@@ -50,7 +52,7 @@
                 let type = ENEMY_TYPES.RASTRERO;
                 if (gameState.level >= 2 && rand > 0.6) type = ENEMY_TYPES.VOLADOR;
                 if (gameState.level >= 3 && rand > 0.85) type = ENEMY_TYPES.ESPECIAL;
-                const speed = type.speed * gameState.roomType.enemySpeedMult;
+                const speed = type.speed * gameState.roomType.enemySpeedMult * (diff?.enemySpeedMult || 1);
 
                 gameState.enemies.push({
                     x: x * TILE_SIZE + TILE_SIZE / 2,
@@ -62,7 +64,7 @@
                     vy: 0,
                     baseSpeed: speed,
                     changeTimer: Math.random() * 100,
-                    elite: gameState.roomType.id === 'ELITE' || gameState.roomType.id === 'CURSED',
+                    elite: gameState.roomType.id === 'ELITE' || gameState.roomType.id === 'CURSED' || (diff?.eliteBonus || 0) > 0 && Math.random() < diff.eliteBonus,
                     lastDirection: 'down',
                     __gridAnchor: 'center',
                     desiredDirection: 'down'

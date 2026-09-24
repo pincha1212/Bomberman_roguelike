@@ -98,10 +98,11 @@ function generateHazards() {
     }
     candidates.splice(0, candidates.length, ...riskCandidates, ...normalCandidates);
 
-    const count = Math.min(
-        candidates.length,
-        Math.max(2, 2 + Math.floor(gameState.level / 2) + (gameState.roomType.id === 'CURSED' ? 2 : 0))
-    );
+    const baseCount = Math.max(2, 2 + Math.floor(gameState.level / 2) + (gameState.roomType.id === 'CURSED' ? 2 : 0));
+    const difficultyCount = typeof getDifficultyTrapCountV323 === 'function'
+        ? getDifficultyTrapCountV323(baseCount)
+        : baseCount;
+    const count = Math.min(candidates.length, difficultyCount);
 
     player.hazardSlowTimer = 0;
     player.hazardSlowFactor = 1;

@@ -13,7 +13,7 @@
         { dx: -1, dy: 0, dir: 'LEFT' }
     ]);
 
-    const TEST_NAMES = Object.freeze(['movement', 'bombs', 'damage', 'traps', 'enemies', 'ai-stress', 'navigation-stress', 'room-stress', 'camera', 'restart']);
+    const TEST_NAMES = Object.freeze(['movement', 'bombs', 'damage', 'traps', 'enemies', 'ai-stress', 'navigation-stress', 'room-stress', 'difficulty-stress', 'camera', 'restart']);
     const MAX_EVENTS = 220;
     const MAX_ERRORS = 100;
     const MAX_TEST_RESULTS = 30;
@@ -271,6 +271,7 @@
                     roomName: room?.name || '—',
                     threat: Number(state.threatLevel || 0),
                     roomTimeMs: Number(state.roomTime || 0),
+                    difficulty: state.difficulty ? `T${state.difficulty.tier} · x${state.difficulty.enemyCountMult.toFixed(2)}` : '—',
                     run: Number(state.runNumber || 0),
                     score: Number(state.score || 0),
                     coins: Number(state.coins || 0),
@@ -321,6 +322,7 @@
                 navigation,
                 aiStress: this.aiStress,
                 roomStress: this.roomStress,
+                difficultyStress: this.difficultyStress,
                 profiler: window.BOMBER_PROFILER?.snapshot?.() || null
             };
         },
@@ -469,6 +471,7 @@
             this.aiStress = null;
             this.navigationStress = null;
             this.roomStress = null;
+            this.difficultyStress = null;
             const storage = captureStorage();
             const startedSuite = performance.now();
             this.recordEvent('TEST', `Inicio de suite: ${names.length} prueba(s).`);
@@ -1691,6 +1694,11 @@
             if (typeof window.RUN_ROOM_STRESS_V322 !== 'function') throw new Error('Room Stress v3.22 no disponible.');
             return window.RUN_ROOM_STRESS_V322();
         },
+        'difficulty-stress': async () => {
+            if (typeof window.RUN_DIFFICULTY_STRESS_V323 !== 'function') throw new Error('Difficulty Stress v3.23 no disponible.');
+            return window.RUN_DIFFICULTY_STRESS_V323();
+        },
+
         camera: async () => {
             prepareTestScene();
             const p = getPlayer();

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.28.4 — Unified Debug Mode
+// Bomberman Roguelike v3.28.5 — Unified Debug Mode
 // Depuración interna del mismo runtime. Se activa solo con ?debug=1.
 (() => {
     'use strict';
@@ -612,7 +612,7 @@
             const hw = checks.filter(c => c.status === 'WARN').length;
             const hf = checks.filter(c => c.status === 'FAIL').length;
             return [
-                'BOMBERMAN ROGUELIKE — DEBUG MODE v3.28.4',
+                'BOMBERMAN ROGUELIKE — DEBUG MODE v3.28.5',
                 `SUITE: ${results.length}/${getAvailableTestNames().length} · ${passed} PASS · ${failed} FAIL`,
                 ...results.map(r => `${String(r.name || 'TEST').toUpperCase()}: ${r.status} — ${compactCopyText(r.summary || r.result || 'Sin resultado')}`),
                 `DIAGNOSTICO: ${this.lastHealth?.status || 'PENDIENTE'} — ${hp} PASS · ${hw} WARN · ${hf} FAIL`,
@@ -2124,6 +2124,6 @@
         }
     });
 
-    DEBUG_MODE.recordEvent('DEBUG', 'Debug Mode v3.28.3 unificado cargado en el mismo runtime.');
+    DEBUG_MODE.recordEvent('DEBUG', 'Debug Mode v3.28.5 unificado cargado en el mismo runtime.');
     DEBUG_MODE.recordEvent('DEBUG', 'Usá RESET para activar una escena de depuración limpia.');
 })();

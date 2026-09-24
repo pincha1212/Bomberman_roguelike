@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.28.4 — Unified Debug Overlay
+// Bomberman Roguelike v3.28.5 — Unified Debug Overlay
 // Panel reconstruido para inspección en vivo. Solo se crea con ?debug=1.
 (() => {
     'use strict';
@@ -12,7 +12,7 @@
     root.innerHTML = `
         <div class="debug-header">
             <div>
-                <div class="debug-kicker">BOMBERMAN ENGINE · v3.28.4</div>
+                <div class="debug-kicker">BOMBERMAN ENGINE · v3.28.5</div>
                 <h2>DEBUG MODE <span id="debug-status" class="debug-status">CARGANDO</span></h2>
             </div>
             <button type="button" class="debug-icon-btn" data-debug-action="toggle" title="Mostrar/ocultar panel">F3</button>
@@ -27,16 +27,20 @@
             <button type="button" data-debug-action="copy-tests" title="Copia resultados de tests y diagnóstico en texto plano">COPIAR RESULTADOS</button>
         </div>
 
-        <nav class="debug-jump" aria-label="Navegar por Debug Mode">
-            <button type="button" data-debug-jump="dbg-section-state">ESTADO</button>
+        <nav class="debug-jump" aria-label="Navegación rápida de Debug Mode">
+            <button type="button" class="is-active" data-debug-jump="dbg-section-state">ESTADO</button>
+            <button type="button" data-debug-jump="dbg-section-profile">PERFIL</button>
             <button type="button" data-debug-jump="dbg-section-player">PLAYER</button>
             <button type="button" data-debug-jump="dbg-section-world">WORLD</button>
             <button type="button" data-debug-jump="dbg-section-navigation">NAVEGACIÓN</button>
             <button type="button" data-debug-jump="dbg-section-tests">TESTS</button>
             <button type="button" data-debug-jump="dbg-section-diagnostic">DIAGNÓSTICO</button>
             <button type="button" data-debug-jump="dbg-section-events">LOG</button>
+            <button type="button" data-debug-jump="dbg-section-errors">ERRORES</button>
+            <button type="button" data-debug-jump="dbg-section-actions">ACCIONES</button>
         </nav>
 
+        <div class="debug-scroll" id="debug-scroll">
         <section id="dbg-section-state" class="debug-section">
             <div class="debug-section-head"><div class="debug-section-title">ESTADO</div><span id="dbg-state-status">—</span></div>
             <div class="debug-grid debug-grid-3">
@@ -240,13 +244,14 @@
                 <button type="button" data-debug-action="exit">SALIR DEBUG</button>
             </div>
         </section>
+        </div>
     `;
     document.body.appendChild(root);
     document.body.classList.add('debug-page');
     document.getElementById('game-container')?.classList.add('debug-enabled');
 
     const style = document.createElement('style');
-    style.id = 'debug-v3284-inline-style';
+    style.id = 'debug-v3285-inline-style';
     style.textContent = `
 #debug-overlay{position:fixed;top:12px;right:12px;bottom:12px;width:min(500px,calc(100vw - 24px));z-index:99999;display:flex;flex-direction:column;overflow:hidden;background:rgba(7,12,22,.97);color:#e5e7eb;border:1px solid rgba(148,163,184,.35);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.55);font:12px/1.4 Inter,system-ui,sans-serif;backdrop-filter:blur(10px)}
 #debug-overlay.hidden{display:none}
@@ -256,10 +261,14 @@
 #debug-overlay .debug-toolbar,#debug-overlay .debug-action-grid{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px}
 #debug-overlay button,#debug-overlay select{font:600 11px/1.1 Inter,system-ui,sans-serif;color:#e5e7eb;background:#111827;border:1px solid #334155;border-radius:7px;padding:7px 9px;cursor:pointer}
 #debug-overlay button:hover{border-color:#64748b;background:#172033}
-#debug-overlay .debug-jump{position:sticky;top:0;z-index:4;display:flex;gap:5px;overflow-x:auto;padding:7px 12px;background:rgba(7,12,22,.98);border-top:1px solid rgba(148,163,184,.12);border-bottom:1px solid rgba(148,163,184,.16)}
-#debug-overlay .debug-jump button{white-space:nowrap;padding:6px 8px;font-size:10px}
+#debug-overlay .debug-jump{flex:0 0 auto;display:flex;gap:5px;overflow-x:auto;overflow-y:hidden;padding:7px 12px;background:rgba(7,12,22,.995);border-top:1px solid rgba(148,163,184,.12);border-bottom:1px solid rgba(148,163,184,.16);scrollbar-width:thin}
+#debug-overlay .debug-jump button{white-space:nowrap;padding:6px 8px;font-size:10px;flex:0 0 auto}
+#debug-overlay .debug-jump button.is-active{border-color:#60a5fa;background:#1d4ed8;color:#fff}
+#debug-overlay .debug-scroll{min-height:0;flex:1 1 auto;overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth;overscroll-behavior:contain;scroll-padding-top:8px}
+#debug-overlay .debug-scroll::-webkit-scrollbar{width:8px}
+#debug-overlay .debug-scroll::-webkit-scrollbar-thumb{background:rgba(148,163,184,.32);border-radius:8px}
 #debug-overlay .debug-section{padding:12px;border-bottom:1px solid rgba(148,163,184,.12)}
-#debug-overlay .debug-section-navigation{scroll-margin-top:52px}
+#debug-overlay .debug-section{scroll-margin-top:8px}
 #debug-overlay .debug-section-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
 #debug-overlay .debug-section-title{font-weight:800;letter-spacing:.08em;font-size:11px}
 #debug-overlay .debug-grid{display:grid;gap:5px}
@@ -704,11 +713,30 @@
         if (select) { selectedNavTarget = select.value; drawNavigationMap(D.snapshot()); }
     });
 
+    function setActiveJump(id) {
+        root.querySelectorAll('[data-debug-jump]').forEach(button => {
+            button.classList.toggle('is-active', button.dataset.debugJump === id);
+        });
+    }
+
     root.addEventListener('click', event => {
         const jump = event.target.closest('[data-debug-jump]');
         if (!jump) return;
-        document.getElementById(jump.dataset.debugJump)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const section = document.getElementById(jump.dataset.debugJump);
+        const scroll = document.getElementById('debug-scroll');
+        if (!section || !scroll) return;
+        scroll.scrollTo({ top: Math.max(0, section.offsetTop - 6), behavior: 'smooth' });
+        setActiveJump(section.id);
     });
+
+    const debugScroll = document.getElementById('debug-scroll');
+    if (debugScroll && 'IntersectionObserver' in window) {
+        const observer = new IntersectionObserver(entries => {
+            const visible = entries.filter(entry => entry.isIntersecting).sort((a,b) => b.intersectionRatio - a.intersectionRatio)[0];
+            if (visible?.target?.id) setActiveJump(visible.target.id);
+        }, { root: debugScroll, threshold: [0.15, 0.35, 0.6] });
+        root.querySelectorAll('.debug-section').forEach(section => observer.observe(section));
+    }
 
     window.addEventListener('bomber-debug-updated', refresh);
     window.setInterval(refresh, 120);

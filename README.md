@@ -257,3 +257,25 @@ La salida v3.28.2 mostraba `ENEMY-BEHAVIOR-STRESS: FAIL` y simultáneamente `RUN
 - Un fallo funcional de una prueba ya no se suma a `RUNTIME ERRORS`; los errores de ejecución quedan reservados para excepciones del runtime, recursos, promesas no controladas o acciones.
 - La suite termina generando automáticamente un snapshot y un diagnóstico para que el reporte de copia no quede en `PENDIENTE`.
 - El resultado bruto de `ROGUELIKE-STRESS` se normaliza a texto simple en vez de mostrar `[object Object]`.
+
+
+## v3.28.4 — Debug Mode visual/navigation + threat instrumentation
+
+- Se mantiene Debug Mode como única interfaz de depuración.
+- NAVEGACIÓN incorpora un mapa visual del nivel usando la misma rejilla del juego.
+- Se visualizan alcance del jugador, ruta del objetivo seleccionado, jugador, enemigos, bombas, explosiones y dirección real de IA según los toggles.
+- Se agregó selector JUGADOR/E<n> y actualización manual de navegación para evitar recalcular BFS en cada render del panel.
+- Se agregó navegación rápida entre secciones del panel.
+- El caché de navegación pasa a 700 ms para reducir el coste del análisis en vivo.
+- `threat-state` ahora detecta `gameState.threatLevel`, que es la propiedad usada por el runtime/HUD.
+- Se mantiene el snapshot y diagnóstico automáticos al finalizar la suite.
+- El reporte continúa siendo texto plano copiable.
+
+### Validación v3.28.4
+
+- Syntax: PASS.
+- Threat Level instrumentation: PASS.
+- Navigation visual DOM/canvas: PASS.
+- Unified Debug Mode references: PASS.
+- Harness: PASS.
+- No se afirma validación visual en GitHub Pages.

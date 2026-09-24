@@ -1,0 +1,12 @@
+/*
+ * BOMBERMAN ROGUELIKE v4.3
+ * Hoja de estilos principal: solo ordena módulos.
+ * El orden de estos imports conserva la cascada histórica de v4.2.
+ */
+@import url("01-base.css");
+@import url("02-ui-systems.css");
+@import url("03-menu-layout.css");
+@import url("04-relics-screens.css");
+@import url("06-v4-theme.css");
+@import url("07-v4-responsive.css");
+@import url("08-device-quality.css");

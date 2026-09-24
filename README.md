@@ -93,3 +93,22 @@ Debug Engine: `ROOM STRESS` valida las seis topologías, cantidad de celdas alca
 - BFS permanece reservado al recovery excepcional.
 - Debug muestra arquetipo y etiqueta del enemigo.
 - Nuevo `js/26-enemy-behavior-stress.js` para validar los cinco roles.
+
+
+## v3.24.1 — AI Stress & Recovery Fix
+
+- Intersecciones: seguir recto es una decisión válida; los tests ya no exigen un giro artificial.
+- Recovery: se registra la dirección físicamente bloqueada y la cantidad de fallos consecutivos.
+- Recovery local: una dirección bloqueada repetidamente queda excluida como candidata.
+- Recovery local exige una comprobación física de 2 px antes de aceptar el nuevo vector.
+- AI Stress incorpora un caso específico de bloqueo repetido para evitar regresiones.
+- BFS sigue reservado para recovery excepcional y no puede devolver la misma dirección bloqueada.
+- Debug expone `blockedDirection` y `blockedDirectionFrames`.
+
+
+## Validación v3.24.1
+
+- AI Stress: intersecciones aceptan continuidad recta.
+- Recovery stress: dirección bloqueada repetidamente no vuelve a seleccionarse.
+- BFS: 0 en recovery con salida local.
+- Movimiento cardinal conservado.

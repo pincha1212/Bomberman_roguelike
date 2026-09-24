@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.2 — Core, configuration, state, audio, performance and adaptive interface
+// Bomberman Roguelike v4.5 — Core, configuration, state, audio, performance and adaptive interface
 // V2.0 IMMERSIVE SYSTEMS
 let audioCtx = null;
 const ambient = { dustTimer: 0, lastFoot: 0, introTimer: 0 };
@@ -58,7 +58,9 @@ function updatePerfSceneV329(){
 
 function drawAmbientDust(){
     const heavy=updatePerfSceneV329();
-    const count=perf.lowQuality ? 8 : (heavy ? 12 : 24);
+    const configured = typeof getDeviceQualityV45 === 'function' ? getDeviceQualityV45().ambientDust : null;
+    const count = configured !== null ? Math.min(configured, heavy ? Math.max(6, configured) : configured) : (perf.lowQuality ? 8 : (heavy ? 12 : 24));
+    if (count <= 0) return;
     for(let i=0;i<count;i++){
         const seed=(i*97)%1000;
         const x=((seed*3.71+gameState.animFrame*.09*(i%3+1))%(canvas.width+80))-40;
@@ -72,6 +74,7 @@ function drawLighting(){
     // realmente cargadas se actualiza cada 2 frames para contener el coste de
     // los gradientes sin tocar la simulación.
     updatePerfSceneV329();
+    if (typeof deviceQualityV45ShouldLighting === 'function' && !deviceQualityV45ShouldLighting()) return;
     if(!perfRenderEveryV329(2)) return;
     ctx.save();
     const pcx=player.x+player.width/2-gameState.camera.x;
@@ -79,7 +82,7 @@ function drawLighting(){
     const grad=ctx.createRadialGradient(pcx,pcy,35,pcx,pcy,240);
     grad.addColorStop(0,'rgba(0,0,0,0)'); grad.addColorStop(.65,'rgba(0,0,0,.12)'); grad.addColorStop(1,'rgba(0,0,0,.52)');
     ctx.fillStyle=grad; ctx.fillRect(0,0,canvas.width,canvas.height);
-    if (!perf.lowQuality || gameState.animFrame % 2 === 0) {
+    if (typeof deviceQualityV45ShouldBombGlow === 'function' ? deviceQualityV45ShouldBombGlow() : (!perf.lowQuality || gameState.animFrame % 2 === 0)) {
         for(let i=0;i<gameState.bombs.length;i++){
             const b=gameState.bombs[i];
             if(!b) continue;

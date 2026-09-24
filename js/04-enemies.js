@@ -88,8 +88,9 @@
         }
 
         function addParticles(x, y, color, count = 8) {
+            const requested = typeof deviceQualityV45ParticleCount === 'function' ? deviceQualityV45ParticleCount(count) : count;
             const room = Math.max(0, largeSupport.particleBudget - gameState.particles.length);
-            count = Math.min(count, room, perf.lowQuality ? 5 : count);
+            count = Math.min(requested, room, perf.lowQuality ? 5 : requested);
             for (let i = 0; i < count; i++) {
                 let angle = Math.random() * Math.PI * 2;
                 let speed = 1 + Math.random() * 3;

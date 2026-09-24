@@ -105,7 +105,8 @@ function feedbackV326FindRing() {
 function feedbackV326SpawnParticles(x, y, color, count, scale = 1) {
     if (!FEEDBACK_V326_CONFIG.enabled) return;
 
-    const targetCount = Math.min(count, FEEDBACK_V326_CONFIG.maxParticles);
+    const scaledCount = typeof deviceQualityV45FeedbackCount === 'function' ? deviceQualityV45FeedbackCount(count, 'particles') : count;
+    const targetCount = Math.min(scaledCount, FEEDBACK_V326_CONFIG.maxParticles);
     for (let i = 0; i < targetCount; i++) {
         const p = feedbackV326FindParticle();
         if (!p) break;
@@ -133,6 +134,7 @@ function feedbackV326SpawnParticles(x, y, color, count, scale = 1) {
 }
 
 function feedbackV326SpawnRing(x, y, color, scale = 1) {
+    if (typeof deviceQualityV45FeedbackCount === 'function' && deviceQualityV45FeedbackCount(1, 'rings') <= 0) return;
     const ring = feedbackV326FindRing();
     if (!ring) return;
 
@@ -169,8 +171,8 @@ function feedbackV326Impact(x, y, color = '#fde68a', scale = 1) {
     FeedbackV326.impactCount += 1;
     feedbackV326SpawnParticles(x, y, color, Math.round(7 * scale), scale);
     feedbackV326SpawnRing(x, y, color, 0.8 * scale);
-    feedbackV326Flash(0.12 * scale, FEEDBACK_V326_CONFIG.impactFlashMs);
-    feedbackV326KickCamera(FEEDBACK_V326_CONFIG.cameraKickImpact * scale);
+    feedbackV326Flash(typeof deviceQualityV45FeedbackFlash === 'function' ? deviceQualityV45FeedbackFlash(0.12 * scale) : 0.12 * scale, FEEDBACK_V326_CONFIG.impactFlashMs);
+    feedbackV326KickCamera(typeof deviceQualityV45CameraKick === 'function' ? deviceQualityV45CameraKick(FEEDBACK_V326_CONFIG.cameraKickImpact * scale) : FEEDBACK_V326_CONFIG.cameraKickImpact * scale);
     feedbackV326PlaySound('impact', scale);
 }
 
@@ -179,8 +181,8 @@ function feedbackV326Explosion(x, y, color = '#fb923c', scale = 1) {
     feedbackV326SpawnParticles(x, y, color, Math.round(14 * scale), 1.15 * scale);
     feedbackV326SpawnRing(x, y, '#fed7aa', 1.25 * scale);
     feedbackV326SpawnRing(x, y, color, 0.8 * scale);
-    feedbackV326Flash(0.18 * scale, FEEDBACK_V326_CONFIG.explosionFlashMs);
-    feedbackV326KickCamera(FEEDBACK_V326_CONFIG.cameraKickExplosion * scale);
+    feedbackV326Flash(typeof deviceQualityV45FeedbackFlash === 'function' ? deviceQualityV45FeedbackFlash(0.18 * scale) : 0.18 * scale, FEEDBACK_V326_CONFIG.explosionFlashMs);
+    feedbackV326KickCamera(typeof deviceQualityV45CameraKick === 'function' ? deviceQualityV45CameraKick(FEEDBACK_V326_CONFIG.cameraKickExplosion * scale) : FEEDBACK_V326_CONFIG.cameraKickExplosion * scale);
     feedbackV326PlaySound('explosion', scale);
 }
 
@@ -188,8 +190,8 @@ function feedbackV326Damage(x, y) {
     FeedbackV326.damageCount += 1;
     feedbackV326SpawnParticles(x, y, '#f87171', 8, 0.9);
     feedbackV326SpawnRing(x, y, '#fecaca', 0.75);
-    feedbackV326Flash(0.16, FEEDBACK_V326_CONFIG.impactFlashMs);
-    feedbackV326KickCamera(2.2);
+    feedbackV326Flash(typeof deviceQualityV45FeedbackFlash === 'function' ? deviceQualityV45FeedbackFlash(0.16) : 0.16, FEEDBACK_V326_CONFIG.impactFlashMs);
+    feedbackV326KickCamera(typeof deviceQualityV45CameraKick === 'function' ? deviceQualityV45CameraKick(2.2) : 2.2);
     feedbackV326PlaySound('damage', 0.9);
 }
 
@@ -216,7 +218,10 @@ function feedbackV326PlaySound(kind, scale = 1) {
         FeedbackV326.soundWindowStart = now;
         FeedbackV326.soundWindowCount = 0;
     }
-    if (FeedbackV326.soundWindowCount >= FEEDBACK_V326_CONFIG.maxSoundsPerSecond) return;
+    const maxSounds = typeof getDeviceQualityV45 === 'function'
+        ? Math.min(FEEDBACK_V326_CONFIG.maxSoundsPerSecond, getDeviceQualityV45().maxSoundsPerSecond)
+        : FEEDBACK_V326_CONFIG.maxSoundsPerSecond;
+    if (FeedbackV326.soundWindowCount >= maxSounds) return;
 
     const audio = feedbackV326GetAudioContext();
     if (!audio) return;
@@ -301,6 +306,7 @@ function feedbackV326BeginWorldDraw() {
 }
 
 function drawFeedbackV326() {
+    const quality = typeof getDeviceQualityV45 === 'function' ? getDeviceQualityV45() : null;
     const particlesActive = FeedbackV326.particles.some(p => p.active);
     const ringsActive = FeedbackV326.rings.some(r => r.active);
 

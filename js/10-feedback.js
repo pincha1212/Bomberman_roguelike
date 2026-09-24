@@ -40,8 +40,11 @@ function updateCombatFeedback(dt){
 }
 
 function triggerCombatFlash(color='rgba(255,255,255,1)', alpha=.35, duration=110){
+    const scaledAlpha = typeof deviceQualityV45FeedbackFlash === 'function'
+        ? deviceQualityV45FeedbackFlash(alpha)
+        : alpha;
     combatFeedback.flashColor = color;
-    combatFeedback.flashAlpha = alpha;
+    combatFeedback.flashAlpha = scaledAlpha;
     combatFeedback.flash = Math.max(combatFeedback.flash, duration);
 }
 
@@ -211,7 +214,10 @@ function renderCombatFeedback(){
     }
     if(combatFeedback.death>0){
         const p=1-clamp01(combatFeedback.death/900);
-        const alpha=(1-p)*.28;
+        const baseAlpha=(1-p)*.28;
+        const alpha=typeof deviceQualityV45FeedbackFlash === 'function'
+            ? deviceQualityV45FeedbackFlash(baseAlpha)
+            : baseAlpha;
         ctx.save();
         ctx.fillStyle='rgba(127,29,29,1)';
         ctx.globalAlpha=alpha;

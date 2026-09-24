@@ -4,6 +4,7 @@
         // El personaje usa una hurtbox de movimiento más pequeña que el sprite,
         // con un pequeño "skin" de seguridad para evitar enganches en esquinas.
         // V3.4 — ASSISTED MOTION
+        // V4.3.3 — FEEL UPDATE: turn carry + buffered cardinal steering
         // El jugador sigue moviéndose SOLO en los cuatro ejes cardinales.
         // La asistencia no crea diagonales: ayuda a centrar carriles, memoriza
         // brevemente un giro y suaviza aceleración/frenado/reversa.
@@ -11,13 +12,16 @@
         const MOVEMENT_WALL_PADDING = 1.5;
         const MOVEMENT_EPSILON = 0.001;
         const MOTION = {
+            // v4.3.3 — sensación de control: entrada rápida sin perder continuidad.
             maxStep: 2.0,
-            acceleration: 0.95,
-            braking: 1.35,
-            reverseBraking: 1.8,
-            turnAssistRadius: 8.5,
+            acceleration: 1.05,
+            braking: 1.45,
+            reverseBraking: 2.35,
+            turnAssistRadius: 12,
             turnSnapRadius: 4.5,
-            inputBufferMs: 115,
+            turnCorrectionStep: 3.25,
+            turnCarrySpeed: 0.92,
+            inputBufferMs: 145,
             stopEpsilon: 0.035,
             axisDeadzone: 0.18
         };
@@ -42,38 +46,41 @@
 
         function getLaneTarget(axis) {
             const center = axis === 'x' ? player.y + player.height / 2 : player.x + player.width / 2;
-            const cell = Math.floor(center / TILE_SIZE);
+            const maxCell = axis === 'x' ? gameState.gridHeight - 1 : gameState.gridWidth - 1;
+            // Usamos el centro más cercano, no el piso actual. Así el giro queda
+            // asociado a la intersección más cercana y no a la celda de origen.
+            const rawCell = Math.round((center / TILE_SIZE) - 0.5);
+            const cell = Math.max(0, Math.min(maxCell, rawCell));
             const laneCenter = cell * TILE_SIZE + TILE_SIZE / 2;
             return axis === 'x' ? laneCenter - player.height / 2 : laneCenter - player.width / 2;
         }
 
-        function alignToLane(axis) {
+        function getLaneOffset(axis) {
             const target = getLaneTarget(axis);
             const current = axis === 'x' ? player.y : player.x;
-            const delta = target - current;
-            const abs = Math.abs(delta);
-            const assistRadius = MOTION.turnAssistRadius + (Number(gameState.relicMods?.turnAssistBonus) || 0);
+            return target - current;
+        }
+
+        function trySnapToLane(axis) {
+            const offset = getLaneOffset(axis);
             const snapRadius = MOTION.turnSnapRadius + (Number(gameState.relicMods?.turnSnapBonus) || 0);
-            if (abs > assistRadius) return false;
+            if (Math.abs(offset) > snapRadius) return false;
 
-            // Corrección asistida por etapas: el jugador se detiene en su eje
-            // actual y se centra suavemente en el carril. Nunca se aplican X e Y
-            // en el mismo paso, por lo que no existe movimiento diagonal.
-            if (abs <= snapRadius) {
-                const candidateX = axis === 'x' ? player.x : target;
-                const candidateY = axis === 'x' ? target : player.y;
-                if (!rectCollidesSolid(candidateX, candidateY, player.width, player.height)) {
-                    if (axis === 'x') player.y = target;
-                    else player.x = target;
-                    return true;
-                }
-            }
+            const current = axis === 'x' ? player.y : player.x;
+            const target = current + offset;
+            const candidateX = axis === 'x' ? player.x : target;
+            const candidateY = axis === 'x' ? target : player.y;
+            if (rectCollidesSolid(candidateX, candidateY, player.width, player.height)) return false;
 
-            const correction = Math.min(1.8, abs);
-            const moved = axis === 'x'
-                ? moveAxisWithCollision('y', Math.sign(delta) * correction)
-                : moveAxisWithCollision('x', Math.sign(delta) * correction);
-            return moved && Math.abs(target - (axis === 'x' ? player.y : player.x)) <= snapRadius;
+            if (axis === 'x') player.y = target;
+            else player.x = target;
+            return true;
+        }
+
+        function isReadyForTurn(axis) {
+            const offset = getLaneOffset(axis);
+            const assistRadius = MOTION.turnAssistRadius + (Number(gameState.relicMods?.turnAssistBonus) || 0);
+            return Math.abs(offset) <= assistRadius;
         }
 
         function getCardinalInput() {
@@ -115,42 +122,140 @@
             const desired = input.axis ? input : player.inputBuffer;
             const currentAxis = Math.abs(player.vx) > 0.01 ? 'x' : Math.abs(player.vy) > 0.01 ? 'y' : null;
             let axis = currentAxis;
+            let turnEntrySpeed = 0;
+            let turnCorrectionConsumed = false;
+            let movementDirection = desired?.dir || 0;
 
+            // Un snap de carril consume este frame. Guardamos la velocidad de
+            // entrada para arrancar el nuevo eje en el frame siguiente, evitando
+            // combinar la corrección lateral con el avance del giro.
+            if (desired && !currentAxis && player._turnEntryAxis === desired.axis && player._turnEntryDir === desired.dir && player._turnEntrySpeed > 0) {
+                axis = desired.axis;
+                movementDirection = desired.dir;
+                turnEntrySpeed = player._turnEntrySpeed;
+                player._turnEntrySpeed = 0;
+                player._turnEntryAxis = null;
+                player._turnEntryDir = 0;
+            }
             if (!desired) {
+                player._turnEntrySpeed = 0;
+                player._turnEntryAxis = null;
+                player._turnEntryDir = 0;
                 if (currentAxis === 'x') player.vx = approach(player.vx, 0, MOTION.braking * frameScale);
                 if (currentAxis === 'y') player.vy = approach(player.vy, 0, MOTION.braking * frameScale);
+                if (Math.abs(player.vx) <= MOTION.stopEpsilon) player.vx = 0;
+                if (Math.abs(player.vy) <= MOTION.stopEpsilon) player.vy = 0;
             } else if (!currentAxis) {
                 axis = desired.axis;
             } else if (currentAxis !== desired.axis) {
-                // Para girar: primero frena y centra el carril; luego cambia de eje.
-                const centered = alignToLane(desired.axis);
-                const velocity = currentAxis === 'x' ? player.vx : player.vy;
-                if (centered || Math.abs(velocity) <= MOTION.stopEpsilon) {
-                    if (currentAxis === 'x') player.vx = 0;
-                    else player.vy = 0;
-                    axis = desired.axis;
+                const currentVelocity = currentAxis === 'x' ? player.vx : player.vy;
+                const currentDirection = Math.sign(currentVelocity) || (gameState.lastMoveAxis === 'horizontal' ? 1 : 1);
+                const turnReady = isReadyForTurn(desired.axis);
+
+                if (turnReady) {
+                    // Primero intentamos el giro limpio en el centro del carril.
+                    if (trySnapToLane(desired.axis)) {
+                        turnEntrySpeed = Math.abs(currentVelocity) * MOTION.turnCarrySpeed;
+                        player._turnEntrySpeed = turnEntrySpeed;
+                        player._turnEntryAxis = desired.axis;
+                        player._turnEntryDir = desired.dir;
+                        if (currentAxis === 'x') player.vx = 0;
+                        else player.vy = 0;
+                        turnCorrectionConsumed = true;
+                        axis = desired.axis;
+                        movementDirection = desired.dir;
+                    } else {
+                        // Asistencia mínima y estrictamente cardinal. Si todavía
+                        // faltan unos píxeles para entrar a la intersección,
+                        // corregimos SOLO el eje perpendicular y consumimos este
+                        // frame. Esto evita desplazamiento diagonal.
+                        const offset = getLaneOffset(desired.axis);
+                        const correction = Math.min(MOTION.turnCorrectionStep, Math.abs(offset));
+                        if (correction > MOVEMENT_EPSILON) {
+                            const correctionAxis = desired.axis === 'x' ? 'y' : 'x';
+                            const movedCorrection = correctionAxis === 'x'
+                                ? moveAxisWithCollision('x', Math.sign(offset) * correction)
+                                : moveAxisWithCollision('y', Math.sign(offset) * correction);
+                            if (movedCorrection) {
+                                turnCorrectionConsumed = true;
+                                axis = currentAxis;
+                                movementDirection = currentDirection;
+                            } else {
+                                // Si la corrección lateral es físicamente imposible,
+                                // no forzamos el giro. Mantenemos el carril actual.
+                                axis = currentAxis;
+                                movementDirection = currentDirection;
+                            }
+                        } else {
+                            axis = currentAxis;
+                            movementDirection = currentDirection;
+                        }
+                    }
                 } else {
-                    if (currentAxis === 'x') player.vx = approach(player.vx, 0, MOTION.reverseBraking * frameScale);
-                    else player.vy = approach(player.vy, 0, MOTION.reverseBraking * frameScale);
+                    // El jugador puede anticipar el giro. Seguimos avanzando en
+                    // la dirección actual hasta llegar a la ventana de giro; el
+                    // input perpendicular queda bufferizado. Nunca invertimos el
+                    // eje por culpa del nuevo input.
                     axis = currentAxis;
+                    movementDirection = currentDirection;
                 }
             } else {
                 axis = desired.axis;
+                movementDirection = desired.dir;
+            }
+
+            const effectiveSpeed = typeof getHazardSpeedFactor === 'function'
+                ? player.speed * getHazardSpeedFactor()
+                : player.speed;
+
+            if (turnCorrectionConsumed && turnEntrySpeed <= 0) {
+                // La corrección lateral ya movió al personaje este frame. No
+                // aplicamos después otro desplazamiento sobre el eje longitudinal.
+                player.isMoving = true;
+                player.walkCycle += motionDt * 0.015;
+                return;
+            }
+
+            if (turnCorrectionConsumed && turnEntrySpeed > 0) {
+                // Un snap de giro no avanza el nuevo eje en el mismo frame.
+                player.isMoving = true;
+                player.walkCycle += motionDt * 0.015;
+                return;
             }
 
             // Un solo componente de velocidad puede existir en todo momento.
             if (axis === 'x') {
                 player.vy = 0;
-                const effectiveSpeed = desired && typeof getHazardSpeedFactor === 'function' ? player.speed * getHazardSpeedFactor() : player.speed;
-                const target = desired ? desired.dir * effectiveSpeed : 0;
-                player.vx = approach(player.vx, target, (desired ? MOTION.acceleration : MOTION.braking) * frameScale);
+                const target = desired ? movementDirection * effectiveSpeed : 0;
+                if (turnEntrySpeed > 0) {
+                    player.vx = movementDirection * Math.min(
+                        effectiveSpeed,
+                        Math.max(turnEntrySpeed, effectiveSpeed * 0.68)
+                    );
+                } else {
+                    player.vx = approach(
+                        player.vx,
+                        target,
+                        (desired ? MOTION.acceleration : MOTION.braking) * frameScale
+                    );
+                }
                 if (Math.abs(player.vx) < MOTION.stopEpsilon) player.vx = 0;
                 if (player.vx !== 0) player.dir = player.vx < 0 ? 'left' : 'right';
             } else if (axis === 'y') {
                 player.vx = 0;
-                const effectiveSpeed = desired && typeof getHazardSpeedFactor === 'function' ? player.speed * getHazardSpeedFactor() : player.speed;
-                const target = desired ? desired.dir * effectiveSpeed : 0;
-                player.vy = approach(player.vy, target, (desired ? MOTION.acceleration : MOTION.braking) * frameScale);
+                const target = desired ? movementDirection * effectiveSpeed : 0;
+                if (turnEntrySpeed > 0) {
+                    player.vy = movementDirection * Math.min(
+                        effectiveSpeed,
+                        Math.max(turnEntrySpeed, effectiveSpeed * 0.68)
+                    );
+                } else {
+                    player.vy = approach(
+                        player.vy,
+                        target,
+                        (desired ? MOTION.acceleration : MOTION.braking) * frameScale
+                    );
+                }
                 if (Math.abs(player.vy) < MOTION.stopEpsilon) player.vy = 0;
                 if (player.vy !== 0) player.dir = player.vy < 0 ? 'up' : 'down';
             }
@@ -160,8 +265,6 @@
             else if (player.vy) moved = moveAxisWithCollision('y', player.vy * frameScale);
 
             if (!moved && (player.vx || player.vy)) {
-                // Frente bloqueado: corta solo el eje activo. No empuja al jugador
-                // contra la pared ni genera desplazamiento diagonal accidental.
                 if (player.vx) player.vx = 0;
                 if (player.vy) player.vy = 0;
             }

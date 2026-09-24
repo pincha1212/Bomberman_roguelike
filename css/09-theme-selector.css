@@ -1,0 +1,18 @@
+/* BOMBERMAN ROGUELIKE v4.6.1 — Theme selector */
+.theme-selector{margin-top:10px;padding:9px 0 0;border-top:1px solid rgba(148,163,184,.10)}
+.theme-selector-head{display:flex;align-items:end;justify-content:space-between;gap:8px;margin-bottom:7px}
+.theme-selector-kicker{display:block;color:#70798a;font:5px 'Press Start 2P';letter-spacing:.12em;margin-bottom:3px}
+.theme-selector-head strong{display:block;color:#e8edf3;font:8px 'Press Start 2P';letter-spacing:.04em}
+.theme-selected-summary{color:#8fdcff;font:5px 'Press Start 2P';text-align:right;white-space:nowrap}
+.theme-options{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.theme-option{min-width:0;display:grid;grid-template-columns:28px 1fr;grid-template-rows:auto auto;column-gap:7px;align-items:center;padding:7px;border:1px solid #343b48;background:#0b0f15;color:#aeb4c0;text-align:left;cursor:pointer;border-radius:4px}
+.theme-option:hover{border-color:#697383;transform:translateY(-1px)}
+.theme-option:focus-visible{outline:2px solid #ffd23f;outline-offset:2px}
+.theme-option.is-selected{border-color:#ffd23f;background:rgba(255,210,63,.07);box-shadow:inset 0 0 0 1px rgba(255,210,63,.08),0 0 12px rgba(255,210,63,.04)}
+.theme-option strong{font:7px 'Press Start 2P';color:#f3f6f8;grid-column:2}
+.theme-option>span:not(.theme-preview){font:7px Inter,sans-serif;color:#7f8999;grid-column:2}
+.theme-preview{grid-row:1 / span 2;display:block;width:28px;height:28px;border-radius:3px;border:1px solid rgba(255,255,255,.18);box-shadow:inset 0 0 0 3px rgba(0,0,0,.12)}
+.theme-preview-winter{background:linear-gradient(145deg,#dff6ff 0 24%,#7196aa 25% 48%,#17334a 49% 72%,#7dd3fc 73%)}
+.theme-preview-inferno{background:linear-gradient(145deg,#ffe066 0 18%,#ff7a18 19% 42%,#7c2d12 43% 68%,#160504 69%)}
+.theme-selector-note{margin:7px 0 0;color:#697383;font:7px Inter,sans-serif;line-height:1.3}
+@media (max-width:700px){.theme-selector-head{align-items:flex-start;flex-direction:column}.theme-selected-summary{text-align:left}.theme-options{grid-template-columns:1fr}}

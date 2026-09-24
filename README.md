@@ -236,3 +236,24 @@ Correcciones derivadas del reporte real de v3.28.0:
 - `node --check`: `19-debug-overlay.js` PASS.
 - Harness unificado: 16 tests detectables, runner único, health checks sin `undefined`, reporte textual simple y `DEBUG LAB STRESS` PASS.
 - Sin prueba visual de GitHub Pages realizada en esta validación.
+
+
+## v3.28.3 — Corrección de Enemy Behavior Stress
+
+- El fallo observado en `enemy-behavior-stress` no se reproduce con la IA y colisión aisladas: los 5 roles completan la prueba con movimiento, estados diferenciados y BFS=0.
+- El stress ahora reinicia el estado global de IA entre escenarios, fija `threatLevel=0`, limpia objetos temporales y restaura el runtime al terminar.
+- La validación de alerta observa varios frames del estado esperado en lugar de exigir únicamente el último frame.
+- Un `FAIL` de una prueba funcional ya no se contabiliza como `RUNTIME ERRORS`; queda separado como resultado de la suite.
+- Se mantiene la IA de juego sin cambios.
+
+
+## v3.28.3 — Verificación y corrección de Enemy Behavior Stress
+
+La salida v3.28.2 mostraba `ENEMY-BEHAVIOR-STRESS: FAIL` y simultáneamente `RUNTIME ERRORS: 1`. La investigación separó ambos problemas:
+
+- La IA v3.24.1 + colisión v3.20, ejecutadas de forma aislada con el mismo escenario, producen `5/5 roles`, estados `chase/patrol/flee/aggressive` y `BFS=0`. No se encontró evidencia de una falla de comportamiento del juego.
+- El stress original reutilizaba estado global de IA entre escenarios y no fijaba `threatLevel`, por lo que podía depender del estado que otros tests hubieran dejado atrás.
+- v3.28.3 reinicia el estado global de IA por caso, fija `threatLevel=0`, restaura el runtime completo al finalizar y valida los estados esperados durante varios frames.
+- Un fallo funcional de una prueba ya no se suma a `RUNTIME ERRORS`; los errores de ejecución quedan reservados para excepciones del runtime, recursos, promesas no controladas o acciones.
+- La suite termina generando automáticamente un snapshot y un diagnóstico para que el reporte de copia no quede en `PENDIENTE`.
+- El resultado bruto de `ROGUELIKE-STRESS` se normaliza a texto simple en vez de mostrar `[object Object]`.

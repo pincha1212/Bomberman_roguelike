@@ -156,6 +156,8 @@ function gridMoveCardinal(entity, dx, dy, options = {}) {
 
     const originalDx = dx;
     const originalDy = dy;
+    const startX = Number(entity?.x || 0);
+    const startY = Number(entity?.y || 0);
     let diagonalInputResolved = false;
 
     // La navegación del juego es estrictamente cardinal.
@@ -178,6 +180,25 @@ function gridMoveCardinal(entity, dx, dy, options = {}) {
     let laneCorrectionConsumed = false;
     let movedPx = 0;
     let laneCorrectionPx = 0;
+    let blockedCell = null;
+    let blockedReason = null;
+
+    const debugBlockerAt = (x, y) => {
+        if (!window.DEBUG_MODE?.enabled) return null;
+        try {
+            const rect = gridGetEntityRect(entity, x, y, options.kind || null);
+            const tiles = gridGetOverlappedTiles(rect);
+            for (const tile of tiles) {
+                const type = gameState.grid[tile.y]?.[tile.x];
+                if (type === TYPES.WALL) return { x: tile.x, y: tile.y, reason: 'WALL', type };
+                if (type === TYPES.BLOCK && !options.canFly) return { x: tile.x, y: tile.y, reason: 'BLOCK', type };
+                if (options.kind === 'player' && typeof isBombSolidForPlayer === 'function' && isBombSolidForPlayer(tile.x, tile.y)) return { x: tile.x, y: tile.y, reason: 'BOMB', type };
+                if (options.kind === 'enemy' && !options.ignoreBombs && typeof getBombAtTile === 'function' && getBombAtTile(tile.x, tile.y)) return { x: tile.x, y: tile.y, reason: 'BOMB', type };
+                if (options.avoidDanger && typeof isEnemyBombDanger === 'function' && isEnemyBombDanger(tile.x, tile.y)) return { x: tile.x, y: tile.y, reason: 'DANGER', type };
+            }
+        } catch (_) {}
+        return null;
+    };
 
     for (let i = 0; i < steps; i++) {
         // Enemigos: un corredor tiene un eje de avance y otro eje bloqueado al
@@ -200,6 +221,8 @@ function gridMoveCardinal(entity, dx, dy, options = {}) {
                 const nextY = laneAxis === 'y' ? entity.y + correction : entity.y;
                 if (!gridCanOccupy(entity, nextX, nextY, options)) {
                     blocked = true;
+                    blockedCell = debugBlockerAt(nextX, nextY);
+                    blockedReason = blockedCell?.reason || 'SOLID';
                     break;
                 }
                 entity.x = nextX;
@@ -267,7 +290,7 @@ function gridMoveCardinal(entity, dx, dy, options = {}) {
 
     if (blocked) GRID_COLLISION_STATS_V320.blockedCalls += 1;
     if (laneCorrected && !moved) GRID_COLLISION_STATS_V320.noProgressAfterCorrection += 1;
-    return {
+    const result = {
         moved,
         blocked,
         laneCorrected,
@@ -275,8 +298,20 @@ function gridMoveCardinal(entity, dx, dy, options = {}) {
         laneCorrectionPx,
         diagonalInputResolved,
         laneCorrectionConsumed,
-        input: { dx: originalDx, dy: originalDy }
+        input: { dx: originalDx, dy: originalDy },
+        blockedCell,
+        blockedReason
     };
+    if (window.DEBUG_MODE?.enabled && typeof window.DEBUG_MODE.recordCollisionTrace === 'function') {
+        window.DEBUG_MODE.recordCollisionTrace({
+            kind: options.kind || (entity?.__gridAnchor === 'center' ? 'enemy' : 'player'),
+            from: { x: startX, y: startY },
+            to: { x: Number(entity.x), y: Number(entity.y) },
+            input: { dx: originalDx, dy: originalDy },
+            moved, blocked, movedPx, laneCorrected, laneCorrectionPx, diagonalInputResolved, blockedCell, blockedReason
+        });
+    }
+    return result;
 }
 
 function gridIsNearTileCenter(entity, radius = GRID_COLLISION_V312.centerSnapRadius) {

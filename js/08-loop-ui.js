@@ -5,9 +5,12 @@
             const debugEnabled = !!window.DEBUG_MODE?.enabled;
             window.BOMBER_PROFILER?.beginFrame(timestamp);
             const frameStart = debugEnabled ? performance.now() : 0;
-            let dt = timestamp - gameState.lastTime;
+            const rawDt = timestamp - gameState.lastTime;
+            let dt = rawDt;
             gameState.lastTime = timestamp;
             if (dt > 100) dt = 16;
+
+            if (debugEnabled) window.DEBUG_MODE.beginDiagnosticFrame?.(rawDt, dt, rawDt !== dt);
 
             // Adapt visual effects to the device without changing gameplay speed.
             perf.frameCount++;
@@ -28,6 +31,8 @@
             const updateStart = debugEnabled ? performance.now() : 0;
             if (shouldUpdate) update(dt);
             const updateMs = debugEnabled ? performance.now() - updateStart : 0;
+
+            if (debugEnabled && shouldUpdate) window.DEBUG_MODE.afterLogicalUpdate?.(dt, rawDt);
 
             const drawStart = debugEnabled ? performance.now() : 0;
             draw();

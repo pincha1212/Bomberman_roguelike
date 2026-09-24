@@ -38,6 +38,7 @@
                     if (typeof invalidateRenderCacheV317 === 'function') invalidateRenderCacheV317();
                     gameState.score += 10;
                     gameState.blocksBroken++;
+                    if (typeof debugRecordEvent === 'function') debugRecordEvent('WORLD', `Bloque roto · ${tx},${ty}`, { x: tx, y: ty, blastId });
                     const coins = Math.max(1, Math.round((1 + Math.random() * 2) * (1 + gameState.coinBonus) * gameState.roomType.coinMult));
                     gameState.coins += coins;
                     addFloatingText(`+10  +${coins}¢`, (tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#fbbf24');
@@ -173,6 +174,7 @@
                         gameState.score += killScore;
                         gameState.coins += killCoins;
                         gameState.totalKills++;
+                        if (typeof debugRecordEvent === 'function') debugRecordEvent('COMBAT', `Enemigo muerto · ${e.type?.name || e.type || 'enemy'}`, { x: e.x, y: e.y, elite: !!e.elite });
                         addFloatingText(`+${killScore}  +${killCoins}¢`, e.x, e.y, e.elite ? '#fb7185' : '#38bdf8');
                         if (typeof tryUnlockExitV44 === 'function') tryUnlockExitV44();
                     }
@@ -215,6 +217,7 @@
                     
                     addParticles((it.x + 0.5) * TILE_SIZE, (it.y + 0.5) * TILE_SIZE, '#ffffff', 10);
                     gameState.items.splice(i, 1);
+                    if (typeof debugRecordEvent === 'function') debugRecordEvent('WORLD', `Item recogido · ${it.type}`, { x: it.x, y: it.y, type: it.type, relicId: it.relicId || null });
                     sfx('pickup');
                     updateUI();
                 }

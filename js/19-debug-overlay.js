@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.0 — Unified Debug Overlay
+// Bomberman Roguelike v4.2 — Unified Debug Overlay
 // Panel reconstruido para inspección en vivo. Solo se crea con ?debug=1.
 (() => {
     'use strict';
@@ -17,7 +17,7 @@
     root.innerHTML = `
         <div class="debug-header">
             <div>
-                <div class="debug-kicker">BOMBERMAN ENGINE · v4.0</div>
+                <div class="debug-kicker">BOMBERMAN ENGINE · v4.2</div>
                 <h2>DEBUG MODE <span id="debug-status" class="debug-status">CARGANDO</span></h2>
             </div>
             <button type="button" class="debug-icon-btn" data-debug-action="toggle" title="Mostrar/ocultar panel">F3</button>
@@ -150,6 +150,8 @@
             <div class="debug-checks">
                 <label><input type="checkbox" data-debug-visual="paths" checked> Rutas</label>
                 <label><input type="checkbox" data-debug-visual="reachable" checked> Alcance</label>
+                <label><input type="checkbox" data-debug-visual="danger"> Peligro</label>
+                <label><input type="checkbox" data-debug-visual="overlaps"> Overlaps</label>
                 <label><input type="checkbox" data-debug-visual="grid"> Grid</label>
                 <label><input type="checkbox" data-debug-visual="collision"> Colisión</label>
                 <label><input type="checkbox" data-debug-visual="hitboxes"> Hitboxes</label>
@@ -181,7 +183,38 @@
             <pre id="dbg-nav-enemies" class="debug-log">Sin datos de navegación.</pre>
         </section>
 
+
+        <section id="dbg-section-diagnostics" class="debug-section">
+            <div class="debug-section-head"><div class="debug-section-title">DIAGNÓSTICO REAL</div><span id="dbg-freeze-status">OK</span></div>
+            <div class="debug-diagnostic-banner" id="dbg-freeze-banner">SIN FREEZE</div>
+            <div class="debug-action-grid">
+                <button type="button" data-debug-action="release-freeze">LIBERAR FREEZE</button>
+                <button type="button" data-debug-action="inspect-failure">INSPECCIONAR ÚLTIMO FALLO</button>
+                <button type="button" data-debug-action="copy-diagnostic">COPIAR DIAGNÓSTICO</button>
+            </div>
+            <div class="debug-grid debug-grid-4">
+                <div><span>FRAME</span><strong id="dbg-diag-frame">—</strong></div>
+                <div><span>DT REAL</span><strong id="dbg-diag-rawdt">—</strong></div>
+                <div><span>DT LÓGICO</span><strong id="dbg-diag-dt">—</strong></div>
+                <div><span>CLAMP</span><strong id="dbg-diag-clamp">—</strong></div>
+                <div><span>ROJO</span><strong id="dbg-diag-hard">0</strong></div>
+                <div><span>AMARILLO</span><strong id="dbg-diag-warn">0</strong></div>
+                <div><span>INPUT</span><strong id="dbg-diag-input">—</strong></div>
+                <div><span>COLISIÓN</span><strong id="dbg-diag-collision-count">0</strong></div>
+            </div>
+            <div class="debug-note" id="dbg-diag-failure">Sin fallo congelado.</div>
+            <div class="debug-section-title debug-subtitle">INVARIANTES</div>
+            <pre id="dbg-diag-invariants" class="debug-log">Sin invariantes reportadas.</pre>
+            <div class="debug-section-title debug-subtitle">INPUT</div>
+            <pre id="dbg-diag-input-trace" class="debug-log">Sin eventos de input.</pre>
+            <div class="debug-section-title debug-subtitle">RESOLUCIÓN DE COLISIÓN</div>
+            <pre id="dbg-diag-collision-trace" class="debug-log">Sin trazas de colisión.</pre>
+        </section>
+
         <section id="dbg-section-inspector" class="debug-section">
+            <div class="debug-section-head"><div class="debug-section-title">INSPECTOR DE CELDA</div><span id="dbg-cell-coord">clic en el mapa</span></div>
+            <div id="dbg-cell-summary" class="debug-note">Seleccioná una celda del mapa de navegación.</div>
+            <pre id="dbg-cell-data" class="debug-log">Sin celda seleccionada.</pre>
             <div class="debug-section-head"><div class="debug-section-title">INSPECTOR DE TEST</div><span id="dbg-last-test">—</span></div>
             <div id="dbg-test-summary" class="debug-note">Todavía no hay una prueba seleccionada.</div>
             <pre id="dbg-test-data" class="debug-log">Los detalles aparecerán acá al ejecutar un test.</pre>
@@ -294,6 +327,10 @@
 #debug-overlay .debug-test-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
 #debug-overlay .debug-test-list button{display:flex;justify-content:space-between;align-items:center;text-align:left;gap:6px}
 #debug-overlay .debug-test-list em{font-style:normal;font-size:9px;opacity:.7}
+#debug-overlay .debug-diagnostic-banner{padding:8px 10px;margin:7px 0;border:1px solid rgba(148,163,184,.18);border-radius:7px;background:#07111f;font:700 10px/1.3 ui-monospace,SFMono-Regular,Consolas,monospace}
+#debug-overlay .debug-diagnostic-banner.is-red{border-color:#b91c1c;background:rgba(127,29,29,.25);color:#fecaca}
+#debug-overlay .debug-diagnostic-banner.is-yellow{border-color:#a16207;background:rgba(120,53,15,.2);color:#fde68a}
+#debug-overlay .debug-subtitle{margin-top:10px}
 #debug-overlay .is-pass{border-color:#3f8f5d!important}
 #debug-overlay .is-fail{border-color:#b24b4b!important}
 @media(max-width:700px){#debug-overlay{top:6px;right:6px;bottom:6px;width:calc(100vw - 12px)}#debug-overlay .debug-grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}#debug-overlay .debug-grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -370,6 +407,18 @@
             drawRoute(nav.player.trail.map(t=>({x:t.x,y:t.y})));
         }
 
+        if (D.selectedVisuals.danger) {
+            for (const b of state.bombs || []) {
+                let cells=[];
+                try { cells=typeof window.calculateBombBlastCells==='function' ? window.calculateBombBlastCells(b) : (typeof calculateBombBlastCells==='function' ? calculateBombBlastCells(b) : []); } catch (_) {}
+                for (const cell of cells || []) {
+                    if(cell.x<0||cell.y<0||cell.x>=cols||cell.y>=rows) continue;
+                    ctx.fillStyle='rgba(250,204,21,.17)';
+                    ctx.fillRect(cell.x*cw+2,cell.y*ch+2,Math.max(1,cw-4),Math.max(1,ch-4));
+                    ctx.strokeStyle='rgba(250,204,21,.65)'; ctx.lineWidth=1; ctx.strokeRect(cell.x*cw+2,cell.y*ch+2,Math.max(1,cw-4),Math.max(1,ch-4));
+                }
+            }
+        }
         if (D.selectedVisuals.bombs) {
             for (const b of state.bombs || []) {
                 ctx.beginPath(); ctx.arc((b.x+.5)*cw,(b.y+.5)*ch,Math.max(3,cw*.23),0,Math.PI*2); ctx.fillStyle='#f59e0b'; ctx.fill();
@@ -379,6 +428,15 @@
             for (const e of state.explosions || []) {
                 ctx.fillStyle='rgba(249,115,22,.75)'; ctx.fillRect(e.x*cw+2,e.y*ch+2,Math.max(1,cw-4),Math.max(1,ch-4));
             }
+        }
+        if (D.selectedVisuals.overlaps) {
+            const counts=new Map();
+            const mark=(x,y,type)=>{ if(!Number.isFinite(x)||!Number.isFinite(y))return; const key=`${x},${y}`; const item=counts.get(key)||[]; item.push(type); counts.set(key,item); };
+            const pt=nav.player?.tile; if(pt) mark(pt.x,pt.y,'P');
+            for(const b of state.bombs||[]) mark(b.x,b.y,'B');
+            for(const e of nav.enemies||[]) if(e.tile) mark(e.tile.x,e.tile.y,'E');
+            for(const e of state.explosions||[]) mark(e.x,e.y,'F');
+            for(const [key,types] of counts){ if(types.length<2) continue; const [x,y]=key.split(',').map(Number); ctx.fillStyle='rgba(239,68,68,.75)'; ctx.fillRect(x*cw+1,y*ch+1,Math.max(1,cw-2),Math.max(1,ch-2)); ctx.strokeStyle='#fecaca'; ctx.lineWidth=1.5; ctx.strokeRect(x*cw+1,y*ch+1,Math.max(1,cw-2),Math.max(1,ch-2)); }
         }
 
         const playerTile = nav.player?.tile || {x:-1,y:-1};
@@ -400,9 +458,17 @@
         }
 
         if (D.selectedVisuals.grid) {
-            ctx.strokeStyle='rgba(148,163,184,.14)'; ctx.lineWidth=1;
+            ctx.strokeStyle='rgba(148,163,184,.18)'; ctx.lineWidth=1;
             for(let x=0;x<=cols;x++){ctx.beginPath();ctx.moveTo(x*cw,0);ctx.lineTo(x*cw,canvas.height);ctx.stroke();}
             for(let y=0;y<=rows;y++){ctx.beginPath();ctx.moveTo(0,y*ch);ctx.lineTo(canvas.width,y*ch);ctx.stroke();}
+            ctx.fillStyle='rgba(226,232,240,.72)'; ctx.font='7px ui-monospace,SFMono-Regular,Consolas,monospace';
+            for(let x=0;x<cols;x++) ctx.fillText(String(x),x*cw+2,8);
+            for(let y=0;y<rows;y++) ctx.fillText(String(y),2,y*ch+8);
+        }
+
+        const selectedCell = snapshot?.diagnostics?.selectedCell || D.diagnostics?.selectedCell;
+        if (selectedCell && selectedCell.x >= 0 && selectedCell.y >= 0 && selectedCell.x < cols && selectedCell.y < rows) {
+            ctx.save(); ctx.strokeStyle='#f43f5e'; ctx.lineWidth=2.5; ctx.strokeRect(selectedCell.x*cw+2, selectedCell.y*ch+2, Math.max(1,cw-4), Math.max(1,ch-4)); ctx.restore();
         }
 
         if (D.selectedVisuals.camera && snapshot.camera) {
@@ -517,6 +583,40 @@
             ['dbg-world-room','dbg-depth','dbg-run','dbg-room','dbg-threat','dbg-time','dbg-score','dbg-coins','dbg-blocks','dbg-map','dbg-enemies','dbg-world-bombs','dbg-explosions','dbg-traps','dbg-active-traps','dbg-particles','dbg-projectiles','dbg-boss','dbg-exit'].forEach(id => setText(id, '—'));
         }
 
+
+        const diag = s.diagnostics || {};
+        const freezeActive = !!diag.freeze?.active;
+        const hardFailures = diag.invariants?.hardFailures || [];
+        const designWarnings = diag.invariants?.designWarnings || [];
+        setText('dbg-freeze-status', freezeActive ? `FREEZE F${diag.freeze.frame}` : (hardFailures.length ? 'ROJO' : 'OK'));
+        const banner = document.getElementById('dbg-freeze-banner');
+        if (banner) {
+            banner.textContent = freezeActive ? `FREEZE ON INVARIANTE · FRAME ${diag.freeze.frame} · ${diag.freeze.reason || 'sin detalle'}` : (designWarnings.length ? `AVISOS DE DISEÑO · ${designWarnings.length}` : 'SIN FREEZE');
+            banner.classList.toggle('is-red', freezeActive);
+            banner.classList.toggle('is-yellow', !freezeActive && !!designWarnings.length);
+        }
+        setText('dbg-diag-frame', diag.frame ?? '—');
+        setText('dbg-diag-rawdt', `${fmt(diag.timestep?.rawDt,2)}ms`);
+        setText('dbg-diag-dt', `${fmt(diag.timestep?.dt,2)}ms`);
+        setText('dbg-diag-clamp', diag.timestep?.clamped ? 'SI' : 'NO');
+        setText('dbg-diag-hard', hardFailures.length);
+        setText('dbg-diag-warn', designWarnings.length);
+        setText('dbg-diag-input', diag.input?.code || `${diag.input?.axis || '—'} / ${diag.input?.dir ?? '—'}`);
+        setText('dbg-diag-collision-count', (D.diagnostics?.collisionTrace || []).length);
+        setText('dbg-diag-failure', diag.lastFailure ? `Último fallo: F${diag.lastFailure.frame} · ${diag.lastFailure.reason}${diag.lastFailure.focusCell ? ` · celda ${diag.lastFailure.focusCell.x},${diag.lastFailure.focusCell.y}` : ''}` : 'Sin fallo congelado.');
+        const invariantNode=document.getElementById('dbg-diag-invariants');
+        if(invariantNode) invariantNode.textContent=[...hardFailures.map(x=>`RED ${x.id} — ${x.detail}`),...designWarnings.map(x=>`YELLOW ${x.id} — ${x.detail}`)].join('\n')||'Sin invariantes reportadas.';
+        const inputNode=document.getElementById('dbg-diag-input-trace');
+        if(inputNode) inputNode.textContent=(D.diagnostics?.inputTrace||[]).slice(-12).map(x=>`F${x.frame} ${x.kind} ${x.code||''} · keys=${safeInlineJson(x.keys)} · axis=${x.axis||'—'} · buffer=${x.buffer?safeInlineJson(x.buffer):'—'} · ${Number(x.bufferMs||0).toFixed(0)}ms`).join('\n')||'Sin eventos de input.';
+        const collisionNode=document.getElementById('dbg-diag-collision-trace');
+        if(collisionNode) collisionNode.textContent=(D.diagnostics?.collisionTrace||[]).slice(-16).map(x=>`F${x.frame} ${String(x.kind).toUpperCase()} input=${safeInlineJson(x.input)} moved=${x.moved?'SI':'NO'} blocked=${x.blocked?'SI':'NO'} movedPx=${Number(x.movedPx||0).toFixed(2)}${x.blockedCell?` · blocker=${x.blockedCell.x},${x.blockedCell.y} ${x.blockedReason}`:''}`).join('\n')||'Sin trazas de colisión.';
+        const cell=diag.selectedCell;
+        setText('dbg-cell-coord',cell?`${cell.x},${cell.y}`:'clic en el mapa');
+        const cellData=document.getElementById('dbg-cell-data');
+        const cellSummary=document.getElementById('dbg-cell-summary');
+        if(cellData) cellData.textContent=diag.selectedCellDump?JSON.stringify(diag.selectedCellDump,null,2):'Sin celda seleccionada.';
+        if(cellSummary) cellSummary.textContent=diag.selectedCellDump?`${diag.selectedCellDump.terrain.name} · bombas=${diag.selectedCellDump.bombs.length} · fuego=${diag.selectedCellDump.explosions.length} · enemigos=${diag.selectedCellDump.enemies.length} · items=${diag.selectedCellDump.items.length} · overlaps=${diag.selectedCellDump.overlaps.join(', ')||'ninguno'}`:'Seleccioná una celda del mapa de navegación.';
+
         const nav = s.navigation || {};
         const np = nav.player || {};
         setText('dbg-nav-player-tile', np.tile ? `${np.tile.x},${np.tile.y}` : '—');
@@ -541,7 +641,7 @@
         if (navNode) navNode.textContent = enemyLines.length ? enemyLines.join('\n') : 'Sin enemigos en la escena.';
         refreshNavSelector(enemyNav);
         const navDrawKey = [
-            D.selectedVisuals.paths, D.selectedVisuals.reachable, D.selectedVisuals.grid, D.selectedVisuals.ai, D.selectedVisuals.bombs, D.selectedVisuals.explosions, D.selectedVisuals.camera, D.selectedVisuals.spawns,
+            D.selectedVisuals.paths, D.selectedVisuals.reachable, D.selectedVisuals.grid, D.selectedVisuals.ai, D.selectedVisuals.bombs, D.selectedVisuals.explosions, D.selectedVisuals.camera, D.selectedVisuals.spawns, D.selectedVisuals.danger, D.selectedVisuals.overlaps,
             s.world?.depth, s.world?.map, s.world?.blocksBroken, np.tile?.x, np.tile?.y, np.reachableTiles,
             ...(enemyNav.slice(0, 22).map(e => `${e.index}:${e.tile?.x},${e.tile?.y}:${e.actualDirection}:${e.stuckLikely}:${e.physicalBlocked}`)),
             ...(s.world ? [s.world.bombs, s.world.explosions, s.world.exit] : [])
@@ -650,7 +750,8 @@
             eventNode.textContent = D.eventLog.slice(-100).map(item => {
                 const suffix = item.data ? ` · ${safeInlineJson(item.data)}` : '';
                 const repeat = Number(item.repeatCount || 1);
-                return `[${item.wallTime}] ${item.type.padEnd(8)} ${item.message}${repeat > 1 ? ` · ×${repeat}` : ''}${suffix}`;
+                const frame = item.frame != null ? `F${item.frame} ` : '';
+                return `${frame}[${item.wallTime}] ${item.type.padEnd(8)} ${item.message}${repeat > 1 ? ` · ×${repeat}` : ''}${suffix}`;
             }).join('\n') || 'Sin eventos.';
         }
         setText('dbg-event-count', D.eventLog.length);
@@ -717,6 +818,9 @@
         else if (name === 'enemy') D.manualEnemy();
         else if (name === 'clear-events') D.clearEvents();
         else if (name === 'clear-errors') D.clearErrors();
+        else if (name === 'release-freeze') D.releaseInvariantFreeze?.();
+        else if (name === 'inspect-failure') { const f=D.diagnostics?.lastFailure; if(f?.focusCell) D.inspectCell?.(f.focusCell.x,f.focusCell.y); refresh(true); }
+        else if (name === 'copy-diagnostic') D.copyDiagnosticReport?.();
         else if (name === 'profile') window.BOMBER_PROFILER?.toggle?.();
         else if (name === 'profile-reset') window.BOMBER_PROFILER?.reset?.();
         else if (name === 'exit') window.location.href = './';
@@ -748,6 +852,19 @@
         const select = event.target.closest('#dbg-nav-selected');
         if (select) { selectedNavTarget = select.value; lastNavigationDrawKey = ''; refresh(true); }
     });
+    root.addEventListener('click', event => {
+        const map = event.target.closest('#dbg-nav-map');
+        if (!map) return;
+        const state = window.BOMBER_ENGINE?.getState?.();
+        if (!state || !Array.isArray(state.grid)) return;
+        const rect=map.getBoundingClientRect();
+        const cols=Number(state.gridWidth||state.grid[0]?.length||0), rows=Number(state.gridHeight||state.grid.length||0);
+        const x=Math.floor(((event.clientX-rect.left)/rect.width)*cols);
+        const y=Math.floor(((event.clientY-rect.top)/rect.height)*rows);
+        D.inspectCell?.(x,y);
+        refresh(true);
+    });
+
 
     function setActiveJump(id) {
         root.querySelectorAll('[data-debug-jump]').forEach(button => {

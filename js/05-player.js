@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.12 — Cardinal assisted player movement and collision helpers
+// Bomberman Roguelike v4.7 — Cardinal movement + Mechanics Registry
         // V3.2.4 — MOVEMENT UPDATE
         // Movimiento continuo cardinal asistido. La cuadrícula SOLO define las paredes.
         // El personaje usa una hurtbox de movimiento más pequeña que el sprite,
@@ -107,6 +107,12 @@
 
         function updatePlayerMovement(dt) {
             const motionDt = getCombatMotionDt(dt);
+            const mechanicsMotion = typeof getMovementModifiersV47 === 'function'
+                ? getMovementModifiersV47()
+                : { acceleration: 1, braking: 1, turnCarrySpeed: 1 };
+            const acceleration = MOTION.acceleration * mechanicsMotion.acceleration;
+            const braking = MOTION.braking * mechanicsMotion.braking;
+            const turnCarrySpeed = MOTION.turnCarrySpeed * mechanicsMotion.turnCarrySpeed;
             const frameScale = Math.min(motionDt / 16.6667, 2);
             player._frameScale = frameScale;
             const input = getCardinalInput();
@@ -141,8 +147,8 @@
                 player._turnEntrySpeed = 0;
                 player._turnEntryAxis = null;
                 player._turnEntryDir = 0;
-                if (currentAxis === 'x') player.vx = approach(player.vx, 0, MOTION.braking * frameScale);
-                if (currentAxis === 'y') player.vy = approach(player.vy, 0, MOTION.braking * frameScale);
+                if (currentAxis === 'x') player.vx = approach(player.vx, 0, braking * frameScale);
+                if (currentAxis === 'y') player.vy = approach(player.vy, 0, braking * frameScale);
                 if (Math.abs(player.vx) <= MOTION.stopEpsilon) player.vx = 0;
                 if (Math.abs(player.vy) <= MOTION.stopEpsilon) player.vy = 0;
             } else if (!currentAxis) {
@@ -155,7 +161,7 @@
                 if (turnReady) {
                     // Primero intentamos el giro limpio en el centro del carril.
                     if (trySnapToLane(desired.axis)) {
-                        turnEntrySpeed = Math.abs(currentVelocity) * MOTION.turnCarrySpeed;
+                        turnEntrySpeed = Math.abs(currentVelocity) * turnCarrySpeed;
                         player._turnEntrySpeed = turnEntrySpeed;
                         player._turnEntryAxis = desired.axis;
                         player._turnEntryDir = desired.dir;
@@ -236,7 +242,7 @@
                     player.vx = approach(
                         player.vx,
                         target,
-                        (desired ? MOTION.acceleration : MOTION.braking) * frameScale
+                        (desired ? acceleration : braking) * frameScale
                     );
                 }
                 if (Math.abs(player.vx) < MOTION.stopEpsilon) player.vx = 0;
@@ -253,7 +259,7 @@
                     player.vy = approach(
                         player.vy,
                         target,
-                        (desired ? MOTION.acceleration : MOTION.braking) * frameScale
+                        (desired ? acceleration : braking) * frameScale
                     );
                 }
                 if (Math.abs(player.vy) < MOTION.stopEpsilon) player.vy = 0;

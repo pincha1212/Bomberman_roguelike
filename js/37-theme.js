@@ -1,10 +1,10 @@
-// Bomberman Roguelike v4.6.1 — Visual Themes
-// Solo visuales: terreno, bombas, fuego, fondo, partículas y ambiente.
-// No introduce mecánicas, hazards, cambios de física ni generación alternativa.
-(function initThemeFoundationV461(global) {
+// Bomberman Roguelike v4.7 — Visual Themes + Mechanics contract
+// Los temas declaran datos visuales y IDs de mecánicas.
+// La lógica de las mecánicas vive exclusivamente en 38-mechanics-registry.js.
+(function initThemeFoundationV47(global) {
     'use strict';
 
-    const THEME_STORAGE_V461 = 'bombermanRoguelikeTheme';
+    const THEME_STORAGE_V47 = 'bombermanRoguelikeTheme';
 
     const CLASSIC_THEME = Object.freeze({
         id: 'classic',
@@ -132,7 +132,7 @@
             })
         }),
 
-        mecanicas: Object.freeze([]),
+        mechanics: Object.freeze([]),
         hazards: Object.freeze([]),
         nivelGen: Object.freeze({ source: 'v4.4-bomberman-number-generator', densityMin: 0.25, densityMax: 0.72, classicPillarSpacing: 2, symmetry: 'current' }),
         enemigos: Object.freeze({
@@ -142,7 +142,7 @@
         powerups: Object.freeze({ pool: Object.freeze(['BOMB_UP', 'FIRE_UP', 'SPEED_UP', 'HEALTH_UP', 'SHIELD_UP', 'RELIC']) })
     });
 
-    function createVisualThemeV461(id, nombre, paletteOverrides, spriteOverrides, ambientOverrides) {
+    function createVisualThemeV47(id, nombre, paletteOverrides, spriteOverrides, ambientOverrides, mechanicIds = []) {
         return Object.freeze({
             ...CLASSIC_THEME,
             id,
@@ -150,12 +150,12 @@
             paleta: Object.freeze({ ...CLASSIC_THEME.paleta, ...paletteOverrides }),
             sprites: Object.freeze({ ...CLASSIC_THEME.sprites, ...spriteOverrides }),
             ambiente: Object.freeze({ ...CLASSIC_THEME.ambiente, ...ambientOverrides }),
-            mecanicas: Object.freeze([]),
+            mechanics: Object.freeze([...mechanicIds]),
             hazards: Object.freeze([])
         });
     }
 
-    const WINTER_THEME = createVisualThemeV461(
+    const WINTER_THEME = createVisualThemeV47(
         'winter',
         'Invierno',
         {
@@ -209,10 +209,11 @@
             floor: 'procedural:ice-floor', wall: 'procedural:ice-wall', brick: 'procedural:frozen-block',
             bomb: 'procedural:ice-bomb', fire: 'procedural:frost-fire'
         },
-        { tipo: 'snow', color: 'ambientDust', densidad: 1, velocidad: 0.42, sizeMin: 1, sizeMax: 3, alpha: 0.55 }
+        { tipo: 'snow', color: 'ambientDust', densidad: 1, velocidad: 0.42, sizeMin: 1, sizeMax: 3, alpha: 0.55 },
+        ['slippery']
     );
 
-    const INFERNO_THEME = createVisualThemeV461(
+    const INFERNO_THEME = createVisualThemeV47(
         'inferno',
         'Infierno',
         {
@@ -269,7 +270,7 @@
         { tipo: 'ember', color: 'ambientDust', densidad: 0.9, velocidad: 0.52, sizeMin: 1, sizeMax: 2, alpha: 0.58 }
     );
 
-    const registry = { classic: CLASSIC_THEME, winter: WINTER_THEME, inferno: INFERNO_THEME };
+    const registry = Object.freeze({ classic: CLASSIC_THEME, winter: WINTER_THEME, inferno: INFERNO_THEME });
     let activeThemeId = 'classic';
 
     function getThemeV46() {
@@ -319,7 +320,12 @@
             button.setAttribute('aria-checked', active ? 'true' : 'false');
         });
         const summary = global.document?.getElementById?.('theme-selected-summary');
-        if (summary) summary.textContent = `${theme.nombre.toUpperCase()} · SOLO VISUAL`;
+        if (summary) {
+            const mechanicsLabel = theme.mechanics.length
+                ? ` · ${theme.mechanics.length} MECÁNICA${theme.mechanics.length === 1 ? '' : 'S'}`
+                : ' · SOLO VISUAL';
+            summary.textContent = `${theme.nombre.toUpperCase()}${mechanicsLabel}`;
+        }
     }
 
     function setActiveThemeV46(id, persist = true) {
@@ -329,7 +335,7 @@
         applyThemeCssTokensV46();
         if (typeof global.invalidateRenderCacheV317 === 'function') global.invalidateRenderCacheV317();
         if (persist) {
-            try { global.localStorage.setItem(THEME_STORAGE_V461, id); } catch (_) {}
+            try { global.localStorage.setItem(THEME_STORAGE_V47, id); } catch (_) {}
         }
         updateThemeSelectorV461();
         return true;
@@ -339,9 +345,9 @@
         return ['winter', 'inferno'].map(id => registry[id]);
     }
 
-    function initializeThemeV461() {
+    function initializeThemeV47() {
         let stored = null;
-        try { stored = global.localStorage.getItem(THEME_STORAGE_V461); } catch (_) {}
+        try { stored = global.localStorage.getItem(THEME_STORAGE_V47); } catch (_) {}
         setActiveThemeV46(registry[stored] ? stored : 'classic', false);
 
         global.document?.querySelectorAll?.('[data-theme-option]').forEach(button => {
@@ -367,20 +373,21 @@
     global.setActiveThemeV46 = setActiveThemeV46;
     global.getThemeOptionsV461 = getThemeOptionsV461;
     global.applyThemeCssTokensV46 = applyThemeCssTokensV46;
-    global.initializeThemeV461 = initializeThemeV461;
+    global.initializeThemeV47 = initializeThemeV47;
 
     global.BOMBER_ENGINE = global.BOMBER_ENGINE || {};
     global.BOMBER_ENGINE.getTheme = getThemeV46;
     global.BOMBER_ENGINE.getThemeRegistry = () => ({ ...registry });
     global.BOMBER_ENGINE.getThemeId = () => activeThemeId;
+    global.BOMBER_ENGINE.getThemeMechanicIds = () => [...getThemeV46().mechanics];
     global.BOMBER_ENGINE.getThemeMetadata = () => {
         const theme = getThemeV46();
         return {
             id: theme.id,
             nombre: theme.nombre,
             type: theme.tipo,
-            visualOnly: theme.tipo === 'visual-only',
-            mechanics: [...theme.mecanicas],
+            visualOnly: theme.mechanics.length === 0 && theme.hazards.length === 0,
+            mechanics: [...theme.mechanics],
             hazards: [...theme.hazards],
             levelGeneration: { ...theme.nivelGen },
             enemyPool: [...theme.enemigos.pool],
@@ -389,8 +396,8 @@
     };
 
     if (global.document?.readyState === 'loading') {
-        global.document.addEventListener('DOMContentLoaded', initializeThemeV461, { once: true });
+        global.document.addEventListener('DOMContentLoaded', initializeThemeV47, { once: true });
     } else {
-        initializeThemeV461();
+        initializeThemeV47();
     }
 })(window);

@@ -78,3 +78,18 @@ Debug Engine: `ROOM STRESS` valida las seis topologías, cantidad de celdas alca
 
 - La primera oleada conserva un intervalo derivado del tiempo de sala; las oleadas siguientes usan el intervalo de amenaza escalado.
 - El escalado no modifica el pathfinding: BFS queda reservado al recovery excepcional.
+
+
+## v3.24.0 — Enemy Behaviors Update
+
+- Cinco arquetipos: `chaser`, `patroller`, `evasive`, `aggressive`, `flyer`.
+- El arquetipo se fija al crear la entidad y se conserva durante su vida.
+- `chaser`: prioriza distancia al jugador y continuidad de persecución.
+- `patroller`: prioriza continuidad, ramificaciones locales y memoria corta.
+- `evasive`: evita peligro y jugador cercano.
+- `aggressive`: persigue con menor penalización de reversa y una velocidad específica del rol.
+- `flyer`: mantiene movimiento cardinal y utiliza `canFly` para atravesar bloques.
+- El peligro de bombas/explosiones mantiene prioridad sobre el rol.
+- BFS permanece reservado al recovery excepcional.
+- Debug muestra arquetipo y etiqueta del enemigo.
+- Nuevo `js/26-enemy-behavior-stress.js` para validar los cinco roles.

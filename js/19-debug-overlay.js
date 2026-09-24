@@ -117,6 +117,7 @@
                 <div><span>PROJECTILES</span><strong id="dbg-projectiles">—</strong></div>
                 <div><span>BOSS</span><strong id="dbg-boss">—</strong></div>
                 <div><span>SALIDA</span><strong id="dbg-exit">—</strong></div>
+                <div><span>LAYOUT</span><strong id="dbg-layout">—</strong></div>
             </div>
         </section>
 
@@ -160,7 +161,7 @@
         <section class="debug-section debug-tests">
             <div class="debug-section-head"><div class="debug-section-title">TEST RUNNER</div><span id="dbg-suite">0/${Object.keys(window.DEBUG_TESTS || {}).length}</span></div>
             <div class="debug-test-list">
-                ${Object.keys(window.DEBUG_TESTS || {}).map(name => `<button type="button" data-debug-test="${name}"><span>${name.replace('ai-stress','AI STRESS').replace('collision-stress','COLLISION STRESS').toUpperCase()}</span><em id="dbg-test-${name}">PENDIENTE</em></button>`).join('')}
+                ${Object.keys(window.DEBUG_TESTS || {}).map(name => `<button type="button" data-debug-test="${name}"><span>${name.replace('ai-stress','AI STRESS').replace('collision-stress','COLLISION STRESS').replace('room-stress','ROOM STRESS').toUpperCase()}</span><em id="dbg-test-${name}">PENDIENTE</em></button>`).join('')}
             </div>
         </section>
 
@@ -173,6 +174,9 @@
         <section class="debug-section">
             <div class="debug-section-head"><div class="debug-section-title">COLLISION STRESS</div><span id="dbg-collision-stress-head">PENDIENTE</span></div>
             <div id="dbg-collision-stress-summary" class="debug-note">Ejecutá COLLISION STRESS para probar esquinas, corredores, obstáculos, bombas, overlaps y lane-lock.</div>
+
+            <div class="debug-section-head"><div class="debug-section-title">ROOM STRESS</div><span id="dbg-room-stress-head">PENDIENTE</span></div>
+            <div id="dbg-room-stress-summary" class="debug-note">Ejecutá ROOM STRESS para validar las seis topologías procedurales y sus rutas.</div>
             <pre id="dbg-collision-stress-data" class="debug-log">Sin resultados.</pre>
         </section>
 
@@ -305,6 +309,7 @@
             setText('dbg-projectiles', w.projectiles);
             setText('dbg-boss', w.boss ? 'SI' : 'NO');
             setText('dbg-exit', w.exit);
+            setText('dbg-layout', w.layout || '—');
         } else {
             ['dbg-world-room','dbg-depth','dbg-run','dbg-room','dbg-threat','dbg-time','dbg-score','dbg-coins','dbg-blocks','dbg-map','dbg-enemies','dbg-world-bombs','dbg-explosions','dbg-traps','dbg-active-traps','dbg-particles','dbg-projectiles','dbg-boss','dbg-exit'].forEach(id => setText(id, '—'));
         }
@@ -358,6 +363,15 @@
         const navigationStressResult = D.testResults.slice().reverse().find(r => r.name === 'navigation-stress');
         if (navigationStressResult) {
             setText('dbg-nav-mode', `${navigationStressResult.status} · NAV STRESS`);
+        }
+
+        const roomStress = D.testResults.slice().reverse().find(r => r.name === 'room-stress');
+        if (roomStress) {
+            setText('dbg-room-stress-head', roomStress.status);
+            setText('dbg-room-stress-summary', roomStress.summary);
+        } else {
+            setText('dbg-room-stress-head', 'PENDIENTE');
+            setText('dbg-room-stress-summary', 'Ejecutá ROOM STRESS para validar las seis topologías procedurales y sus rutas.');
         }
 
         const collisionStress = D.testResults.slice().reverse().find(r => r.name === 'collision-stress');

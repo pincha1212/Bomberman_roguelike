@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.13 — Spatial room design and procedural layout accents
+// Bomberman Roguelike v3.22 — Spatial room design and procedural room topologies
 
 const roomDesignV313 = {
     rooms: [],
@@ -9,7 +9,9 @@ const roomDesignV313 = {
     secretInterior: new Set(),
     exitGate: null,
     secretRoom: null,
-    version: 1
+    version: 2,
+    layoutVariant: 'corridors',
+    layoutMetrics: null
 };
 
 function roomKeyV313(x, y) {
@@ -214,6 +216,274 @@ function buildBossRoomLayoutV313() {
     roomDesignV313.exitGate = { x: w - 3, y: h - 3 };
 }
 
+
+// v3.22: procedural room topology layer.
+const ROOM_LAYOUTS_V322 = Object.freeze([
+    'corridors',
+    'intersection',
+    'small-chambers',
+    'large-chamber',
+    'open-zone',
+    'dead-end'
+]);
+
+function roomNeighborCountV322(x, y) {
+    let count = 0;
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    for (const [dx, dy] of dirs) {
+        if (gameState.grid[y + dy]?.[x + dx] === TYPES.EMPTY) count++;
+    }
+    return count;
+}
+
+function collectRoomTopologyV322(start, goal) {
+    const w = gameState.gridWidth;
+    const h = gameState.gridHeight;
+    const queue = [{x:start.x, y:start.y}];
+    const seen = new Set([roomKeyV313(start.x, start.y)]);
+    const prev = new Map();
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    let head = 0;
+    let junctions = 0;
+    let deadEnds = 0;
+
+    while (head < queue.length) {
+        const p = queue[head++];
+        let degree = 0;
+        for (const [dx, dy] of dirs) {
+            const nx = p.x + dx, ny = p.y + dy;
+            if (nx <= 0 || ny <= 0 || nx >= w - 1 || ny >= h - 1) continue;
+            if (gameState.grid[ny]?.[nx] !== TYPES.EMPTY) continue;
+            degree++;
+            const key = roomKeyV313(nx, ny);
+            if (!seen.has(key)) {
+                seen.add(key);
+                prev.set(key, roomKeyV313(p.x, p.y));
+                queue.push({x:nx, y:ny});
+            }
+        }
+        if (degree >= 3) junctions++;
+        if (degree === 1 && !(p.x === start.x && p.y === start.y)) deadEnds++;
+    }
+
+    const goalKey = roomKeyV313(goal.x, goal.y);
+    const route = [];
+    if (seen.has(goalKey)) {
+        let cur = goalKey;
+        route.push(cur);
+        while (cur !== roomKeyV313(start.x, start.y)) {
+            cur = prev.get(cur);
+            if (!cur) { route.length = 0; break; }
+            route.push(cur);
+        }
+        route.reverse();
+    }
+
+    return {
+        reachable: seen.size,
+        routeLength: route.length,
+        junctions,
+        deadEnds,
+        route
+    };
+}
+
+function carveGuaranteedRouteV322(start, goal) {
+    const from = clampRoomPointV313(start.x, start.y);
+    const to = clampRoomPointV313(goal.x, goal.y);
+    let x = from.x;
+    let y = from.y;
+    carveCellV313(x, y);
+    const horizontalFirst = (gameState.level + from.x + to.y) % 2 === 0;
+    const segments = horizontalFirst
+        ? [{x:to.x, y:from.y}, {x:to.x, y:to.y}]
+        : [{x:from.x, y:to.y}, {x:to.x, y:to.y}];
+
+    for (const segment of segments) {
+        while (x !== segment.x || y !== segment.y) {
+            if (x !== segment.x) x += Math.sign(segment.x - x);
+            else if (y !== segment.y) y += Math.sign(segment.y - y);
+            carveCellV313(x, y);
+        }
+    }
+    return {x, y};
+}
+
+function chooseRoomLayoutV322() {
+    const forced = typeof window !== 'undefined' ? window.FORCE_ROOM_LAYOUT_V322 : null;
+    if (forced && ROOM_LAYOUTS_V322.includes(forced)) return forced;
+    const index = Math.floor(Math.random() * ROOM_LAYOUTS_V322.length);
+    return ROOM_LAYOUTS_V322[index];
+}
+
+function buildCorridorLayoutV322() {
+    const w = gameState.gridWidth, h = gameState.gridHeight;
+    const start = {x:2,y:2}, goal = {x:w-3,y:h-3};
+    const a = {x:Math.max(4,Math.floor(w*0.32)), y:2};
+    const b = {x:Math.max(4,Math.floor(w*0.52)), y:Math.floor(h*0.68)};
+    const c = {x:w-3, y:Math.max(4,Math.floor(h*0.40))};
+    const d = {x:Math.floor(w*0.34), y:h-3};
+    carveRectV313(start.x,start.y,3,3,'start','#38bdf8','ENTRADA','E');
+    const r1 = carveRectV313(a.x,a.y,4,3,'combat','#60a5fa','COMBATE','C');
+    const r2 = carveRectV313(b.x,b.y,4,4,'risk','#f59e0b','RIESGO','!');
+    const r3 = carveRectV313(c.x,c.y,4,4,'treasure','#fbbf24','TESORO','$');
+    const r4 = carveRectV313(d.x,d.y,4,3,'combat','#60a5fa','COMBATE','C');
+    carveCorridorV313(start,a,1);
+    carveCorridorV313({x:r1.x+r1.w-1,y:a.y},b,1);
+    carveCorridorV313(b,c,1);
+    carveCorridorV313(b,d,1);
+    carveCorridorV313(d,goal,1);
+    carveCorridorV313(c,goal,1);
+    carveCorridorV313({x:Math.floor(w*0.52),y:2},{x:Math.floor(w*0.78),y:Math.floor(h*0.22)},1);
+    carveCorridorV313({x:Math.floor(w*0.78),y:Math.floor(h*0.22)},c,1);
+    roomDesignV313.exitGate = goal;
+    return {start, goal, rooms:[r1,r2,r3,r4]};
+}
+
+function buildIntersectionLayoutV322() {
+    const w = gameState.gridWidth, h = gameState.gridHeight;
+    const start = {x:2,y:2}, goal = {x:w-3,y:h-3};
+    const center = {x:Math.floor(w/2), y:Math.floor(h/2)};
+    const north = {x:center.x,y:2}, west = {x:2,y:center.y}, east = {x:w-3,y:center.y}, south = {x:center.x,y:h-3};
+    carveRectV313(start.x,start.y,3,3,'start','#38bdf8','ENTRADA','E');
+    const cr = carveRectV313(center.x,center.y,7,7,'combat','#60a5fa','INTERSECCIÓN','+');
+    const rooms = [
+        carveRectV313(north.x,north.y,4,4,'combat','#60a5fa','NORTE','N'),
+        carveRectV313(west.x,west.y,4,4,'risk','#f59e0b','OESTE','W'),
+        carveRectV313(east.x,east.y,4,4,'treasure','#fbbf24','ESTE','T'),
+        carveRectV313(south.x,south.y,4,4,'combat','#60a5fa','SUR','S'),
+        cr
+    ];
+    carveCorridorV313(start, west,1);
+    carveCorridorV313(west, center,1);
+    carveCorridorV313(center, north,1);
+    carveCorridorV313(center, east,1);
+    carveCorridorV313(center, south,1);
+    carveCorridorV313(south, goal,1);
+    carveCorridorV313(east, goal,1);
+    roomDesignV313.exitGate = goal;
+    return {start,goal,rooms};
+}
+
+function buildSmallChambersLayoutV322() {
+    const w=gameState.gridWidth,h=gameState.gridHeight;
+    const start={x:2,y:2}, goal={x:w-3,y:h-3};
+    const points=[
+        {x:3,y:3,role:'start',label:'ENTRADA',icon:'E'},
+        {x:6,y:4,role:'combat',label:'CÁMARA 1',icon:'1'},
+        {x:10,y:4,role:'risk',label:'CÁMARA 2',icon:'2'},
+        {x:13,y:7,role:'treasure',label:'CÁMARA 3',icon:'3'},
+        {x:9,y:10,role:'combat',label:'CÁMARA 4',icon:'4'},
+        {x:5,y:12,role:'risk',label:'CÁMARA 5',icon:'5'},
+        {x:w-3,y:h-3,role:'goal',label:'SALIDA',icon:'G'}
+    ];
+    const rooms=[];
+    for (const p of points) rooms.push(carveRectV313(p.x,p.y,p.role==='start'||p.role==='goal'?4:5,p.role==='start'||p.role==='goal'?4:4,p.role,p.role==='risk'?'#f59e0b':p.role==='treasure'?'#fbbf24':p.role==='combat'?'#60a5fa':'#facc15',p.label,p.icon));
+    for(let i=0;i<points.length-1;i++) carveCorridorV313(points[i],points[i+1],1);
+    // One alternate connection creates loops without making the map open everywhere.
+    carveCorridorV313(points[1],points[4],1);
+    carveCorridorV313(points[2],points[5],1);
+    roomDesignV313.exitGate=goal;
+    return {start,goal,rooms};
+}
+
+function buildLargeChamberLayoutV322() {
+    const w=gameState.gridWidth,h=gameState.gridHeight;
+    const start={x:2,y:2}, goal={x:w-3,y:h-3};
+    const center={x:Math.floor(w/2),y:Math.floor(h/2)};
+    const rooms=[];
+    carveRectV313(start.x,start.y,4,4,'start','#38bdf8','ENTRADA','E');
+    rooms.push(carveRectV313(center.x,center.y,9,7,'combat','#60a5fa','CÁMARA GRANDE','A'));
+    rooms.push(carveRectV313(Math.floor(w*0.78),Math.floor(h*0.25),5,4,'treasure','#fbbf24','TESORO','$'));
+    rooms.push(carveRectV313(Math.floor(w*0.25),Math.floor(h*0.72),5,4,'risk','#f59e0b','RIESGO','!'));
+    carveCorridorV313(start,{x:center.x-4,y:center.y},1);
+    carveCorridorV313({x:center.x+4,y:center.y},goal,1);
+    carveCorridorV313({x:center.x+3,y:center.y-2},{x:Math.floor(w*0.78),y:Math.floor(h*0.25)},1);
+    carveCorridorV313({x:center.x-3,y:center.y+2},{x:Math.floor(w*0.25),y:Math.floor(h*0.72)},1);
+    // Side access around the main chamber.
+    carveCorridorV313({x:center.x,y:center.y-3},{x:center.x,y:2},1);
+    carveCorridorV313({x:center.x,y:center.y+3},{x:center.x,y:h-3},1);
+    roomDesignV313.exitGate=goal;
+    return {start,goal,rooms};
+}
+
+function buildOpenZoneLayoutV322() {
+    const w=gameState.gridWidth,h=gameState.gridHeight;
+    const start={x:2,y:2}, goal={x:w-3,y:h-3};
+    const zone={x:Math.floor(w/2),y:Math.floor(h/2)};
+    carveRectV313(start.x,start.y,4,4,'start','#38bdf8','ENTRADA','E');
+    const openRoom=carveRectV313(zone.x,zone.y,Math.min(10,w-6),Math.min(9,h-6),'combat','#60a5fa','ZONA ABIERTA','O');
+    carveCorridorV313(start,{x:openRoom.x,y:zone.y},1);
+    carveCorridorV313({x:openRoom.x+openRoom.w-1,y:zone.y},goal,1);
+    // Sparse internal pillars: always leave the central cross and perimeter circulation open.
+    const pillarCandidates=[
+        {x:zone.x-2,y:zone.y-2},{x:zone.x+2,y:zone.y-2},
+        {x:zone.x-2,y:zone.y+2},{x:zone.x+2,y:zone.y+2}
+    ];
+    for(const q of pillarCandidates){
+        if(q.x>openRoom.x+1&&q.x<openRoom.x+openRoom.w-2&&q.y>openRoom.y+1&&q.y<openRoom.y+openRoom.h-2) gameState.grid[q.y][q.x]=TYPES.WALL;
+    }
+    carveRectV313(Math.min(w-4,zone.x+3),Math.max(3,zone.y-3),3,3,'treasure','#fbbf24','PUESTO','$');
+    roomDesignV313.exitGate=goal;
+    return {start,goal,rooms:[openRoom]};
+}
+
+function buildDeadEndLayoutV322() {
+    const w=gameState.gridWidth,h=gameState.gridHeight;
+    const start={x:2,y:2}, goal={x:w-3,y:h-3};
+    const spine={x:Math.floor(w*0.45),y:Math.floor(h*0.50)};
+    const north={x:spine.x,y:2}, west={x:2,y:spine.y}, east={x:w-3,y:spine.y}, south={x:spine.x,y:h-3};
+    carveRectV313(start.x,start.y,4,4,'start','#38bdf8','ENTRADA','E');
+    const rooms=[
+        carveRectV313(north.x,north.y,4,4,'risk','#f59e0b','CALLEJÓN N','N'),
+        carveRectV313(west.x,west.y,4,4,'combat','#60a5fa','CALLEJÓN O','O'),
+        carveRectV313(east.x,east.y,4,4,'treasure','#fbbf24','CALLEJÓN E','E'),
+        carveRectV313(south.x,south.y,4,4,'combat','#60a5fa','SALIDA SUR','S')
+    ];
+    carveCorridorV313(start,spine,1);
+    carveCorridorV313(spine,east,1);
+    carveCorridorV313(spine,south,1);
+    carveCorridorV313(spine,north,1);
+    carveCorridorV313(spine,west,1);
+    // Keep the final approach to goal distinct from the dead-end branches.
+    carveCorridorV313(east,goal,1);
+    roomDesignV313.exitGate=goal;
+    return {start,goal,rooms};
+}
+
+function buildProceduralRoomLayoutV322() {
+    const variant = chooseRoomLayoutV322();
+    let built;
+    switch (variant) {
+        case 'intersection': built = buildIntersectionLayoutV322(); break;
+        case 'small-chambers': built = buildSmallChambersLayoutV322(); break;
+        case 'large-chamber': built = buildLargeChamberLayoutV322(); break;
+        case 'open-zone': built = buildOpenZoneLayoutV322(); break;
+        case 'dead-end': built = buildDeadEndLayoutV322(); break;
+        case 'corridors':
+        default: built = buildCorridorLayoutV322(); break;
+    }
+    const beforeRepair = collectRoomTopologyV322(built.start, built.goal);
+    let repairApplied = false;
+    if (!beforeRepair.routeLength) {
+        carveGuaranteedRouteV322(built.start, built.goal);
+        repairApplied = true;
+    }
+    const topology = collectRoomTopologyV322(built.start, built.goal);
+    roomDesignV313.layoutVariant = variant;
+    roomDesignV313.layoutMetrics = {
+        variant,
+        rooms: roomDesignV313.rooms.length,
+        reachableTiles: topology.reachable,
+        routeLength: Math.max(0, topology.routeLength - 1),
+        junctions: topology.junctions,
+        deadEnds: topology.deadEnds,
+        repairApplied,
+        routeValid: topology.routeLength > 0
+    };
+    return { ...built, variant, topology };
+}
+
 function applyRoomDesignV313() {
     roomDesignV313.rooms = [];
     roomDesignV313.riskCells.clear();
@@ -223,12 +493,43 @@ function applyRoomDesignV313() {
     roomDesignV313.secretInterior.clear();
     roomDesignV313.exitGate = null;
     roomDesignV313.secretRoom = null;
+    roomDesignV313.layoutVariant = 'corridors';
+    roomDesignV313.layoutMetrics = null;
     gameState.roomDesign = roomDesignV313;
 
-    if (gameState.roomType.id === 'BOSS') buildBossRoomLayoutV313();
-    else buildStandardRoomLayoutV313();
+    if (gameState.roomType.id === 'BOSS') {
+        buildBossRoomLayoutV313();
+        const start = { x: 2, y: 2 };
+        const goal = roomDesignV313.exitGate || { x: gameState.gridWidth - 3, y: gameState.gridHeight - 3 };
+        const topology = collectRoomTopologyV322(start, goal);
+        if (!topology.routeLength) carveGuaranteedRouteV322(start, goal);
+        roomDesignV313.layoutVariant = 'boss';
+        roomDesignV313.layoutMetrics = { variant:'boss', rooms:roomDesignV313.rooms.length, ...collectRoomTopologyV322(start, goal), routeValid:true, repairApplied:!topology.routeLength };
+    } else {
+        buildProceduralRoomLayoutV322();
+    }
 
     createSecretRoomV313();
+
+    // Secret-room shell may overlap the network. Revalidate after it exists.
+    const start = { x: 2, y: 2 };
+    const goal = roomDesignV313.exitGate || { x: gameState.gridWidth - 3, y: gameState.gridHeight - 3 };
+    const beforeSecretRepair = collectRoomTopologyV322(start, goal);
+    let postSecretRepair = false;
+    if (!beforeSecretRepair.routeLength) {
+        carveGuaranteedRouteV322(start, goal);
+        postSecretRepair = true;
+    }
+    const finalTopology = collectRoomTopologyV322(start, goal);
+    roomDesignV313.layoutMetrics = {
+        ...(roomDesignV313.layoutMetrics || {}),
+        reachableTiles: finalTopology.reachable,
+        routeLength: Math.max(0, finalTopology.routeLength - 1),
+        junctions: finalTopology.junctions,
+        deadEnds: finalTopology.deadEnds,
+        routeValid: finalTopology.routeLength > 0,
+        repairApplied: !!(roomDesignV313.layoutMetrics?.repairApplied || postSecretRepair)
+    };
 }
 
 function chooseRoomDesignItemCellV313(set, used) {

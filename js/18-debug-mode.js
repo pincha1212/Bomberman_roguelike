@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.29.0 — Unified Debug Mode
+// Bomberman Roguelike v4.1 — Unified Debug Mode
 // Depuración interna del mismo runtime. Se activa solo con ?debug=1.
 (() => {
     'use strict';
@@ -1867,10 +1867,20 @@
     }
 
     function getUnifiedBossSummary() {
-        let boss = null; try { boss = window.BossV325 || null; } catch (_) {}
+        let boss = null, runtime = null;
+        try { boss = window.BossV41 || window.BossV325 || null; runtime = boss?.state || null; } catch (_) {}
         if (!boss) return null;
-        const projectiles = Array.isArray(boss.projectiles) ? boss.projectiles : [];
-        return { active: !!(boss.active ?? boss.exists), phase: boss.phase ?? boss.currentPhase ?? null, hp: boss.hp ?? boss.health ?? null, maxHp: boss.maxHp ?? boss.maxHealth ?? null, projectiles: projectiles.length, telegraph: !!(boss.telegraphActive ?? boss.telegraph) };
+        const liveBoss = getState()?.boss || null;
+        return {
+            active: !!runtime?.active,
+            phase: runtime?.phase ?? liveBoss?.phase ?? null,
+            hp: liveBoss?.hp ?? liveBoss?.health ?? null,
+            maxHp: liveBoss?.maxHp ?? liveBoss?.maxHealth ?? null,
+            bombs: typeof window.bossV4BombCount === 'function' ? window.bossV4BombCount() : (Array.isArray(getState()?.bombs) ? getState().bombs.filter(b => b?.owner === 'boss').length : 0),
+            attack: runtime?.lastAttack || runtime?.pattern || 'N/D',
+            projectiles: 0,
+            telegraph: runtime?.telegraphKind || null
+        };
     }
 
     function lightweightSnapshot() {
@@ -1912,8 +1922,8 @@
         const threatAvailable = snapshot.world && snapshot.world.threat !== 'NO EXPUESTO';
         checks.push({ id: 'threat-state', status: threatAvailable ? 'PASS' : 'WARN', detail: threatAvailable ? `threat=${snapshot.world.threat}` : 'threat NO EXPUESTO' });
         add('feedback-cap', !feedback || feedback.particles <= 96, feedback ? `particulas=${feedback.particles}` : 'feedback N/D');
-        const maxProjectiles = unifiedNum(window.BOSS_V325_CONFIG?.maxProjectiles, 6);
-        add('boss-projectile-cap', !boss || boss.projectiles <= maxProjectiles, boss ? `projectiles=${boss.projectiles}` : 'boss N/D');
+        const bossProjectiles = boss ? unifiedNum(boss.projectiles, 0) : 0;
+        add('boss-projectile-cap', !boss || bossProjectiles === 0, boss ? `projectiles=${bossProjectiles} · ataques=bombas/suelo` : 'boss N/D');
         const diagonal = enemies.filter(e => Math.abs(unifiedNum(e.vx)) > 0.001 && Math.abs(unifiedNum(e.vy)) > 0.001).length;
         add('enemy-cardinal', diagonal === 0, diagonal === 0 ? 'sin velocidades diagonales' : `${diagonal} enemigo(s) diagonales`);
         const blocked = enemies.filter(e => e?.ai?.physicalBlocked || e?.physicalBlocked).length;

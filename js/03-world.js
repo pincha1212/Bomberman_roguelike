@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.0 — Level generation, bosses, bombs, threats and traps
+// Bomberman Roguelike v4.1 — Level generation, bombs, boss arena, threats and traps
         function initLevel() {
             // Expand map grid size with higher levels
             gameState.roomType = getRoomForDepth(gameState.level);
@@ -136,17 +136,8 @@
                 vx: 1.05,
                 vy: 0,
                 moveTimer: 0,
-                attackTimer: 1500,
-                summonTimer: 6200,
-                waveTimer: 3200,
-                chargeTimer: 5200,
-                chargeTime: 0,
-                charging: false,
-                chargeVx: 0,
-                chargeVy: 0,
                 invuln: 0,
                 flash: 0,
-                roarTimer: 0,
                 defeated: false,
                 lastBlastHitId: -1
             };
@@ -186,109 +177,28 @@
             updateUI();
         }
 
-        function bossShoot() {
-            const b = gameState.boss;
-            if (!b || b.defeated) return;
-            const dx = player.x + player.width / 2 - b.x;
-            const dy = player.y + player.height / 2 - b.y;
-            const len = Math.hypot(dx, dy) || 1;
-            const speed = 2.8 + b.phase * 0.35;
-            if(gameState.bossProjectiles.length < largeSupport.maxBossProjectiles) gameState.bossProjectiles.push({x:b.x, y:b.y, vx:dx/len*speed, vy:dy/len*speed, life:4200, radius:9, kind:'orb'});
-            if (b.phase >= 2) {
-                const spread = 0.16;
-                for (const angle of [-spread, spread]) {
-                    const c=Math.cos(angle), q=Math.sin(angle);
-                    if(gameState.bossProjectiles.length < largeSupport.maxBossProjectiles) gameState.bossProjectiles.push({x:b.x, y:b.y, vx:(dx/len*c-dy/len*q)*speed*.92, vy:(dx/len*q+dy/len*c)*speed*.92, life:3900, radius:7, kind:'orb'});
-                }
-            }
-            sfx('alarm');
-        }
-
-        function bossShockwave() {
-            const b=gameState.boss;
-            if(!b || b.defeated) return;
-            const count=b.phase>=3?16:(b.phase>=2?12:10);
-            const speed=2.0+b.phase*.35;
-            for(let i=0;i<count;i++){
-                const a=(Math.PI*2/count)*i;
-                if(gameState.bossProjectiles.length < largeSupport.maxBossProjectiles) gameState.bossProjectiles.push({x:b.x,y:b.y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,life:3000,radius:8,kind:'wave'});
-            }
-            addFloatingText('¡OLA DE CHOQUE!', b.x, b.y-b.height*.55, '#c084fc');
-            triggerScreenShake(5,220);
-            sfx('bossWave');
-        }
-
-        function bossStartCharge() {
-            const b=gameState.boss;
-            if(!b || b.defeated || b.charging) return;
-            const dx=player.x+player.width/2-b.x, dy=player.y+player.height/2-b.y;
-            const len=Math.hypot(dx,dy)||1;
-            b.charging=true; b.chargeTime=950; b.chargeVx=dx/len*(3.2+b.phase*.55); b.chargeVy=dy/len*(3.2+b.phase*.55);
-            sfx('bossCharge'); addFloatingText('¡CARGA!', b.x, b.y-b.height*.55, '#fb7185');
-        }
-
-        function bossSummon() {
-            const b = gameState.boss;
-            if (!b || b.defeated) return;
-            const candidates=[];
-            const bx=Math.floor(b.x/TILE_SIZE), by=Math.floor(b.y/TILE_SIZE);
-            for(let y=1;y<gameState.gridHeight-1;y++) for(let x=1;x<gameState.gridWidth-1;x++) {
-                if(gameState.grid[y][x]!==TYPES.EMPTY) continue;
-                const d=Math.abs(x-bx)+Math.abs(y-by);
-                if(d>=4 && d<10 && !gameState.enemies.some(e=>Math.floor(e.x/TILE_SIZE)===x && Math.floor(e.y/TILE_SIZE)===y)) candidates.push({x,y,d});
-            }
-            candidates.sort((a,z)=>z.d-a.d);
-            const count=Math.min(2,candidates.length, Math.max(0,Math.min(largeSupport.maxEnemies, gameState.difficulty?.maxEnemies || largeSupport.maxEnemies)-gameState.enemies.length));
-            for(let i=0;i<count;i++) {
-                const c=candidates[i], type=i%2===0?ENEMY_TYPES.RASTRERO:ENEMY_TYPES.VOLADOR;
-                const sp=type.speed*gameState.roomType.enemySpeedMult*(1+gameState.threatLevel*.04)*1.15;
-                gameState.enemies.push({x:c.x*TILE_SIZE+TILE_SIZE/2,y:c.y*TILE_SIZE+TILE_SIZE/2,width:TILE_SIZE*.75,height:TILE_SIZE*.75,type,vx:sp,vy:0,baseSpeed:sp,changeTimer:25,elite:true,reinforcement:true});
-            }
-            if(count) addFloatingText('¡REFUERZOS DEL JEFE!', b.x, b.y-55, '#c084fc');
-        }
-
         function updateBoss(dt) {
             const b=gameState.boss;
             if(!b || b.defeated) return;
-            b.invuln=Math.max(0,b.invuln-dt); b.flash=Math.max(0,b.flash-dt); b.roarTimer=Math.max(0,b.roarTimer-dt);
-            b.attackTimer-=dt; b.summonTimer-=dt; b.waveTimer-=dt; b.chargeTimer-=dt; b.moveTimer-=dt;
+            b.invuln=Math.max(0,b.invuln-dt); b.flash=Math.max(0,b.flash-dt);
+            b.moveTimer-=dt;
             const ratio=b.hp/b.maxHp;
             b.phase=ratio<=.33?3:(ratio<=.66?2:1);
             const scale=Math.min(getCombatMotionDt(dt)/16.6667,2);
 
-            if(b.charging){
-                b.chargeTime-=dt;
-                const nx=b.x+b.chargeVx*scale, ny=b.y+b.chargeVy*scale;
-                if(!rectCollidesSolid(nx-b.width/2,ny-b.height/2,b.width,b.height)) { b.x=nx;b.y=ny; }
-                else { b.charging=false;b.chargeTimer=Math.max(1800,4200-b.phase*500);bossShockwave(); }
-                if(b.chargeTime<=0){b.charging=false;b.chargeTimer=Math.max(1800,4200-b.phase*500);}
-            } else {
-                if(b.moveTimer<=0){
-                    b.moveTimer=760-Math.min(260,b.phase*80);
-                    const dx=player.x+player.width/2-b.x, dy=player.y+player.height/2-b.y;
-                    if(Math.abs(dx)>Math.abs(dy)){b.vx=Math.sign(dx)*(0.8+b.phase*.3);b.vy=0;} else {b.vx=0;b.vy=Math.sign(dy)*(0.8+b.phase*.3);}
-                }
-                const nx=b.x+b.vx*scale, ny=b.y+b.vy*scale;
-                if(!rectCollidesSolid(nx-b.width/2,ny-b.height/2,b.width,b.height)){b.x=nx;b.y=ny;} else {b.vx*=-1;b.vy*=-1;}
+            if(b.moveTimer<=0){
+                b.moveTimer=760-Math.min(260,b.phase*80);
+                const dx=player.x+player.width/2-b.x, dy=player.y+player.height/2-b.y;
+                if(Math.abs(dx)>Math.abs(dy)){b.vx=Math.sign(dx)*(0.8+b.phase*.3);b.vy=0;} else {b.vx=0;b.vy=Math.sign(dy)*(0.8+b.phase*.3);}
             }
+            const nx=b.x+b.vx*scale, ny=b.y+b.vy*scale;
+            if(!rectCollidesSolid(nx-b.width/2,ny-b.height/2,b.width,b.height)){b.x=nx;b.y=ny;} else {b.vx*=-1;b.vy*=-1;}
 
-            if(b.attackTimer<=0){ bossShoot(); b.attackTimer=Math.max(700,1700-b.phase*260); }
-            if(b.waveTimer<=0){ bossShockwave(); b.waveTimer=Math.max(2300,4300-b.phase*650); }
-            if(b.summonTimer<=0){ bossSummon(); b.summonTimer=Math.max(3000,6500-b.phase*850); }
-            if(b.chargeTimer<=0 && b.phase>=2){ bossStartCharge(); }
-            if(b.phase===3 && b.roarTimer<=0){ sfx('bossRoar');b.roarTimer=7200;triggerScreenShake(4,180); }
-
+            // v4.1: el boss ya no tiene proyectiles, cargas ni refuerzos;
+            // sus ataques viven únicamente en js/27-boss-system.js.
             const hit={left:b.x-b.width*.38,right:b.x+b.width*.38,top:b.y-b.height*.38,bottom:b.y+b.height*.38};
             const ph={left:player.x+5,right:player.x+player.width-5,top:player.y+5,bottom:player.y+player.height-5};
             if(checkOverlap(hit,ph)) takeDamage('boss-contact', b.x, b.y);
-            for(let i=gameState.bossProjectiles.length-1;i>=0;i--){
-                const p=gameState.bossProjectiles[i]; p.x+=p.vx*scale;p.y+=p.vy*scale;p.life-=dt;
-                const gx=Math.floor(p.x/TILE_SIZE),gy=Math.floor(p.y/TILE_SIZE);
-                if(isSolid(gx,gy)){gameState.bossProjectiles.splice(i,1);continue;}
-                const pr={left:p.x-p.radius,right:p.x+p.radius,top:p.y-p.radius,bottom:p.y+p.radius};
-                if(checkOverlap(ph,pr)){takeDamage(p.kind==='wave' ? 'boss-projectile' : 'boss-projectile', p.x, p.y);gameState.bossProjectiles.splice(i,1);continue;}
-                if(p.life<=0) gameState.bossProjectiles.splice(i,1);
-            }
         }
 
         function drawBoss() {
@@ -320,13 +230,7 @@
             ctx.fillStyle=rage?'#ef4444':'#c084fc';ctx.shadowBlur=18;ctx.shadowColor=ctx.fillStyle;ctx.beginPath();ctx.arc(0,b.height*.15,b.width*.10,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
             // Phase markers
             ctx.fillStyle='#fef08a';for(let i=0;i<b.phase;i++){ctx.beginPath();ctx.arc(-10+(i-1)*10,b.height*.34,3,0,Math.PI*2);ctx.fill();}
-            if(b.charging){ctx.strokeStyle='#fef08a';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,b.width*.58,0,Math.PI*2);ctx.stroke();}
             ctx.restore();
-            gameState.bossProjectiles.forEach(p=>{
-                ctx.fillStyle=p.kind==='wave'?'#f0abfc':'#c084fc';
-                if(!perf.lowQuality){ctx.shadowBlur=p.kind==='wave'?16:12;ctx.shadowColor=ctx.fillStyle;} else {ctx.shadowBlur=0;}
-                ctx.beginPath();ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
-            });
         }
 
         // V3.12.3: el sistema de trampas/hazards vive en js/14-traps.js.

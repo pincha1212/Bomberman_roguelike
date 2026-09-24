@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.0 — Bombs, explosions, damage and gameplay simulation
+// Bomberman Roguelike v4.1 — Bombs, explosions, damage and gameplay simulation
         function explodeBomb(bombIndex) {
             const first = gameState.bombs[bombIndex];
             if (!first) return;
@@ -146,7 +146,7 @@
                     takeDamage(damageSource, (exp.x + .5) * TILE_SIZE, (exp.y + .5) * TILE_SIZE);
                 }
 
-                if (gameState.boss && !gameState.boss.defeated) {
+                if (gameState.boss && !gameState.boss.defeated && exp.owner !== 'boss') {
                     const b = gameState.boss;
                     const bossRect = { left:b.x-b.width/2, right:b.x+b.width/2, top:b.y-b.height/2, bottom:b.y+b.height/2 };
                     if (explosionOverlapsRect(bossRect, exp, 5) && b.lastBlastHitId !== exp.blastId) {

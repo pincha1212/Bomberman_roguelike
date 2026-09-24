@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.0 — Bomb Handling + shared bomb states
+// Bomberman Roguelike v4.1 — Bomb Handling + shared bomb states
 // Núcleo de colocación, retención segura, ocupación, mecha y cadenas.
 
 const BOMB_HANDLING = {
@@ -44,6 +44,11 @@ function ensureBombV4State(bomb){
     if (!Number.isFinite(bomb.motionRotation)) bomb.motionRotation = 0;
     if (!Number.isFinite(bomb.motionRotationSpeed)) bomb.motionRotationSpeed = 0;
     if (!Number.isFinite(bomb.bobPhase)) bomb.bobPhase = 0;
+    if (!bomb.interactionState) bomb.interactionState = 'free';
+    if (typeof bomb.canKick !== 'boolean') bomb.canKick = bomb.owner !== 'boss';
+    if (typeof bomb.canPush !== 'boolean') bomb.canPush = bomb.owner !== 'boss';
+    if (typeof bomb.canCarry !== 'boolean') bomb.canCarry = false;
+    if (!Object.prototype.hasOwnProperty.call(bomb, 'carriedBy')) bomb.carriedBy = null;
     if (!Number.isFinite(bomb.timer)) bomb.timer = Number(bomb.fuseTotal || 0);
     return bomb;
 }

@@ -452,12 +452,20 @@ function draw() {
             if (moving) ctx.rotate((b.motionRotation || 0) * 0.35);
             ctx.scale(scale, scale);
 
-            // La bomba del jugador usa un aro cian de identidad; la mecha sigue en ámbar/rojo.
-            if ((b.owner || 'player') === 'player') {
+            const bossBomb = (b.owner || 'player') === 'boss';
+            // La bomba del jugador usa un aro cian; la bomba del boss usa identidad roja.
+            if (!bossBomb) {
                 ctx.strokeStyle = 'rgba(34,211,238,.78)';
                 ctx.lineWidth = 2;
                 ctx.beginPath();
                 ctx.arc(0, 0, TILE_SIZE * .42, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            if (bossBomb) {
+                ctx.strokeStyle = 'rgba(248,113,113,.82)';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.arc(0, 0, TILE_SIZE * .44, 0, Math.PI * 2);
                 ctx.stroke();
             }
             renderBombFuseFeedback(0, 0, b);

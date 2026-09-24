@@ -1,55 +1,33 @@
 /*
- * BOMBERMAN ROGUELIKE v4.0
- * Boss System Update
+ * BOMBERMAN ROGUELIKE v4.1
+ * Boss Bomb System
  *
- * Purpose:
- * - Add deterministic boss phases and low-cost attack patterns.
- * - Reuse the existing gameState/player/update/draw runtime.
- * - Keep a strict projectile cap.
- * - Avoid per-frame pathfinding or expensive searches.
- * - Keep the existing boss entity as the source of health/position.
+ * Boss attacks are deliberately reduced to the game's core fantasy:
+ * - throw bombs to random valid cells;
+ * - ground slam to create a wide bomb-style explosion.
+ *
+ * No boss projectiles, no charge attack, no enemy summoning.
  */
 
-const BOSS_V325_CONFIG = Object.freeze({
+const BOSS_V41_CONFIG = Object.freeze({
     enabled: true,
-    projectileCap: 6,
-    projectileSpeed: 3.2,
-    projectileLifeMs: 2400,
-    phaseThresholds: Object.freeze({
-        phase2: 0.66,
-        phase3: 0.33
-    }),
-    patternIntervalMs: Object.freeze({
-        phase1: 1550,
-        phase2: 1325,
-        phase3: 1100
-    }),
-    telegraphMs: 260,
-    damage: 1,
+    phaseThresholds: Object.freeze({ phase2: 0.66, phase3: 0.33 }),
+    telegraphMs: 520,
     bossBombCap: 6,
     bombFuseMs: 2100,
     bombMoveMs: 420,
     bombArcPx: 22,
-    bombThrowCount: Object.freeze({
-        1: 1,
-        2: 2,
-        3: 3
-    }),
-    bombIntervalMs: Object.freeze({
-        phase1: 2500,
-        phase2: 2050,
-        phase3: 1650
-    }),
+    bombThrowCount: Object.freeze({ 1: 1, 2: 2, 3: 3 }),
+    bombIntervalMs: Object.freeze({ phase1: 2700, phase2: 2150, phase3: 1700 }),
+    bombRange: Object.freeze({ phase1: 2, phase2: 3, phase3: 4 }),
     bombMinFromPlayer: 3,
     bombMinFromBoss: 2,
-    phaseSpeedMultiplier: Object.freeze({
-        1: 1.00,
-        2: 1.08,
-        3: 1.16
-    })
+    slamIntervalMs: Object.freeze({ phase1: 5200, phase2: 4300, phase3: 3400 }),
+    slamRange: Object.freeze({ phase1: 5, phase2: 6, phase3: 7 }),
+    phaseSpeedMultiplier: Object.freeze({ 1: 1.00, 2: 1.08, 3: 1.16 })
 });
 
-const BossV325 = {
+const BossV41 = {
     state: null,
     originalUpdate: null,
     originalDraw: null,
@@ -62,13 +40,7 @@ const BossV325 = {
     startWrapped: false
 };
 
-function bossV325Distance(a, b) {
-    const dx = a.x - b.x;
-    const dy = a.y - b.y;
-    return Math.sqrt(dx * dx + dy * dy);
-}
-
-function bossV325HealthRatio(boss) {
+function bossV41HealthRatio(boss) {
     if (!boss || boss.defeated) return 0;
     const hp = Number.isFinite(boss.health) ? boss.health : boss.hp;
     const max = Number.isFinite(boss.maxHealth) ? boss.maxHealth : boss.maxHp;
@@ -76,71 +48,55 @@ function bossV325HealthRatio(boss) {
     return Math.max(0, Math.min(1, hp / max));
 }
 
-function bossV325GetPhase(boss) {
-    const ratio = bossV325HealthRatio(boss);
-    if (ratio <= BOSS_V325_CONFIG.phaseThresholds.phase3) return 3;
-    if (ratio <= BOSS_V325_CONFIG.phaseThresholds.phase2) return 2;
+function bossV41GetPhase(boss) {
+    const ratio = bossV41HealthRatio(boss);
+    if (ratio <= BOSS_V41_CONFIG.phaseThresholds.phase3) return 3;
+    if (ratio <= BOSS_V41_CONFIG.phaseThresholds.phase2) return 2;
     return 1;
 }
 
-function bossV325GetPosition(boss) {
+function bossV41GetPosition(boss) {
     if (!boss) return null;
-    const x = Number.isFinite(boss.x) ? boss.x :
-        (Number.isFinite(boss.cx) ? boss.cx : null);
-    const y = Number.isFinite(boss.y) ? boss.y :
-        (Number.isFinite(boss.cy) ? boss.cy : null);
+    const x = Number.isFinite(boss.x) ? boss.x : (Number.isFinite(boss.cx) ? boss.cx : null);
+    const y = Number.isFinite(boss.y) ? boss.y : (Number.isFinite(boss.cy) ? boss.cy : null);
     return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 }
 
-function bossV325EnsureState() {
-    if (!BossV325.state) {
-        BossV325.state = {
-            lastBossRef: null,
-            phase: 1,
-            pattern: 'aimed',
-            patternTimer: 0,
-            bombTimer: 0,
-            telegraphTimer: 0,
-            patternCount: 0,
-            phaseTransitions: 0,
-            shotsFired: 0,
-            hits: 0,
-            blockedByCap: 0,
-            bombShotsFired: 0,
-            lastBombTarget: null,
-            active: false
-        };
-    }
-    return BossV325.state;
+function bossV41EnsureState() {
+    if (!BossV41.state) BossV41.state = bossV41CreateState();
+    return BossV41.state;
 }
 
-function bossV325Reset() {
-    BossV325.state = {
+function bossV41CreateState() {
+    return {
         lastBossRef: null,
         phase: 1,
-        pattern: 'aimed',
+        pattern: 'bomb-throw',
         patternTimer: 0,
         bombTimer: 0,
+        slamTimer: 0,
         telegraphTimer: 0,
+        pendingAttack: null,
+        telegraphKind: null,
         patternCount: 0,
         phaseTransitions: 0,
-        shotsFired: 0,
-        hits: 0,
-        blockedByCap: 0,
         bombShotsFired: 0,
+        slamCount: 0,
         lastBombTarget: null,
-        active: false
+        active: false,
+        lastAttack: 'bomb-throw'
     };
+}
+
+function bossV41Reset() {
+    BossV41.state = bossV41CreateState();
     try {
-        if (Array.isArray(gameState.bossProjectilesV325)) {
-            gameState.bossProjectilesV325.length = 0;
-        } else {
-            gameState.bossProjectilesV325 = [];
-        }
+        gameState.bossProjectilesV325 = [];
+        gameState.bossProjectiles = [];
     } catch (_) {}
 }
 
-function bossV325IsActive() {
+function bossV41IsActive() {
     try {
         return !!(gameState && gameState.isPlaying && gameState.boss && !gameState.boss.defeated);
     } catch (_) {
@@ -148,99 +104,84 @@ function bossV325IsActive() {
     }
 }
 
-function bossV325SetHUD(boss, phase) {
+function bossV41SetHUD(boss, phase) {
     const phaseEl = document.getElementById('boss-phase');
     const barEl = document.getElementById('boss-bar');
     const hudEl = document.getElementById('boss-hud');
     if (phaseEl) phaseEl.textContent = `FASE ${phase}`;
-    if (barEl) {
-        const ratio = bossV325HealthRatio(boss);
-        barEl.style.width = `${Math.round(ratio * 100)}%`;
-    }
-    if (hudEl) hudEl.classList.toggle('hidden', !bossV325IsActive());
-    const bombBadge = document.getElementById('ui-boss-bombs');
-    if (bombBadge) {
+    if (barEl) barEl.style.width = `${Math.round(bossV41HealthRatio(boss) * 100)}%`;
+    if (hudEl) hudEl.classList.toggle('hidden', !bossV41IsActive());
+    const badge = document.getElementById('ui-boss-bombs');
+    if (badge) {
         const count = bossV4BombCount();
-        bombBadge.classList.toggle('hidden', !bossV325IsActive());
-        const value = bombBadge.querySelector('span');
+        badge.classList.toggle('hidden', !bossV41IsActive());
+        const value = badge.querySelector('span');
         if (value) value.textContent = String(count);
     }
 }
 
-function bossV325DirectionToPlayer(boss) {
-    const bp = bossV325GetPosition(boss);
-    if (!bp || typeof player === 'undefined' || !player) return { x: 1, y: 0 };
-    const px = Number.isFinite(player.x) ? player.x + (player.width || 0) / 2 : bp.x;
-    const py = Number.isFinite(player.y) ? player.y + (player.height || 0) / 2 : bp.y;
-    const dx = px - bp.x;
-    const dy = py - bp.y;
-    const len = Math.hypot(dx, dy) || 1;
-    return { x: dx / len, y: dy / len };
-}
-
-
-function bossV4BombCount(){
+function bossV4BombCount() {
     try {
         return Array.isArray(gameState.bombs) ? gameState.bombs.filter(b => b && b.owner === 'boss').length : 0;
     } catch (_) { return 0; }
 }
 
-function bossV4IsBombTargetValid(x, y, bossCell, playerCell){
-    if (!gameState.grid[y] || gameState.grid[y][x] !== TYPES.EMPTY) return false;
+function bossV41IsBombTargetValid(x, y, bossCell, playerCell) {
     if (x <= 0 || y <= 0 || x >= gameState.gridWidth - 1 || y >= gameState.gridHeight - 1) return false;
-    const bombHere = Array.isArray(gameState.bombs) && gameState.bombs.some(b => b && b.x === x && b.y === y);
-    if (bombHere) return false;
-    if (Math.abs(x - bossCell.x) + Math.abs(y - bossCell.y) < BOSS_V325_CONFIG.bombMinFromBoss) return false;
-    if (Math.abs(x - playerCell.x) + Math.abs(y - playerCell.y) < BOSS_V325_CONFIG.bombMinFromPlayer) return false;
+    if (gameState.grid?.[y]?.[x] !== TYPES.EMPTY) return false;
+    if (Array.isArray(gameState.bombs) && gameState.bombs.some(b => b && b.x === x && b.y === y)) return false;
+    if (Math.abs(x - bossCell.x) + Math.abs(y - bossCell.y) < BOSS_V41_CONFIG.bombMinFromBoss) return false;
+    if (Math.abs(x - playerCell.x) + Math.abs(y - playerCell.y) < BOSS_V41_CONFIG.bombMinFromPlayer) return false;
     return true;
 }
 
-function bossV4FindBombTarget(){
+function bossV41FindBombTarget() {
     const boss = gameState.boss;
-    if (!boss) return null;
+    if (!boss || !player) return null;
     const bx = Math.floor(boss.x / TILE_SIZE);
     const by = Math.floor(boss.y / TILE_SIZE);
     const px = Math.floor((player.x + player.width / 2) / TILE_SIZE);
     const py = Math.floor((player.y + player.height / 2) / TILE_SIZE);
-    const bossCell = {x:bx,y:by};
-    const playerCell = {x:px,y:py};
+    const bossCell = { x: bx, y: by };
+    const playerCell = { x: px, y: py };
 
-    // Muestreo aleatorio para que el boss no haga un barrido de mapa por frame.
-    for (let attempt = 0; attempt < 36; attempt++) {
+    // 64 intentos aleatorios: el boss apunta al mapa, no al jugador.
+    for (let attempt = 0; attempt < 64; attempt++) {
         const x = 1 + Math.floor(Math.random() * Math.max(1, gameState.gridWidth - 2));
         const y = 1 + Math.floor(Math.random() * Math.max(1, gameState.gridHeight - 2));
-        if (bossV4IsBombTargetValid(x, y, bossCell, playerCell)) return {x,y};
+        if (bossV41IsBombTargetValid(x, y, bossCell, playerCell)) return { x, y };
     }
 
-    // Fallback determinista: mantiene el ataque vivo si el mapa está muy cargado.
+    // Fallback acotado por anillos; solo ocurre cuando el mapa está cargado.
     for (let radius = 3; radius <= Math.max(gameState.gridWidth, gameState.gridHeight); radius++) {
         for (let y = 1; y < gameState.gridHeight - 1; y++) {
             for (let x = 1; x < gameState.gridWidth - 1; x++) {
                 if (Math.abs(x - bx) + Math.abs(y - by) < radius) continue;
-                if (bossV4IsBombTargetValid(x, y, bossCell, playerCell)) return {x,y};
+                if (bossV41IsBombTargetValid(x, y, bossCell, playerCell)) return { x, y };
             }
         }
     }
     return null;
 }
 
-function bossV4SpawnBomb(){
-    const state = bossV325EnsureState();
-    if (!gameState?.isPlaying || !gameState.boss || gameState.boss.defeated) return false;
-    if (bossV4BombCount() >= BOSS_V325_CONFIG.bossBombCap) return false;
-    const target = bossV4FindBombTarget();
+function bossV41SpawnBomb() {
+    const state = bossV41EnsureState();
+    if (!bossV41IsActive()) return false;
+    if (bossV4BombCount() >= BOSS_V41_CONFIG.bossBombCap) return false;
+    const target = bossV41FindBombTarget();
     if (!target) return false;
     const boss = gameState.boss;
+    const range = BOSS_V41_CONFIG.bombRange[`phase${state.phase}`] || 2;
     const bomb = {
-        id: `boss-bomb-${gameState.animFrame}-${Math.random().toString(36).slice(2,6)}`,
+        id: `boss-bomb-${gameState.animFrame}-${Math.random().toString(36).slice(2, 6)}`,
         owner: 'boss',
         bombType: 'boss-throw',
         x: target.x,
         y: target.y,
-        range: Math.max(1, Math.min(4, 1 + Math.floor(state.phase / 2))),
-        timer: BOSS_V325_CONFIG.bombFuseMs,
-        fuseTotal: BOSS_V325_CONFIG.bombFuseMs,
-        warnBucket: Math.ceil(BOSS_V325_CONFIG.bombFuseMs / 300),
+        range,
+        timer: BOSS_V41_CONFIG.bombFuseMs,
+        fuseTotal: BOSS_V41_CONFIG.bombFuseMs,
+        warnBucket: Math.ceil(BOSS_V41_CONFIG.bombFuseMs / 300),
         scalePulse: 1,
         previewTimer: 0,
         playerPassThrough: true,
@@ -253,296 +194,254 @@ function bossV4SpawnBomb(){
         worldX: boss.x,
         worldY: boss.y,
         motionProgress: 0,
-        motionTimer: BOSS_V325_CONFIG.bombMoveMs,
-        motionDuration: BOSS_V325_CONFIG.bombMoveMs,
+        motionTimer: BOSS_V41_CONFIG.bombMoveMs,
+        motionDuration: BOSS_V41_CONFIG.bombMoveMs,
         motionStartX: boss.x,
         motionStartY: boss.y,
-        motionTargetX: (target.x + .5) * TILE_SIZE,
-        motionTargetY: (target.y + .5) * TILE_SIZE,
-        motionArc: BOSS_V325_CONFIG.bombArcPx,
+        motionTargetX: (target.x + 0.5) * TILE_SIZE,
+        motionTargetY: (target.y + 0.5) * TILE_SIZE,
+        motionArc: BOSS_V41_CONFIG.bombArcPx,
         motionRotation: 0,
-        motionRotationSpeed: .22,
-        bobPhase: 0
+        motionRotationSpeed: 0.22,
+        bobPhase: 0,
+        interactionState: 'free',
+        canKick: false,
+        canPush: false,
+        canCarry: false,
+        carriedBy: null
     };
     if (typeof ensureBombV4State === 'function') ensureBombV4State(bomb);
     gameState.bombs.push(bomb);
-    state.bombShotsFired = (state.bombShotsFired || 0) + 1;
+    state.bombShotsFired += 1;
     state.lastBombTarget = { ...target };
     return true;
 }
 
-function bossV4FireBombVolley(){
-    const state = bossV325EnsureState();
-    const count = Number(BOSS_V325_CONFIG.bombThrowCount[state.phase] || 1);
+function bossV41FireBombVolley() {
+    const state = bossV41EnsureState();
+    const count = Number(BOSS_V41_CONFIG.bombThrowCount[state.phase] || 1);
     let spawned = 0;
-    for (let i=0; i<count; i++) if (bossV4SpawnBomb()) spawned++;
+    for (let i = 0; i < count; i++) if (bossV41SpawnBomb()) spawned++;
+    state.lastAttack = 'bomb-throw';
+    state.pattern = 'bomb-throw';
     return spawned;
 }
 
-function bossV325ProjectileCount() {
-    try {
-        return Array.isArray(gameState.bossProjectilesV325) ? gameState.bossProjectilesV325.length : 0;
-    } catch (_) {
-        return 0;
-    }
-}
-
-function bossV325SpawnProjectile(angle, speedMultiplier = 1) {
-    const state = bossV325EnsureState();
-    if (bossV325ProjectileCount() >= BOSS_V325_CONFIG.projectileCap) {
-        state.blockedByCap += 1;
-        return false;
-    }
+function bossV41BuildSlamBomb() {
     const boss = gameState.boss;
-    const bp = bossV325GetPosition(boss);
-    if (!bp) return false;
-
-    if (!Array.isArray(gameState.bossProjectilesV325)) gameState.bossProjectilesV325 = [];
-    const speed = BOSS_V325_CONFIG.projectileSpeed * speedMultiplier;
-    gameState.bossProjectilesV325.push({
-        x: bp.x,
-        y: bp.y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        radius: 5,
-        damage: BOSS_V325_CONFIG.damage,
-        lifeMs: BOSS_V325_CONFIG.projectileLifeMs,
-        bornAt: performance.now(),
-        owner: 'boss-v325'
-    });
-    state.shotsFired += 1;
-    return true;
+    const centerX = Math.max(1, Math.min(gameState.gridWidth - 2, Math.floor(boss.x / TILE_SIZE)));
+    const centerY = Math.max(1, Math.min(gameState.gridHeight - 2, Math.floor(boss.y / TILE_SIZE)));
+    return {
+        id: `boss-slam-${gameState.animFrame}`,
+        owner: 'boss',
+        bombType: 'boss-slam',
+        x: centerX,
+        y: centerY,
+        range: BOSS_V41_CONFIG.slamRange[`phase${BossV41.state?.phase || 1}`] || 5,
+        timer: 0,
+        fuseTotal: 0,
+        playerPassThrough: false,
+        countsTowardPlayerCapacity: false,
+        state: BOMB_V4_STATES.ARMED,
+        motionState: 'idle',
+        worldX: (centerX + 0.5) * TILE_SIZE,
+        worldY: (centerY + 0.5) * TILE_SIZE,
+        motionProgress: 1,
+        motionTimer: 0,
+        motionDuration: 0,
+        interactionState: 'slam'
+    };
 }
 
-function bossV325FirePattern() {
-    const state = bossV325EnsureState();
+function bossV41GroundSlam() {
+    if (!bossV41IsActive() || typeof explodeBomb !== 'function') return 0;
     const boss = gameState.boss;
-    const aim = bossV325DirectionToPlayer(boss);
-    const baseAngle = Math.atan2(aim.y, aim.x);
-    const phase = state.phase;
-
-    if (phase === 1) {
-        state.pattern = 'aimed';
-        bossV325SpawnProjectile(baseAngle, 1.00);
-        return;
-    }
-
-    if (phase === 2) {
-        state.pattern = 'cross';
-        for (let i = 0; i < 4; i++) {
-            bossV325SpawnProjectile(i * Math.PI / 2, 1.00);
-        }
-        return;
-    }
-
-    state.pattern = 'tri-shot';
-    const spread = Math.PI / 10;
-    bossV325SpawnProjectile(baseAngle, 1.08);
-    bossV325SpawnProjectile(baseAngle - spread, 1.08);
-    bossV325SpawnProjectile(baseAngle + spread, 1.08);
+    const state = bossV41EnsureState();
+    const slamBomb = bossV41BuildSlamBomb();
+    gameState.bombs.push(slamBomb);
+    const index = gameState.bombs.length - 1;
+    const range = slamBomb.range;
+    explodeBomb(index);
+    state.slamCount += 1;
+    state.lastAttack = 'ground-slam';
+    state.pattern = 'ground-slam';
+    addFloatingText('¡APLASTAMIENTO!', boss.x, boss.y - boss.height * 0.58, '#facc15');
+    triggerScreenShake(10, 360);
+    if (typeof sfx === 'function') sfx('boss');
+    return range;
 }
 
-function bossV325UpdateProjectiles(dt) {
-    const list = Array.isArray(gameState.bossProjectilesV325) ? gameState.bossProjectilesV325 : [];
-    if (!list.length) return;
-
-    const dtScale = Math.max(0.5, Math.min(2, dt / 16.6667));
-    const now = performance.now();
-
-    for (let i = list.length - 1; i >= 0; i--) {
-        const p = list[i];
-        p.x += p.vx * dtScale;
-        p.y += p.vy * dtScale;
-        p.lifeMs -= dt;
-
-        let hit = false;
-        if (typeof player !== 'undefined' && player) {
-            const pw = Number.isFinite(player.width) ? player.width : 24;
-            const ph = Number.isFinite(player.height) ? player.height : 24;
-            const px = (Number.isFinite(player.x) ? player.x : 0) + pw / 2;
-            const py = (Number.isFinite(player.y) ? player.y : 0) + ph / 2;
-            const r = Math.max(pw, ph) * 0.35 + p.radius;
-            const dx = p.x - px;
-            const dy = p.y - py;
-            if (dx * dx + dy * dy <= r * r) {
-                hit = true;
-                const state = bossV325EnsureState();
-                state.hits += 1;
-                if (!player.isInvincible && typeof takeDamage === 'function') takeDamage();
-            }
-        }
-
-        const outside = p.x < -24 || p.y < -24 || p.x > gameState.gridWidth * TILE_SIZE + 24 || p.y > gameState.gridHeight * TILE_SIZE + 24;
-        if (hit || outside || p.lifeMs <= 0 || now - p.bornAt > BOSS_V325_CONFIG.projectileLifeMs) {
-            list.splice(i, 1);
-        }
-    }
-}
-
-function bossV325BeginWorldDraw() {
-    const cam = gameState && gameState.camera ? gameState.camera : { x: 0, y: 0 };
-    ctx.save();
-    ctx.translate(-Math.floor(Number.isFinite(cam.x) ? cam.x : 0), -Math.floor(Number.isFinite(cam.y) ? cam.y : 0));
-}
-
-function bossV325DrawProjectiles() {
-    const list = Array.isArray(gameState.bossProjectilesV325) ? gameState.bossProjectilesV325 : [];
-    if (!list.length) return;
-
-    bossV325BeginWorldDraw();
-    ctx.globalCompositeOperation = 'lighter';
-    for (const p of list) {
-        ctx.fillStyle = '#ef4444';
-        ctx.globalAlpha = 0.85;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#fecaca';
-        ctx.globalAlpha = 0.45;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius + 2, 0, Math.PI * 2);
-        ctx.stroke();
-    }
-    ctx.restore();
-}
-
-function bossV325DrawTelegraphWorld() {
-    if (!bossV325IsActive()) return;
-    const state = bossV325EnsureState();
-    if (state.telegraphTimer <= 0) return;
-    const bp = bossV325GetPosition(gameState.boss);
-    if (!bp) return;
-    const t = state.telegraphTimer / BOSS_V325_CONFIG.telegraphMs;
-    bossV325BeginWorldDraw();
-    ctx.globalAlpha = 0.35 + t * 0.35;
-    ctx.strokeStyle = '#f87171';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(bp.x, bp.y, 24 + (1 - t) * 12, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-}
-
-function bossV325ApplyPhase(boss, phase) {
-    const state = bossV325EnsureState();
+function bossV41ApplyPhase(boss, phase) {
+    const state = bossV41EnsureState();
     if (state.lastBossRef !== boss) {
         state.lastBossRef = boss;
         state.phase = phase;
         state.patternTimer = 0;
+        state.bombTimer = 0;
+        state.slamTimer = BOSS_V41_CONFIG.slamIntervalMs[`phase${phase}`] * 0.55;
         state.telegraphTimer = 0;
+        state.telegraphKind = null;
+        state.pendingAttack = null;
         state.patternCount = 0;
         state.bombShotsFired = 0;
+        state.slamCount = 0;
         state.lastBombTarget = null;
         state.active = true;
     }
-
     if (state.phase !== phase) {
         state.phase = phase;
         state.phaseTransitions += 1;
         state.patternTimer = 0;
-        state.bombTimer = BOSS_V325_CONFIG.bombIntervalMs[`phase${phase}`] * 0.6;
-        state.telegraphTimer = BOSS_V325_CONFIG.telegraphMs;
-        state.pattern = phase === 1 ? 'aimed' : (phase === 2 ? 'cross' : 'tri-shot');
+        state.bombTimer = 0;
+        state.pendingAttack = null;
+        state.slamTimer = BOSS_V41_CONFIG.slamIntervalMs[`phase${phase}`] * 0.55;
     }
-
     boss.phase = phase;
     boss.bossPhase = phase;
-    boss.phaseSpeedMultiplier = BOSS_V325_CONFIG.phaseSpeedMultiplier[phase];
-    boss.patternV325 = state.pattern;
+    boss.phaseSpeedMultiplier = BOSS_V41_CONFIG.phaseSpeedMultiplier[phase];
+    boss.bossAttack = state.pattern;
 }
 
-function updateBossV325(dt) {
-    if (!BOSS_V325_CONFIG.enabled) return;
-    if (!bossV325IsActive()) {
-        bossV325EnsureState().active = false;
+function updateBossV41(dt) {
+    if (!BOSS_V41_CONFIG.enabled) return;
+    if (!bossV41IsActive()) {
+        bossV41EnsureState().active = false;
         return;
     }
 
     const boss = gameState.boss;
-    const state = bossV325EnsureState();
-    const phase = bossV325GetPhase(boss);
-    bossV325ApplyPhase(boss, phase);
-    bossV325SetHUD(boss, phase);
+    const state = bossV41EnsureState();
+    const phase = bossV41GetPhase(boss);
+    bossV41ApplyPhase(boss, phase);
+    bossV41SetHUD(boss, phase);
 
-    state.patternTimer -= dt;
-    if (state.telegraphTimer > 0) state.telegraphTimer = Math.max(0, state.telegraphTimer - dt);
+    state.bombTimer -= dt;
+    state.slamTimer -= dt;
+    state.patternTimer = Math.max(0, state.patternTimer - dt);
 
-    const interval = BOSS_V325_CONFIG.patternIntervalMs[`phase${phase}`];
-    state.bombTimer = Number.isFinite(state.bombTimer) ? state.bombTimer - dt : BOSS_V325_CONFIG.bombIntervalMs[`phase${phase}`];
-    if (state.bombTimer <= 0) {
-        bossV4FireBombVolley();
-        state.bombTimer = BOSS_V325_CONFIG.bombIntervalMs[`phase${phase}`];
+    if (state.telegraphTimer > 0) {
+        state.telegraphTimer = Math.max(0, state.telegraphTimer - dt);
+        if (state.telegraphTimer === 0 && state.pendingAttack) {
+            const attack = state.pendingAttack;
+            state.pendingAttack = null;
+            state.patternCount += 1;
+            if (attack === 'ground-slam') {
+                bossV41GroundSlam();
+                state.slamTimer = BOSS_V41_CONFIG.slamIntervalMs[`phase${phase}`];
+            } else {
+                bossV41FireBombVolley();
+                state.bombTimer = BOSS_V41_CONFIG.bombIntervalMs[`phase${phase}`];
+            }
+            state.patternTimer = 260;
+        }
+    } else if (state.patternTimer <= 0) {
+        let attack = null;
+        if (state.slamTimer <= 0) attack = 'ground-slam';
+        else if (state.bombTimer <= 0) attack = 'bomb-throw';
+        if (attack) {
+            state.pendingAttack = attack;
+            state.telegraphKind = attack;
+            state.telegraphTimer = BOSS_V41_CONFIG.telegraphMs;
+            state.patternTimer = BOSS_V41_CONFIG.telegraphMs + 80;
+        } else {
+            state.patternTimer = 120;
+        }
     }
-    if (state.patternTimer <= 0) {
-        state.patternTimer = interval;
-        state.patternCount += 1;
-        state.telegraphTimer = BOSS_V325_CONFIG.telegraphMs;
-        bossV325FirePattern();
-    }
 
-    bossV325UpdateProjectiles(dt);
+    // Las bombas lanzadas se manejan en js/11-bombs.js como parte del runtime común.
 }
 
-function drawBossV325Telegraph() {
-    bossV325DrawTelegraphWorld();
+function bossV41DrawTelegraphWorld() {
+    if (!bossV41IsActive()) return;
+    const state = bossV41EnsureState();
+    if (state.telegraphTimer <= 0) return;
+    const boss = gameState.boss;
+    const t = state.telegraphTimer / BOSS_V41_CONFIG.telegraphMs;
+    const cx = boss.x;
+    const cy = boss.y;
+    const range = BOSS_V41_CONFIG.slamRange[`phase${state.phase}`] || 5;
+    const radius = state.telegraphKind === 'ground-slam' ? range * TILE_SIZE : TILE_SIZE * 1.15;
+    const cam = gameState.camera || { x: 0, y: 0 };
+    ctx.save();
+    ctx.translate(-Math.floor(cam.x || 0), -Math.floor(cam.y || 0));
+    ctx.globalAlpha = 0.18 + t * 0.28;
+    ctx.strokeStyle = state.telegraphKind === 'ground-slam' ? '#facc15' : '#fb7185';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([8, 8]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius * (1.0 + (1 - t) * 0.10), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (state.telegraphKind === 'ground-slam') {
+        ctx.fillStyle = 'rgba(250,204,21,.08)';
+        ctx.fillRect(cx - range * TILE_SIZE, cy - TILE_SIZE * 0.18, range * TILE_SIZE * 2, TILE_SIZE * 0.36);
+        ctx.fillRect(cx - TILE_SIZE * 0.18, cy - range * TILE_SIZE, TILE_SIZE * 0.36, range * TILE_SIZE * 2);
+    }
+    ctx.restore();
 }
 
-function bossV325WrapFunctions() {
-    if (BossV325.installed) return true;
+function bossV41WrapFunctions() {
+    if (BossV41.installed) return true;
     if (typeof update !== 'function' || typeof draw !== 'function' || typeof initLevel !== 'function') return false;
 
-    BossV325.originalUpdate = update;
-    BossV325.originalDraw = draw;
-    BossV325.originalInitLevel = initLevel;
+    BossV41.originalUpdate = update;
+    BossV41.originalDraw = draw;
+    BossV41.originalInitLevel = initLevel;
 
-    window.update = function updateV325(dt) {
-        BossV325.originalUpdate(dt);
-        updateBossV325(dt);
+    window.update = function updateV41(dt) {
+        BossV41.originalUpdate(dt);
+        updateBossV41(dt);
     };
 
-    window.draw = function drawV325() {
-        BossV325.originalDraw();
-        drawBossV325Telegraph();
-        bossV325DrawProjectiles();
+    window.draw = function drawV41() {
+        BossV41.originalDraw();
+        bossV41DrawTelegraphWorld();
     };
 
-    window.initLevel = function initLevelV325(...args) {
-        const result = BossV325.originalInitLevel(...args);
-        bossV325Reset();
+    window.initLevel = function initLevelV41(...args) {
+        const result = BossV41.originalInitLevel(...args);
+        bossV41Reset();
         return result;
     };
 
     if (typeof startGame === 'function') {
-        BossV325.originalStartGame = startGame;
-        window.startGame = function startGameV325(...args) {
-            bossV325Reset();
-            return BossV325.originalStartGame(...args);
+        BossV41.originalStartGame = startGame;
+        window.startGame = function startGameV41(...args) {
+            bossV41Reset();
+            return BossV41.originalStartGame(...args);
         };
-        BossV325.startWrapped = true;
+        BossV41.startWrapped = true;
     }
 
-    BossV325.installed = true;
-    BossV325.updateWrapped = true;
-    BossV325.drawWrapped = true;
-    BossV325.initWrapped = true;
-    bossV325EnsureState();
+    BossV41.installed = true;
+    BossV41.updateWrapped = true;
+    BossV41.drawWrapped = true;
+    BossV41.initWrapped = true;
+    bossV41EnsureState();
     return true;
 }
 
-function bossV325Bootstrap() {
-    if (bossV325WrapFunctions()) return;
-    setTimeout(bossV325Bootstrap, 50);
+function bossV41Bootstrap() {
+    if (bossV41WrapFunctions()) return;
+    setTimeout(bossV41Bootstrap, 50);
 }
 
-window.BOSS_V325_CONFIG = BOSS_V325_CONFIG;
-window.BossV325 = BossV325;
-window.updateBossV325 = updateBossV325;
-window.resetBossV325 = bossV325Reset;
-window.bossV325GetPhase = bossV325GetPhase;
-window.bossV325SpawnProjectile = bossV325SpawnProjectile;
-window.bossV4SpawnBomb = bossV4SpawnBomb;
-window.bossV4BombVolley = bossV4FireBombVolley;
-window.BOSS_V4_CONFIG = BOSS_V325_CONFIG;
+// Compatibilidad de diagnóstico v3.x/v4.0: mismos puntos de acceso, nueva implementación.
+window.BOSS_V41_CONFIG = BOSS_V41_CONFIG;
+window.BOSS_V325_CONFIG = BOSS_V41_CONFIG;
+window.BossV41 = BossV41;
+window.BossV325 = BossV41;
+window.updateBossV41 = updateBossV41;
+window.updateBossV325 = updateBossV41;
+window.resetBossV41 = bossV41Reset;
+window.resetBossV325 = bossV41Reset;
+window.bossV41GetPhase = bossV41GetPhase;
+window.bossV325GetPhase = bossV41GetPhase;
+window.bossV41SpawnBomb = bossV41SpawnBomb;
+window.bossV4SpawnBomb = bossV41SpawnBomb;
+window.bossV4BombVolley = bossV41FireBombVolley;
+window.bossV4BombCount = bossV4BombCount;
+window.bossV41GroundSlam = bossV41GroundSlam;
+window.BOSS_V4_CONFIG = BOSS_V41_CONFIG;
 
-bossV325Bootstrap();
+bossV41Bootstrap();

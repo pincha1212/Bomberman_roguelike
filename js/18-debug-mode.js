@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.24.0 — Debug Engine
+// Bomberman Roguelike v3.28.2 — Unified Debug Mode
 // Depuración interna del mismo runtime. Se activa solo con ?debug=1.
 (() => {
     'use strict';
@@ -13,12 +13,16 @@
         { dx: -1, dy: 0, dir: 'LEFT' }
     ]);
 
-    const TEST_NAMES = Object.freeze(['movement', 'bombs', 'damage', 'traps', 'enemies', 'ai-stress', 'navigation-stress', 'room-stress', 'difficulty-stress', 'camera', 'restart']);
+    const TEST_NAMES = Object.freeze(['movement', 'bombs', 'damage', 'traps', 'enemies', 'ai-stress', 'navigation-stress', 'room-stress', 'difficulty-stress', 'camera', 'restart', 'enemy-behavior-stress', 'collision-stress', 'boss-stress', 'roguelike-stress', 'debug-lab-stress']);
     const MAX_EVENTS = 220;
     const MAX_ERRORS = 100;
     const MAX_TEST_RESULTS = 30;
     const MAX_NAV_NODES = 900;
     const MAX_MOTION_TRAIL = 24;
+    const MAX_SNAPSHOT_HISTORY = 12;
+    const MAX_TIMELINE_SAMPLES = 120;
+    const MAX_DIFF_KEYS = 80;
+    const TIMELINE_INTERVAL_MS = 250;
     const AI_STRESS_CASES = 9;
     const NAVIGATION_STRESS_CASES = 5;
     const EVENT_DEDUPE_MS = 850;
@@ -63,6 +67,16 @@
         motionSampleCount: 0,
         aiStress: null,
         navigationStress: null,
+        roomStress: null,
+        difficultyStress: null,
+        lastHealth: null,
+        lastSnapshot: null,
+        lastDiff: null,
+        snapshotHistory: [],
+        timeline: [],
+        timelineTimer: 0,
+        timelineRecording: false,
+        testRunner: { available: false, method: null, source: null },
         selectedVisuals: {
             grid: false,
             collision: false,
@@ -311,10 +325,15 @@
                 tests: {
                     passed: this.testResults.filter(r => r.status === 'PASS').length,
                     failed: this.testResults.filter(r => r.status === 'FAIL').length,
-                    total: TEST_NAMES.length,
+                    total: getAvailableTestNames().length,
+                    availableCount: getAvailableTestNames().length,
+                    runnerAvailable: this.testRunner.available,
+                    runnerMethod: this.testRunner.method,
+                    runnerSource: this.testRunner.source,
                     busy: this.busy,
                     last: this.lastTest
                 },
+                health: this.lastHealth,
                 errors: this.runtimeErrors.length,
                 events: this.eventLog.length,
                 rawEvents: this.eventCountRaw,
@@ -464,7 +483,7 @@
 
         async runAllTests() {
             if (!this.enabled || this.busy) return;
-            await this.executeTests(TEST_NAMES);
+            await this.executeTests(getAvailableTestNames());
         },
 
         async executeTests(names) {
@@ -490,6 +509,7 @@
                             status: 'PASS',
                             summary: normalized.summary,
                             details: normalized.details,
+                            output: `${name.toUpperCase()}: PASS — ${compactCopyText(normalized.summary)}`,
                             ms: performance.now() - started
                         };
                         this.testResults.push({ ...this.lastTest, result: normalized.summary });
@@ -501,6 +521,7 @@
                             status: 'FAIL',
                             summary: message,
                             details: { error: message, stack: error?.stack || '' },
+                            output: `${name.toUpperCase()}: FAIL — ${compactCopyText(message)}`,
                             ms: performance.now() - started
                         };
                         this.testResults.push({ ...this.lastTest, result: message });
@@ -523,6 +544,49 @@
             }
         },
 
+        captureSnapshot() {
+            const snapshot = this.snapshot();
+            const diff = diffSnapshots(this.lastSnapshot, snapshot);
+            this.snapshotHistory.push(snapshot);
+            if (this.snapshotHistory.length > MAX_SNAPSHOT_HISTORY) this.snapshotHistory.splice(0, this.snapshotHistory.length - MAX_SNAPSHOT_HISTORY);
+            this.lastSnapshot = snapshot;
+            this.lastDiff = diff;
+            this.recordEvent('DEBUG', `Snapshot · +${diff.added.length} · Δ${diff.changed.length} · -${diff.removed.length}`);
+            dispatchUpdate();
+            return { snapshot, diff };
+        },
+
+        runHealthChecks() {
+            const checks = buildHealthChecks(this.lightweightSnapshot());
+            const passed = checks.filter(c => c.status === 'PASS').length;
+            const warnings = checks.filter(c => c.status === 'WARN').length;
+            const failed = checks.filter(c => c.status === 'FAIL').length;
+            this.lastHealth = { status: failed ? 'FAIL' : 'PASS', passed, warnings, failed, checks, capturedAt: new Date().toISOString() };
+            this.recordEvent(failed ? 'WARN' : (warnings ? 'DEBUG' : 'PASS'), `Diagnóstico ${this.lastHealth.status} · ${passed} PASS · ${warnings} WARN · ${failed} FAIL`);
+            dispatchUpdate();
+            return this.lastHealth;
+        },
+
+        lightweightSnapshot() { return lightweightSnapshot(); },
+
+        toggleTimeline() {
+            if (this.timelineRecording) {
+                this.timelineRecording = false;
+                if (this.timelineTimer) window.clearInterval(this.timelineTimer);
+                this.timelineTimer = 0;
+                this.recordEvent('DEBUG', `Timeline detenida · ${this.timeline.length} muestras.`);
+                dispatchUpdate();
+                return false;
+            }
+            this.timelineRecording = true;
+            this.timeline = [];
+            pushTimelineSample(this);
+            this.timelineTimer = window.setInterval(() => { if (this.timelineRecording) pushTimelineSample(this); }, TIMELINE_INTERVAL_MS);
+            this.recordEvent('DEBUG', 'Timeline iniciada.');
+            dispatchUpdate();
+            return true;
+        },
+
         clearEvents() {
             this.eventLog.length = 0;
             this.eventCountRaw = 0;
@@ -531,69 +595,25 @@
         },
 
         buildTestReport() {
-            const snapshot = this.snapshot();
-            const total = this.testResults.length;
-            const passed = this.testResults.filter(r => r.status === 'PASS').length;
-            const failed = this.testResults.filter(r => r.status === 'FAIL').length;
-            const lines = [
-                'BOMBERMAN ROGUELIKE — DEBUG TEST COMPLETO',
-                `Fecha: ${new Date().toLocaleString('es-AR')}`,
-                `Suite: ${total} pruebas registradas · ${passed} PASS · ${failed} FAIL`,
-                '',
-                '=== RESUMEN TESTS ===',
-                ...this.testResults.map((r, index) => `${index + 1}. ${String(r.name || 'TEST').toUpperCase()} — ${r.status} — ${Number(r.ms || 0).toFixed(1)} ms — ${r.summary || r.result || 'Sin resumen'}`),
-                '',
-                '=== INSPECTOR DE TEST ===',
-                this.lastTest ? JSON.stringify({
-                    name: this.lastTest.name,
-                    status: this.lastTest.status,
-                    summary: this.lastTest.summary,
-                    ms: Number(this.lastTest.ms || 0).toFixed(1),
-                    details: this.lastTest.details || {}
-                }, null, 2) : 'Sin prueba seleccionada.',
-                '',
-                '=== ESTADO ===',
-                `status=${snapshot.status} · playing=${snapshot.engine?.playing} · gamePaused=${snapshot.engine?.gamePaused} · debugPaused=${snapshot.engine?.debugPaused}`,
-                `RAF=${snapshot.engine?.rafId || 0} · frame=${this.frameCount} · errors=${snapshot.errors} · eventos=${snapshot.events}/${snapshot.rawEvents || snapshot.events} · repetidos colapsados=${snapshot.suppressedEvents || 0}`,
-                '',
-                '=== PERFORMANCE ===',
-                `FPS=${Number(snapshot.performance.fps || 0).toFixed(1)} · intervalo RAF=${Number(snapshot.performance.avgFrameIntervalMs || 0).toFixed(2)}ms`,
-                `trabajo JS/frame=${Number(snapshot.performance.workMs || 0).toFixed(2)}ms · update=${Number(snapshot.performance.updateMs || 0).toFixed(2)}ms · draw=${Number(snapshot.performance.drawMs || 0).toFixed(2)}ms`,
-                `trabajo min/max=${Number(snapshot.performance.minMs || 0).toFixed(2)}/${Number(snapshot.performance.maxMs || 0).toFixed(2)}ms · intervalo min/max=${Number(snapshot.performance.minIntervalMs || 0).toFixed(2)}/${Number(snapshot.performance.maxIntervalMs || 0).toFixed(2)}ms`,
-                '',
-                '=== REAL PROFILING ===',
-                snapshot.profiler ? `estado=${snapshot.profiler.enabled ? 'ON' : 'OFF'} · muestras=${snapshot.profiler.totalFrames} · FPS=${Number(snapshot.profiler.frame?.fps || 0).toFixed(1)} · avg=${Number(snapshot.profiler.frame?.avgMs || 0).toFixed(2)}ms · p95=${Number(snapshot.profiler.frame?.p95Ms || 0).toFixed(2)}ms · max=${Number(snapshot.profiler.frame?.maxMs || 0).toFixed(2)}ms · sobre presupuesto=${Number(snapshot.profiler.overBudgetPercent || 0).toFixed(1)}%` : 'Profiler sin datos.',
-                snapshot.profiler?.systems?.length ? snapshot.profiler.systems.slice(0, 12).map((item, index) => `${index + 1}. ${item.label} · avg=${Number(item.avgMs || 0).toFixed(3)}ms · p95=${Number(item.p95Ms || 0).toFixed(3)}ms · max=${Number(item.maxMs || 0).toFixed(3)}ms`).join('\n') : 'Sin muestras de sistemas.',
-                '',
-                '=== PLAYER ===',
-                compactPlayerLine(snapshot.player),
-                '',
-                '=== WORLD ===',
-                compactWorldLine(snapshot.world),
-                '',
-                '=== NAVEGACIÓN ===',
-                compactNavigationReport(snapshot.navigation),
-                '',
-                '=== DIAGNÓSTICO IA / MOVIMIENTO REAL ===',
-                compactMotionDiagnostic(snapshot.navigation),
-                '',
-                '=== AI STRESS TEST ===',
-                compactStressReport(this.aiStress),
-                '',
-                '=== EVENT LOG (AGRUPADO) ===',
-                this.eventLog.length ? this.eventLog.map(item => {
-                    const repeat = Number(item.repeatCount || 1);
-                    const suffix = item.data ? ` · ${safeJson(item.data)}` : '';
-                    return `[${item.wallTime}] ${item.type} ${item.message}${repeat > 1 ? ` · ×${repeat}` : ''}${suffix}`;
-                }).join('\n') : 'Sin eventos.',
-                '',
-                '=== RUNTIME ERRORS ===',
-                this.runtimeErrors.length ? this.runtimeErrors.map((e, index) => {
-                    const loc = e.url ? ` · ${e.url}` : '';
-                    return `${index + 1}. [${e.wallTime}] ${e.source}: ${e.message}${loc}${e.stack ? `\n${e.stack.split('\n').slice(0,4).join('\n')}` : ''}`;
-                }).join('\n\n') : 'Sin errores de runtime.'
-            ];
-            return lines.join('\n');
+            const snapshot = this.lightweightSnapshot();
+            const results = this.testResults.slice();
+            const passed = results.filter(r => r.status === 'PASS').length;
+            const failed = results.filter(r => r.status === 'FAIL').length;
+            const checks = this.lastHealth?.checks || [];
+            const hp = checks.filter(c => c.status === 'PASS').length;
+            const hw = checks.filter(c => c.status === 'WARN').length;
+            const hf = checks.filter(c => c.status === 'FAIL').length;
+            return [
+                'BOMBERMAN ROGUELIKE — DEBUG MODE v3.28.2',
+                `SUITE: ${results.length}/${getAvailableTestNames().length} · ${passed} PASS · ${failed} FAIL`,
+                ...results.map(r => `${String(r.name || 'TEST').toUpperCase()}: ${r.status} — ${compactCopyText(r.summary || r.result || 'Sin resultado')}`),
+                `DIAGNOSTICO: ${this.lastHealth?.status || 'PENDIENTE'} — ${hp} PASS · ${hw} WARN · ${hf} FAIL`,
+                ...checks.filter(c => c.status !== 'PASS').map(c => `DIAG ${String(c.id).toUpperCase()}: ${c.status} — ${compactCopyText(c.detail)}`),
+                `RUNTIME ERRORS: ${snapshot.errors || 0}`,
+                `PERFORMANCE: ${Number(this.fps || 0).toFixed(1)} FPS · JS ${Number(this.loopMs || 0).toFixed(2)}ms/frame`,
+                `SNAPSHOT: ${this.lastDiff ? `+${this.lastDiff.added.length} · Δ${this.lastDiff.changed.length} · -${this.lastDiff.removed.length}` : 'PENDIENTE'}`,
+                `TIMELINE: ${this.timeline.length}/${MAX_TIMELINE_SAMPLES}`
+            ].join('\n');
         },
 
         async copyTestReport() {
@@ -674,6 +694,8 @@
         resetScene() {
             try {
                 prepareCleanDebugScene();
+                if (this.timelineRecording) this.toggleTimeline();
+                this.lastHealth = null; this.lastSnapshot = null; this.lastDiff = null; this.snapshotHistory = []; this.timeline = [];
                 this.lastAction = 'ESCENA REINICIADA';
                 this.recordEvent('LIFECYCLE', 'Escena de depuración reconstruida.');
                 dispatchUpdate();
@@ -1760,8 +1782,146 @@
             if (p.vx !== 0 || p.vy !== 0) throw new Error('La velocidad no fue limpiada.');
             if (state.bombs.length || state.explosions.length || state.bossProjectiles.length || state.shakeTimer) throw new Error('Persistieron objetos del estado anterior.');
             return { summary: 'estado limpio · reset verificado', details: { health: p.health, bombsPlaced: p.bombsPlaced, velocity: { x: p.vx, y: p.vy }, bombs: state.bombs.length, explosions: state.explosions.length, projectiles: state.bossProjectiles.length, shakeTimer: state.shakeTimer } };
-        }
+        },
+
+        'debug-lab-stress': async () => runDebugLabStressMerged()
     };
+
+    function getAvailableTestNames() {
+        const registry = window.DEBUG_TESTS || {};
+        const names = [];
+        for (const name of TEST_NAMES) if (typeof registry[name] === 'function') names.push(name);
+        for (const name of Object.keys(registry)) if (typeof registry[name] === 'function' && !names.includes(name)) names.push(name);
+        return names;
+    }
+
+    function compactCopyText(value, max = 220) {
+        const text = String(value ?? 'Sin resultado').replace(/\s+/g, ' ').trim();
+        return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+    }
+
+    function unifiedNum(value, fallback = 0) { return Number.isFinite(Number(value)) ? Number(value) : fallback; }
+    function unifiedRound(value, decimals = 2) { const n = unifiedNum(value); const p = 10 ** decimals; return Math.round(n * p) / p; }
+    function unifiedDirection(vx, vy) {
+        const x = unifiedNum(vx), y = unifiedNum(vy);
+        if (Math.abs(x) > 0.001 && Math.abs(y) > 0.001) return 'DIAGONAL';
+        if (Math.abs(x) > 0.001) return x > 0 ? 'RIGHT' : 'LEFT';
+        if (Math.abs(y) > 0.001) return y > 0 ? 'DOWN' : 'UP';
+        return 'STILL';
+    }
+
+    function getUnifiedRogueSummary() {
+        let rogue = null; try { rogue = window.ROGUELIKE_V327 || null; } catch (_) {}
+        if (!rogue) return null;
+        let synergies = [], bonuses = null;
+        try { if (typeof window.rogueV327GetActiveSynergies === 'function') synergies = window.rogueV327GetActiveSynergies().map(s => s?.id || s?.name || String(s)); if (typeof window.rogueV327GetRelicBonuses === 'function') bonuses = window.rogueV327GetRelicBonuses(); } catch (_) {}
+        return { runActive: !!rogue.runActive, coins: unifiedNum(rogue.coins ?? getState()?.coins), relics: Array.isArray(rogue.relics) ? rogue.relics.slice() : [], synergies, bonuses, room: rogue.currentRoomPlan || 'standard', pendingRoom: rogue.pendingRoomPlan || 'standard', rerolls: unifiedNum(rogue.rerollsUsed) };
+    }
+
+    function getUnifiedFeedbackSummary() {
+        let fb = null; try { fb = window.FeedbackV326 || null; } catch (_) {}
+        if (!fb) return null;
+        const particles = Array.isArray(fb.particles) ? fb.particles.filter(p => p?.active).length : 0;
+        const rings = Array.isArray(fb.rings) ? fb.rings.filter(r => r?.active).length : 0;
+        return { installed: !!fb.installed, particles, particlePool: Array.isArray(fb.particles) ? fb.particles.length : 0, rings, impacts: unifiedNum(fb.impactCount), explosions: unifiedNum(fb.explosionCount), damage: unifiedNum(fb.damageCount), sounds: unifiedNum(fb.soundCount) };
+    }
+
+    function getUnifiedBossSummary() {
+        let boss = null; try { boss = window.BossV325 || null; } catch (_) {}
+        if (!boss) return null;
+        const projectiles = Array.isArray(boss.projectiles) ? boss.projectiles : [];
+        return { active: !!(boss.active ?? boss.exists), phase: boss.phase ?? boss.currentPhase ?? null, hp: boss.hp ?? boss.health ?? null, maxHp: boss.maxHp ?? boss.maxHealth ?? null, projectiles: projectiles.length, telegraph: !!(boss.telegraphActive ?? boss.telegraph) };
+    }
+
+    function lightweightSnapshot() {
+        const state = getState(), player = getPlayer(), enemies = Array.isArray(state?.enemies) ? state.enemies : [];
+        return { engine: { stateAvailable: !!state, playerAvailable: !!player, playing: !!state?.isPlaying, frame: unifiedNum(state?.animFrame) }, player: player ? { x: unifiedRound(player.x), y: unifiedRound(player.y), vx: unifiedRound(player.vx), vy: unifiedRound(player.vy), hp: unifiedNum(player.health), maxHp: unifiedNum(player.maxHealth), direction: unifiedDirection(player.vx, player.vy) } : null, world: state ? { width: unifiedNum(state.gridWidth), height: unifiedNum(state.gridHeight), depth: unifiedNum(state.level), score: unifiedNum(state.score), coins: unifiedNum(state.coins), enemies: enemies.length, bombs: Array.isArray(state.bombs) ? state.bombs.length : 0, explosions: Array.isArray(state.explosions) ? state.explosions.length : 0, projectiles: Array.isArray(state.bossProjectiles) ? state.bossProjectiles.length : 0, threat: Object.prototype.hasOwnProperty.call(state, 'threat') ? state.threat : 'NO EXPUESTO' } : null, errors: DEBUG_MODE.runtimeErrors.length };
+    }
+
+    function flattenSnapshot(obj, prefix = '', out = {}) {
+        if (out.__count >= MAX_DIFF_KEYS) return out;
+        if (obj === null || obj === undefined || typeof obj !== 'object') { out[prefix] = obj; out.__count = (out.__count || 0) + 1; return out; }
+        if (Array.isArray(obj)) { out[prefix] = JSON.stringify(obj); out.__count = (out.__count || 0) + 1; return out; }
+        for (const [key, value] of Object.entries(obj)) { const next = prefix ? `${prefix}.${key}` : key; if (value && typeof value === 'object' && !Array.isArray(value)) flattenSnapshot(value, next, out); else { out[next] = value; out.__count = (out.__count || 0) + 1; } if (out.__count >= MAX_DIFF_KEYS) break; }
+        return out;
+    }
+
+    function diffSnapshots(previous, current) {
+        if (!previous) return { added: Object.keys(flattenSnapshot(current)).filter(k => k !== '__count'), removed: [], changed: [] };
+        const a = flattenSnapshot(previous), b = flattenSnapshot(current); delete a.__count; delete b.__count;
+        const added = [], removed = [], changed = [];
+        for (const key of Object.keys(b)) { if (!(key in a)) added.push(key); else if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) changed.push({ key, from: a[key], to: b[key] }); }
+        for (const key of Object.keys(a)) if (!(key in b)) removed.push(key);
+        return { added, removed, changed: changed.slice(0, MAX_DIFF_KEYS) };
+    }
+
+    function buildHealthChecks(snapshot) {
+        const checks = [], state = getState(), enemies = Array.isArray(state?.enemies) ? state.enemies : [], rogue = getUnifiedRogueSummary(), feedback = getUnifiedFeedbackSummary(), boss = getUnifiedBossSummary();
+        const add = (id, ok, detail) => checks.push({ id, status: ok ? 'PASS' : 'FAIL', detail: compactCopyText(detail, 180) });
+        add('engine-state', !!snapshot.engine?.stateAvailable, snapshot.engine?.stateAvailable ? 'gameState disponible' : 'gameState no expuesto');
+        add('player-state', !!snapshot.engine?.playerAvailable, snapshot.engine?.playerAvailable ? 'player disponible' : 'player no expuesto');
+        add('grid-shape', !!(snapshot.world?.width && snapshot.world?.height), snapshot.world ? `${snapshot.world.width}x${snapshot.world.height}` : 'grid no disponible');
+        add('player-finite', !!(snapshot.player && Number.isFinite(snapshot.player.x) && Number.isFinite(snapshot.player.y)), snapshot.player ? `${snapshot.player.x},${snapshot.player.y}` : 'player N/D');
+        const gameOverWarn = !snapshot.engine?.playing && Number(snapshot.player?.hp) <= 0;
+        checks.push({ id: 'player-vitals', status: gameOverWarn ? 'WARN' : 'PASS', detail: gameOverWarn ? 'partida detenida con HP=0; compatible con Game Over' : `hp=${snapshot.player?.hp ?? 'N/D'}` });
+        add('relic-module', !!rogue && typeof window.rogueV327GetRelicBonuses === 'function', rogue ? 'roguelike disponible' : 'roguelike no disponible');
+        add('relic-unique', !!rogue && new Set(rogue.relics || []).size === (rogue.relics || []).length, rogue ? `${rogue.relics.length} reliquias` : 'N/D');
+        add('economy-finite', Number.isFinite(Number(snapshot.world?.coins)), `coins=${snapshot.world?.coins ?? 'N/D'}`);
+        const runnerAvailable = typeof DEBUG_MODE.runAllTests === 'function';
+        checks.push({ id: 'test-runner', status: runnerAvailable ? 'PASS' : 'FAIL', detail: runnerAvailable ? 'DEBUG_MODE.runAllTests' : 'runner no disponible' });
+        const threatAvailable = snapshot.world && snapshot.world.threat !== 'NO EXPUESTO';
+        checks.push({ id: 'threat-state', status: threatAvailable ? 'PASS' : 'WARN', detail: threatAvailable ? `threat=${snapshot.world.threat}` : 'threat NO EXPUESTO' });
+        add('feedback-cap', !feedback || feedback.particles <= 96, feedback ? `particulas=${feedback.particles}` : 'feedback N/D');
+        const maxProjectiles = unifiedNum(window.BOSS_V325_CONFIG?.maxProjectiles, 6);
+        add('boss-projectile-cap', !boss || boss.projectiles <= maxProjectiles, boss ? `projectiles=${boss.projectiles}` : 'boss N/D');
+        const diagonal = enemies.filter(e => Math.abs(unifiedNum(e.vx)) > 0.001 && Math.abs(unifiedNum(e.vy)) > 0.001).length;
+        add('enemy-cardinal', diagonal === 0, diagonal === 0 ? 'sin velocidades diagonales' : `${diagonal} enemigo(s) diagonales`);
+        const blocked = enemies.filter(e => e?.ai?.physicalBlocked || e?.physicalBlocked).length;
+        add('enemy-blocking', blocked === 0, blocked === 0 ? 'sin bloqueos fisicos activos' : `${blocked} enemigo(s) bloqueados`);
+        const bootErrors = Array.isArray(window.__BOMBER_DEBUG_BOOT_ERRORS) ? window.__BOMBER_DEBUG_BOOT_ERRORS.length : 0;
+        add('runtime-errors', DEBUG_MODE.runtimeErrors.length === 0 && bootErrors === 0, `${DEBUG_MODE.runtimeErrors.length + bootErrors} error(es)`);
+        return checks;
+    }
+
+    function pushTimelineSample(D) {
+        const s = lightweightSnapshot(), now = new Date();
+        D.timeline.push({ time: now.toLocaleTimeString('es-AR', { hour12: false }), frame: s.engine.frame, fps: Number(D.fps || 0), depth: s.world?.depth, score: s.world?.score, coins: s.world?.coins, enemies: s.world?.enemies, bombs: s.world?.bombs, explosions: s.world?.explosions, projectiles: s.world?.projectiles, runtimeErrors: s.errors });
+        if (D.timeline.length > MAX_TIMELINE_SAMPLES) D.timeline.splice(0, D.timeline.length - MAX_TIMELINE_SAMPLES);
+    }
+
+    async function runDebugLabStressMerged() {
+        const D = DEBUG_MODE, state = getState(), rogue = window.ROGUELIKE_V327 || null;
+        if (!state) throw new Error('gameState no disponible.');
+        const original = { score: state.score, enemies: state.enemies, animFrame: state.animFrame, relics: rogue ? rogue.relics : undefined, lastSnapshot: D.lastSnapshot, lastDiff: D.lastDiff, lastHealth: D.lastHealth, snapshotHistory: D.snapshotHistory.slice(), timeline: D.timeline.slice(), eventLog: D.eventLog.slice(), eventCountRaw: D.eventCountRaw, suppressedEvents: D.suppressedEvents, runtimeErrors: D.runtimeErrors.slice() };
+        try {
+            D.lastSnapshot = null; D.lastDiff = null; D.lastHealth = null; D.snapshotHistory = []; D.timeline = [];
+            const before = JSON.stringify(state), snapshotA = lightweightSnapshot();
+            if (!snapshotA.engine.stateAvailable || !snapshotA.engine.playerAvailable) throw new Error('Snapshot no detectó runtime completo.');
+            if (JSON.stringify(state) !== before) throw new Error('Snapshot mutó gameState.');
+            state.score = unifiedNum(state.score) + 10;
+            const diff = diffSnapshots(snapshotA, lightweightSnapshot());
+            if (!diff.changed.some(c => c.key === 'world.score')) throw new Error('Diff no detectó world.score.');
+            const baseline = buildHealthChecks(lightweightSnapshot());
+            if (!baseline.length) throw new Error('Health checks vacíos.');
+            if (baseline.some(c => String(c.detail).includes('undefined'))) throw new Error('Health output expone undefined.');
+            state.enemies = [{ vx: 1, vy: 0, ai: { physicalBlocked: false } }, { vx: 1, vy: 1, ai: { physicalBlocked: true } }];
+            if (rogue) rogue.relics = ['ember_core', 'ember_core'];
+            const faults = buildHealthChecks(lightweightSnapshot()).filter(c => c.status === 'FAIL').map(c => c.id);
+            if (!faults.includes('relic-unique')) throw new Error('No detectó relic duplication.');
+            if (!faults.includes('enemy-cardinal')) throw new Error('No detectó velocidad diagonal.');
+            if (!faults.includes('enemy-blocking')) throw new Error('No detectó enemigo bloqueado.');
+            for (let i = 0; i < 150; i++) { state.animFrame = i; pushTimelineSample(D); }
+            if (D.timeline.length !== MAX_TIMELINE_SAMPLES) throw new Error(`Timeline cap incorrecto: ${D.timeline.length}`);
+            D.lastSnapshot = null;
+            for (let i = 0; i < 20; i++) D.captureSnapshot();
+            if (D.snapshotHistory.length !== MAX_SNAPSHOT_HISTORY) throw new Error(`Snapshot history cap incorrecto: ${D.snapshotHistory.length}`);
+            return { summary: 'snapshot OK · diff OK · health OK · caps OK', details: { diff: 'world.score', baselineChecks: baseline.length, faultChecks: faults.join(','), timeline: D.timeline.length, history: D.snapshotHistory.length } };
+        } finally {
+            state.score = original.score; state.enemies = original.enemies; state.animFrame = original.animFrame;
+            if (rogue && original.relics !== undefined) rogue.relics = original.relics;
+            D.lastSnapshot = original.lastSnapshot; D.lastDiff = original.lastDiff; D.lastHealth = original.lastHealth; D.snapshotHistory = original.snapshotHistory; D.timeline = original.timeline; D.eventLog = original.eventLog; D.eventCountRaw = original.eventCountRaw; D.suppressedEvents = original.suppressedEvents; D.runtimeErrors = original.runtimeErrors;
+        }
+    }
 
     function buildStressGrid() {
         const state = getState();
@@ -1917,6 +2077,8 @@
     window.debugCaptureError = (...args) => DEBUG_MODE.captureError(...args);
     window.debugStateSnapshot = () => DEBUG_MODE.snapshot();
     window.debugNavigationSnapshot = force => DEBUG_MODE.getNavigationSnapshot(!!force);
+    DEBUG_MODE.getAvailableTestNames = () => getAvailableTestNames();
+    DEBUG_MODE.testRunner = { available: true, method: 'runAllTests', source: 'DEBUG_MODE' };
 
     if (!enabled) return;
 
@@ -1940,6 +2102,6 @@
         }
     });
 
-    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.24.1 cargado en el mismo runtime.');
+    DEBUG_MODE.recordEvent('DEBUG', 'Debug Mode v3.28.2 unificado cargado en el mismo runtime.');
     DEBUG_MODE.recordEvent('DEBUG', 'Usá RESET para activar una escena de depuración limpia.');
 })();

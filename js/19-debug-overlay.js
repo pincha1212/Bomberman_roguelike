@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.24.0 — Debug Overlay
+// Bomberman Roguelike v3.28.2 — Unified Debug Overlay
 // Panel reconstruido para inspección en vivo. Solo se crea con ?debug=1.
 (() => {
     'use strict';
@@ -12,7 +12,7 @@
     root.innerHTML = `
         <div class="debug-header">
             <div>
-                <div class="debug-kicker">BOMBERMAN ENGINE · v3.24</div>
+                <div class="debug-kicker">BOMBERMAN ENGINE · v3.28.2</div>
                 <h2>DEBUG MODE <span id="debug-status" class="debug-status">CARGANDO</span></h2>
             </div>
             <button type="button" class="debug-icon-btn" data-debug-action="toggle" title="Mostrar/ocultar panel">F3</button>
@@ -24,7 +24,7 @@
             <button type="button" data-debug-action="step">STEP <kbd>F6</kbd></button>
             <button type="button" data-debug-action="run-tests">TESTS <kbd>F7</kbd></button>
             <button type="button" data-debug-action="profile">PROFILE <kbd>F8</kbd></button>
-            <button type="button" data-debug-action="copy-tests" title="Copia el informe completo de tests, estado, eventos y errores">COPIAR TEST</button>
+            <button type="button" data-debug-action="copy-tests" title="Copia resultados de tests y diagnóstico en texto plano">COPIAR RESULTADOS</button>
         </div>
 
         <section class="debug-section">
@@ -161,9 +161,7 @@
 
         <section class="debug-section debug-tests">
             <div class="debug-section-head"><div class="debug-section-title">TEST RUNNER</div><span id="dbg-suite">0/${Object.keys(window.DEBUG_TESTS || {}).length}</span></div>
-            <div class="debug-test-list">
-                ${Object.keys(window.DEBUG_TESTS || {}).map(name => `<button type="button" data-debug-test="${name}"><span>${name.replace('ai-stress','AI STRESS').replace('collision-stress','COLLISION STRESS').replace('room-stress','ROOM STRESS').replace('enemy-behavior-stress','ENEMY BEHAVIOR').toUpperCase()}</span><em id="dbg-test-${name}">PENDIENTE</em></button>`).join('')}
-            </div>
+            <div id="dbg-test-list" class="debug-test-list"></div>
         </section>
 
         <section class="debug-section">
@@ -181,6 +179,21 @@
             <pre id="dbg-collision-stress-data" class="debug-log">Sin resultados.</pre>
             <div class="debug-section-head"><div class="debug-section-title">DIFFICULTY STRESS</div><span id="dbg-difficulty-stress-head">PENDIENTE</span></div>
             <div id="dbg-difficulty-stress-summary" class="debug-note">Ejecutá DIFFICULTY STRESS para validar progresión por profundidad.</div>
+        </section>
+
+        <section class="debug-section">
+            <div class="debug-section-head"><div class="debug-section-title">DIAGNÓSTICO UNIFICADO</div><span id="dbg-health-status">PENDIENTE</span></div>
+            <div class="debug-action-grid">
+                <button type="button" data-debug-action="health">DIAGNÓSTICO</button>
+                <button type="button" data-debug-action="snapshot">SNAPSHOT</button>
+                <button type="button" data-debug-action="timeline">TIMELINE</button>
+                <button type="button" data-debug-action="copy-tests">COPIAR RESULTADOS</button>
+            </div>
+            <div class="debug-note" id="dbg-health-summary">Sin diagnóstico.</div>
+            <pre id="dbg-health-data" class="debug-log">Ejecutá DIAGNÓSTICO para comprobar el runtime.</pre>
+            <div class="debug-note" id="dbg-snapshot-summary">Snapshot: pendiente.</div>
+            <pre id="dbg-timeline-data" class="debug-log">Timeline: 0/120 muestras.</pre>
+            <pre id="dbg-copy-preview" class="debug-log">La copia será texto plano.</pre>
         </section>
 
         <section class="debug-section">
@@ -401,13 +414,21 @@
         setText('dbg-last-test', last ? `${last.name.toUpperCase()} · ${last.status} · ${last.ms.toFixed(1)}ms` : '—');
         setText('dbg-test-summary', last ? last.summary : 'Todavía no hay una prueba seleccionada.');
         const dataNode = document.getElementById('dbg-test-data');
-        if (dataNode) dataNode.textContent = last ? JSON.stringify(last.details ?? {}, null, 2) : 'Los detalles aparecerán acá al ejecutar un test.';
+        if (dataNode) dataNode.textContent = last ? (last.output || last.summary || 'Sin resultado.') : 'Los detalles aparecerán acá al ejecutar un test.';
 
-        const total = Object.keys(window.DEBUG_TESTS || {}).length;
+        const testNames = D.getAvailableTestNames ? D.getAvailableTestNames() : Object.keys(window.DEBUG_TESTS || {});
         const passed = D.testResults.filter(r => r.status === 'PASS').length;
         const failed = D.testResults.filter(r => r.status === 'FAIL').length;
-        setText('dbg-suite', `${passed} PASS · ${failed} FAIL · ${total}`);
-        for (const name of Object.keys(window.DEBUG_TESTS || {})) {
+        setText('dbg-suite', `${passed} PASS · ${failed} FAIL · ${testNames.length}`);
+        const testList = document.getElementById('dbg-test-list');
+        if (testList) {
+            const signature = testNames.join('|');
+            if (testList.dataset.signature !== signature) {
+                testList.dataset.signature = signature;
+                testList.innerHTML = testNames.map(name => `<button type="button" data-debug-test="${name}"><span>${name.replace('ai-stress','AI STRESS').replace('navigation-stress','NAVIGATION STRESS').replace('room-stress','ROOM STRESS').replace('difficulty-stress','DIFFICULTY STRESS').replace('collision-stress','COLLISION STRESS').replace('enemy-behavior-stress','ENEMY BEHAVIOR').replace('boss-stress','BOSS STRESS').replace('roguelike-stress','ROGUELIKE STRESS').replace('debug-lab-stress','DEBUG LAB STRESS').toUpperCase()}</span><em id="dbg-test-${name}">PENDIENTE</em></button>`).join('');
+            }
+        }
+        for (const name of testNames) {
             const node = document.getElementById(`dbg-test-${name}`);
             if (!node) continue;
             const result = [...D.testResults].reverse().find(r => r.name === name);
@@ -416,6 +437,16 @@
             node.closest('button')?.classList.toggle('is-pass', result?.status === 'PASS');
             node.closest('button')?.classList.toggle('is-fail', result?.status === 'FAIL');
         }
+        const health = D.lastHealth;
+        setText('dbg-health-status', health ? health.status : 'PENDIENTE');
+        setText('dbg-health-summary', health ? `${health.passed} PASS · ${health.warnings} WARN · ${health.failed} FAIL` : 'Sin diagnóstico.');
+        const healthNode = document.getElementById('dbg-health-data');
+        if (healthNode) healthNode.textContent = health?.checks?.length ? health.checks.map(c => `${c.status} ${c.id} — ${c.detail}`).join('\n') : 'Ejecutá DIAGNÓSTICO para comprobar el runtime.';
+        setText('dbg-snapshot-summary', D.lastDiff ? `Snapshot: +${D.lastDiff.added.length} · Δ${D.lastDiff.changed.length} · -${D.lastDiff.removed.length} · historial ${D.snapshotHistory.length}/12` : 'Snapshot: pendiente.');
+        const timelineNode = document.getElementById('dbg-timeline-data');
+        if (timelineNode) timelineNode.textContent = D.timeline.length ? D.timeline.slice(-12).map(x => `${x.time} F${x.frame} · ${Number(x.fps || 0).toFixed(1)} FPS · D${x.depth} · E${x.enemies} · B${x.bombs} · X${x.explosions} · ERR${x.runtimeErrors}`).join('\n') : `Timeline: 0/120 muestras.${D.timelineRecording ? ' GRABANDO' : ''}`;
+        const copyPreview = document.getElementById('dbg-copy-preview');
+        if (copyPreview) copyPreview.textContent = D.buildTestReport();
 
         const eventNode = document.getElementById('dbg-events');
         if (eventNode) {
@@ -446,6 +477,9 @@
         else if (name === 'pause') D.requestPause();
         else if (name === 'step') D.requestStep();
         else if (name === 'run-tests') D.runAllTests();
+        else if (name === 'health') D.runHealthChecks();
+        else if (name === 'snapshot') D.captureSnapshot();
+        else if (name === 'timeline') D.toggleTimeline();
         else if (name === 'copy-tests') D.copyTestReport().then(result => {
             const button = root.querySelector('[data-debug-action="copy-tests"]');
             if (!button) return;
@@ -478,7 +512,7 @@
         }
         const testButton = event.target.closest('[data-debug-test]');
         if (testButton) {
-            D.runTest(testButton.dataset.debugTest);
+            D.runTest(testButton.dataset.debugTest).then(refresh);
             return;
         }
     });

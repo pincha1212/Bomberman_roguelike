@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.16.7 — Debug Engine
+// Bomberman Roguelike v3.19.0 — Debug Engine
 // Depuración interna del mismo runtime. Se activa solo con ?debug=1.
 (() => {
     'use strict';
@@ -19,7 +19,7 @@
     const MAX_TEST_RESULTS = 30;
     const MAX_NAV_NODES = 900;
     const MAX_MOTION_TRAIL = 24;
-    const AI_STRESS_CASES = 7;
+    const AI_STRESS_CASES = 8;
     const EVENT_DEDUPE_MS = 850;
     const EVENT_DEDUPE_TYPES = new Set(['AI', 'DEBUG', 'VISUAL', 'INFO', 'WORLD']);
 
@@ -377,6 +377,9 @@
                     recoveryCount: Number(ai.recoveryCount || 0),
                     lastRecoveryReason: ai.lastRecoveryReason || '—',
                     recoveryPathNodes: Number(ai.lastRecoveryPathNodes || 0),
+                    recoveryPathCalls: Number(ai.recoveryPathCalls || 0),
+                    turnLockMs: Number(ai.turnLockTimer || 0),
+                    lastTurnDirection: ai.lastTurnDirection || '—',
                     trail: progress.trail,
                     seesPlayer: !!ai.seesPlayer,
                     options,
@@ -1325,11 +1328,12 @@
             const stressStarted = performance.now();
             const cases = [
                 { name: 'direct-chase', player: { x: 5, y: 7 }, enemy: { x: 1, y: 7 }, dir: 'right', minMove: 8, minTurns: 0 },
+                { name: 'intersection-stability', player: { x: 13, y: 13 }, enemy: { x: 7, y: 7 }, dir: 'right', minMove: 8, minTurns: 1, maxTurns: 2, forceChase: true, expectBfsMax: 0 },
                 { name: 'corner-turn', player: { x: 7, y: 7 }, enemy: { x: 3, y: 3 }, dir: 'down', minMove: 8, minTurns: 1 },
                 { name: 'long-corridor', player: { x: 13, y: 7 }, enemy: { x: 1, y: 7 }, dir: 'right', minMove: 40, minTurns: 0 },
                 { name: 'intersection', player: { x: 3, y: 3 }, enemy: { x: 7, y: 3 }, dir: 'down', minMove: 8, minTurns: 1 },
                 { name: 'dead-end', player: { x: 5, y: 10 }, enemy: { x: 5, y: 13 }, dir: 'down', minMove: 8, minTurns: 1, recoveryExpected: true },
-                { name: 'corner-recovery-no-player', player: { x: 13, y: 13 }, enemy: { x: 7, y: 7 }, dir: 'up', minMove: 8, minTurns: 0, recoveryExpected: true, cornerOffset: 12, patrolTarget: { x: 7, y: 1 } },
+                { name: 'corner-recovery-no-player', player: { x: 13, y: 13 }, enemy: { x: 7, y: 7 }, dir: 'up', minMove: 8, minTurns: 0, recoveryExpected: true, cornerOffset: 12, patrolTarget: { x: 7, y: 1 }, expectBfsMax: 0 },
                 { name: 'bomb-flee', player: { x: 13, y: 7 }, enemy: { x: 5, y: 7 }, dir: 'right', minMove: 8, minTurns: 0, bomb: { x: 6, y: 7, timer: 1200, range: 3 } }
             ];
             const results = [];
@@ -1352,8 +1356,8 @@
                 if (typeof ensureEnemyMotionStateV312 === 'function') ensureEnemyMotionStateV312(enemy, results.length);
                 enemy.ai.visionTimer = 0;
                 enemy.ai.decisionTimer = 0;
-                enemy.ai.seesPlayer = false;
-                enemy.ai.memoryTimer = 0;
+                enemy.ai.seesPlayer = !!spec.forceChase;
+                enemy.ai.memoryTimer = spec.forceChase ? 900 : 0;
                 enemy.ai.patrolX = -1;
                 enemy.ai.patrolY = -1;
                 enemy.ai.direction = spec.dir;
@@ -1455,6 +1459,9 @@
                 const failures = [];
                 if (movedTotal < spec.minMove) { pass = false; failures.push(`movimiento ${movedTotal.toFixed(1)}<${spec.minMove}`); }
                 if (directionChanges < spec.minTurns) { pass = false; failures.push(`giros ${directionChanges}<${spec.minTurns}`); }
+                if (Number.isFinite(spec.maxTurns) && directionChanges > spec.maxTurns) { pass = false; failures.push(`giros inestables ${directionChanges}>${spec.maxTurns}`); }
+                const recoveryPathCalls = Number(enemy.ai?.recoveryPathCalls || 0);
+                if (Number.isFinite(spec.expectBfsMax) && recoveryPathCalls > spec.expectBfsMax) { pass = false; failures.push(`BFS ${recoveryPathCalls}>${spec.expectBfsMax}`); }
                 if (stuckLikely) { pass = false; failures.push('atasco detectado'); }
                 if (blockedFrames > 120) { pass = false; failures.push(`bloqueo prolongado ${blockedFrames}/180`); }
                 if (spec.name !== 'bomb-flee' && !canReach) { pass = false; failures.push('sin ruta al jugador'); }
@@ -1492,6 +1499,9 @@
                     recoveryCount: Number(enemy.ai?.recoveryCount || 0),
                     recoveryReason: enemy.ai?.lastRecoveryReason || '—',
                     recoveryPathNodes: Number(enemy.ai?.lastRecoveryPathNodes || 0),
+                    recoveryPathCalls,
+                    turnLockMs: Number(enemy.ai?.turnLockTimer || 0),
+                    lastTurnDirection: enemy.ai?.lastTurnDirection || '—',
                     noPlayerAssist,
                     cornerCorrected,
                     stuckLikely,
@@ -1745,6 +1755,6 @@
         }
     });
 
-    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.16.7 cargado en el mismo runtime.');
+    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.19.0 cargado en el mismo runtime.');
     DEBUG_MODE.recordEvent('DEBUG', 'Usá RESET para activar una escena de depuración limpia.');
 })();

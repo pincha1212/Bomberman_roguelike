@@ -1,5 +1,6 @@
-// Bomberman Roguelike v3.16.8 — Enemy lane-lock update
+// Bomberman Roguelike v3.19 — Stable AI update
 // Navegación local tipo corredor/intersección: la IA decide una dirección
+// v3.19: histéresis de giro + commit breve + recovery local antes de BFS.
 // y 13-collision.js se ocupa del movimiento y las paredes.
 
 const enemyAI_V312 = {
@@ -17,7 +18,12 @@ const enemyAI_V312 = {
     cornerAssistSpeed: 1.15,
     recoveryPathNodes: 240,
     cursor: 0,
-    decisionCursor: 0
+    decisionCursor: 0,
+    // v3.19: estabilización de decisiones y recovery.
+    turnHysteresis: 3.5,
+    turnCommitMs: 150,
+    recoveryCooldownMs: 280,
+    recoveryTriggerMs: 220
 };
 
 const ENEMY_DIRS_V312 = [
@@ -110,9 +116,23 @@ function ensureEnemyMotionStateV312(e, index) {
             lastY: e.y,
             slot: index % 4,
             lastDecisionTileX: -1,
-            lastDecisionTileY: -1
+            lastDecisionTileY: -1,
+            turnLockTimer: 0,
+            lastTurnTileKey: -1,
+            lastTurnDirection: null,
+            recoveryCooldownTimer: 0,
+            recoveryPathCalls: 0
         };
     }
+
+    const ai = e.ai;
+
+    // v3.19: compatibilidad con enemigos creados antes de este update.
+    ai.turnLockTimer = Number.isFinite(Number(ai.turnLockTimer)) ? Number(ai.turnLockTimer) : 0;
+    ai.lastTurnTileKey = Number.isFinite(Number(ai.lastTurnTileKey)) ? Number(ai.lastTurnTileKey) : -1;
+    ai.lastTurnDirection = ai.lastTurnDirection || null;
+    ai.recoveryCooldownTimer = Number.isFinite(Number(ai.recoveryCooldownTimer)) ? Number(ai.recoveryCooldownTimer) : 0;
+    ai.recoveryPathCalls = Number.isFinite(Number(ai.recoveryPathCalls)) ? Number(ai.recoveryPathCalls) : 0;
 
     // Un enemigo nunca arranca con una dirección que choque contra una pared.
     if (!e.ai.direction || !enemyDirectionPassableV312(e, enemyDirectionV312(e.ai.direction), false)) {
@@ -198,6 +218,8 @@ function enemyPhysicalDirectionChoicesV312(e, avoidDanger = false) {
 
 function enemyRecoveryDirectionByPathV312(e) {
     if (!e || !gameState.grid?.length) return null;
+    e.ai = e.ai || {};
+    e.ai.recoveryPathCalls = Number(e.ai.recoveryPathCalls || 0) + 1;
     const start = enemyTileV312(e);
     const target = enemyTargetForStateV312(e);
     if (!target) return null;
@@ -425,7 +447,13 @@ function enemyDirectionScoreV312(e, dir, target, options = {}) {
     score += reverse ? (options.allowReverse ? 3 : 24) : 0;
     score -= openAhead * 0.7;
 
-    if (options.patrol) score += Math.random() * 3.2;
+    if (options.patrol) {
+        // v3.19: ruido determinista. Evita que la misma intersección produzca
+        // giros distintos en cada decisión solo por un random nuevo.
+        const slot = Number(e.ai?.slot || 0);
+        const seed = Math.abs(slot * 17 + next.x * 31 + next.y * 47) % 17;
+        score += seed * 0.12;
+    }
     if (options.urgent) score += reverse ? 4 : 0;
     return score;
 }
@@ -491,22 +519,73 @@ function enemyTargetForStateV312(e) {
     return { x: ai.patrolX, y: ai.patrolY };
 }
 
+function enemyIsIntersectionNodeV319(e, possible, currentDir) {
+    if (!e || !possible?.length) return false;
+    if (possible.length >= 3) return true;
+    // Esquina: continuar recto deja de ser posible; el giro sí es una decisión real.
+    if (!currentDir) return true;
+    const hasCurrent = possible.some(dir => dir.dir === currentDir.dir);
+    if (!hasCurrent) return true;
+    return possible.some(dir => dir.dir !== currentDir.dir && dir.dir !== ENEMY_OPPOSITE_V312[currentDir.dir]);
+}
+
+function enemyChooseLocalRecoveryDirectionV319(e) {
+    const ai = e.ai;
+    ai.lastRecoveryPathNodes = 0;
+    const physical = enemyPhysicalDirectionChoicesV312(e, ai.alert === 'flee');
+    if (!physical.length) return null;
+
+    const current = enemyDirectionV312(ai.direction);
+    const target = enemyTargetForStateV312(e) || enemyPlayerTileV312();
+    const alternatives = physical.filter(dir =>
+        dir.dir !== current.dir && dir.dir !== ENEMY_OPPOSITE_V312[current.dir]
+    );
+    // En recovery no devolvemos la misma dirección que acaba de fallar. Si no
+    // existe otra salida física, dejamos que el BFS excepcional lo determine.
+    const options = alternatives.length
+        ? alternatives
+        : physical.filter(dir => dir.dir !== current.dir);
+    if (!options.length) return null;
+
+    let best = null;
+    for (const dir of options) {
+        const score = enemyDirectionScoreV312(e, dir, target, { allowReverse: true, urgent: true });
+        if (!best || score < best.score) best = { dir, score };
+    }
+    return best?.dir || null;
+}
+
 function enemyChooseDirectionAtIntersectionV312(e) {
     const ai = e.ai;
-    const dangerHere = enemyDangerV312(enemyTileV312(e).x, enemyTileV312(e).y);
+    const tile = enemyTileV312(e);
+    const dangerHere = enemyDangerV312(tile.x, tile.y);
     const physicalChoices = enemyPhysicalDirectionChoicesV312(e, ai.alert === 'flee');
-    const possible = ai.physicalBlocked && physicalChoices.length ? physicalChoices : enemyAvailableDirectionsV312(e, false);
+    const possible = physicalChoices.length && ai.physicalBlocked
+        ? physicalChoices
+        : enemyAvailableDirectionsV312(e, false);
     if (!possible.length) return null;
 
-    // Recuperación excepcional: solo ante bloqueo físico/stuck usamos una ruta
-    // limitada para salir de la esquina. La IA normal sigue siendo local.
-    if (ai.physicalBlocked || Number(ai.blockedTimer || 0) > 0 || Number(ai.stuckTimer || 0) > 0) {
-        const recovery = enemyRecoveryDirectionByPathV312(e);
-        if (recovery?.dir) {
-            ai.lastRecoveryPathNodes = recovery.nodes;
-            const recoveryDir = enemyDirectionV312(recovery.dir);
-            if (physicalChoices.some(dir => dir.dir === recovery.dir) && enemyImmediateDirectionPassableV312(e, recoveryDir, ai.alert === 'flee', 0.75)) {
-                return recoveryDir;
+    const currentDir = enemyDirectionV312(ai.direction);
+    const currentPassable = possible.some(dir => dir.dir === currentDir.dir);
+    const exceptionalRecovery =
+        Number(ai.physicalBlockedTimer || 0) >= enemyAI_V312.recoveryTriggerMs ||
+        Number(ai.stuckTimer || 0) >= enemyAI_V312.stuckMs;
+
+    // v3.19: recovery local primero. BFS queda reservado para un bloqueo físico
+    // persistente donde las alternativas inmediatas no permiten salir.
+    if (exceptionalRecovery) {
+        const localRecovery = enemyChooseLocalRecoveryDirectionV319(e);
+        if (localRecovery) return localRecovery;
+
+        if (ai.recoveryCooldownTimer <= 0) {
+            const recovery = enemyRecoveryDirectionByPathV312(e);
+            if (recovery?.dir) {
+                ai.lastRecoveryPathNodes = recovery.nodes;
+                ai.recoveryCooldownTimer = enemyAI_V312.recoveryCooldownMs;
+                const recoveryDir = enemyDirectionV312(recovery.dir);
+                if (enemyImmediateDirectionPassableV312(e, recoveryDir, ai.alert === 'flee', 0.75)) {
+                    return recoveryDir;
+                }
             }
         }
     }
@@ -519,27 +598,26 @@ function enemyChooseDirectionAtIntersectionV312(e) {
         ? possible.filter(dir => dir.dir !== ENEMY_OPPOSITE_V312[ai.direction])
         : possible;
     let options = filtered.length ? filtered : possible;
-    if (ai.physicalBlocked && options.length > 1) {
-        const nonCurrent = options.filter(dir => dir.dir !== ai.direction);
-        if (nonCurrent.length) options = nonCurrent;
-    }
 
-    // Si el jugador está directamente en el mismo corredor, la respuesta es inmediata.
+    // Prioridad estable de persecución: si el jugador está en el mismo
+    // corredor y el giro requerido está disponible, no dejamos que el
+    // scoring general lo reemplace por una dirección lateral equivalente.
     if (ai.seesPlayer) {
         const pt = enemyPlayerTileV312();
         const et = enemyTileV312(e);
         if (pt.x === et.x) {
             const wanted = pt.y < et.y ? 'up' : pt.y > et.y ? 'down' : null;
             const direct = options.find(dir => dir.dir === wanted);
-            if (direct) return direct;
+            if (direct && !(Number(ai.turnLockTimer || 0) > 0 && currentPassable && direct.dir !== currentDir.dir)) return direct;
         }
         if (pt.y === et.y) {
             const wanted = pt.x < et.x ? 'left' : pt.x > et.x ? 'right' : null;
             const direct = options.find(dir => dir.dir === wanted);
-            if (direct) return direct;
+            if (direct && !(Number(ai.turnLockTimer || 0) > 0 && currentPassable && direct.dir !== currentDir.dir)) return direct;
         }
     }
 
+    const atNode = enemyIsIntersectionNodeV319(e, options, currentDir);
     const target = enemyTargetForStateV312(e);
     let best = options[0];
     let bestScore = Infinity;
@@ -553,6 +631,22 @@ function enemyChooseDirectionAtIntersectionV312(e) {
             best = dir;
         }
     }
+
+    // v3.19: mantener dirección si sigue siendo válida. Un giro solo se acepta
+    // cuando mejora de forma suficiente la puntuación o existe peligro real.
+    if (currentPassable && best.dir !== currentDir.dir && atNode) {
+        const currentScore = enemyDirectionScoreV312(e, currentDir, target, {
+            patrol: !ai.seesPlayer && ai.memoryTimer <= 0,
+            urgent: ai.alert === 'chase' || ai.alert === 'surround'
+        });
+        const turnLocked = Number(ai.turnLockTimer || 0) > 0;
+        const materiallyBetter = bestScore + enemyAI_V312.turnHysteresis < currentScore;
+        if (turnLocked || !materiallyBetter) return currentDir;
+    }
+
+    // Fuera de una intersección/esquina real, no fabricamos giros.
+    if (currentPassable && best.dir !== currentDir.dir && !atNode) return currentDir;
+
     return best;
 }
 
@@ -560,6 +654,8 @@ function updateEnemyIntentV312(e, index, dt) {
     const ai = ensureEnemyMotionStateV312(e, index);
     ai.decisionTimer -= dt;
     ai.visionTimer -= dt;
+    ai.turnLockTimer = Math.max(0, Number(ai.turnLockTimer || 0) - dt);
+    ai.recoveryCooldownTimer = Math.max(0, Number(ai.recoveryCooldownTimer || 0) - dt);
     ai.memoryTimer = Math.max(0, ai.memoryTimer - dt);
     ai.surroundTimer = Math.max(0, ai.surroundTimer - dt);
 
@@ -620,16 +716,21 @@ function updateEnemyIntentV312(e, index, dt) {
 
     ai.desiredDirection = chosen.dir;
     ai.decisionTimer = enemyAI_V312.decisionInterval + (index % 3) * 10;
-    if (ai.physicalBlockedTimer > 0) {
-        ai.physicalBlocked = true;
-        if (chosen.dir !== currentDir.dir && enemyImmediateDirectionPassableV312(e, chosen, ai.alert === 'flee', 0.75)) {
-            ai.direction = chosen.dir;
-            e.lastDirection = chosen.dir;
+    if (chosen.dir !== currentDir.dir && enemyImmediateDirectionPassableV312(e, chosen, ai.alert === 'flee', 0.75)) {
+        const wasRecovery = Number(ai.physicalBlockedTimer || 0) > 0 || Number(ai.stuckTimer || 0) > 0;
+        ai.direction = chosen.dir;
+        e.lastDirection = chosen.dir;
+        if (wasRecovery) {
             ai.recoveryCount += 1;
-            ai.lastRecoveryReason = ai.lastRecoveryPathNodes > 0 ? 'replan-ruta' : 'bloqueo-fisico';
+            ai.lastRecoveryReason = ai.lastRecoveryPathNodes > 0 ? 'replan-ruta' : 'replan-fisico';
             ai.blockedTimer = 0;
             ai.physicalBlockedTimer = 0;
             ai.physicalBlocked = false;
+            ai.recoveryCooldownTimer = Math.max(Number(ai.recoveryCooldownTimer || 0), enemyAI_V312.recoveryCooldownMs);
+        } else {
+            ai.turnLockTimer = enemyAI_V312.turnCommitMs;
+            ai.lastTurnTileKey = enemyTileKeyV312(tile.x, tile.y);
+            ai.lastTurnDirection = chosen.dir;
         }
     }
     ai.lastDecisionTileX = tile.x;
@@ -724,6 +825,7 @@ function moveEnemyV312(e, dt) {
         ai.stuckTimer = 0;
         ai.physicalBlockedTimer = 0;
         ai.physicalBlocked = false;
+        ai.cornerCorrectionMs = 0;
         ai.lastX = e.x;
         ai.lastY = e.y;
         if (dir.x) e.vx = dir.x * speed, e.vy = 0;
@@ -750,7 +852,7 @@ function moveEnemyV312(e, dt) {
 
     // Si el corredor sigue bloqueado, hacemos una decisión de recuperación
     // basada en la posición física actual, no en la presencia del jugador.
-    if (ai.physicalBlockedTimer >= enemyAI_V312.physicalRecoveryMs || ai.stuckTimer >= enemyAI_V312.stuckMs || ai.blockedTimer >= 50) {
+    if (ai.physicalBlockedTimer >= enemyAI_V312.recoveryTriggerMs || ai.stuckTimer >= enemyAI_V312.stuckMs) {
         ai.stuckTimer = 0;
         ai.blockedTimer = 0;
         const fallback = enemyChooseDirectionAtIntersectionV312(e);
@@ -762,6 +864,8 @@ function moveEnemyV312(e, dt) {
             ai.lastRecoveryReason = ai.lastRecoveryPathNodes > 0 ? 'replan-ruta' : 'replan-fisico';
             ai.physicalBlockedTimer = 0;
             ai.physicalBlocked = false;
+            ai.cornerCorrectionMs = 0;
+            ai.recoveryCooldownTimer = enemyAI_V312.recoveryCooldownMs;
         }
     }
 }

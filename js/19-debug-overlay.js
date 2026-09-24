@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.16.7 — Debug Overlay
+// Bomberman Roguelike v3.19.0 — Debug Overlay
 // Panel reconstruido para inspección en vivo. Solo se crea con ?debug=1.
 (() => {
     'use strict';
@@ -321,7 +321,7 @@
         const enemyLines = enemyNav.map(e => {
             const route = e.canReachPlayer ? `${e.routeLength} celdas` : 'SIN RUTA';
             const flags = [e.stuckLikely ? 'ATASCADO' : null, e.currentPassable === false ? 'BLOQUEADO-GRID' : null, e.physicalBlocked ? 'BLOQUEADO-HITBOX' : null, e.cornerCorrectionMs > 0 ? 'CORR-ESQUINA' : null, e.recoveryCount > 0 ? `REC#${e.recoveryCount}` : null, e.turnReady ? 'CENTRO' : null].filter(Boolean).join(',') || 'OK';
-            return `E${e.index} · tile ${e.tile.x},${e.tile.y} · prev ${e.previousTile?.x},${e.previousTile?.y} · ${e.behavior}/${e.alert} · actual ${e.currentDirection} · deseada ${e.desiredDirection} · REAL ${e.actualDirection} · estado ${e.movementState} · progreso ${e.progressStatus} · mov ${fmt(e.movedPx,2)}px · trans ${e.tileTransitions || 0} · giros ${e.directionChanges || 0} · ruta ${route} · ref ${e.routeNextDirection}/${e.routeAlignment} · centro ${fmt(e.distanceToCenter,1)}px · fisBloq ${fmt(e.physicalBlockedMs,0)}ms · rec ${e.recoveryCount || 0} · sinProg ${e.framesSinceProgress || 0}f · ${flags} · target ${e.target?.x},${e.target?.y}`;
+            return `E${e.index} · tile ${e.tile.x},${e.tile.y} · prev ${e.previousTile?.x},${e.previousTile?.y} · ${e.behavior}/${e.alert} · actual ${e.currentDirection} · deseada ${e.desiredDirection} · REAL ${e.actualDirection} · estado ${e.movementState} · progreso ${e.progressStatus} · mov ${fmt(e.movedPx,2)}px · trans ${e.tileTransitions || 0} · giros ${e.directionChanges || 0} · ruta ${route} · ref ${e.routeNextDirection}/${e.routeAlignment} · centro ${fmt(e.distanceToCenter,1)}px · fisBloq ${fmt(e.physicalBlockedMs,0)}ms · rec ${e.recoveryCount || 0} · BFS ${e.recoveryPathCalls || 0} · lock ${fmt(e.turnLockMs,0)}ms · sinProg ${e.framesSinceProgress || 0}f · ${flags} · target ${e.target?.x},${e.target?.y}`;
         });
         const navNode = document.getElementById('dbg-nav-enemies');
         if (navNode) navNode.textContent = enemyLines.length ? enemyLines.join('\n') : 'Sin enemigos en la escena.';
@@ -340,7 +340,7 @@
                 const corner = c.cornerCorrectionFrames ? ` · esquina=${c.cornerCorrectionFrames}f` : '';
                 const physical = c.physicalBlockedFrames ? ` · fisBloq=${c.physicalBlockedFrames}f/${c.maxPhysicalBlockedMs}ms` : '';
                 const noAssist = c.name === 'corner-recovery-no-player' ? ` · sinPlayer=${c.noPlayerAssist ? 'OK' : 'NO'}` : ''; 
-                return `${c.status} ${c.name} · mov=${c.movedPx}px · trans=${c.tileTransitions} · giros=${c.directionChanges} · ruta=${c.routeLength} · REAL=${c.finalAlert} · bloqueos=${c.blockedFrames} · pausaMax=${c.maxNoMoveFrames}f · centroMax=${c.maxCenterDistance}px · atascado=${c.stuckLikely ? 'SI' : 'NO'}${recovery}${corner}${physical}${noAssist}${agree}${bomb}${c.failure ? ` · ${c.failure}` : ''}`;
+                return `${c.status} ${c.name} · mov=${c.movedPx}px · trans=${c.tileTransitions} · giros=${c.directionChanges} · BFS=${c.recoveryPathCalls || 0} · lock=${Number(c.turnLockMs || 0).toFixed(0)}ms · ruta=${c.routeLength} · REAL=${c.finalAlert} · bloqueos=${c.blockedFrames} · pausaMax=${c.maxNoMoveFrames}f · centroMax=${c.maxCenterDistance}px · atascado=${c.stuckLikely ? 'SI' : 'NO'}${recovery}${corner}${physical}${noAssist}${agree}${bomb}${c.failure ? ` · ${c.failure}` : ''}`;
             }).join('\n');
         } else {
             setText('dbg-stress-head', 'PENDIENTE');

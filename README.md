@@ -1,4 +1,4 @@
-# BOMBERMAN // DESCENT — Roguelike v3.26.0
+# BOMBERMAN // DESCENT — Roguelike v3.27.0
 
 Videojuego web estático desarrollado con HTML, CSS y JavaScript vanilla. Preparado para GitHub Pages, sin backend ni bundler.
 
@@ -153,4 +153,27 @@ Debug Engine: `ROOM STRESS` valida las seis topologías, cantidad de celdas alca
 - Benchmark del pool: 10.000 updates ≈ 11,8 ms en harness aislado.
 - Sonido limitado a 10 eventos/segundo y cooldown de 55 ms.
 - Sin audio externo ni assets adicionales.
+- Prueba visual en navegador/GitHub Pages: pendiente.
+
+
+## v3.27.0 — Roguelike Update
+- Economía de run reforzada sin duplicar la economía base existente: recompensas de limpieza, bonuses por reliquias y reroll como gasto.
+- Nuevo gasto de monedas: reroll de la oferta de reliquias, una vez por sala.
+- Pool de 12 reliquias v3.27 con rareza `common`, `uncommon` y `rare`.
+- Protección contra duplicados dentro de la nueva capa de reliquias.
+- Sinergias por etiquetas: combustión, demolición, economía, movilidad, supervivencia y riesgo.
+- Bonificaciones de sinergia derivadas: no se acumulan cada frame ni pisan los stats base del juego.
+- Decisiones de ruta entre salas: se ofrecen 3 opciones de las 4 rutas disponibles (`ESTÁNDAR`, `TESORO`, `ÉLITE`, `SANTUARIO`).
+- `ÉLITE` añade presión física limitada y mejora la calidad de la siguiente oferta de reliquias.
+- `TESORO` entrega monedas al entrar; `SANTUARIO` recupera vida; cada ruta modifica la recompensa de limpieza.
+- La ruta elegida se aplica en la próxima llamada normal a `initLevel()`.
+- La mejora estadística existente de la pantalla de recompensa se conserva; la capa v3.27 agrega decisiones antes de continuar.
+- Nuevo `js/31-roguelike-update.js`.
+- Nuevo `js/32-roguelike-stress.js`.
+
+## Validación v3.27.0
+- `node --check`: módulos v3.27 PASS.
+- Stress aislado: unicidad de ofertas, adquisición de reliquia, sinergias, selección de 3 rutas, pool de rooms y generación con sesgo de calidad.
+- Guard de economía: las monedas que ya entrega el sistema base no se vuelven a cobrar; v3.27 suma únicamente el incremento propio.
+- No se modifica el loop principal, pathfinding, colisión ni lógica de boss.
 - Prueba visual en navegador/GitHub Pages: pendiente.

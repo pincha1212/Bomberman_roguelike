@@ -9,7 +9,7 @@ const roomDesignV313 = {
     secretInterior: new Set(),
     exitGate: null,
     secretRoom: null,
-    version: '4.4.0',
+    version: '4.5.2',
     layoutVariant: 'corridors',
     layoutMetrics: null
 };
@@ -488,7 +488,7 @@ function buildProceduralRoomLayoutV322() {
 // v4.4.0 — Dungeon generator: pre-established Bomberman-like hard-wall glyphs
 // + high-variance destructible blocks. The glyph is structural, not a HUD label.
 const BOMBERMAN_DUNGEON_V44 = Object.freeze({
-    version: '4.4.0',
+    version: '4.5.2',
     digitWidth: 7,
     digitHeight: 9,
     maxNormalEnemies: 12,
@@ -571,6 +571,7 @@ function v44ApplyClassicHardWalls(bounds, hard) {
     for (let y = 1; y < gameState.gridHeight - 1; y++) {
         for (let x = 1; x < gameState.gridWidth - 1; x++) {
             // Outside the number, use the classic Bomberman pillar cadence.
+            if (v44IsStartSafeCell(x, y)) continue;
             if (x % 2 !== 0 || y % 2 !== 0) continue;
             if (v44InsideDigitBounds(x, y, bounds)) continue;
             gameState.grid[y][x] = TYPES.WALL;

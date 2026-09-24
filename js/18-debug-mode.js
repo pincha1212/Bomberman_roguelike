@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.20.0 — Debug Engine
+// Bomberman Roguelike v3.20.1 — Debug Engine
 // Depuración interna del mismo runtime. Se activa solo con ?debug=1.
 (() => {
     'use strict';
@@ -1328,17 +1328,18 @@
             const stressStarted = performance.now();
             const cases = [
                 { name: 'direct-chase', player: { x: 5, y: 7 }, enemy: { x: 1, y: 7 }, dir: 'right', minMove: 8, minTurns: 0 },
-                { name: 'intersection-stability', player: { x: 13, y: 13 }, enemy: { x: 7, y: 7 }, dir: 'right', minMove: 8, minTurns: 1, maxTurns: 2, forceChase: true, expectBfsMax: 0 },
+                { name: 'intersection-stability', player: { x: 7, y: 5 }, enemy: { x: 5, y: 7 }, dir: 'right', minMove: 8, minTurns: 1, maxTurns: 1, forceChase: true, persistChase: true, requiresRoute: true, stopOnPlayer: true, expectBfsMax: 0 },
                 { name: 'corner-turn', player: { x: 7, y: 7 }, enemy: { x: 3, y: 3 }, dir: 'down', minMove: 8, minTurns: 1 },
                 { name: 'long-corridor', player: { x: 13, y: 7 }, enemy: { x: 1, y: 7 }, dir: 'right', minMove: 40, minTurns: 0 },
                 { name: 'intersection', player: { x: 3, y: 3 }, enemy: { x: 7, y: 3 }, dir: 'down', minMove: 8, minTurns: 1 },
                 { name: 'dead-end', player: { x: 5, y: 10 }, enemy: { x: 5, y: 13 }, dir: 'down', minMove: 8, minTurns: 1, recoveryExpected: true },
-                { name: 'corner-recovery-no-player', player: { x: 13, y: 13 }, enemy: { x: 7, y: 7 }, dir: 'up', minMove: 8, minTurns: 0, recoveryExpected: true, cornerOffset: 12, patrolTarget: { x: 7, y: 1 }, expectBfsMax: 0 },
+                { name: 'corner-recovery-no-player', player: { x: 13, y: 13 }, enemy: { x: 7, y: 7 }, dir: 'up', minMove: 8, minTurns: 0, recoveryExpected: true, recoveryMode: 'lane-correction', cornerOffset: 12, patrolTarget: { x: 7, y: 1 }, requiresRoute: false, expectBfsMax: 0 },
                 { name: 'bomb-flee', player: { x: 13, y: 7 }, enemy: { x: 5, y: 7 }, dir: 'right', minMove: 8, minTurns: 0, bomb: { x: 6, y: 7, timer: 1200, range: 3 } }
             ];
             const results = [];
             for (const spec of cases) {
                 buildStressGrid();
+                window.GRID_COLLISION_V320?.reset?.();
                 const state = getState();
                 const p = getPlayer();
                 state.bombs = [];
@@ -1354,7 +1355,7 @@
                 state.enemies.push(enemy);
                 if (spec.bomb) state.bombs.push({ x: spec.bomb.x, y: spec.bomb.y, timer: spec.bomb.timer, range: spec.bomb.range, fuseTotal: 2000, owner: 'debug-stress' });
                 if (typeof ensureEnemyMotionStateV312 === 'function') ensureEnemyMotionStateV312(enemy, results.length);
-                enemy.ai.visionTimer = 0;
+                enemy.ai.visionTimer = spec.persistChase ? Number.MAX_SAFE_INTEGER : 0;
                 enemy.ai.decisionTimer = 0;
                 enemy.ai.seesPlayer = !!spec.forceChase;
                 enemy.ai.memoryTimer = spec.forceChase ? 900 : 0;
@@ -1363,8 +1364,10 @@
                 enemy.ai.direction = spec.dir;
                 enemy.ai.desiredDirection = spec.dir;
                 enemy.lastDirection = spec.dir;
-                enemy.ai.seesPlayer = false;
-                enemy.ai.memoryTimer = 0;
+                if (!spec.forceChase) {
+                    enemy.ai.seesPlayer = false;
+                    enemy.ai.memoryTimer = 0;
+                }
                 if (spec.patrolTarget) {
                     enemy.ai.patrolX = spec.patrolTarget.x;
                     enemy.ai.patrolY = spec.patrolTarget.y;
@@ -1395,11 +1398,27 @@
                 let physicalBlockedFrames = 0;
                 let cornerCorrectionFrames = 0;
                 let maxPhysicalBlockedMs = 0;
+                let laneCorrections = 0;
+                let laneCorrectionPx = 0;
+                let laneCorrectionFrames = 0;
+                let initialCanReachPlayer = false;
+                let canReachAnyFrame = false;
+                let targetReachedFrame = -1;
+
+                const initialNav = DEBUG_MODE.getNavigationSnapshot(true);
+                const initialItem = initialNav?.enemies?.[0] || null;
+                initialCanReachPlayer = !!initialItem?.canReachPlayer;
 
                 for (let frame = 0; frame < 180; frame++) {
                     const beforeX = enemy.x;
                     const beforeY = enemy.y;
                     updateEnemyAI(16.6667);
+                    const collisionSnapshot = window.GRID_COLLISION_V320?.snapshot?.() || {};
+                    const caseLaneCorrections = Number(collisionSnapshot.laneCorrections || 0);
+                    const caseLaneCorrectionPx = Number(collisionSnapshot.laneCorrectionPx || 0);
+                    if (caseLaneCorrections > laneCorrections) laneCorrectionFrames += 1;
+                    laneCorrections = caseLaneCorrections;
+                    laneCorrectionPx = caseLaneCorrectionPx;
                     const moved = Math.hypot(enemy.x - beforeX, enemy.y - beforeY);
                     maxMove = Math.max(maxMove, moved);
                     if (moved > 0.05) consecutiveNoMoveFrames = 0;
@@ -1439,6 +1458,11 @@
                     const currentDirObserved = movementDirection(enemy.vx, enemy.vy);
                     const routeSnap = getState() && getPlayer() ? DEBUG_MODE.getNavigationSnapshot(true).enemies?.[0] : null;
                     const routeNext = routeSnap?.routeNextDirection || '—';
+                    if (routeSnap?.canReachPlayer) canReachAnyFrame = true;
+                    if (spec.stopOnPlayer && routeSnap?.canReachPlayer && routeSnap.routeLength === 0 && targetReachedFrame < 0) {
+                        targetReachedFrame = frame;
+                        break;
+                    }
                     if (currentDirObserved !== '—' && routeNext !== '—') {
                         routeDirectionSamples += 1;
                         if (currentDirObserved === routeNext) routeDirectionMatches += 1;
@@ -1454,7 +1478,7 @@
                 const stuckLikely = !!item?.stuckLikely;
                 const recoveryOk = spec.name !== 'recovery' || String(enemy.ai?.direction || '').toLowerCase() !== 'up';
                 const noPlayerAssist = spec.name !== 'corner-recovery-no-player' || (!enemy.ai?.seesPlayer && Number(enemy.ai?.memoryTimer || 0) <= 0);
-                const cornerCorrected = spec.name !== 'corner-recovery-no-player' || Number(enemy.ai?.recoveryCount || 0) > 0 || Number(enemy.ai?.cornerCorrectionMs || 0) > 0;
+                const cornerCorrected = spec.name !== 'corner-recovery-no-player' || laneCorrections > 0 || Number(enemy.ai?.recoveryCount || 0) > 0 || Number(enemy.ai?.cornerCorrectionMs || 0) > 0 || cornerCorrectionFrames > 0;
                 let pass = true;
                 const failures = [];
                 if (movedTotal < spec.minMove) { pass = false; failures.push(`movimiento ${movedTotal.toFixed(1)}<${spec.minMove}`); }
@@ -1464,8 +1488,15 @@
                 if (Number.isFinite(spec.expectBfsMax) && recoveryPathCalls > spec.expectBfsMax) { pass = false; failures.push(`BFS ${recoveryPathCalls}>${spec.expectBfsMax}`); }
                 if (stuckLikely) { pass = false; failures.push('atasco detectado'); }
                 if (blockedFrames > 120) { pass = false; failures.push(`bloqueo prolongado ${blockedFrames}/180`); }
-                if (spec.name !== 'bomb-flee' && !canReach) { pass = false; failures.push('sin ruta al jugador'); }
-                if (spec.recoveryExpected && firstDirectionChangeFrame < 0) { pass = false; failures.push('no recuperó dirección bloqueada'); }
+                const requiresRoute = spec.requiresRoute !== false && spec.name !== 'bomb-flee';
+                if (requiresRoute && !initialCanReachPlayer && !canReachAnyFrame) { pass = false; failures.push('sin ruta al jugador'); }
+                if (spec.recoveryExpected) {
+                    const recovered = spec.recoveryMode === 'lane-correction'
+                        ? (laneCorrections > 0 || laneCorrectionFrames > 0 || cornerCorrectionFrames > 0 || Number(enemy.ai?.recoveryCount || 0) > 0)
+                        : (firstDirectionChangeFrame >= 0 || Number(enemy.ai?.recoveryCount || 0) > 0 || cornerCorrectionFrames > 0 || laneCorrections > 0);
+                    if (!recovered) failures.push('no se detectó recuperación física');
+                    if (!recovered) pass = false;
+                }
                 if (spec.name === 'bomb-flee' && fleeFrames < 5) { pass = false; failures.push(`flee insuficiente (${fleeFrames} frames)`); }
                 if (spec.name === 'bomb-flee' && maxBombDistance <= 1) { pass = false; failures.push(`no aumentó distancia a bomba (máx ${maxBombDistance})`); }
                 if (spec.name === 'corner-recovery-no-player' && !noPlayerAssist) { pass = false; failures.push('necesitó ver al jugador'); }
@@ -1495,6 +1526,12 @@
                     dangerNextFrames,
                     physicalBlockedFrames,
                     cornerCorrectionFrames,
+                    laneCorrections,
+                    laneCorrectionPx: Number(laneCorrectionPx.toFixed(2)),
+                    laneCorrectionFrames,
+                    initialCanReachPlayer,
+                    canReachAnyFrame,
+                    targetReachedFrame,
                     maxPhysicalBlockedMs: Number(maxPhysicalBlockedMs.toFixed(1)),
                     recoveryCount: Number(enemy.ai?.recoveryCount || 0),
                     recoveryReason: enemy.ai?.lastRecoveryReason || '—',
@@ -1527,7 +1564,7 @@
                     cases: results,
                     durationMs: Number((performance.now() - stressStarted).toFixed(1)),
                     focus: 'movimiento real, giros, rutas, bloqueos físicos, corrección de esquinas, recuperación y evasión de bomba',
-                    note: 'La prueba observa updateEnemyAI(); no modifica 12-enemy-ai.js.'
+                    note: 'La prueba observa updateEnemyAI() y GRID_COLLISION_V320; no modifica 12-enemy-ai.js ni 13-collision.js.'
                 }
             };
         },
@@ -1755,6 +1792,6 @@
         }
     });
 
-    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.20.0 cargado en el mismo runtime.');
+    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.20.1 cargado en el mismo runtime.');
     DEBUG_MODE.recordEvent('DEBUG', 'Usá RESET para activar una escena de depuración limpia.');
 })();

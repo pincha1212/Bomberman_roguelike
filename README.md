@@ -1,4 +1,4 @@
-# BOMBERMAN // DESCENT — Roguelike v4.1
+# BOMBERMAN // DESCENT — Roguelike v3.28.0
 
 Videojuego web estático desarrollado con HTML, CSS y JavaScript vanilla. Preparado para GitHub Pages, sin backend ni bundler.
 
@@ -381,3 +381,32 @@ La validación de v3.29 se limita a sintaxis, harnesses y auditoría estática/e
 - Boss-owned explosions do not damage the boss itself.
 - Bombs now expose `interactionState`, `canKick`, `canPush`, `canCarry` and `carriedBy` for future player/bomb skills.
 - Existing moving → armed → exploding bomb state model remains the shared foundation.
+
+
+==================================================
+V4.2 — SMART INFORMATION LAYOUT
+==================================================
+
+Segunda revisión visual de distribución: el HUD, banners, boss HUD, pantallas
+y controles táctiles se adaptan al viewport. Se incorpora perfil dinámico de
+tamaño/orientación y se evita depender de posiciones fijas únicas.
+
+## v4.3 — CSS modularization
+
+La hoja `styles.css` de v4.2 tenía 1334 líneas y acumulaba reglas de distintas etapas.
+En v4.3 se divide en módulos dentro de `css/` sin cambiar la cascada existente.
+
+Estructura:
+
+- `css/main.css` — manifiesto de carga, mantiene el orden.
+- `css/01-base.css` — base global y controles elementales.
+- `css/02-ui-systems.css` — HUD, banners, bombas, boss HUD y layout histórico.
+- `css/03-menu-layout.css` — menú principal y layouts de pantalla.
+- `css/04-relics-screens.css` — reliquias, game over y resultados.
+- `css/05-debug.css` — Debug Mode.
+- `css/06-v4-theme.css` — identidad visual Bomberman v4.
+- `css/07-v4-responsive.css` — responsive e información inteligente v4.2.
+
+`styles.css` queda reducido a un loader de compatibilidad. La página ahora carga directamente `css/main.css`.
+
+La división se hizo preservando exactamente el orden original de las reglas para no cambiar el comportamiento visual por accidente.

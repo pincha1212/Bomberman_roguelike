@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.20.1 — Debug Engine
+// Bomberman Roguelike v3.21.0 — Debug Engine
 // Depuración interna del mismo runtime. Se activa solo con ?debug=1.
 (() => {
     'use strict';
@@ -13,13 +13,14 @@
         { dx: -1, dy: 0, dir: 'LEFT' }
     ]);
 
-    const TEST_NAMES = Object.freeze(['movement', 'bombs', 'damage', 'traps', 'enemies', 'ai-stress', 'camera', 'restart']);
+    const TEST_NAMES = Object.freeze(['movement', 'bombs', 'damage', 'traps', 'enemies', 'ai-stress', 'navigation-stress', 'camera', 'restart']);
     const MAX_EVENTS = 220;
     const MAX_ERRORS = 100;
     const MAX_TEST_RESULTS = 30;
     const MAX_NAV_NODES = 900;
     const MAX_MOTION_TRAIL = 24;
     const AI_STRESS_CASES = 8;
+    const NAVIGATION_STRESS_CASES = 5;
     const EVENT_DEDUPE_MS = 850;
     const EVENT_DEDUPE_TYPES = new Set(['AI', 'DEBUG', 'VISUAL', 'INFO', 'WORLD']);
 
@@ -61,6 +62,7 @@
         playerProgress: null,
         motionSampleCount: 0,
         aiStress: null,
+        navigationStress: null,
         selectedVisuals: {
             grid: false,
             collision: false,
@@ -380,6 +382,11 @@
                     recoveryPathCalls: Number(ai.recoveryPathCalls || 0),
                     turnLockMs: Number(ai.turnLockTimer || 0),
                     lastTurnDirection: ai.lastTurnDirection || '—',
+                    lastTurnFromDirection: ai.lastTurnFromDirection || '—',
+                    lastTurnTileKey: Number.isFinite(Number(ai.lastTurnAtTileKey)) ? Number(ai.lastTurnAtTileKey) : -1,
+                    navigationMemoryTiles: Array.isArray(ai.recentTileKeys) ? ai.recentTileKeys.length : 0,
+                    navigationMemoryTimer: Number(ai.navigationMemoryTimer || 0),
+                    navigationTurnCount: Number(ai.navigationTurnCount || 0),
                     trail: progress.trail,
                     seesPlayer: !!ai.seesPlayer,
                     options,
@@ -457,6 +464,7 @@
             this.busy = true;
             this.testResults = [];
             this.aiStress = null;
+            this.navigationStress = null;
             const storage = captureStorage();
             const startedSuite = performance.now();
             this.recordEvent('TEST', `Inicio de suite: ${names.length} prueba(s).`);
@@ -879,7 +887,7 @@
         const lines = [];
         lines.push(`modo=${nav.mode} · jugador alcanzables=${nav.player?.reachableTiles || 0} · junctions=${nav.player?.junctions || 0} · deadEnds=${nav.player?.deadEnds || 0} · opciones=${(nav.player?.options || []).join(',') || '—'}`);
         for (const e of (nav.enemies || [])) {
-            lines.push(`E${e.index} tile=${e.tile.x},${e.tile.y} · ${e.behavior}/${e.alert} · actual=${e.currentDirection} · deseada=${e.desiredDirection} · real=${e.actualDirection} · estado=${e.movementState} · centro=${Number(e.distanceToCenter || 0).toFixed(1)}px · bloqueado=${e.currentPassable === false ? 'SI' : 'NO'} · atascado=${e.stuckLikely ? 'SI' : 'NO'} · ruta=${e.routeLength} · nextRuta=${e.routeNextDirection} · alineación=${e.routeAlignment} · target=${e.target?.x},${e.target?.y}`);
+            lines.push(`E${e.index} tile=${e.tile.x},${e.tile.y} · ${e.behavior}/${e.alert} · actual=${e.currentDirection} · deseada=${e.desiredDirection} · real=${e.actualDirection} · estado=${e.movementState} · centro=${Number(e.distanceToCenter || 0).toFixed(1)}px · bloqueado=${e.currentPassable === false ? 'SI' : 'NO'} · atascado=${e.stuckLikely ? 'SI' : 'NO'} · ruta=${e.routeLength} · nextRuta=${e.routeNextDirection} · alineación=${e.routeAlignment} · mem=${e.navigationMemoryTiles || 0} · navTurns=${e.navigationTurnCount || 0} · target=${e.target?.x},${e.target?.y}`);
         }
         return lines.join('\n');
     }
@@ -1569,6 +1577,111 @@
             };
         },
 
+
+        'navigation-stress': async () => {
+            prepareControlledStressScene();
+            const started = performance.now();
+            const cases = [
+                { name: 'corridor-continuity', player: { x: 13, y: 7 }, enemy: { x: 1, y: 7 }, dir: 'right', forceChase: true, minMove: 50, maxTurns: 0, expectBfsMax: 0 },
+                { name: 'intersection-local-chase', player: { x: 3, y: 3 }, enemy: { x: 7, y: 3 }, dir: 'down', forceChase: true, minMove: 20, minTurns: 1, expectBfsMax: 0 },
+                { name: 'patrol-short-memory', player: { x: 13, y: 13 }, enemy: { x: 7, y: 7 }, dir: 'right', patrolTarget: { x: 7, y: 3 }, minMove: 30, expectBfsMax: 0, maxOscillations: 0 },
+                { name: 'dead-end-local-reversal', player: { x: 5, y: 10 }, enemy: { x: 5, y: 13 }, dir: 'down', forceChase: true, minMove: 15, minTurns: 1, expectBfsMax: 0 },
+                { name: 'unreachable-target-local', player: { x: 13, y: 13 }, enemy: { x: 7, y: 7 }, dir: 'up', forceChase: true, minMove: 30, expectBfsMax: 0, requiresRoute: false }
+            ];
+            const results = [];
+            for (const spec of cases) {
+                buildStressGrid();
+                window.GRID_COLLISION_V320?.reset?.();
+                const state = getState();
+                const p = getPlayer();
+                state.bombs = [];
+                state.explosions = [];
+                state.hazards = [];
+                state.enemies = [];
+                state.bossProjectiles = [];
+                state.particles = [];
+                state.floaters = [];
+                setPlayerAt(spec.player);
+                p.vx = 0; p.vy = 0;
+                const enemy = createStressEnemy(spec.enemy, spec.dir, results.length);
+                state.enemies.push(enemy);
+                if (typeof ensureEnemyMotionStateV312 === 'function') ensureEnemyMotionStateV312(enemy, results.length);
+                enemy.ai.visionTimer = Number.MAX_SAFE_INTEGER;
+                enemy.ai.decisionTimer = 0;
+                enemy.ai.seesPlayer = !!spec.forceChase;
+                enemy.ai.memoryTimer = spec.forceChase ? 900 : 0;
+                enemy.ai.patrolX = spec.patrolTarget?.x ?? -1;
+                enemy.ai.patrolY = spec.patrolTarget?.y ?? -1;
+                enemy.ai.direction = spec.dir;
+                enemy.ai.desiredDirection = spec.dir;
+                enemy.lastDirection = spec.dir;
+
+                const start = { x: enemy.x, y: enemy.y };
+                const directions = [];
+                let directionChanges = 0;
+                let maxNoMove = 0;
+                let noMove = 0;
+                let maxCenterDistance = 0;
+                let recoveryCalls = 0;
+                let navigationMemoryMax = 0;
+                for (let frame = 0; frame < 180; frame++) {
+                    const beforeX = enemy.x;
+                    const beforeY = enemy.y;
+                    const beforeDir = String(enemy.ai.direction || '—').toLowerCase();
+                    updateEnemyAI(16.6667);
+                    const afterDir = String(enemy.ai.direction || '—').toLowerCase();
+                    if (directions[directions.length - 1] !== afterDir) directions.push(afterDir);
+                    if (afterDir !== beforeDir && afterDir !== '—') directionChanges += 1;
+                    const moved = Math.hypot(enemy.x - beforeX, enemy.y - beforeY);
+                    if (moved <= 0.05) { noMove += 1; maxNoMove = Math.max(maxNoMove, noMove); } else noMove = 0;
+                    const tile = enemyTileV312(enemy);
+                    const center = gridTileCenter(tile.x, tile.y);
+                    maxCenterDistance = Math.max(maxCenterDistance, Math.hypot(enemy.x - center.x, enemy.y - center.y));
+                    recoveryCalls = Math.max(recoveryCalls, Number(enemy.ai.recoveryPathCalls || 0));
+                    navigationMemoryMax = Math.max(navigationMemoryMax, Array.isArray(enemy.ai.recentTileKeys) ? enemy.ai.recentTileKeys.length : 0);
+                }
+
+                let oscillations = 0;
+                for (let i = 2; i < directions.length; i++) {
+                    if (directions[i] === directions[i - 2] && directions[i] !== directions[i - 1]) oscillations += 1;
+                }
+                const movedTotal = Math.hypot(enemy.x - start.x, enemy.y - start.y);
+                let pass = movedTotal >= spec.minMove;
+                const failures = [];
+                if (directionChanges < (spec.minTurns || 0)) { pass = false; failures.push(`giros ${directionChanges}<${spec.minTurns}`); }
+                if (Number.isFinite(spec.maxTurns) && directionChanges > spec.maxTurns) { pass = false; failures.push(`giros ${directionChanges}>${spec.maxTurns}`); }
+                if (recoveryCalls > (spec.expectBfsMax ?? 0)) { pass = false; failures.push(`BFS ${recoveryCalls}>${spec.expectBfsMax}`); }
+                if (maxNoMove > 12) { pass = false; failures.push(`parón ${maxNoMove}f`); }
+                if ((spec.maxOscillations ?? Infinity) < oscillations) { pass = false; failures.push(`oscilaciones ${oscillations}>${spec.maxOscillations}`); }
+                if (navigationMemoryMax < 2) { pass = false; failures.push('memoria local no registrada'); }
+                if (spec.name === 'dead-end-local-reversal' && String(enemy.ai.direction).toLowerCase() !== 'up') { pass = false; failures.push('no revirtió en callejón'); }
+                results.push({
+                    name: spec.name,
+                    status: pass ? 'PASS' : 'FAIL',
+                    movedPx: Number(movedTotal.toFixed(1)),
+                    directionChanges,
+                    directionTrace: directions,
+                    oscillations,
+                    maxNoMoveFrames: maxNoMove,
+                    maxCenterDistance: Number(maxCenterDistance.toFixed(1)),
+                    recoveryPathCalls: recoveryCalls,
+                    navigationMemoryMax,
+                    finalDirection: enemy.ai.direction,
+                    recentTileKeys: Array.isArray(enemy.ai.recentTileKeys) ? enemy.ai.recentTileKeys.slice() : [],
+                    failure: failures.join(' · ') || null
+                });
+            }
+            const passed = results.filter(r => r.status === 'PASS').length;
+            const durationMs = performance.now() - started;
+            DEBUG_MODE.navigationStress = { total: results.length, passed, failed: results.length - passed, cases: results, durationMs };
+            const failureText = results.filter(r => r.failure).map(r => `${r.name}: ${r.failure}`).join(' | ');
+            if (passed !== results.length) throw new Error(`Navigation Stress: ${passed}/${results.length} casos PASS. ${failureText}`);
+            return {
+                summary: `${passed}/${results.length} escenarios PASS · BFS=${Math.max(...results.map(r => r.recoveryPathCalls || 0))} · oscilaciones=${results.reduce((a, r) => a + r.oscillations, 0)}`,
+                details: { cases: results, durationMs: Number(durationMs.toFixed(1)), focus: 'decisiones locales, continuidad, memoria corta, reversa en callejón y ausencia de BFS continuo' }
+            };
+        },
+
         camera: async () => {
             prepareTestScene();
             const p = getPlayer();
@@ -1792,6 +1905,6 @@
         }
     });
 
-    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.20.1 cargado en el mismo runtime.');
+    DEBUG_MODE.recordEvent('DEBUG', 'Debug Engine v3.21.0 cargado en el mismo runtime.');
     DEBUG_MODE.recordEvent('DEBUG', 'Usá RESET para activar una escena de depuración limpia.');
 })();

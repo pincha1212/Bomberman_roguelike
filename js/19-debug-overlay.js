@@ -327,7 +327,7 @@
         const enemyLines = enemyNav.map(e => {
             const route = e.canReachPlayer ? `${e.routeLength} celdas` : 'SIN RUTA';
             const flags = [e.stuckLikely ? 'ATASCADO' : null, e.currentPassable === false ? 'BLOQUEADO-GRID' : null, e.physicalBlocked ? 'BLOQUEADO-HITBOX' : null, e.cornerCorrectionMs > 0 ? 'CORR-ESQUINA' : null, e.recoveryCount > 0 ? `REC#${e.recoveryCount}` : null, e.turnReady ? 'CENTRO' : null].filter(Boolean).join(',') || 'OK';
-            return `E${e.index} · tile ${e.tile.x},${e.tile.y} · prev ${e.previousTile?.x},${e.previousTile?.y} · ${e.behavior}/${e.alert} · actual ${e.currentDirection} · deseada ${e.desiredDirection} · REAL ${e.actualDirection} · estado ${e.movementState} · progreso ${e.progressStatus} · mov ${fmt(e.movedPx,2)}px · trans ${e.tileTransitions || 0} · giros ${e.directionChanges || 0} · ruta ${route} · ref ${e.routeNextDirection}/${e.routeAlignment} · centro ${fmt(e.distanceToCenter,1)}px · fisBloq ${fmt(e.physicalBlockedMs,0)}ms · rec ${e.recoveryCount || 0} · BFS ${e.recoveryPathCalls || 0} · lock ${fmt(e.turnLockMs,0)}ms · sinProg ${e.framesSinceProgress || 0}f · ${flags} · target ${e.target?.x},${e.target?.y}`;
+            return `E${e.index} · tile ${e.tile.x},${e.tile.y} · prev ${e.previousTile?.x},${e.previousTile?.y} · ${e.behavior}/${e.alert} · actual ${e.currentDirection} · deseada ${e.desiredDirection} · REAL ${e.actualDirection} · estado ${e.movementState} · progreso ${e.progressStatus} · mov ${fmt(e.movedPx,2)}px · trans ${e.tileTransitions || 0} · giros ${e.directionChanges || 0} · ruta ${route} · ref ${e.routeNextDirection}/${e.routeAlignment} · centro ${fmt(e.distanceToCenter,1)}px · fisBloq ${fmt(e.physicalBlockedMs,0)}ms · rec ${e.recoveryCount || 0} · BFS ${e.recoveryPathCalls || 0} · mem ${e.navigationMemoryTiles || 0} · navTurns ${e.navigationTurnCount || 0} · lock ${fmt(e.turnLockMs,0)}ms · sinProg ${e.framesSinceProgress || 0}f · ${flags} · target ${e.target?.x},${e.target?.y}`;
         });
         const navNode = document.getElementById('dbg-nav-enemies');
         if (navNode) navNode.textContent = enemyLines.length ? enemyLines.join('\n') : 'Sin enemigos en la escena.';
@@ -353,6 +353,11 @@
             setText('dbg-stress-summary', 'Ejecutá AI STRESS para probar movimiento, giros, rutas, bloqueos y evasión.');
             const stressNode = document.getElementById('dbg-stress-cases');
             if (stressNode) stressNode.textContent = 'Sin resultados.';
+        }
+
+        const navigationStressResult = D.testResults.slice().reverse().find(r => r.name === 'navigation-stress');
+        if (navigationStressResult) {
+            setText('dbg-nav-mode', `${navigationStressResult.status} · NAV STRESS`);
         }
 
         const collisionStress = D.testResults.slice().reverse().find(r => r.name === 'collision-stress');

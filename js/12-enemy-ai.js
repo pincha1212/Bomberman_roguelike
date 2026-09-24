@@ -1,6 +1,6 @@
-// Bomberman Roguelike v3.19 — Stable AI update
+// Bomberman Roguelike v3.21 — Navigation Update
 // Navegación local tipo corredor/intersección: la IA decide una dirección
-// v3.19: histéresis de giro + commit breve + recovery local antes de BFS.
+// v3.21: decisiones locales + memoria corta + continuidad de ruta; BFS solo para recovery excepcional.
 // y 13-collision.js se ocupa del movimiento y las paredes.
 
 const enemyAI_V312 = {
@@ -23,7 +23,14 @@ const enemyAI_V312 = {
     turnHysteresis: 3.5,
     turnCommitMs: 150,
     recoveryCooldownMs: 280,
-    recoveryTriggerMs: 220
+    recoveryTriggerMs: 220,
+    // v3.21: memoria corta de navegación y protección contra ciclos locales.
+    navigationMemoryMs: 900,
+    navigationMemoryTiles: 6,
+    recentTilePenalty: 1.8,
+    repeatedTilePenalty: 3.2,
+    branchPreference: 0.45,
+    navigationTurnCommitMs: 240
 };
 
 const ENEMY_DIRS_V312 = [
@@ -121,7 +128,14 @@ function ensureEnemyMotionStateV312(e, index) {
             lastTurnTileKey: -1,
             lastTurnDirection: null,
             recoveryCooldownTimer: 0,
-            recoveryPathCalls: 0
+            recoveryPathCalls: 0,
+            // v3.21: memoria corta de tiles visitados para evitar ciclos locales.
+            recentTileKeys: [],
+            navigationMemoryTimer: 0,
+            lastNavigationTileKey: -1,
+            navigationTurnCount: 0,
+            lastTurnFromDirection: null,
+            lastTurnAtTileKey: -1
         };
     }
 
@@ -133,6 +147,19 @@ function ensureEnemyMotionStateV312(e, index) {
     ai.lastTurnDirection = ai.lastTurnDirection || null;
     ai.recoveryCooldownTimer = Number.isFinite(Number(ai.recoveryCooldownTimer)) ? Number(ai.recoveryCooldownTimer) : 0;
     ai.recoveryPathCalls = Number.isFinite(Number(ai.recoveryPathCalls)) ? Number(ai.recoveryPathCalls) : 0;
+    ai.recentTileKeys = Array.isArray(ai.recentTileKeys) ? ai.recentTileKeys.filter(Number.isFinite).slice(-enemyAI_V312.navigationMemoryTiles) : [];
+    ai.navigationMemoryTimer = Number.isFinite(Number(ai.navigationMemoryTimer)) ? Number(ai.navigationMemoryTimer) : 0;
+    ai.lastNavigationTileKey = Number.isFinite(Number(ai.lastNavigationTileKey)) ? Number(ai.lastNavigationTileKey) : -1;
+    ai.navigationTurnCount = Number.isFinite(Number(ai.navigationTurnCount)) ? Number(ai.navigationTurnCount) : 0;
+    ai.lastTurnFromDirection = ai.lastTurnFromDirection || null;
+    ai.lastTurnAtTileKey = Number.isFinite(Number(ai.lastTurnAtTileKey)) ? Number(ai.lastTurnAtTileKey) : -1;
+    if (!ai.recentTileKeys.length) {
+        const initialTile = enemyTileV312(e);
+        const initialKey = enemyTileKeyV312(initialTile.x, initialTile.y);
+        ai.recentTileKeys.push(initialKey);
+        ai.lastNavigationTileKey = initialKey;
+        ai.navigationMemoryTimer = enemyAI_V312.navigationMemoryMs;
+    }
 
     // Un enemigo nunca arranca con una dirección que choque contra una pared.
     if (!e.ai.direction || !enemyDirectionPassableV312(e, enemyDirectionV312(e.ai.direction), false)) {
@@ -429,6 +456,61 @@ function enemyChooseSurroundTargetV312(e) {
     return best || { x: pt.x, y: pt.y, score: 0 };
 }
 
+
+function enemyRememberNavigationTileV321(e) {
+    if (!e?.ai) return;
+    const tile = enemyTileV312(e);
+    const key = enemyTileKeyV312(tile.x, tile.y);
+    if (key === e.ai.lastNavigationTileKey) return;
+    const recent = Array.isArray(e.ai.recentTileKeys) ? e.ai.recentTileKeys : [];
+    const priorIndex = recent.lastIndexOf(key);
+    if (priorIndex >= 0) recent.splice(priorIndex, 1);
+    recent.push(key);
+    while (recent.length > enemyAI_V312.navigationMemoryTiles) recent.shift();
+    e.ai.recentTileKeys = recent;
+    e.ai.lastNavigationTileKey = key;
+    e.ai.navigationMemoryTimer = enemyAI_V312.navigationMemoryMs;
+}
+
+function enemyRecentNavigationPenaltyV321(e, key, options = {}) {
+    const recent = e?.ai?.recentTileKeys;
+    if (!Array.isArray(recent) || !recent.length) return 0;
+    const index = recent.lastIndexOf(key);
+    if (index < 0) return 0;
+    const age = recent.length - 1 - index;
+    const recencyWeight = Math.max(1, enemyAI_V312.navigationMemoryTiles - age);
+    let penalty = recencyWeight * enemyAI_V312.recentTilePenalty;
+    if (age <= 1) penalty += enemyAI_V312.repeatedTilePenalty;
+    if (options.recovery) penalty *= 0.15;
+    if (options.flee) penalty *= 0.35;
+    return penalty;
+}
+
+function enemyNavigationLoopRiskV321(e, dir) {
+    const next = enemyProjectedTileV312(e, dir, 1);
+    const key = enemyTileKeyV312(next.x, next.y);
+    const recent = e?.ai?.recentTileKeys || [];
+    if (recent.length < 2) return 0;
+    if (recent[recent.length - 2] === key) return 1;
+    if (recent.length >= 3 && recent[recent.length - 3] === key) return 0.7;
+    return 0;
+}
+
+function enemyLocalBranchScoreV321(e, dir) {
+    const next = enemyProjectedTileV312(e, dir, 1);
+    if (!gridIsInside(next.x, next.y)) return -2;
+    // Solo necesitamos conectividad estática aquí. Evitar gridCanOccupy() y su
+    // geometría de hitbox reduce el coste de puntuar hasta cuatro candidatos.
+    let exits = 0;
+    for (const probe of ENEMY_DIRS_V312) {
+        const x = next.x + probe.x;
+        const y = next.y + probe.y;
+        if (!gridIsInside(x, y)) continue;
+        if (!gridTileIsBlocked(x, y, { canFly: !!e.type.canFly })) exits += 1;
+    }
+    return exits;
+}
+
 function enemyDirectionScoreV312(e, dir, target, options = {}) {
     const next = enemyProjectedTileV312(e, dir, 1);
     const next2 = enemyProjectedTileV312(e, dir, 2);
@@ -440,12 +522,24 @@ function enemyDirectionScoreV312(e, dir, target, options = {}) {
     const distance = enemyDistanceToV312(next.x, next.y, target.x, target.y);
     const distance2 = enemyDistanceToV312(next2.x, next2.y, target.x, target.y);
     const openAhead = enemyDirectionDangerDistanceV312(e, dir);
+    const branchScore = options.patrol ? enemyLocalBranchScoreV321(e, dir) : 0;
+    const recentPenalty = enemyRecentNavigationPenaltyV321(e, enemyTileKeyV312(next.x, next.y), {
+        recovery: !!options.recovery,
+        flee: !!options.flee
+    });
+    const loopRisk = enemyNavigationLoopRiskV321(e, dir);
 
     let score = distance * 2.0 + distance2 * 0.55;
     score += danger * 2500 + danger2 * 750;
     score -= same ? 2.8 : 0;
+    if (same && !reverse) score -= 1.4;
     score += reverse ? (options.allowReverse ? 3 : 24) : 0;
     score -= openAhead * 0.7;
+    // v3.21: preferencia leve por salidas que mantienen opciones locales.
+    // Se mantiene deliberadamente pequeña para no vencer al objetivo de chase.
+    score -= branchScore * enemyAI_V312.branchPreference * (options.patrol ? 1.0 : 0.35);
+    score += recentPenalty;
+    score += loopRisk * (options.patrol ? 3.5 : 1.2);
 
     if (options.patrol) {
         // v3.19: ruido determinista. Evita que la misma intersección produzca
@@ -549,7 +643,7 @@ function enemyChooseLocalRecoveryDirectionV319(e) {
 
     let best = null;
     for (const dir of options) {
-        const score = enemyDirectionScoreV312(e, dir, target, { allowReverse: true, urgent: true });
+        const score = enemyDirectionScoreV312(e, dir, target, { allowReverse: true, urgent: true, recovery: true, flee: ai.alert === 'flee' });
         if (!best || score < best.score) best = { dir, score };
     }
     return best?.dir || null;
@@ -599,6 +693,15 @@ function enemyChooseDirectionAtIntersectionV312(e) {
         : possible;
     let options = filtered.length ? filtered : possible;
 
+    // v3.21: durante el mismo nodo no encadenar un segundo giro salvo peligro
+    // o bloqueo. Evita secuencias como RIGHT→UP→LEFT dentro de la misma zona.
+    const currentTileKey = enemyTileKeyV312(tile.x, tile.y);
+    const sameTurnNode = ai.lastTurnAtTileKey === currentTileKey;
+    if (sameTurnNode && currentPassable && !dangerHere && ai.alert !== 'flee' && options.length > 1) {
+        const committed = options.filter(dir => dir.dir === ai.direction);
+        if (committed.length) options = committed;
+    }
+
     // Prioridad estable de persecución: si el jugador está en el mismo
     // corredor y el giro requerido está disponible, no dejamos que el
     // scoring general lo reemplace por una dirección lateral equivalente.
@@ -624,7 +727,9 @@ function enemyChooseDirectionAtIntersectionV312(e) {
     for (const dir of options) {
         const score = enemyDirectionScoreV312(e, dir, target, {
             patrol: !ai.seesPlayer && ai.memoryTimer <= 0,
-            urgent: ai.alert === 'chase' || ai.alert === 'surround'
+            urgent: ai.alert === 'chase' || ai.alert === 'surround',
+            recovery: exceptionalRecovery,
+            flee: ai.alert === 'flee'
         });
         if (score < bestScore) {
             bestScore = score;
@@ -637,7 +742,9 @@ function enemyChooseDirectionAtIntersectionV312(e) {
     if (currentPassable && best.dir !== currentDir.dir && atNode) {
         const currentScore = enemyDirectionScoreV312(e, currentDir, target, {
             patrol: !ai.seesPlayer && ai.memoryTimer <= 0,
-            urgent: ai.alert === 'chase' || ai.alert === 'surround'
+            urgent: ai.alert === 'chase' || ai.alert === 'surround',
+            recovery: false,
+            flee: ai.alert === 'flee'
         });
         const turnLocked = Number(ai.turnLockTimer || 0) > 0;
         const materiallyBetter = bestScore + enemyAI_V312.turnHysteresis < currentScore;
@@ -656,6 +763,13 @@ function updateEnemyIntentV312(e, index, dt) {
     ai.visionTimer -= dt;
     ai.turnLockTimer = Math.max(0, Number(ai.turnLockTimer || 0) - dt);
     ai.recoveryCooldownTimer = Math.max(0, Number(ai.recoveryCooldownTimer || 0) - dt);
+    ai.navigationMemoryTimer = Math.max(0, Number(ai.navigationMemoryTimer || 0) - dt);
+    if (ai.navigationMemoryTimer <= 0 && Array.isArray(ai.recentTileKeys)) {
+        const currentTile = enemyTileV312(e);
+        ai.recentTileKeys = [enemyTileKeyV312(currentTile.x, currentTile.y)];
+        ai.lastNavigationTileKey = ai.recentTileKeys[0];
+        ai.navigationMemoryTimer = enemyAI_V312.navigationMemoryMs;
+    }
     ai.memoryTimer = Math.max(0, ai.memoryTimer - dt);
     ai.surroundTimer = Math.max(0, ai.surroundTimer - dt);
 
@@ -728,9 +842,12 @@ function updateEnemyIntentV312(e, index, dt) {
             ai.physicalBlocked = false;
             ai.recoveryCooldownTimer = Math.max(Number(ai.recoveryCooldownTimer || 0), enemyAI_V312.recoveryCooldownMs);
         } else {
-            ai.turnLockTimer = enemyAI_V312.turnCommitMs;
+            ai.turnLockTimer = enemyAI_V312.navigationTurnCommitMs;
             ai.lastTurnTileKey = enemyTileKeyV312(tile.x, tile.y);
             ai.lastTurnDirection = chosen.dir;
+            ai.lastTurnFromDirection = currentDir.dir;
+            ai.lastTurnAtTileKey = enemyTileKeyV312(tile.x, tile.y);
+            ai.navigationTurnCount = Number(ai.navigationTurnCount || 0) + 1;
         }
     }
     ai.lastDecisionTileX = tile.x;
@@ -746,7 +863,7 @@ function updateEnemyIntentV312(e, index, dt) {
         debugRecordEvent('AI', `Enemy ${index} · ${ai.alert} · ${currentDir.dir || '?'} → ${chosen.dir}`, {
             index, behavior: ai.behavior, alert: ai.alert, desired: chosen.dir, tile,
             physicalBlocked: !!ai.physicalBlocked, physicalBlockedMs: Number(ai.physicalBlockedTimer.toFixed(1)),
-            recoveryCount: Number(ai.recoveryCount || 0), recoveryReason: ai.lastRecoveryReason || '—', recoveryPathNodes: Number(ai.lastRecoveryPathNodes || 0)
+            recoveryCount: Number(ai.recoveryCount || 0), recoveryReason: ai.lastRecoveryReason || '—', recoveryPathNodes: Number(ai.lastRecoveryPathNodes || 0), navigationMemory: ai.recentTileKeys?.length || 0, navigationTurns: Number(ai.navigationTurnCount || 0)
         });
         ai.lastRecoveryReason = '';
         ai.lastRecoveryPathNodes = 0;
@@ -831,6 +948,7 @@ function moveEnemyV312(e, dt) {
         if (dir.x) e.vx = dir.x * speed, e.vy = 0;
         else e.vx = 0, e.vy = dir.y * speed;
         e.lastDirection = dir.dir;
+        enemyRememberNavigationTileV321(e);
         return;
     }
 

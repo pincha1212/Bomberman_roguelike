@@ -1,4 +1,4 @@
-# BOMBERMAN // DESCENT — Roguelike v3.21.0
+# BOMBERMAN // DESCENT — Roguelike v3.22.0
 
 Videojuego web estático desarrollado con HTML, CSS y JavaScript vanilla. Preparado para GitHub Pages, sin backend ni bundler.
 
@@ -50,7 +50,7 @@ El Debug Mode se carga sobre el mismo `index.html` y conserva la estructura de m
 - Debug expone lock de giro y llamadas BFS por enemigo.
 
 
-## v3.21.0 — Robust Collision Update
+## v3.22.0 — Robust Collision Update
 
 - Lane-lock tolerante: evita snap exacto dentro de la tolerancia normal.
 - Correcciones laterales limitadas a `enemyLaneCorrectionStep`.
@@ -59,3 +59,10 @@ El Debug Mode se carga sobre el mismo `index.html` y conserva la estructura de m
 - Nuevo `js/22-collision-stress.js` con seis escenarios automáticos: esquina, corredor, obstáculo, bomba, enemigos superpuestos y recuperación de lane-lock.
 - El stress test comprueba específicamente ausencia de movimiento diagonal, ausencia de snap normal y recuperación del avance después de una corrección fuerte.
 - BFS de IA no se modifica y continúa reservado al recovery excepcional de v3.19.
+
+
+## v3.22.0 — Rooms Update
+
+Se agregaron seis topologías procedurales: `corridors`, `intersection`, `small-chambers`, `large-chamber`, `open-zone`, `dead-end`. Cada room revalida la conectividad jugador→salida después de crear la room secreta y aplica un corredor de reparación únicamente si la ruta deja de existir.
+
+Debug Engine: `ROOM STRESS` valida las seis topologías, cantidad de celdas alcanzables, longitud de ruta y registro de reparación.

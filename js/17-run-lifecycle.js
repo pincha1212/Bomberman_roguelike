@@ -73,7 +73,9 @@ function resetWorldRuntimeState() {
     gameState.floaters = [];
     gameState.hazards = [];
     gameState.environmentHazards = [];
+    gameState.materialResiduesV60 = [];
     gameState.hazardCooldown = 0;
+    if (typeof materialResetV60 === 'function') materialResetV60();
     gameState.boss = null;
     gameState.bossProjectiles = [];
     gameState.roomTime = 0;

@@ -11,7 +11,7 @@
 (function installGameEventBus(global) {
     'use strict';
 
-    const VERSION = '5.9.0';
+    const VERSION = '6.0.0';
 
     const EVENTS = Object.freeze({
         BOMBA_EXPLOTO: 'BOMBA_EXPLOTO'
@@ -176,6 +176,7 @@
 
     global.GameEventBus = GameEventBus;
     global.GAME_EVENTS_V59 = EVENTS;
+    global.GAME_EVENTS_V60 = EVENTS;
     global.gameEventBus = bus;
 
     global.BOMBER_ENGINE = global.BOMBER_ENGINE || {};

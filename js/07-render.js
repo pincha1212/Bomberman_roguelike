@@ -145,6 +145,9 @@ function draw() {
             // V3.13: acentos espaciales; las salas se leen en el propio piso, sin minimapa.
             if (typeof drawRoomDesignLayerV313 === 'function') drawRoomDesignLayerV313();
 
+            // v6.0: residuos materiales persistentes; quedan por debajo de items, bombas y personajes.
+            if (typeof drawMaterialResiduesV60 === 'function') drawMaterialResiduesV60(ctx);
+
             // V3.3: las trampas aparecen visualmente solo después de activarse.
             drawHazards();
 

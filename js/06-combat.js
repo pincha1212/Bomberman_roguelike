@@ -58,7 +58,7 @@
                     gameState.explosions.push({
                         x: cell.x,
                         y: cell.y,
-                        timer: 450,
+                        timer: 100,
                         blastId,
                         owner: bomb.owner || 'player'
                     });
@@ -86,6 +86,7 @@
 
             updateRoomThreat(dt);
             updateHazards(dt);
+            if (typeof materialUpdateV60 === 'function') materialUpdateV60(dt);
             updateBoss(dt);
 
             // Shake countdown

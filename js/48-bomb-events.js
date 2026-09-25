@@ -1,4 +1,4 @@
-// Bomberman Roguelike v5.9 — Bomb explosion event listeners
+// Bomberman Roguelike v6.0 — Bomb explosion event listeners
 //
 // These listeners intentionally know nothing about explodeBomb().
 // The bomb system only publishes BOMBA_EXPLOTO.
@@ -7,7 +7,7 @@
     'use strict';
 
     const bus = global.gameEventBus;
-    const EVENT = global.GAME_EVENTS_V59?.BOMBA_EXPLOTO;
+    const EVENT = global.GAME_EVENTS_V60?.BOMBA_EXPLOTO || global.GAME_EVENTS_V59?.BOMBA_EXPLOTO;
 
     if (!bus || !EVENT) {
         throw new Error('v5.9: Event Bus no disponible para BOMBA_EXPLOTO');
@@ -125,11 +125,11 @@
     function audit() {
         const base = bus.audit();
         const actual = bus.getListenerKeys(EVENT).slice().sort();
-        const expected = Object.values(LISTENER_KEYS).slice().sort();
+        const expected = Object.values(LISTENER_KEYS).concat('bomb-explosion:materials').slice().sort();
         const errors = base.errors.slice();
 
         if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
-            errors.push(`BOMBA_EXPLOTO debe tener exactamente ${expected.length} listeners`);
+            errors.push(`BOMBA_EXPLOTO debe tener exactamente ${expected.length} listeners en v6.0`);
         }
 
         return {

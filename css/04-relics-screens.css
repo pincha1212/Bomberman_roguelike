@@ -40,6 +40,8 @@
 .death-kicker { margin-top: 2px; color:#94a3b8; font-size:7px; letter-spacing:.18em; }
 .death-icon { margin-top:10px; font-size:28px; filter: drop-shadow(0 0 16px rgba(239,68,68,.28)); }
 .death-title { margin-top:8px; font-size:18px; color:#fecaca; text-shadow:0 0 18px rgba(239,68,68,.25); }
+.death-screen.run-complete .death-title { color:#bbf7d0; text-shadow:0 0 18px rgba(34,197,94,.22); }
+.death-screen.run-complete .death-kicker { color:#86efac; }
 .death-record { margin-top:9px; min-height:24px; display:flex; align-items:center; justify-content:center; padding:5px 8px; border:1px solid #334155; background:rgba(15,23,42,.68); color:#cbd5e1; font:6px 'Press Start 2P'; letter-spacing:.08em; }
 .death-record.record-new { border-color:#facc15; color:#fde68a; box-shadow:0 0 16px rgba(250,204,21,.12); }
 .death-cause { margin-top:7px; color:#64748b; font:6px 'Press Start 2P'; letter-spacing:.06em; }

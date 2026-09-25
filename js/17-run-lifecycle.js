@@ -109,6 +109,9 @@ function resetWorldRuntimeState() {
     gameState.runHistoryV51 = null;
     gameState.rafId = 0;
 
+    // v5.8 ECS: el registro es derivado del runtime y se reconstruye limpio.
+    if (typeof ecsReset === 'function') ecsReset();
+
     if (typeof resetRelicModifiers === 'function') resetRelicModifiers();
     if (typeof resetBombHandlingState === 'function') resetBombHandlingState();
     resetCombatFeedbackForRun();

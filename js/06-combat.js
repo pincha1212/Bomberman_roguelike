@@ -240,6 +240,10 @@
                 if (f.life <= 0) gameState.floaters.splice(i, 1);
             }
 
+            // v5.8 ECS: sincroniza la capa de entidades después del gameplay del frame.
+            // No modifica la fuente de verdad legacy; solo normaliza Position/Health/Explosive.
+            if (typeof ecsUpdate === 'function') ecsUpdate(dt);
+
             updateUI();
 
             // Exit Check

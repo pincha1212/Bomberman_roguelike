@@ -1,0 +1,4 @@
+/* v5.5 — Run Save / Resume UI */
+.menu-resume-button{width:100%;margin-bottom:8px;border-color:rgba(125,211,252,.34);color:#bae6fd;background:rgba(14,116,144,.20);box-shadow:0 0 18px rgba(56,189,248,.08)}
+.menu-resume-button:hover{background:rgba(14,116,144,.32)}
+.menu-resume-button.hidden{display:none}

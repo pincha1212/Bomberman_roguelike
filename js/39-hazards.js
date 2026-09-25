@@ -118,10 +118,23 @@
     }
 
     function blizzardCreate() {
+        const directions = [
+            { axis: 'x', dir: 1 }, { axis: 'y', dir: 1 },
+            { axis: 'x', dir: -1 }, { axis: 'y', dir: -1 }
+        ];
+        const wind = directions[Math.floor(Math.random() * directions.length)];
         return {
-            id: nextId('blizzard'), kind: 'blizzard', state: 'telegraph',
-            telegraphMs: 1050, lifeMs: 3150, activeAfterMs: 1050,
-            gustTimer: 500, gustIndex: Math.floor(Math.random() * 4),
+            id: nextId('blizzard'),
+            kind: 'blizzard',
+            state: 'telegraph',
+            telegraphMs: 1050,
+            activeMs: 8000,
+            lifeMs: 9050,
+            gustTimer: 0,
+            windAxis: wind.axis,
+            windDir: wind.dir,
+            windStrength: 0.72,
+            coldTimer: 0,
             pulse: 0
         };
     }
@@ -130,21 +143,47 @@
         if (h.damageCooldown > 0) h.damageCooldown = Math.max(0, h.damageCooldown - dt);
         h.lifeMs -= dt;
         h.telegraphMs = Math.max(0, h.telegraphMs - dt);
-        h.gustTimer -= dt;
         if (h.telegraphMs > 0) return;
+
         h.state = 'active';
+        h.activeMs = Math.max(0, h.activeMs - dt);
         h.pulse += dt;
-        if (h.gustTimer <= 0 && h.lifeMs > 0) {
-            h.gustTimer += 520;
-            h.gustIndex = (h.gustIndex + 1) % 4;
-            const gusts = [
-                { axis: 'x', dir: 1 }, { axis: 'y', dir: 1 },
-                { axis: 'x', dir: -1 }, { axis: 'y', dir: -1 }
-            ];
-            const gust = gusts[h.gustIndex];
-            pushPlayer(gust.axis, gust.dir * 5.5);
-            if (typeof global.recordRunEventV51 === 'function') global.recordRunEventV51('hazard_interaction', { kind: 'blizzard', interaction: 'gust', axis: gust.axis, dir: gust.dir });
+        h.coldTimer -= dt;
+
+        const state = getState();
+        if (state) {
+            state.winterWindV64 = {
+                active: h.activeMs > 0,
+                axis: h.windAxis,
+                dir: h.windDir,
+                strength: h.windStrength,
+                remainingMs: h.activeMs,
+                source: h.id
+            };
         }
+
+        // Un pulso de frío refresca la exposición de todas las entidades.
+        if (h.coldTimer <= 0 && h.activeMs > 0) {
+            h.coldTimer += 900;
+            if (typeof global.applyBombEffectToAllEntitiesV64 === 'function') {
+                global.applyBombEffectToAllEntitiesV64('cold', {
+                    durationMs: Infinity,
+                    intensity: 1,
+                    exposureBoostMs: 0,
+                    source: 'blizzard'
+                });
+            }
+            if (typeof global.recordRunEventV51 === 'function') {
+                global.recordRunEventV51('hazard_interaction', {
+                    kind: 'blizzard',
+                    interaction: 'cold_pulse',
+                    axis: h.windAxis,
+                    dir: h.windDir
+                });
+            }
+        }
+
+        if (h.activeMs <= 0 && state) state.winterWindV64 = null;
     }
 
     function tideCreate() {
@@ -330,6 +369,7 @@
         const state = getState();
         if (!state) return false;
         state.environmentHazards = [];
+        state.winterWindV64 = null;
         HAZARD_RUNTIME.roomToken += 1;
         HAZARD_RUNTIME.cooldowns = Object.create(null);
         for (const id of themeHazardIds()) {
@@ -364,6 +404,7 @@
         const active = themeHazardIds();
         if (!active.length) {
             if (state.environmentHazards.length) state.environmentHazards = [];
+            state.winterWindV64 = null;
             return;
         }
         const activeSet = new Set(active);
@@ -377,6 +418,9 @@
             HAZARDS[h.kind].update(h, dt);
         }
         removeExpiredHazards();
+        if (!state.environmentHazards.some(h => h?.kind === 'blizzard' && h.lifeMs > 0 && h.state === 'active')) {
+            state.winterWindV64 = null;
+        }
     }
 
     function rgba(hex, alpha) {
@@ -465,6 +509,11 @@
         global.update = function updateV48(dt) {
             const result = wrapRuntime.originalUpdate(dt);
             updateHazardsV48(dt);
+            // v6.4: la ventisca debe actualizar primero su estado de viento y
+            // recién después empujar jugador, enemigos, eco y bombas.
+            if (typeof global.winterSystemUpdateV64 === 'function') {
+                global.winterSystemUpdateV64(dt);
+            }
             return result;
         };
         global.draw = function drawV48() {

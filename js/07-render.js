@@ -147,6 +147,7 @@ function draw() {
 
             // v6.0: residuos materiales persistentes; quedan por debajo de items, bombas y personajes.
             if (typeof drawMaterialResiduesV60 === 'function') drawMaterialResiduesV60(ctx);
+            if (typeof drawBombEffectsV64 === 'function') drawBombEffectsV64(ctx);
 
             // V3.3: las trampas aparecen visualmente solo después de activarse.
             drawHazards();
@@ -192,6 +193,7 @@ function draw() {
             // Draw Player Bomberman
             if (!player.isInvincible || Math.floor(gameState.animFrame / 4) % 2 === 0) {
                 drawBombermanSprite(player.x, player.y);
+                if (typeof drawWinterBodyEffectsV64 === 'function') drawWinterBodyEffectsV64(player);
             }
 
             // Draw Particles: el presupuesto visual es menor que el de simulación.
@@ -448,6 +450,51 @@ function draw() {
             ctx.restore();
         }
 
+        function drawWinterBodyEffectsV64(actor) {
+            if (!actor || typeof getBombEffectVisualStateV64 !== 'function') return;
+            if (String(gameState.biomeV49?.id || '') !== 'winter') return;
+            const visual = getBombEffectVisualStateV64(actor);
+            const severity = Math.max(0, Math.min(1, Number(visual.coldSeverity) || 0));
+            if (severity < 0.20 && !visual.heatActive) return;
+
+            const w = Number(actor.width) || TILE_SIZE * 0.68;
+            const h = Number(actor.height) || TILE_SIZE * 0.68;
+            ctx.save();
+            if (visual.heatActive) {
+                ctx.globalAlpha = 0.14;
+                ctx.strokeStyle = '#ffb347';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(actor.x + w / 2, actor.y + h / 2, Math.max(w, h) * 0.50, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            if (severity >= 0.20) {
+                const alpha = 0.10 + severity * 0.28;
+                ctx.globalAlpha = alpha;
+                ctx.strokeStyle = '#eff6ff';
+                ctx.fillStyle = '#dbeafe';
+                ctx.lineWidth = 1.5;
+                const x = actor.x, y = actor.y;
+                const frost = Math.max(2, Math.floor(2 + severity * 4));
+                for (let i = 0; i < frost; i++) {
+                    const px = x + 4 + (i * 13) % Math.max(8, w - 8);
+                    const py = y + 4 + ((i * 17) % Math.max(8, h - 8));
+                    ctx.beginPath();
+                    ctx.moveTo(px - 3, py);
+                    ctx.lineTo(px + 3, py);
+                    ctx.moveTo(px, py - 3);
+                    ctx.lineTo(px, py + 3);
+                    ctx.stroke();
+                }
+                if (severity >= 0.40) {
+                    ctx.globalAlpha = Math.min(0.28, alpha + 0.05);
+                    ctx.strokeRect(x + 3, y + 3, w - 6, h - 6);
+                }
+            }
+            ctx.restore();
+        }
+
         function drawEnemySprite(e) {
             ctx.save();
             if (e.elite) {
@@ -530,6 +577,7 @@ function draw() {
             ctx.save();
             ctx.translate(cx, cy);
             if (moving) ctx.rotate((b.motionRotation || 0) * 0.35);
+            else if (Number.isFinite(b.windTilt)) ctx.rotate(Number(b.windTilt));
             ctx.scale(scale, scale);
 
             const bossBomb = (b.owner || 'player') === 'boss';

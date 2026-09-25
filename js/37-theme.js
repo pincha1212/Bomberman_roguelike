@@ -218,7 +218,8 @@
         ...WINTER_THEME_BASE,
         mecanicas: Object.freeze(['slippery']),
         mechanics: Object.freeze(['slippery']),
-        hazards: Object.freeze(['blizzard'])
+        hazards: Object.freeze(['blizzard']),
+        bombEffects: Object.freeze({ heat: Object.freeze({ durationMs: 3000 }) })
     });
 
     const INFERNO_THEME = createVisualThemeV461(

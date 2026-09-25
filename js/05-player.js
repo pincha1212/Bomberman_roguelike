@@ -132,7 +132,11 @@
 
             if (input.axis) {
                 player.inputBuffer = input;
-                player.inputBufferTimer = MOTION.inputBufferMs + (Number(gameState.relicMods?.inputBufferBonus) || 0);
+                const effectMods = typeof getBombEffectMovementModifiersV64 === 'function'
+                    ? getBombEffectMovementModifiersV64(player)
+                    : { inputBufferMultiplier: 1 };
+                player.inputBufferTimer = (MOTION.inputBufferMs + (Number(gameState.relicMods?.inputBufferBonus) || 0))
+                    * Number(effectMods.inputBufferMultiplier || 1);
             } else if (player.inputBufferTimer > 0) {
                 player.inputBufferTimer -= dt;
                 if (player.inputBufferTimer <= 0) player.inputBuffer = null;
@@ -143,10 +147,13 @@
             const movementMods = typeof getMovementModifiersV47 === 'function'
                 ? getMovementModifiersV47()
                 : { acceleration: 1, braking: 1, turnCarrySpeed: 1, speedMultiplier: 1 };
-            const acceleration = MOTION.acceleration * Number(movementMods.acceleration || 1);
-            const braking = MOTION.braking * Number(movementMods.braking || 1);
-            const turnCarrySpeed = MOTION.turnCarrySpeed * Number(movementMods.turnCarrySpeed || 1);
-            const effectiveSpeedBase = player.speed * Number(movementMods.speedMultiplier || 1);
+            const effectMods = typeof getBombEffectMovementModifiersV64 === 'function'
+                ? getBombEffectMovementModifiersV64(player)
+                : { accelerationMultiplier: 1, brakingMultiplier: 1, turnCarryMultiplier: 1, speedMultiplier: 1 };
+            const acceleration = MOTION.acceleration * Number(movementMods.acceleration || 1) * Number(effectMods.accelerationMultiplier || 1);
+            const braking = MOTION.braking * Number(movementMods.braking || 1) * Number(effectMods.brakingMultiplier || 1);
+            const turnCarrySpeed = MOTION.turnCarrySpeed * Number(movementMods.turnCarrySpeed || 1) * Number(effectMods.turnCarryMultiplier || 1);
+            const effectiveSpeedBase = player.speed * Number(movementMods.speedMultiplier || 1) * Number(effectMods.speedMultiplier || 1);
             const effectiveSpeed = typeof getHazardSpeedFactor === 'function'
                 ? effectiveSpeedBase * getHazardSpeedFactor()
                 : effectiveSpeedBase;

@@ -74,6 +74,7 @@ function resetWorldRuntimeState() {
     gameState.hazards = [];
     gameState.environmentHazards = [];
     gameState.materialResiduesV60 = [];
+    gameState.deathEchoV61 = null;
     gameState.hazardCooldown = 0;
     if (typeof materialResetV60 === 'function') materialResetV60();
     gameState.boss = null;
@@ -188,6 +189,12 @@ function getDeathCauseLabel(source) {
 
 function finishRun(source = 'unknown') {
     if (RUN_LIFECYCLE.lastSummary) return RUN_LIFECYCLE.lastSummary;
+
+    // v6.1: capturamos el build ANTES de cerrar la run. El eco se guarda
+    // separado del save de la run para sobrevivir al siguiente intento.
+    if (String(source || '') !== 'completed' && typeof recordDeathEchoV61 === 'function') {
+        recordDeathEchoV61(source);
+    }
 
     gameState.isPlaying = false;
     gameState.paused = false;

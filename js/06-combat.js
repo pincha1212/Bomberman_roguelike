@@ -133,6 +133,9 @@
                     takeDamage(damageSource, (exp.x + .5) * TILE_SIZE, (exp.y + .5) * TILE_SIZE);
                 }
 
+                // v6.1: los ecos reciben daño de las mismas explosiones del campo.
+                if (typeof damageDeathEchoV61 === 'function') damageDeathEchoV61(exp);
+
                 if (gameState.boss && !gameState.boss.defeated && exp.owner !== 'boss') {
                     const b = gameState.boss;
                     const bossRect = { left:b.x-b.width/2, right:b.x+b.width/2, top:b.y-b.height/2, bottom:b.y+b.height/2 };
@@ -161,6 +164,9 @@
 
                 if (exp.timer <= 0) gameState.explosions.splice(i, 1);
             }
+
+            // v6.1: el eco tiene IA propia y se actualiza fuera de la IA legacy.
+            if (typeof updateDeathEchoV61 === 'function') updateDeathEchoV61(dt);
 
             // V3.11: IA de enemigos aislada y con pathfinding dosificado.
             updateEnemyAI(dt);

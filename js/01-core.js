@@ -485,6 +485,8 @@ const UI = {};
             hazards: [],
             // v6.0: residuos materiales persistentes del campo de batalla.
             materialResiduesV60: [],
+            // v6.1: referencia runtime al eco activo; la persistencia vive en localStorage.
+            deathEchoV61: null,
             hazardCooldown: 0,
             boss: null,
             bossProjectiles: [],

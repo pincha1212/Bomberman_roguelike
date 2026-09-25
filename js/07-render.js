@@ -182,6 +182,10 @@ function draw() {
             }
             if (typeof drawEnemyAISignals === 'function') drawEnemyAISignals();
 
+            // v6.1: eco persistente del intento anterior. Se dibuja antes del boss
+            // y del jugador para conservar la jerarquía visual actual.
+            if (typeof drawDeathEchoV61 === 'function') drawDeathEchoV61();
+
             // Draw Boss
             drawBoss();
 
@@ -217,6 +221,55 @@ function draw() {
             drawAmbientDust();
             drawLighting();
             renderCombatFeedback();
+        }
+
+        function drawDeathEchoV61() {
+            const ghost = window.BOMBER_ENGINE?.getDeathEcho ? window.BOMBER_ENGINE.getDeathEcho(gameState.level) : gameState.deathEchoV61;
+            if (!ghost || ghost.defeated) return;
+            const visible = typeof isWorldRectVisibleV329 === 'function'
+                ? isWorldRectVisibleV329(ghost.x, ghost.y, ghost.width, ghost.height, TILE_SIZE)
+                : true;
+            if (!visible) return;
+
+            ctx.save();
+            const pulse = 0.56 + Math.sin(gameState.animFrame * 0.08) * 0.08;
+            ctx.globalAlpha = ghost.hitFlash > 0 ? 0.92 : pulse;
+
+            ctx.fillStyle = 'rgba(148,163,184,.28)';
+            ctx.beginPath();
+            ctx.ellipse(ghost.x + ghost.width / 2, ghost.y + ghost.height, ghost.width / 2.25, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Silueta fantasma: misma lectura corporal que el jugador, pero
+            // deliberadamente abstracta para no confundirlo con el personaje vivo.
+            ctx.fillStyle = '#a78bfa';
+            ctx.beginPath();
+            ctx.arc(ghost.x + ghost.width / 2, ghost.y + 10, 13, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillRect(ghost.x + 6, ghost.y + 13, ghost.width - 12, ghost.height - 18);
+
+            ctx.fillStyle = '#1e1b4b';
+            const eyeY = ghost.y + 9;
+            ctx.fillRect(ghost.x + ghost.width / 2 - 6, eyeY, 3, 5);
+            ctx.fillRect(ghost.x + ghost.width / 2 + 3, eyeY, 3, 5);
+
+            ctx.strokeStyle = '#ddd6fe';
+            ctx.globalAlpha *= 0.7;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(ghost.x + ghost.width / 2, ghost.y + ghost.height / 2, ghost.width * 0.53, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Barra de vida mínima: comunica que puede ser derrotado.
+            const barWidth = ghost.width * 0.9;
+            const healthRatio = ghost.maxHealth > 0 ? ghost.health / ghost.maxHealth : 0;
+            ctx.globalAlpha = 0.82;
+            ctx.fillStyle = 'rgba(15,23,42,.75)';
+            ctx.fillRect(ghost.x + (ghost.width - barWidth) / 2, ghost.y - 8, barWidth, 3);
+            ctx.fillStyle = '#c4b5fd';
+            ctx.fillRect(ghost.x + (ghost.width - barWidth) / 2, ghost.y - 8, barWidth * Math.max(0, Math.min(1, healthRatio)), 3);
+
+            ctx.restore();
         }
 
         function drawSteelWall(x, y, targetCtx = ctx) {

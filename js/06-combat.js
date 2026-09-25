@@ -115,6 +115,7 @@
 
             // V3.4: movimiento asistido cardinal. Nunca se combinan X e Y.
             updatePlayerMovement(dt);
+            if (typeof playerFSMUpdate === 'function') playerFSMUpdate(dt);
 
             // V3.7: la cámara acompaña al personaje al recorrer sectores del mapa.
             // V3.12.4: la cámara no puede detener el game loop si el módulo no está disponible.
@@ -182,12 +183,6 @@
 
             // V3.11: IA de enemigos aislada y con pathfinding dosificado.
             updateEnemyAI(dt);
-
-            // v5.3: revalidar la salida también cuando el último enemigo desaparece
-            // por una ruta distinta al evento de explosión. Evita salas sin transición.
-            if (typeof tryUnlockExitV44 === 'function' && gameState.dungeonV44?.fixedEnemyCount) {
-                tryUnlockExitV44();
-            }
 
             // Contacto jugador-enemigo: separado del movimiento para que la IA
             // no pueda romper accidentalmente el sistema de daño.
@@ -301,6 +296,7 @@
             triggerPlayerDamageFeedback(source, sx, sy, lethal, false);
             triggerScreenShake(lethal ? 14 : 10, lethal ? 520 : 400);
             if (lethal) sfx('death');
+            if (lethal && typeof playerFSMDeath === 'function') playerFSMDeath(source);
             updateUI(true);
             if (lethal) gameOver(source);
             return true;

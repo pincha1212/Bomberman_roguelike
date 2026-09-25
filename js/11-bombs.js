@@ -264,6 +264,7 @@ function placeBomb(reason='manual'){
 
     gameState.bombs.push(bomb);
     player.bombsPlaced++;
+    if (typeof playerFSMStartBomb === 'function') playerFSMStartBomb();
     player.bombCooldown = BOMB_HANDLING.placementCooldown;
     if (typeof triggerBombPlacedFeedback === 'function') triggerBombPlacedFeedback(bomb);
     sfx('bomb');

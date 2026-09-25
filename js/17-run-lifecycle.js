@@ -53,6 +53,7 @@ function resetPlayerRuntimeState() {
     player.hazardSlowTimer = 0;
     player.hazardSlowFactor = 1;
     player.hazardSlowType = '';
+    if (typeof playerFSMReset === 'function') playerFSMReset('runtime-reset');
 }
 
 function resetWorldRuntimeState() {

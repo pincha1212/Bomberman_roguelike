@@ -106,6 +106,9 @@
         }
 
         function startDepthForTestV53(targetDepth) {
+            const engine = window.BOMBER_ENGINE || {};
+            const state = engine.getState?.() || gameState;
+            const currentPlayer = engine.getPlayer?.() || player;
             const maxDepth = typeof getBiomeProgressionSummaryV49 === 'function'
                 ? Number(getBiomeProgressionSummaryV49().totalDepths) || 44
                 : 44;
@@ -115,14 +118,14 @@
             document.getElementById('game-over-screen')?.classList.add('hidden');
             document.getElementById('level-complete-screen')?.classList.add('hidden');
             document.getElementById('pause-screen')?.classList.add('hidden');
-            gameState.level = depth;
-            gameState.isPlaying = false;
-            gameState.paused = false;
-            gameState.rafId = 0;
-            player.isInvincible = false;
-            player.invincibleTimer = 0;
-            player.lastDamageFrame = -1;
-            gameState.lastMoveInputAt = 0;
+            state.level = depth;
+            state.isPlaying = false;
+            state.paused = false;
+            state.rafId = 0;
+            currentPlayer.isInvincible = false;
+            currentPlayer.invincibleTimer = 0;
+            currentPlayer.lastDamageFrame = -1;
+            state.lastMoveInputAt = 0;
             if (typeof resetBombHandlingState === 'function') resetBombHandlingState();
             if (typeof combatFeedback !== 'undefined') {
                 combatFeedback.hitStop = 0;
@@ -133,20 +136,21 @@
                 combatFeedback.playerRecoilY = 0;
             }
             initLevel();
-            gameState.isPlaying = true;
-            gameState.paused = false;
-            gameState.lastTime = performance.now();
+            if (typeof playerFSMReset === 'function') playerFSMReset('test-depth');
+            state.isPlaying = true;
+            state.paused = false;
+            state.lastTime = performance.now();
             updateRoguePresentation();
             updateUI(true);
-            if (gameState.rafId) cancelAnimationFrame(gameState.rafId);
-            gameState.rafId = requestAnimationFrame(gameLoop);
+            if (state.rafId) cancelAnimationFrame(state.rafId);
+            state.rafId = requestAnimationFrame(gameLoop);
             return depth;
         }
 
         window.startDepthForTestV53 = startDepthForTestV53;
         window.BOMBER_ENGINE = window.BOMBER_ENGINE || {};
         window.BOMBER_ENGINE.startDepthForTest = startDepthForTestV53;
-        window.BOMBER_ENGINE.nextDepth = () => { startNextDepth(); return gameState.level; };
+        window.BOMBER_ENGINE.nextDepth = () => { startNextDepth(); return (window.BOMBER_ENGINE.getState?.() || gameState).level; };
         window.BOMBER_ENGINE.getMaxRunDepth = getMaxRunDepthV56;
         window.BOMBER_ENGINE.completeRun = completeRunV56;
 
@@ -226,6 +230,7 @@
             combatFeedback.playerRecoilX = 0;
             combatFeedback.playerRecoilY = 0;
             initLevel();
+            if (typeof playerFSMReset === 'function') playerFSMReset('depth-start');
             gameState.isPlaying = true;
             gameState.paused = false;
             gameState.lastTime = performance.now();

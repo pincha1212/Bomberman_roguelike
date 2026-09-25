@@ -280,9 +280,22 @@ function draw() {
 
         function drawBombermanSprite(x, y) {
             ctx.save();
-            let bounce = Math.sin(player.walkCycle * 4) * (player.isMoving ? 3 : 1);
+
+            const fsmState = typeof playerFSMGetState === 'function'
+                ? playerFSMGetState()
+                : (player.isMoving ? 'CAMINANDO' : 'QUIETO');
+            const walkingAnimation = fsmState === 'CAMINANDO';
+            const plantingAnimation = fsmState === 'PONIENDO_BOMBA';
+            const deadAnimation = fsmState === 'MUERTO';
+
+            // v5.7: el render solo consume la FSM; no cambia gameplay ni estado.
+            let bounce = plantingAnimation
+                ? Math.sin(gameState.animFrame * 0.24) * 1.5
+                : Math.sin(player.walkCycle * 4) * (walkingAnimation ? 3 : 1);
             const recoil = getPlayerRenderRecoil();
             let px = x + recoil.x, py = y + bounce + recoil.y;
+
+            if (deadAnimation) ctx.globalAlpha = 0.65;
 
             // Sombra
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('bombShadow') : 'rgba(0,0,0,0.5)';
@@ -291,6 +304,16 @@ function draw() {
             ctx.fill();
 
             // Burbuja de Escudo
+            if (plantingAnimation) {
+                ctx.strokeStyle = typeof themeColorV46 === 'function' ? themeColorV46('bombPlayerRing') : 'rgba(34, 211, 238, 0.78)';
+                ctx.lineWidth = 2;
+                ctx.globalAlpha = deadAnimation ? 0.35 : 0.8;
+                ctx.beginPath();
+                ctx.arc(px + player.width / 2, py + player.height / 2, player.width * (0.58 + Math.sin(gameState.animFrame * 0.35) * 0.05), 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.globalAlpha = deadAnimation ? 0.65 : 1;
+            }
+
             if (player.hasShield) {
                 ctx.strokeStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerShield') : 'rgba(56, 189, 248, 0.8)';
                 ctx.lineWidth = 4;
@@ -360,8 +383,8 @@ function draw() {
 
             // Pies (Zapatos Rojos) animando
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerBoot') : '#dc2626';
-            let leftFootY = py + player.height - 4 + (player.isMoving && Math.floor(player.walkCycle*4)%2===0 ? -4 : 0);
-            let rightFootY = py + player.height - 4 + (player.isMoving && Math.floor(player.walkCycle*4)%2===1 ? -4 : 0);
+            let leftFootY = py + player.height - 4 + (walkingAnimation && Math.floor(player.walkCycle*4)%2===0 ? -4 : 0);
+            let rightFootY = py + player.height - 4 + (walkingAnimation && Math.floor(player.walkCycle*4)%2===1 ? -4 : 0);
             
             if (player.dir === 'right') {
                 ctx.beginPath(); ctx.ellipse(px + player.width/2 - 2, leftFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();

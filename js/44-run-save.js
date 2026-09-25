@@ -242,6 +242,7 @@
             state.dungeonV44 = dungeon;
 
             Object.assign(player, clone(save.player) || {});
+            if (typeof playerFSMReset === 'function') playerFSMReset('save-restore');
             state.keys = {};
             state.touchControls = { x:0, y:0 };
             if (typeof resetBombHandlingState === 'function') resetBombHandlingState();

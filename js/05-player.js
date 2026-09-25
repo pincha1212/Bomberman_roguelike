@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.7.1 — Cardinal movement + Mechanics Registry
+// Bomberman Roguelike v3.12 — Cardinal assisted player movement and collision helpers
         // V3.2.4 — MOVEMENT UPDATE
         // Movimiento continuo cardinal asistido. La cuadrícula SOLO define las paredes.
         // El personaje usa una hurtbox de movimiento más pequeña que el sprite,
@@ -107,12 +107,6 @@
 
         function updatePlayerMovement(dt) {
             const motionDt = getCombatMotionDt(dt);
-            const mechanicsMotion = typeof getMovementModifiersV47 === 'function'
-                ? getMovementModifiersV47()
-                : { acceleration: 1, braking: 1, turnCarrySpeed: 1 };
-            const acceleration = MOTION.acceleration * mechanicsMotion.acceleration;
-            const braking = MOTION.braking * mechanicsMotion.braking;
-            const turnCarrySpeed = MOTION.turnCarrySpeed * mechanicsMotion.turnCarrySpeed;
             const frameScale = Math.min(motionDt / 16.6667, 2);
             player._frameScale = frameScale;
             const input = getCardinalInput();
@@ -147,8 +141,8 @@
                 player._turnEntrySpeed = 0;
                 player._turnEntryAxis = null;
                 player._turnEntryDir = 0;
-                if (currentAxis === 'x') player.vx = approach(player.vx, 0, braking * frameScale);
-                if (currentAxis === 'y') player.vy = approach(player.vy, 0, braking * frameScale);
+                if (currentAxis === 'x') player.vx = approach(player.vx, 0, MOTION.braking * frameScale);
+                if (currentAxis === 'y') player.vy = approach(player.vy, 0, MOTION.braking * frameScale);
                 if (Math.abs(player.vx) <= MOTION.stopEpsilon) player.vx = 0;
                 if (Math.abs(player.vy) <= MOTION.stopEpsilon) player.vy = 0;
             } else if (!currentAxis) {
@@ -161,7 +155,7 @@
                 if (turnReady) {
                     // Primero intentamos el giro limpio en el centro del carril.
                     if (trySnapToLane(desired.axis)) {
-                        turnEntrySpeed = Math.abs(currentVelocity) * turnCarrySpeed;
+                        turnEntrySpeed = Math.abs(currentVelocity) * MOTION.turnCarrySpeed;
                         player._turnEntrySpeed = turnEntrySpeed;
                         player._turnEntryAxis = desired.axis;
                         player._turnEntryDir = desired.dir;
@@ -242,7 +236,7 @@
                     player.vx = approach(
                         player.vx,
                         target,
-                        (desired ? acceleration : braking) * frameScale
+                        (desired ? MOTION.acceleration : MOTION.braking) * frameScale
                     );
                 }
                 if (Math.abs(player.vx) < MOTION.stopEpsilon) player.vx = 0;
@@ -259,7 +253,7 @@
                     player.vy = approach(
                         player.vy,
                         target,
-                        (desired ? acceleration : braking) * frameScale
+                        (desired ? MOTION.acceleration : MOTION.braking) * frameScale
                     );
                 }
                 if (Math.abs(player.vy) < MOTION.stopEpsilon) player.vy = 0;
@@ -274,24 +268,16 @@
                 if (player.vx) player.vx = 0;
                 if (player.vy) player.vy = 0;
             }
-
-            // Mechanics Registry: un vendaval toma el control SOLO cuando el
-            // jugador no está dando input ni conserva movimiento. Mantiene la
-            // regla cardinal y evita introducir diagonales artificiales.
-            const wind = typeof getWindPushV471 === 'function' ? getWindPushV471() : null;
-            const canReceiveWind = !!wind?.active && !input.axis && !player.inputBuffer && !player.vx && !player.vy;
-            if (canReceiveWind) {
-                const windMoved = moveAxisWithCollision(wind.axis, wind.dir * wind.strength * frameScale);
-                if (windMoved) {
-                    moved = true;
-                    player.dir = wind.axis === 'x'
-                        ? (wind.dir < 0 ? 'left' : 'right')
-                        : (wind.dir < 0 ? 'up' : 'down');
-                }
-            }
-
             player.isMoving = moved;
             if (moved) player.walkCycle += motionDt * 0.015;
+
+            // v5.7: sincroniza la FSM con el resultado físico real.
+            if (typeof playerFSMSyncMovement === 'function') {
+                playerFSMSyncMovement({
+                    moving: moved,
+                    inputActive: !!desired
+                });
+            }
         }
 
         function approach(value, target, amount) {

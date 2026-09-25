@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOMBERMAN ROGUELIKE — v5.9</title>
+    <title>BOMBERMAN ROGUELIKE — v6.5</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/11-test-controls.css">
     <link rel="stylesheet" href="css/12-run-save.css">
+    <link rel="stylesheet" href="css/06-mobile-performance.css">
 </head>
 <body class="game-body v4-theme">
 
@@ -46,10 +47,10 @@
                         <div class="flex gap-1.5">
                             <div class="stat-badge text-red-400">❤️ <span id="ui-health">3</span></div>
                             <div class="stat-badge text-cyan-300 hidden" id="ui-shield-badge">🛡️ <span id="ui-shield">SI</span></div>
-                            <div class="stat-badge text-yellow-300">⭐ <span id="ui-score">0</span></div>
-                            <div class="stat-badge text-amber-300">¢ <span id="ui-coins">0</span></div>
+                            <div id="ui-score-badge" class="stat-badge text-yellow-300">⭐ <span id="ui-score">0</span></div>
+                            <div id="ui-coins-badge" class="stat-badge text-amber-300">¢ <span id="ui-coins">0</span></div>
                         </div>
-                        <div class="flex gap-1.5 flex-wrap"><div class="stat-badge text-purple-300 w-fit">🚩 PROFUNDIDAD <span id="ui-level">1</span></div><div class="stat-badge text-red-300">⏱ <span id="ui-timer">80s</span></div><div class="stat-badge text-rose-300">☠ <span id="ui-threat">0</span></div></div>
+                        <div class="flex gap-1.5 flex-wrap"><div class="stat-badge text-purple-300 w-fit">🚩 PROFUNDIDAD <span id="ui-level">1</span></div><div class="stat-badge text-red-300">⏱ <span id="ui-timer">80s</span></div><div id="ui-threat-badge" class="stat-badge text-rose-300">☠ <span id="ui-threat">0</span></div></div>
                     </div>
 
                     <div class="flex flex-col items-end gap-1.5">
@@ -57,7 +58,7 @@
                             <div class="stat-badge bomb-stat text-amber-400" id="bomb-stat">💣 <span id="ui-bombs">1/1</span><span class="bomb-capacity" aria-hidden="true"><span id="ui-bombs-fill"></span></span></div>
                             <div class="stat-badge text-orange-400">🔥 <span id="ui-range">1</span></div>
                             <div class="stat-badge text-emerald-400">👟 <span id="ui-speed">3</span></div>
-                            <div class="stat-badge text-purple-300">✦ <span id="ui-relics">0</span></div><div class="stat-badge text-rose-300 v4-boss-bomb-badge hidden" id="ui-boss-bombs">☠ <span>0</span></div>
+                            <div id="ui-relics-badge" class="stat-badge text-purple-300">✦ <span id="ui-relics">0</span></div><div class="stat-badge text-rose-300 v4-boss-bomb-badge hidden" id="ui-boss-bombs">☠ <span>0</span></div>
                         </div>
                     </div>
                 </div>
@@ -213,7 +214,8 @@
     <script src="js/45-player-fsm.js?v=5.7.0"></script>
     <script src="js/12-enemy-ai.js?v=6.3.0"></script>
     <script src="js/06-combat.js?v=6.4.0"></script>
-    <script src="js/07-render.js?v=6.4.0"></script>
+    <script src="js/53-mobile-performance.js?v=6.5.0"></script>
+    <script src="js/07-render.js?v=6.5.0"></script>
     <script src="js/09-camera.js?v=3.27.0"></script>
     <script src="js/10-feedback.js?v=4.6.2"></script>
     <script src="js/17-run-lifecycle.js?v=6.4.0"></script>

@@ -580,6 +580,13 @@
         return true;
     }
 
+    function getActiveDeathEchoV61(depth = null) {
+        const targetLevel = depth == null && typeof gameState !== 'undefined' ? Number(gameState.level) : Number(depth);
+        if (!state.active || state.active.defeated) return null;
+        if (Number.isFinite(targetLevel) && Number(state.active.level) !== targetLevel) return null;
+        return state.active;
+    }
+
     function auditDeathEchoV61() {
         const stored = readStore();
         const errors = [];
@@ -613,9 +620,13 @@
     global.auditDeathEchoV61 = auditDeathEchoV61;
     global.clearDeathEchoV61 = clearEcho;
     global.getDeathEchoV61 = getEcho;
+    global.getActiveDeathEchoV61 = getActiveDeathEchoV61;
     global.BOMBER_ENGINE = global.BOMBER_ENGINE || {};
     global.BOMBER_ENGINE.recordDeathEcho = recordDeathEchoV61;
-    global.BOMBER_ENGINE.getDeathEcho = getEcho;
+    // Renderer/API de runtime: siempre devuelve la instancia materializada,
+    // nunca el snapshot crudo de localStorage.
+    global.BOMBER_ENGINE.getDeathEcho = getActiveDeathEchoV61;
+    global.BOMBER_ENGINE.getPersistedDeathEcho = getEcho;
     global.BOMBER_ENGINE.auditDeathEcho = auditDeathEchoV61;
 
     bootstrap();

@@ -224,50 +224,78 @@ function draw() {
         }
 
         function drawDeathEchoV61() {
-            const ghost = window.BOMBER_ENGINE?.getDeathEcho ? window.BOMBER_ENGINE.getDeathEcho(gameState.level) : gameState.deathEchoV61;
+            // IMPORTANTE: el render usa la instancia activa, que contiene x/y/size.
+            // Nunca debe dibujar directamente el snapshot persistido de localStorage.
+            const ghost = gameState.deathEchoV61
+                || (window.BOMBER_ENGINE?.getActiveDeathEcho ? window.BOMBER_ENGINE.getActiveDeathEcho(gameState.level) : null);
+
             if (!ghost || ghost.defeated) return;
+            if (!Number.isFinite(Number(ghost.x)) || !Number.isFinite(Number(ghost.y)) ||
+                !Number.isFinite(Number(ghost.width)) || !Number.isFinite(Number(ghost.height))) return;
+
             const visible = typeof isWorldRectVisibleV329 === 'function'
-                ? isWorldRectVisibleV329(ghost.x, ghost.y, ghost.width, ghost.height, TILE_SIZE)
+                ? isWorldRectVisibleV329(ghost.x, ghost.y, ghost.width, ghost.height, TILE_SIZE * 1.5)
                 : true;
             if (!visible) return;
 
+            const cx = ghost.x + ghost.width / 2;
+            const cy = ghost.y + ghost.height / 2;
+            const pulse = 0.68 + Math.sin(gameState.animFrame * 0.08) * 0.12;
+
             ctx.save();
-            const pulse = 0.56 + Math.sin(gameState.animFrame * 0.08) * 0.08;
-            ctx.globalAlpha = ghost.hitFlash > 0 ? 0.92 : pulse;
 
-            ctx.fillStyle = 'rgba(148,163,184,.28)';
+            // Aura amplia: hace al eco inequívocamente visible sobre cualquier bioma.
+            ctx.globalAlpha = ghost.hitFlash > 0 ? 0.95 : pulse * 0.55;
+            ctx.fillStyle = '#8b5cf6';
             ctx.beginPath();
-            ctx.ellipse(ghost.x + ghost.width / 2, ghost.y + ghost.height, ghost.width / 2.25, 4, 0, 0, Math.PI * 2);
+            ctx.arc(cx, cy, TILE_SIZE * 0.55 + Math.sin(gameState.animFrame * 0.12) * 2, 0, Math.PI * 2);
             ctx.fill();
 
-            // Silueta fantasma: misma lectura corporal que el jugador, pero
-            // deliberadamente abstracta para no confundirlo con el personaje vivo.
-            ctx.fillStyle = '#a78bfa';
+            // Sombra.
+            ctx.globalAlpha = ghost.hitFlash > 0 ? 0.96 : pulse;
+            ctx.fillStyle = 'rgba(148,163,184,.4)';
             ctx.beginPath();
-            ctx.arc(ghost.x + ghost.width / 2, ghost.y + 10, 13, 0, Math.PI * 2);
+            ctx.ellipse(cx, ghost.y + ghost.height, ghost.width / 2.1, 4, 0, 0, Math.PI * 2);
             ctx.fill();
-            ctx.fillRect(ghost.x + 6, ghost.y + 13, ghost.width - 12, ghost.height - 18);
 
-            ctx.fillStyle = '#1e1b4b';
-            const eyeY = ghost.y + 9;
-            ctx.fillRect(ghost.x + ghost.width / 2 - 6, eyeY, 3, 5);
-            ctx.fillRect(ghost.x + ghost.width / 2 + 3, eyeY, 3, 5);
-
-            ctx.strokeStyle = '#ddd6fe';
-            ctx.globalAlpha *= 0.7;
-            ctx.lineWidth = 2;
+            // Silueta fantasma.
+            ctx.fillStyle = '#c4b5fd';
             ctx.beginPath();
-            ctx.arc(ghost.x + ghost.width / 2, ghost.y + ghost.height / 2, ghost.width * 0.53, 0, Math.PI * 2);
+            ctx.arc(cx, ghost.y + 10, 13, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillRect(ghost.x + 5, ghost.y + 13, Math.max(8, ghost.width - 10), Math.max(10, ghost.height - 17));
+
+            // Borde luminoso para separar el eco del suelo.
+            ctx.strokeStyle = '#f5f3ff';
+            ctx.globalAlpha *= 0.8;
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(cx, cy, ghost.width * 0.56, 0, Math.PI * 2);
             ctx.stroke();
 
-            // Barra de vida mínima: comunica que puede ser derrotado.
-            const barWidth = ghost.width * 0.9;
+            // Ojos.
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = '#312e81';
+            const eyeY = ghost.y + 9;
+            ctx.fillRect(cx - 7, eyeY, 4, 6);
+            ctx.fillRect(cx + 3, eyeY, 4, 6);
+
+            // Vida.
+            const barWidth = ghost.width * 0.95;
             const healthRatio = ghost.maxHealth > 0 ? ghost.health / ghost.maxHealth : 0;
-            ctx.globalAlpha = 0.82;
-            ctx.fillStyle = 'rgba(15,23,42,.75)';
-            ctx.fillRect(ghost.x + (ghost.width - barWidth) / 2, ghost.y - 8, barWidth, 3);
-            ctx.fillStyle = '#c4b5fd';
-            ctx.fillRect(ghost.x + (ghost.width - barWidth) / 2, ghost.y - 8, barWidth * Math.max(0, Math.min(1, healthRatio)), 3);
+            ctx.fillStyle = 'rgba(15,23,42,.85)';
+            ctx.fillRect(ghost.x + (ghost.width - barWidth) / 2, ghost.y - 9, barWidth, 4);
+            ctx.fillStyle = '#ddd6fe';
+            ctx.fillRect(ghost.x + (ghost.width - barWidth) / 2, ghost.y - 9, barWidth * Math.max(0, Math.min(1, healthRatio)), 4);
+
+            // Etiqueta fija: no depende de emojis ni de fuentes externas.
+            ctx.font = '8px Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillStyle = '#f5f3ff';
+            ctx.fillText('ECO', cx, ghost.y - 12);
+            ctx.textAlign = 'start';
+            ctx.textBaseline = 'alphabetic';
 
             ctx.restore();
         }

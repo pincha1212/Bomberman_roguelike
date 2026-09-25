@@ -1,4 +1,4 @@
-// Bomberman Roguelike v5.0 — Biome Progression
+// Bomberman Roguelike v5.4 — Biome Progression
 // La progresión decide qué Theme está activo en cada profundidad.
 // No contiene lógica de mecánicas ni hazards: solo composición, etapas y transición.
 (function initBiomeProgressionV49(global) {
@@ -56,6 +56,52 @@
                 }),
                 hazards: Object.freeze({ blizzard: Object.freeze({ initialDelayMs: 3500, intervalMs: 11500, maxActive: 1 }) }),
                 generation: Object.freeze({ blockDensityBonus: 0.03 })
+            })
+        }),
+        space: Object.freeze({
+            1: Object.freeze({
+                role: 'introduction',
+                lesson: 'Aprende a soltar antes de llegar: el movimiento conserva impulso.',
+                mechanics: Object.freeze({
+                    low_gravity: Object.freeze({ enabled: true, movement: Object.freeze({ acceleration: 0.94, braking: 0.82, turnCarrySpeed: 1.04, speedMultiplier: 1.00 }) })
+                }),
+                hazards: Object.freeze({
+                    lightning: Object.freeze({ enabled: false })
+                }),
+                generation: Object.freeze({ blockDensityBonus: -0.03 })
+            }),
+            2: Object.freeze({
+                role: 'reinforcement',
+                lesson: 'Conserva la trayectoria y cambia de dirección antes de la intersección.',
+                mechanics: Object.freeze({
+                    low_gravity: Object.freeze({ enabled: true, movement: Object.freeze({ acceleration: 0.86, braking: 0.70, turnCarrySpeed: 1.10, speedMultiplier: 1.02 }) })
+                }),
+                hazards: Object.freeze({
+                    lightning: Object.freeze({ initialDelayMs: 11000, intervalMs: 12800, maxActive: 1 })
+                }),
+                generation: Object.freeze({ blockDensityBonus: -0.01 })
+            }),
+            3: Object.freeze({
+                role: 'combination',
+                lesson: 'Combina impulso, bombas y ventanas eléctricas sin perder la línea de escape.',
+                mechanics: Object.freeze({
+                    low_gravity: Object.freeze({ enabled: true, movement: Object.freeze({ acceleration: 0.77, braking: 0.60, turnCarrySpeed: 1.17, speedMultiplier: 1.04 }) })
+                }),
+                hazards: Object.freeze({
+                    lightning: Object.freeze({ initialDelayMs: 8500, intervalMs: 9400, maxActive: 1 })
+                }),
+                generation: Object.freeze({ blockDensityBonus: 0.015 })
+            }),
+            4: Object.freeze({
+                role: 'exam',
+                lesson: 'Examen: calcula dónde vas a terminar, no solo dónde estás apuntando.',
+                mechanics: Object.freeze({
+                    low_gravity: Object.freeze({ enabled: true, movement: Object.freeze({ acceleration: 0.69, braking: 0.51, turnCarrySpeed: 1.23, speedMultiplier: 1.06 }) })
+                }),
+                hazards: Object.freeze({
+                    lightning: Object.freeze({ initialDelayMs: 6000, intervalMs: 7600, maxActive: 2 })
+                }),
+                generation: Object.freeze({ blockDensityBonus: 0.035 })
             })
         }),
         inferno: Object.freeze({

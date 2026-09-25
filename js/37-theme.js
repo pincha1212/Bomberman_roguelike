@@ -1,4 +1,4 @@
-// Bomberman Roguelike v5.1 — Visual Themes + gameplay contracts
+// Bomberman Roguelike v5.4 — Visual Themes + gameplay contracts
 // Los temas declaran datos visuales y IDs de mecánicas.
 // La lógica de mecánicas y hazards vive en sus registries independientes.
 (function initThemeFoundationV47(global) {
@@ -345,9 +345,9 @@
         { background:'#02030b', floorA:'#0b1024', floorB:'#151b35', wallBase:'#4c527a', wallHighlight:'#b8c2ff', wallShadow:'#313757', wallInset:'#181c31', wallDeep:'#060712', wallAccent:'#a5b4fc', blockBase:'#42496e', blockHighlight:'#7c83b1', blockShadow:'#252a47', blockPattern:'#343b63', blockCore:'#141729', fireOuter:'rgba(129,140,248,.76)', fireMiddle:'#a5b4fc', fireCore:'#ffffff', bombBody:'#0a0d1b', bombCap:'#818cf8', bombSparkHot:'#ffffff', bombSparkDanger:'#f472b6', particleImpact:'#c7d2fe', particleFire:'#a5b4fc', particleBlock:'#6366f1', particleDanger:'#f472b6', ambientDust:'rgba(210,220,255,.66)', lightingMid:'rgba(17,24,65,.10)', lightingDark:'rgba(0,0,10,.68)' },
         { floor:'procedural:starship-floor', wall:'procedural:metal-wall', brick:'procedural:panel-block', bomb:'procedural:plasma-bomb', fire:'procedural:plasma-fire' },
         { tipo:'stars', color:'ambientDust', densidad:.28, velocidad:.03, sizeMin:1, sizeMax:2, alpha:.55 },
-        ['low_gravity','darkness'], ['lightning'],
-        { low_gravity:{ movement:{ acceleration:.76, braking:.60, turnCarrySpeed:1.17, speedMultiplier:1.06 } }, darkness:{ visibility:{ radius:134, midStop:.54, midAlpha:.30, outerAlpha:.88 } } },
-        { lightning:{ intervalMs:11200, maxActive:1 } }
+        ['low_gravity'], ['lightning'],
+        { low_gravity:{ movement:{ acceleration:.76, braking:.60, turnCarrySpeed:1.17, speedMultiplier:1.06 } } },
+        { lightning:{ intervalMs:11200, initialDelayMs:9000, maxActive:1 } }
     );
     const SKY_THEME = createVisualThemeV47(
         'sky', 'Cielo',

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v5.1 — Mechanics Registry
+// Bomberman Roguelike v5.4 — Mechanics Registry
 // Theme declara IDs. Este módulo resuelve esos IDs a comportamiento reutilizable.
 // Ninguna mecánica conoce ni depende de un tema concreto.
 (function initMechanicsRegistryV47(global) {
@@ -77,7 +77,11 @@
     function getActiveMechanicIds() {
         const theme = typeof global.getThemeV46 === 'function' ? global.getThemeV46() : null;
         if (!theme || !Array.isArray(theme.mechanics)) return [];
-        return theme.mechanics.filter(id => !!MECHANICS[id]);
+        return theme.mechanics.filter(id => {
+            if (!MECHANICS[id]) return false;
+            const stageConfig = (typeof gameState !== 'undefined' ? gameState.biomeV49?.stageConfig?.mechanics?.[id] : null);
+            return stageConfig?.enabled !== false;
+        });
     }
 
     function getActiveMechanics() {

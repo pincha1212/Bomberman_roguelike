@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.9 — Hazards Registry
+// Bomberman Roguelike v5.4 — Hazards Registry
 // Los hazards son entidades/timers independientes del Theme y del Mechanics Registry.
 (function initHazardsRegistryV48(global) {
     'use strict';

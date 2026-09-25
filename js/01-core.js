@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.8 — Core, configuration, state, audio, performance and adaptive interface
+// Bomberman Roguelike v5.0 — Core, configuration, state, audio, performance and adaptive interface
 // V2.0 IMMERSIVE SYSTEMS
 let audioCtx = null;
 
@@ -24,7 +24,9 @@ function sfx(type){
 function showRoomIntro(){
     const el=document.getElementById('room-intro'); if(!el) return;
     const r=gameState.roomType;
-    el.innerHTML=`<div class="room-number">DEPTH ${String(gameState.level).padStart(2,'0')} · RUN ${String(gameState.runNumber).padStart(2,'0')}</div><div class="room-name" style="color:${r.color}">${r.icon} ${r.name}</div><div class="room-sub">${r.subtitle}</div>`;
+    const biome = typeof getBiomeMetadataV49 === 'function' ? getBiomeMetadataV49(gameState.level) : null;
+    const roomLabel = biome ? `${biome.nombre.toUpperCase()} ${biome.stage}` : `DEPTH ${String(gameState.level).padStart(2,'0')}`;
+    el.innerHTML=`<div class="room-number">${roomLabel} · RUN ${String(gameState.runNumber).padStart(2,'0')}</div><div class="room-name" style="color:${r.color}">${r.icon} ${r.name}</div><div class="room-sub">${r.subtitle}</div>`;
     el.classList.remove('hidden');
     clearTimeout(ambient.introTimer); ambient.introTimer=setTimeout(()=>el.classList.add('hidden'),1800);
     sfx('click');
@@ -93,11 +95,38 @@ function drawAmbientDust(){
             ctx.beginPath();
             ctx.arc(x,y,Math.max(.7,size*.55),0,Math.PI*2);
             ctx.fill();
-        } else if (ambience.tipo === 'ember') {
+        } else if (ambience.tipo === 'ember' || ambience.tipo === 'ash') {
             x=((seed*3.71 + Math.sin((gameState.animFrame+i)*.045)*9 + travel*.12)%rangeW)-40;
             y=canvas.height+40-((seed*1.83 + travel)%rangeH);
             ctx.globalAlpha=alpha;
             ctx.fillRect(x,y,size,Math.max(1,size*1.5));
+        } else if (ambience.tipo === 'leaf') {
+            x=((seed*4.07 + Math.sin((gameState.animFrame+i)*.03)*18 + travel*.24)%rangeW)-40;
+            y=((seed*1.61 + travel*.82)%rangeH)-40;
+            ctx.globalAlpha=alpha;
+            ctx.save(); ctx.translate(x,y); ctx.rotate((gameState.animFrame*.012+i)*.6);
+            ctx.fillRect(-size, -size*.35, size*1.8, size*.7); ctx.restore();
+        } else if (ambience.tipo === 'rain') {
+            x=((seed*2.83 + travel*1.6)%rangeW)-40;
+            y=((seed*1.29 + travel*2.2)%rangeH)-40;
+            ctx.globalAlpha=alpha;
+            ctx.fillRect(x,y,Math.max(.7,size*.55),Math.max(3,size*3.2));
+        } else if (ambience.tipo === 'pollen' || ambience.tipo === 'stars') {
+            x=((seed*4.31 + Math.sin((gameState.animFrame+i)*.018)*10 + travel*.08)%rangeW)-40;
+            y=((seed*2.07 + Math.cos((gameState.animFrame+i)*.013)*9 + travel*.11)%rangeH)-40;
+            ctx.globalAlpha=alpha;
+            ctx.beginPath(); ctx.arc(x,y,Math.max(.6,size*.45),0,Math.PI*2); ctx.fill();
+        } else if (ambience.tipo === 'sand') {
+            const drift=Number(ambience.drift)||1;
+            x=((seed*4.11 + travel*drift)%rangeW)-40;
+            y=((seed*1.31 + gameState.animFrame*.025*(i%2+1))%rangeH)-40;
+            ctx.globalAlpha=alpha;
+            ctx.fillRect(x,y,size*1.3,size*.55);
+        } else if (ambience.tipo === 'mist' || ambience.tipo === 'cloud') {
+            x=((seed*3.11 + travel*.07)%rangeW)-40;
+            y=((seed*1.77 + Math.sin((gameState.animFrame+i)*.01)*14)%rangeH)-40;
+            ctx.globalAlpha=alpha;
+            ctx.beginPath(); ctx.arc(x,y,Math.max(2,size*2.2),0,Math.PI*2); ctx.fill();
         } else {
             x=((seed*3.71+gameState.animFrame*.09*(i%3+1))%rangeW)-40;
             y=((seed*1.83+gameState.animFrame*.035*(i%2+1))%rangeH)-40;
@@ -463,7 +492,9 @@ const UI = {};
         function getRoomForDepth(depth) {
             if (depth === 1) return ROOM_TYPES.STANDARD;
             const roll = Math.random();
-            if (depth % 5 === 0) return ROOM_TYPES.BOSS;
+            const biomeStage = typeof getBiomeStageV49 === 'function' ? getBiomeStageV49(depth) : null;
+            // v5.0: el cierre de cada bioma es su examen. El boss pasa a la etapa 4.
+            if (biomeStage === 4) return ROOM_TYPES.BOSS;
             if (depth % 5 === 1 && depth > 1) return ROOM_TYPES.SHRINE;
             if (roll < 0.16) return ROOM_TYPES.ELITE;
             if (roll < 0.34) return ROOM_TYPES.TREASURE;
@@ -530,7 +561,8 @@ const UI = {};
             blocksBroken: 0,
             totalKills: 0,
             bestDepth: Number(localStorage.getItem('bombermanBestDepth') || 0),
-            dungeonV44: null
+            dungeonV44: null,
+            runJourneyV50: { visitedBiomes: [], discoveredVerbs: [], currentBiomeId: null, currentStage: 1, maxDepth: 0 }
         };
 
         let player = {

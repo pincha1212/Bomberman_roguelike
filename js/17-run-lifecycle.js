@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.0 — Death & Restart Lifecycle
+// Bomberman Roguelike v5.0 — Death & Restart Lifecycle
 // Mantiene estadísticas de la run, cierre de muerte y reinicio limpio.
 
 const RUN_LIFECYCLE = {
@@ -103,6 +103,8 @@ function resetWorldRuntimeState() {
     gameState.relics = [];
     gameState.roomType = ROOM_TYPES.STANDARD;
     gameState.runElapsedMs = 0;
+    gameState.biomeV49 = null;
+    gameState.runJourneyV50 = typeof createJourneyStateV50 === 'function' ? createJourneyStateV50() : { visitedBiomes: [], discoveredVerbs: [], currentBiomeId: null, currentStage: 1, maxDepth: 0 };
     gameState.rafId = 0;
 
     if (typeof resetRelicModifiers === 'function') resetRelicModifiers();
@@ -143,6 +145,8 @@ function beginNewRun() {
     RUN_LIFECYCLE.elapsedMs = 0;
     RUN_LIFECYCLE.lastSummary = null;
     gameState.runElapsedMs = 0;
+    gameState.biomeV49 = null;
+    gameState.runJourneyV50 = typeof createJourneyStateV50 === 'function' ? createJourneyStateV50() : { visitedBiomes: [], discoveredVerbs: [], currentBiomeId: null, currentStage: 1, maxDepth: 0 };
     gameState.rafId = 0;
 
     return gameState.runNumber;
@@ -191,6 +195,7 @@ function finishRun(source = 'unknown') {
     const finalCoins = Number(gameState.coins) || 0;
     const finalKills = Number(gameState.totalKills) || 0;
     const finalTime = RUN_LIFECYCLE.elapsedMs;
+    const journey = typeof getRunJourneySummaryV50 === 'function' ? getRunJourneySummaryV50() : { maxDepth: finalDepth, visitedBiomes: [], discoveredVerbs: [] };
     const previousBestDepth = Number(localStorage.getItem('bombermanBestDepth') || gameState.bestDepth || 0);
     const previousBestScore = Number(localStorage.getItem('bombermanBestScore') || 0);
     const bestDepth = Math.max(previousBestDepth, finalDepth);
@@ -214,6 +219,7 @@ function finishRun(source = 'unknown') {
             category: relic.category || 'BOMB'
         })),
         elapsedMs: finalTime,
+        journey,
         cause: getDeathCauseLabel(source),
         bestDepth,
         bestScore,
@@ -241,6 +247,14 @@ function renderDeathSummary(summary) {
     set('go-best', summary.bestDepth);
     set('go-best-score', summary.bestScore);
     set('go-cause', summary.cause);
+    const journeyBiomes = document.getElementById('go-biome-list');
+    if (journeyBiomes) journeyBiomes.innerHTML = summary.journey.visitedBiomes.length
+        ? summary.journey.visitedBiomes.map(item => `<span class="death-biome-chip"><strong>${item.name}</strong><small>${item.verb || ''}</small></span>`).join('')
+        : '<span class="death-empty">Sin biomas registrados</span>';
+    const journeyVerbs = document.getElementById('go-verb-list');
+    if (journeyVerbs) journeyVerbs.innerHTML = summary.journey.discoveredVerbs.length
+        ? summary.journey.discoveredVerbs.map(verb => `<span class="death-verb-chip">${verb.toUpperCase()}</span>`).join('')
+        : '<span class="death-empty">Sin verbos registrados</span>';
 
     const record = document.getElementById('go-record');
     if (record) {

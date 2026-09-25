@@ -95,6 +95,7 @@
 
             // V3.15: una nueva run pasa por un reinicio centralizado para evitar
             // arrastres de bombas, enemigos, trampas, proyectiles, timers, input o cámara.
+            if (typeof clearRunSaveV55 === 'function') clearRunSaveV55();
             beginNewRun();
             initLevel();
             gameState.isPlaying = true;
@@ -145,6 +146,7 @@
         window.startDepthForTestV53 = startDepthForTestV53;
         window.BOMBER_ENGINE = window.BOMBER_ENGINE || {};
         window.BOMBER_ENGINE.startDepthForTest = startDepthForTestV53;
+        window.BOMBER_ENGINE.nextDepth = () => { startNextDepth(); return gameState.level; };
 
         function buildRewardChoices() {
             const choices = [];
@@ -188,6 +190,7 @@
             gameState.paused = false;
             gameState.lastTime = performance.now();
             gameState.rafId = requestAnimationFrame(gameLoop);
+            if (typeof saveRunV55 === 'function') saveRunV55('level-start');
         }
 
         function completeLevel() {

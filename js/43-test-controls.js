@@ -16,13 +16,17 @@
 
     function syncInput() {
         const input = getNode('test-depth-input');
-        if (input && typeof global.gameState !== 'undefined') input.value = String(global.gameState.level || 1);
+        const state = global.BOMBER_ENGINE?.getState?.();
+        if (input && state) input.value = String(state.level || 1);
     }
 
     function jump(value) {
         const depth = clampDepth(value);
-        if (typeof global.startDepthForTestV53 !== 'function') return false;
-        global.startDepthForTestV53(depth);
+        const startDepth = typeof global.startDepthForTestV53 === 'function'
+            ? global.startDepthForTestV53
+            : global.BOMBER_ENGINE?.startDepthForTest;
+        if (typeof startDepth !== 'function') return false;
+        startDepth(depth);
         syncInput();
         return true;
     }
@@ -35,7 +39,8 @@
 
         root.querySelectorAll('[data-test-step]').forEach(button => {
             button.addEventListener('click', () => {
-                const current = typeof global.gameState !== 'undefined' ? Number(global.gameState.level) || 1 : 1;
+                const state = global.BOMBER_ENGINE?.getState?.();
+                const current = Number(state?.level) || 1;
                 jump(current + Number(button.getAttribute('data-test-step') || 0));
             });
         });
@@ -49,11 +54,11 @@
             if (!TEST_MODE || event.target?.matches?.('input,textarea,select,button')) return;
             if (event.key === '[') {
                 event.preventDefault();
-                jump((Number(global.gameState?.level) || 1) - 1);
+                jump((Number(global.BOMBER_ENGINE?.getState?.()?.level) || 1) - 1);
             }
             if (event.key === ']') {
                 event.preventDefault();
-                jump((Number(global.gameState?.level) || 1) + 1);
+                jump((Number(global.BOMBER_ENGINE?.getState?.()?.level) || 1) + 1);
             }
         });
 

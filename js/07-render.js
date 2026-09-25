@@ -540,10 +540,44 @@ function draw() {
             }
 
             if (e.type?.winterRole === 'bear') {
+                // Oso polar: orejas + hocico + nariz.
+                ctx.fillStyle = '#cbd5e1';
+                ctx.beginPath();
+                ctx.arc(e.x - 7, e.y - e.height * 0.31 + floaty, 4.2, 0, Math.PI * 2);
+                ctx.arc(e.x + 7, e.y - e.height * 0.31 + floaty, 4.2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#f8fafc';
+                ctx.beginPath();
+                ctx.ellipse(e.x, e.y + e.height * 0.10 + floaty, e.width * 0.22, e.height * 0.16, 0, 0, Math.PI * 2);
+                ctx.fill();
                 ctx.fillStyle = '#334155';
-                ctx.beginPath(); ctx.arc(e.x - 7, e.y - e.height * 0.30 + floaty, 3.5, 0, Math.PI * 2); ctx.arc(e.x + 7, e.y - e.height * 0.30 + floaty, 3.5, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath();
+                ctx.arc(e.x, e.y + e.height * 0.06 + floaty, 2.2, 0, Math.PI * 2);
+                ctx.fill();
             } else if (e.type?.winterRole === 'obstructor') {
-                ctx.strokeStyle = '#e0f2fe'; ctx.lineWidth = 2; ctx.strokeRect(e.x - e.width * 0.34, e.y - e.height * 0.34 + floaty, e.width * 0.68, e.height * 0.68);
+                // Estorbador de hielo: silueta cristalina en vez de un simple aro.
+                ctx.fillStyle = '#dff7ff';
+                ctx.globalAlpha = 0.58;
+                ctx.beginPath();
+                ctx.moveTo(e.x, e.y - e.height * 0.43 + floaty);
+                ctx.lineTo(e.x + e.width * 0.38, e.y - e.height * 0.08 + floaty);
+                ctx.lineTo(e.x + e.width * 0.25, e.y + e.height * 0.40 + floaty);
+                ctx.lineTo(e.x - e.width * 0.28, e.y + e.height * 0.43 + floaty);
+                ctx.lineTo(e.x - e.width * 0.42, e.y - e.height * 0.08 + floaty);
+                ctx.closePath();
+                ctx.fill();
+                ctx.globalAlpha = 1;
+                ctx.strokeStyle = '#e0f2fe';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(255,255,255,.65)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(e.x, e.y - e.height * 0.28 + floaty);
+                ctx.lineTo(e.x - e.width * 0.16, e.y + e.height * 0.30 + floaty);
+                ctx.moveTo(e.x, e.y - e.height * 0.12 + floaty);
+                ctx.lineTo(e.x + e.width * 0.17, e.y + e.height * 0.30 + floaty);
+                ctx.stroke();
             }
 
             // Ojos mirando a la dirección de movimiento

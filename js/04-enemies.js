@@ -51,21 +51,32 @@
             const winterPlan = gameState.biomeV49?.id === 'winter' ? (gameState.biomeV49.stageConfig?.enemies || {}) : null;
             let winterBearSpawned = 0;
             let winterBlockerSpawned = 0;
-            const winterBearTarget = winterPlan ? Math.max(0, Math.round(count * Number(winterPlan.bearRatio || 0))) : 0;
-            const winterBlockerTarget = winterPlan ? Math.max(0, Math.round(count * Number(winterPlan.blockerRatio || 0))) : 0;
+            const winterBearWeight = winterPlan ? Math.max(0, Number(winterPlan.bearRatio || 0)) : 0;
+            const winterBlockerWeight = winterPlan ? Math.max(0, Number(winterPlan.blockerRatio || 0)) : 0;
 
             for (let i = 0; i < Math.min(count, candidates.length); i++) {
                 const {x, y} = candidates[i];
                 let rand = Math.random();
-                let type = ENEMY_TYPES.RASTRERO;
-                if (winterPlan && winterBearSpawned < winterBearTarget) {
-                    type = ENEMY_TYPES.OSO_NIEVE;
-                    winterBearSpawned++;
-                } else if (winterPlan && winterBlockerSpawned < winterBlockerTarget) {
-                    type = ENEMY_TYPES.ESTORBADOR_HIELO;
-                    winterBlockerSpawned++;
-                } else if (gameState.level >= 2 && rand > 0.6) type = ENEMY_TYPES.VOLADOR;
-                if (!winterPlan && gameState.level >= 3 && rand > 0.85) type = ENEMY_TYPES.ESPECIAL;
+                let type;
+
+                if (winterPlan) {
+                    // Winter no comparte enemigos genéricos con otros biomas.
+                    // Sus únicos arquetipos son fauna de nieve + obstáculo de hielo.
+                    const totalWeight = winterBearWeight + winterBlockerWeight;
+                    const winterRoll = Math.random() * (totalWeight || 1);
+                    if (!totalWeight || winterRoll < winterBearWeight) {
+                        type = ENEMY_TYPES.OSO_NIEVE;
+                        winterBearSpawned++;
+                    } else {
+                        type = ENEMY_TYPES.ESTORBADOR_HIELO;
+                        winterBlockerSpawned++;
+                    }
+                } else {
+                    // Los enemigos genéricos siguen disponibles fuera de Winter.
+                    type = ENEMY_TYPES.RASTRERO;
+                    if (gameState.level >= 2 && rand > 0.6) type = ENEMY_TYPES.VOLADOR;
+                    if (gameState.level >= 3 && rand > 0.85) type = ENEMY_TYPES.ESPECIAL;
+                }
                 const behavior = typeof pickEnemyBehaviorV324 === 'function' ? pickEnemyBehaviorV324(type, gameState.level, i, rand) : null;
                 const speed = type.speed * gameState.roomType.enemySpeedMult * (diff?.enemySpeedMult || 1);
 

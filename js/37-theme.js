@@ -219,6 +219,11 @@
         mecanicas: Object.freeze(['slippery']),
         mechanics: Object.freeze(['slippery']),
         hazards: Object.freeze(['blizzard']),
+        enemigos: Object.freeze({
+            ...WINTER_THEME_BASE.enemigos,
+            pool: Object.freeze(['OSO_NIEVE', 'ESTORBADOR_HIELO']),
+            colors: Object.freeze({ OSO_NIEVE: 'enemyBear', ESTORBADOR_HIELO: 'enemyObstructor' })
+        }),
         bombEffects: Object.freeze({ heat: Object.freeze({ durationMs: 3000 }) })
     });
 

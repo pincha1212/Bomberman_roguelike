@@ -3,8 +3,8 @@
             const first = gameState.bombs[bombIndex];
             if (!first) return;
 
-            // La cola evita recursión y hace que toda la cadena pase por la misma
-            // lógica de explosión: bloques, botín, salida, puntuación y feedback.
+            // La cola evita recursión y mantiene una secuencia determinista
+            // para las detonaciones en cadena.
             gameState.bombs.splice(bombIndex, 1);
             if (first.countsTowardPlayerCapacity !== false) player.bombsPlaced = Math.max(0, player.bombsPlaced - 1);
 
@@ -18,7 +18,6 @@
 
                 detonatedCount++;
                 triggerScreenShake(detonatedCount === 1 ? 7 : 5, detonatedCount === 1 ? 300 : 220);
-                sfx('boom');
                 if (typeof feedbackExplosion === 'function') feedbackExplosion(bomb.x, bomb.y);
                 addParticles((bomb.x + 0.5) * TILE_SIZE, (bomb.y + 0.5) * TILE_SIZE, 'particleFire', detonatedCount === 1 ? 15 : 12);
                 if (gameState.relics.some(r => r.id === 'ember_core')) gameState.score += 25;
@@ -29,37 +28,18 @@
                 // V3.12.3: algunas trampas reaccionan al paso de una explosión.
                 if (typeof reactHazardsToBlast === 'function') reactHazardsToBlast(cells, bomb);
 
-                for (const cell of cells) {
-                    if (!cell.block) continue;
-                    const tx = cell.x, ty = cell.y;
-                    gameState.grid[ty][tx] = TYPES.EMPTY;
-                    gameState.gridRevision = (gameState.gridRevision || 0) + 1;
-                    if (typeof invalidateRenderCacheV317 === 'function') invalidateRenderCacheV317();
-                    gameState.score += 10;
-                    gameState.blocksBroken++;
-                    const coins = Math.max(1, Math.round((1 + Math.random() * 2) * (1 + gameState.coinBonus) * gameState.roomType.coinMult));
-                    gameState.coins += coins;
-                    addFloatingText(`+10  +${coins}¢`, (tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#fbbf24');
-                    addParticles((tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, 'particleBlock', 12);
-
-                    if (gameState.exitPos && gameState.exitPos.x === tx && gameState.exitPos.y === ty) {
-                        // v4.4: destruir el bloque de salida no alcanza para abrirla.
-                        // Queda bloqueada hasta eliminar al último enemigo.
-                        gameState.grid[ty][tx] = TYPES.EXIT_LOCKED;
-                        if (typeof tryUnlockExitV44 === 'function') tryUnlockExitV44();
-                        if (gameState.dungeonV44?.exitUnlocked) {
-                            gameState.grid[ty][tx] = TYPES.EXIT_OPEN;
-                            addFloatingText('🚪 SALIDA DESBLOQUEADA', (tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, '#facc15');
-                        }
-                    } else if (Math.random() < gameState.roomType.dropChance) {
-                        const ps = Object.keys(POWERUPS);
-                        gameState.items.push({ x: tx, y: ty, type: POWERUPS[ps[Math.floor(Math.random() * ps.length)]] });
-                    }
-                    if (getAvailableRelics().length && Math.random() < (gameState.roomType.id === 'TREASURE' ? 0.10 : 0.035)) {
-                        const relicPool = getAvailableRelics();
-                        const relic = relicPool[Math.floor(Math.random() * relicPool.length)];
-                        gameState.items.push({ x: tx, y: ty, type: 'RELIC', relicId: relic.id });
-                    }
+                // v5.9: publicación desacoplada. Los listeners de sonido y
+                // destrucción de bloques reaccionan al mismo evento sin que
+                // explodeBomb conozca sus implementaciones.
+                if (typeof gameEventBus !== 'undefined' && typeof GAME_EVENTS_V59 !== 'undefined') {
+                    gameEventBus.emit(GAME_EVENTS_V59.BOMBA_EXPLOTO, Object.freeze({
+                        bomb,
+                        cells: Object.freeze(cells.map(cell => Object.freeze({ ...cell }))),
+                        blastId,
+                        chainIndex: detonatedCount
+                    }));
+                } else {
+                    throw new Error('v5.9: Event Bus no disponible para BOMBA_EXPLOTO');
                 }
 
                 // Una bomba alcanzada por la llama queda marcada para la siguiente

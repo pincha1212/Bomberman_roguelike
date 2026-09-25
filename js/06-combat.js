@@ -182,7 +182,14 @@
                     top: e.y - e.height * 0.3,
                     bottom: e.y + e.height * 0.3
                 };
-                if (checkOverlap(pHurtbox, eHitbox)) takeDamage('enemy', e.x, e.y);
+                if (checkOverlap(pHurtbox, eHitbox)) {
+                    if (e.type?.contactDamage === 0) {
+                        // Winter obstacles are not attackers: their gameplay role is to
+                        // occupy space and force route calculation under slippery movement.
+                        continue;
+                    }
+                    takeDamage('enemy', e.x, e.y);
+                }
             }
 
             // Items pickup

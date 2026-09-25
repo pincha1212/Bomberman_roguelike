@@ -639,6 +639,52 @@ function v44PickExitCell() {
     return candidates[0] || null;
 }
 
+
+function applyWinterTopologyV62(hardWalls, config = {}) {
+    if (gameState.biomeV49?.id !== 'winter') return { applied: false, corridors: 0 };
+    const wanted = Math.max(0, Math.min(3, Math.floor(Number(config.longCorridors) || 0)));
+    if (!wanted) return { applied: false, corridors: 0 };
+
+    const spacing = Math.max(3, Math.floor(Number(config.corridorSpacing) || 4));
+    const rows = [];
+    for (let y = 3; y < gameState.gridHeight - 2 && rows.length < wanted; y += spacing) rows.push(y);
+
+    let carved = 0;
+    const corridorCells = [];
+    for (const y of rows) {
+        let length = 0;
+        for (let x = 1; x < gameState.gridWidth - 1; x++) {
+            if (hardWalls.has(v44RoomKey(x, y))) continue;
+            if (gameState.grid[y][x] === TYPES.WALL) continue;
+            if (gameState.grid[y][x] === TYPES.BLOCK) {
+                gameState.grid[y][x] = TYPES.EMPTY;
+                carved++;
+            }
+            corridorCells.push({ x, y });
+            length++;
+        }
+        if (length >= Math.max(5, Math.floor(gameState.gridWidth * 0.55))) {
+            corridorCells.push({ x: -1, y });
+        }
+    }
+
+    // Un carril vertical de conexión evita que el mapa se convierta en varias
+    // franjas aisladas y conserva opciones de giro para el deslizamiento.
+    const connectorX = Math.min(gameState.gridWidth - 2, Math.max(3, Math.floor(gameState.gridWidth * 0.68)));
+    if (wanted >= 2) {
+        for (let y = 1; y < gameState.gridHeight - 1; y++) {
+            if (hardWalls.has(v44RoomKey(connectorX, y))) continue;
+            if (gameState.grid[y][connectorX] === TYPES.WALL) continue;
+            if (gameState.grid[y][connectorX] === TYPES.BLOCK) {
+                gameState.grid[y][connectorX] = TYPES.EMPTY;
+                carved++;
+            }
+        }
+    }
+
+    return { applied: true, corridors: rows.length, carvedBlocks: carved };
+}
+
 function buildBombermanDungeonV44() {
     // Self-contained terrain reset: outer shell is always indestructible.
     for (let y = 0; y < gameState.gridHeight; y++) {
@@ -657,10 +703,9 @@ function buildBombermanDungeonV44() {
     const levelFactor = Math.min(0.12, Math.max(0, gameState.level - 1) * 0.008);
     const roomBonus = Number(gameState.roomType?.blockBonus || 0);
     const diffBonus = Number(gameState.difficulty?.blockDensityBonus || 0);
-    const biomeGenerationBonus = Number(gameState.biomeV49?.stageConfig?.generation?.blockDensityBonus || 0);
     const density = Math.max(
         BOMBERMAN_DUNGEON_V44.blockDensityMin,
-        Math.min(BOMBERMAN_DUNGEON_V44.blockDensityMax, 0.60 + levelFactor + roomBonus + diffBonus + biomeGenerationBonus)
+        Math.min(BOMBERMAN_DUNGEON_V44.blockDensityMax, 0.60 + levelFactor + roomBonus + diffBonus)
     );
 
     let destructible = 0;
@@ -684,6 +729,9 @@ function buildBombermanDungeonV44() {
         }
     }
 
+    const winterTopology = applyWinterTopologyV62(digitData.hard, gameState.biomeV49?.stageConfig?.generation?.topology || {});
+    if (winterTopology.applied) destructible = Math.max(0, destructible - Number(winterTopology.carvedBlocks || 0));
+
     const targetEnemies = getDungeonEnemyCountV44(gameState.level);
     v44EnsureEnemySpace(digitData.hard, targetEnemies);
 
@@ -706,6 +754,7 @@ function buildBombermanDungeonV44() {
         destructibleBlocks: destructible,
         emptyCells: v44CandidateCells(digitData.hard, 0).filter(c => gameState.grid[c.y]?.[c.x] === TYPES.EMPTY).length,
         density: Number(density.toFixed(3)),
+        winterTopology: winterTopology,
         enemyTarget: targetEnemies,
         routeValid: true,
         repairApplied: false

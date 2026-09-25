@@ -6,7 +6,7 @@
 
     const BIOME_JOURNEY = Object.freeze({
         winter: Object.freeze({
-            verb: 'deslizar', lesson: 'Planear la inercia antes de frenar.', rhythm: 'anticipacion', bossLesson: 'Controlar el deslizamiento bajo presión.', transitionIn: 'El hielo cubre el suelo.'
+            verb: 'deslizar', verbSentence: 'Aprendés a comprometerte antes de moverte.', lesson: 'Aprendé a comprometerte antes de moverte.', rhythm: 'anticipacion', bossLesson: 'Controlar el deslizamiento bajo presión.', transitionIn: 'El hielo cubre el suelo.'
         }),
         autumn: Object.freeze({
             verb: 'leer', lesson: 'Leer el viento antes de comprometer una jugada.', rhythm: 'lectura', bossLesson: 'Anticipar el viento y reposicionarse.', transitionIn: 'El hielo se derrite y el viento levanta hojas.'

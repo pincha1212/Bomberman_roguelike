@@ -48,12 +48,24 @@
                 [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
             }
 
+            const winterPlan = gameState.biomeV49?.id === 'winter' ? (gameState.biomeV49.stageConfig?.enemies || {}) : null;
+            let winterBearSpawned = 0;
+            let winterBlockerSpawned = 0;
+            const winterBearTarget = winterPlan ? Math.max(0, Math.round(count * Number(winterPlan.bearRatio || 0))) : 0;
+            const winterBlockerTarget = winterPlan ? Math.max(0, Math.round(count * Number(winterPlan.blockerRatio || 0))) : 0;
+
             for (let i = 0; i < Math.min(count, candidates.length); i++) {
                 const {x, y} = candidates[i];
                 let rand = Math.random();
                 let type = ENEMY_TYPES.RASTRERO;
-                if (gameState.level >= 2 && rand > 0.6) type = ENEMY_TYPES.VOLADOR;
-                if (gameState.level >= 3 && rand > 0.85) type = ENEMY_TYPES.ESPECIAL;
+                if (winterPlan && winterBearSpawned < winterBearTarget) {
+                    type = ENEMY_TYPES.OSO_NIEVE;
+                    winterBearSpawned++;
+                } else if (winterPlan && winterBlockerSpawned < winterBlockerTarget) {
+                    type = ENEMY_TYPES.ESTORBADOR_HIELO;
+                    winterBlockerSpawned++;
+                } else if (gameState.level >= 2 && rand > 0.6) type = ENEMY_TYPES.VOLADOR;
+                if (!winterPlan && gameState.level >= 3 && rand > 0.85) type = ENEMY_TYPES.ESPECIAL;
                 const behavior = typeof pickEnemyBehaviorV324 === 'function' ? pickEnemyBehaviorV324(type, gameState.level, i, rand) : null;
                 const speed = type.speed * gameState.roomType.enemySpeedMult * (diff?.enemySpeedMult || 1);
 

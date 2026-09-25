@@ -6,7 +6,7 @@
 
     const ROOMS_PER_BIOME = 4;
     const BIOME_PROGRESSION = Object.freeze([
-        Object.freeze({ id:'winter', name:'Invierno', themeId:'winter', rooms:ROOMS_PER_BIOME, accent:'#7dd3fc', bossEnabled:false, examRoomType:'ELITE' }),
+        Object.freeze({ id:'winter', name:'Invierno', themeId:'winter', rooms:ROOMS_PER_BIOME, accent:'#7dd3fc', bossEnabled:false, examRoomType:'ELITE', verbSentence:'Aprendés a comprometerte antes de moverte.' }),
         Object.freeze({ id:'autumn', name:'Otoño', themeId:'autumn', rooms:ROOMS_PER_BIOME, accent:'#f59e0b' }),
         Object.freeze({ id:'spring', name:'Primavera', themeId:'spring', rooms:ROOMS_PER_BIOME, accent:'#86efac' }),
         Object.freeze({ id:'summer', name:'Verano', themeId:'summer', rooms:ROOMS_PER_BIOME, accent:'#fbbf24' }),
@@ -36,7 +36,9 @@
                     slippery: Object.freeze({ movement: Object.freeze({ acceleration: 0.96, braking: 0.62, turnCarrySpeed: 1.02, speedMultiplier: 1 }) })
                 }),
                 hazards: Object.freeze({ blizzard: Object.freeze({ initialDelayMs: 9000, intervalMs: 22000, maxActive: 1 }) }),
-                generation: Object.freeze({ blockDensityBonus: -0.03 })
+                enemies: Object.freeze({ bearRatio: 0.45, blockerRatio: 0.20 }),
+
+                generation: Object.freeze({ blockDensityBonus: -0.03, topology: Object.freeze({ longCorridors: 1, corridorSpacing: 4 }) }),
             }),
             2: Object.freeze({
                 role: 'reinforcement',
@@ -45,7 +47,9 @@
                     slippery: Object.freeze({ movement: Object.freeze({ acceleration: 0.93, braking: 0.48, turnCarrySpeed: 1.06, speedMultiplier: 1 }) })
                 }),
                 hazards: Object.freeze({ blizzard: Object.freeze({ initialDelayMs: 7000, intervalMs: 18000, maxActive: 1 }) }),
-                generation: Object.freeze({ blockDensityBonus: -0.01 })
+                enemies: Object.freeze({ bearRatio: 0.45, blockerRatio: 0.35 }),
+
+                generation: Object.freeze({ blockDensityBonus: -0.01, topology: Object.freeze({ longCorridors: 1, corridorSpacing: 4 }) }),
             }),
             3: Object.freeze({
                 role: 'combination',
@@ -54,7 +58,9 @@
                     slippery: Object.freeze({ movement: Object.freeze({ acceleration: 0.90, braking: 0.38, turnCarrySpeed: 1.09, speedMultiplier: 1 }) })
                 }),
                 hazards: Object.freeze({ blizzard: Object.freeze({ initialDelayMs: 5500, intervalMs: 14500, maxActive: 1 }) }),
-                generation: Object.freeze({ blockDensityBonus: 0.01 })
+                enemies: Object.freeze({ bearRatio: 0.50, blockerRatio: 0.40 }),
+
+                generation: Object.freeze({ blockDensityBonus: 0.01, topology: Object.freeze({ longCorridors: 2, corridorSpacing: 4 }) }),
             }),
             4: Object.freeze({
                 role: 'exam',
@@ -63,7 +69,9 @@
                     slippery: Object.freeze({ movement: Object.freeze({ acceleration: 0.87, braking: 0.30, turnCarrySpeed: 1.12, speedMultiplier: 1 }) })
                 }),
                 hazards: Object.freeze({ blizzard: Object.freeze({ initialDelayMs: 3500, intervalMs: 11500, maxActive: 1 }) }),
-                generation: Object.freeze({ blockDensityBonus: 0.03 })
+                enemies: Object.freeze({ bearRatio: 0.50, blockerRatio: 0.50 }),
+
+                generation: Object.freeze({ blockDensityBonus: 0.03, topology: Object.freeze({ longCorridors: 2, corridorSpacing: 4 }) }),
             })
         }),
         space: Object.freeze({
@@ -205,7 +213,8 @@
             endDepth: BIOME_PROGRESSION.slice(0, BIOME_PROGRESSION.findIndex(b => b.id === biome.id)+1).reduce((n,b) => n+b.rooms,0),
             accent: biome.accent,
             bossEnabled: biome.bossEnabled !== false,
-            examRoomType: biome.examRoomType || 'BOSS'
+            examRoomType: biome.examRoomType || 'BOSS',
+            verbSentence: biome.verbSentence || ''
         });
     }
 
@@ -271,7 +280,7 @@
     function applyBiomeForDepthV49(depth, showTransition = true) {
         const meta = getBiomeMetadataV49(depth);
         if (typeof global.setActiveThemeV46 === 'function') global.setActiveThemeV46(meta.themeId, false);
-        if (typeof gameState !== 'undefined') gameState.biomeV49 = { id: meta.id, themeId: meta.themeId, name: meta.nombre, stage: meta.stage, startDepth: meta.startDepth, endDepth: meta.endDepth, bossEnabled: meta.bossEnabled, examRoomType: meta.examRoomType, stageConfig: getBiomeStageConfigV51(meta.id, meta.stage) };
+        if (typeof gameState !== 'undefined') gameState.biomeV49 = { id: meta.id, themeId: meta.themeId, name: meta.nombre, stage: meta.stage, startDepth: meta.startDepth, endDepth: meta.endDepth, bossEnabled: meta.bossEnabled, examRoomType: meta.examRoomType, verbSentence: meta.verbSentence || '', stageConfig: getBiomeStageConfigV51(meta.id, meta.stage) };
         syncBiomeUi(meta);
         if (typeof global.registerBiomeVisitV50 === 'function') global.registerBiomeVisitV50(meta);
         if (typeof global.touchRunDepthV50 === 'function') global.touchRunDepthV50(Number(depth) || 1);

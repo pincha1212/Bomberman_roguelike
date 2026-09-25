@@ -31,6 +31,7 @@
         decisionTimer: 0,
         bombCooldown: 0,
         aiStep: 0,
+        smoothMoveTarget: null,
         originalInitLevel: null,
         wrappedInitLevel: false
     };
@@ -439,18 +440,36 @@
     }
 
     function moveGhostToward(ghost, targetTile, dt) {
+        if (!ghost || !targetTile) return false;
         const targetX = targetTile.x * TILE_SIZE + TILE_SIZE / 2 - ghost.width / 2;
         const targetY = targetTile.y * TILE_SIZE + TILE_SIZE / 2 - ghost.height / 2;
         const dx = targetX - ghost.x;
         const dy = targetY - ghost.y;
         const distance = Math.hypot(dx, dy);
-        if (distance < 0.5) return;
+        if (distance < 0.5) {
+            ghost.x = targetX;
+            ghost.y = targetY;
+            ghost.moving = false;
+            return false;
+        }
 
-        const maxStep = ghost.speed * Math.max(0.5, Math.min(2, number(dt, 16.6667) / 16.6667));
+        // La decisión sigue siendo discreta; el movimiento NO. Esto elimina el
+        // salto de 220 ms que hacía sentir al eco pesado o con delay.
+        const frameScale = Math.max(0.25, Math.min(2, number(dt, 16.6667) / 16.6667));
+        const maxStep = ghost.speed * frameScale;
         const step = Math.min(maxStep, distance);
         ghost.x += dx / distance * step;
         ghost.y += dy / distance * step;
+        ghost.moveDistance += step;
+        ghost.moving = step > 0.01;
         ghost.dir = Math.abs(dx) >= Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
+        if (step >= distance - 0.01) {
+            ghost.x = targetX;
+            ghost.y = targetY;
+            ghost.moving = false;
+            return true;
+        }
+        return true;
     }
 
     function recoverEchoItems(ghost) {
@@ -552,7 +571,11 @@
             dir: ['up', 'down', 'left', 'right'].includes(build.dir) ? build.dir : 'down',
             hitFlash: 0,
             lastHitBlastId: -1,
-            defeated: false
+            defeated: false,
+            visualTime: 0,
+            moveDistance: 0,
+            moving: false,
+            aiTargetTile: null
         };
 
         ghost.echoStrength = Object.freeze({
@@ -592,10 +615,24 @@
                 createGhostBomb(ghost);
             }
 
-            // Prioridad 2: movimiento hacia el jugador con rechazo de zonas peligrosas.
-            const step = chooseStep(ghost);
-            moveGhostToward(ghost, step, DECISION_MS);
+            // Solo elegimos el siguiente destino aquí. El desplazamiento ocurre
+            // cada frame abajo, con dt real.
+            state.smoothMoveTarget = chooseStep(ghost);
+            ghost.aiTargetTile = state.smoothMoveTarget;
         }
+
+        if (ghost.aiTargetTile) {
+            const reached = moveGhostToward(ghost, ghost.aiTargetTile, dt);
+            const current = tileFromGhost(ghost);
+            if (!reached || (current.x === ghost.aiTargetTile.x && current.y === ghost.aiTargetTile.y)) {
+                ghost.aiTargetTile = null;
+                state.smoothMoveTarget = null;
+                // El siguiente destino se decide enseguida: no dejamos una pausa
+                // artificial de hasta DECISION_MS en cada intersección.
+                state.decisionTimer = 0;
+            }
+        }
+        ghost.visualTime += Math.max(0, number(dt, 16));
 
         const playerRect = {
             left: player.x + player.width * 0.25,

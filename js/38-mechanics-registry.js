@@ -16,7 +16,7 @@
             id: 'slippery',
             nombre: 'Suelo resbaladizo',
             category: 'movement',
-            movement: Object.freeze({ acceleration: 0.92, braking: 0.38, turnCarrySpeed: 1.08, speedMultiplier: 1 })
+            movement: Object.freeze({ acceleration: 0.92, braking: 0.38, turnCarrySpeed: 1.08, speedMultiplier: 1, stopDeadzone: 0.035 })
         }),
         wind_push: Object.freeze({
             id: 'wind_push',
@@ -76,8 +76,9 @@
 
     function getActiveMechanicIds() {
         const theme = typeof global.getThemeV46 === 'function' ? global.getThemeV46() : null;
-        if (!theme || !Array.isArray(theme.mechanics)) return [];
-        return theme.mechanics.filter(id => {
+        const ids = theme?.mechanics || theme?.mecanicas;
+        if (!Array.isArray(ids)) return [];
+        return ids.filter(id => {
             if (!MECHANICS[id]) return false;
             const stageConfig = (typeof gameState !== 'undefined' ? gameState.biomeV49?.stageConfig?.mechanics?.[id] : null);
             return stageConfig?.enabled !== false;

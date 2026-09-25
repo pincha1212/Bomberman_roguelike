@@ -224,83 +224,71 @@ function draw() {
         }
 
         function drawDeathEchoV61() {
-            // IMPORTANTE: el render usa la instancia activa, que contiene x/y/size.
-            // Nunca debe dibujar directamente el snapshot persistido de localStorage.
-            // Compatibilidad API: la instancia activa se expone como getDeathEcho.
-            // Mantenemos getActiveDeathEcho como alias defensivo para evitar que un
-            // desajuste entre versiones vuelva a ocultar el eco.
             const ghost = gameState.deathEchoV61
                 || (window.BOMBER_ENGINE?.getDeathEcho ? window.BOMBER_ENGINE.getDeathEcho(gameState.level) : null)
                 || (window.BOMBER_ENGINE?.getActiveDeathEcho ? window.BOMBER_ENGINE.getActiveDeathEcho(gameState.level) : null);
 
             if (!ghost || ghost.defeated) return;
-            if (!Number.isFinite(Number(ghost.x)) || !Number.isFinite(Number(ghost.y)) ||
-                !Number.isFinite(Number(ghost.width)) || !Number.isFinite(Number(ghost.height))) return;
+            if (![ghost.x, ghost.y, ghost.width, ghost.height].every(Number.isFinite)) return;
 
             const visible = typeof isWorldRectVisibleV329 === 'function'
                 ? isWorldRectVisibleV329(ghost.x, ghost.y, ghost.width, ghost.height, TILE_SIZE * 1.5)
                 : true;
             if (!visible) return;
 
+            // Una sola animación primaria: respiración/reposo o bob de movimiento.
+            // Sin aura pulsante + cuerpo desplazado + partículas animadas a la vez.
+            const t = Number(ghost.visualTime || 0) * 0.001;
+            const bob = ghost.moving
+                ? Math.sin(t * 10) * 1.25
+                : Math.sin(t * 2.2) * 0.8;
+            const alpha = ghost.hitFlash > 0 ? 0.96 : 0.78;
             const cx = ghost.x + ghost.width / 2;
-            const cy = ghost.y + ghost.height / 2;
-            const pulse = 0.68 + Math.sin(gameState.animFrame * 0.08) * 0.12;
+            const cy = ghost.y + ghost.height / 2 + bob;
 
             ctx.save();
+            ctx.globalAlpha = alpha;
 
-            // Aura amplia: hace al eco inequívocamente visible sobre cualquier bioma.
-            ctx.globalAlpha = ghost.hitFlash > 0 ? 0.95 : pulse * 0.55;
-            ctx.fillStyle = '#8b5cf6';
+            // Sombra única y estable.
+            ctx.fillStyle = 'rgba(15,23,42,.48)';
             ctx.beginPath();
-            ctx.arc(cx, cy, TILE_SIZE * 0.55 + Math.sin(gameState.animFrame * 0.12) * 2, 0, Math.PI * 2);
+            ctx.ellipse(cx, ghost.y + ghost.height, ghost.width * 0.34, 3.5, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Sombra.
-            ctx.globalAlpha = ghost.hitFlash > 0 ? 0.96 : pulse;
-            ctx.fillStyle = 'rgba(148,163,184,.4)';
-            ctx.beginPath();
-            ctx.ellipse(cx, ghost.y + ghost.height, ghost.width / 2.1, 4, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Silueta fantasma.
+            // Silueta fantasma compacta.
             ctx.fillStyle = '#c4b5fd';
-            ctx.beginPath();
-            ctx.arc(cx, ghost.y + 10, 13, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillRect(ghost.x + 5, ghost.y + 13, Math.max(8, ghost.width - 10), Math.max(10, ghost.height - 17));
-
-            // Borde luminoso para separar el eco del suelo.
             ctx.strokeStyle = '#f5f3ff';
-            ctx.globalAlpha *= 0.8;
-            ctx.lineWidth = 2.5;
+            ctx.lineWidth = 1.75;
             ctx.beginPath();
-            ctx.arc(cx, cy, ghost.width * 0.56, 0, Math.PI * 2);
+            ctx.arc(cx, cy - 4, ghost.width * 0.29, Math.PI, 0);
+            ctx.lineTo(ghost.x + ghost.width * 0.80, cy + ghost.height * 0.30);
+            ctx.lineTo(ghost.x + ghost.width * 0.63, cy + ghost.height * 0.21);
+            ctx.lineTo(cx, cy + ghost.height * 0.31);
+            ctx.lineTo(ghost.x + ghost.width * 0.37, cy + ghost.height * 0.21);
+            ctx.lineTo(ghost.x + ghost.width * 0.20, cy + ghost.height * 0.30);
+            ctx.closePath();
+            ctx.fill();
             ctx.stroke();
 
-            // Ojos.
-            ctx.globalAlpha = 1;
+            // Ojos fijos. No tienen su propia animación.
             ctx.fillStyle = '#312e81';
-            const eyeY = ghost.y + 9;
-            ctx.fillRect(cx - 7, eyeY, 4, 6);
-            ctx.fillRect(cx + 3, eyeY, 4, 6);
+            ctx.fillRect(cx - 6, cy - 7, 3, 4);
+            ctx.fillRect(cx + 3, cy - 7, 3, 4);
 
-            // Vida.
-            const barWidth = ghost.width * 0.95;
+            // El indicador de vida no se anima: solo comunica estado.
+            const barWidth = ghost.width * 0.92;
             const healthRatio = ghost.maxHealth > 0 ? ghost.health / ghost.maxHealth : 0;
             ctx.fillStyle = 'rgba(15,23,42,.85)';
-            ctx.fillRect(ghost.x + (ghost.width - barWidth) / 2, ghost.y - 9, barWidth, 4);
+            ctx.fillRect(ghost.x + (ghost.width - barWidth) / 2, ghost.y - 8, barWidth, 3);
             ctx.fillStyle = '#ddd6fe';
-            ctx.fillRect(ghost.x + (ghost.width - barWidth) / 2, ghost.y - 9, barWidth * Math.max(0, Math.min(1, healthRatio)), 4);
+            ctx.fillRect(ghost.x + (ghost.width - barWidth) / 2, ghost.y - 8, barWidth * Math.max(0, Math.min(1, healthRatio)), 3);
 
-            // Etiqueta fija: no depende de emojis ni de fuentes externas.
             ctx.font = '8px Arial, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'bottom';
             ctx.fillStyle = '#f5f3ff';
-            ctx.fillText('ECO', cx, ghost.y - 12);
-            ctx.textAlign = 'start';
-            ctx.textBaseline = 'alphabetic';
-
+            ctx.globalAlpha = 0.92;
+            ctx.fillText('ECO', cx, ghost.y - 11);
             ctx.restore();
         }
 
@@ -508,7 +496,7 @@ function draw() {
             ctx.fill();
 
             // Cuerpo
-            const enemyThemeKey = e?.type?.name === 'Rastrero' ? 'enemyRastrero' : e?.type?.name === 'Volador' ? 'enemyVolador' : e?.type?.name === 'Especial' ? 'enemyEspecial' : null;
+            const enemyThemeKey = e?.type?.winterRole === 'bear' ? 'enemyBear' : e?.type?.winterRole === 'obstructor' ? 'enemyObstructor' : e?.type?.name === 'Rastrero' ? 'enemyRastrero' : e?.type?.name === 'Volador' ? 'enemyVolador' : e?.type?.name === 'Especial' ? 'enemyEspecial' : null;
             ctx.fillStyle = enemyThemeKey && typeof themeColorV46 === 'function' ? themeColorV46(enemyThemeKey, e.type.color) : e.type.color;
             ctx.beginPath();
             if (e.type.canFly) {
@@ -523,6 +511,13 @@ function draw() {
             } else {
                 ctx.arc(e.x, e.y + floaty, e.width/2, 0, Math.PI*2);
                 ctx.fill();
+            }
+
+            if (e.type?.winterRole === 'bear') {
+                ctx.fillStyle = '#334155';
+                ctx.beginPath(); ctx.arc(e.x - 7, e.y - e.height * 0.30 + floaty, 3.5, 0, Math.PI * 2); ctx.arc(e.x + 7, e.y - e.height * 0.30 + floaty, 3.5, 0, Math.PI * 2); ctx.fill();
+            } else if (e.type?.winterRole === 'obstructor') {
+                ctx.strokeStyle = '#e0f2fe'; ctx.lineWidth = 2; ctx.strokeRect(e.x - e.width * 0.34, e.y - e.height * 0.34 + floaty, e.width * 0.68, e.height * 0.68);
             }
 
             // Ojos mirando a la dirección de movimiento

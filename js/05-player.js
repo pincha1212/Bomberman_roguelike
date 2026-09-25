@@ -37,11 +37,30 @@
 
         function moveAxisWithCollision(axis, amount) {
             if (!amount) return false;
+            const beforeX = player.x;
+            const beforeY = player.y;
             const result = gridMoveCardinal(player, axis === 'x' ? amount : 0, axis === 'y' ? amount : 0, {
                 kind: 'player',
                 maxStep: MOTION.maxStep
             });
-            return result.moved;
+            if (!result.moved) return false;
+
+            // Invierno: oso/estorbador ocupan espacio, pero no hacen daño de contacto.
+            // Si el jugador intenta atravesarlos, revertimos solo este paso físico.
+            if (gameState.biomeV49?.id === 'winter' && Array.isArray(gameState.enemies)) {
+                const hitbox = { left: player.x, right: player.x + player.width, top: player.y, bottom: player.y + player.height };
+                const blocked = gameState.enemies.some(e => {
+                    if (!e?.type?.winterRole) return false;
+                    const er = { left: e.x - e.width / 2, right: e.x + e.width / 2, top: e.y - e.height / 2, bottom: e.y + e.height / 2 };
+                    return hitbox.right > er.left && hitbox.left < er.right && hitbox.bottom > er.top && hitbox.top < er.bottom;
+                });
+                if (blocked) {
+                    player.x = beforeX;
+                    player.y = beforeY;
+                    return false;
+                }
+            }
+            return true;
         }
 
         function getLaneTarget(axis) {
@@ -121,6 +140,16 @@
 
             const desired = input.axis ? input : player.inputBuffer;
             const currentAxis = Math.abs(player.vx) > 0.01 ? 'x' : Math.abs(player.vy) > 0.01 ? 'y' : null;
+            const movementMods = typeof getMovementModifiersV47 === 'function'
+                ? getMovementModifiersV47()
+                : { acceleration: 1, braking: 1, turnCarrySpeed: 1, speedMultiplier: 1 };
+            const acceleration = MOTION.acceleration * Number(movementMods.acceleration || 1);
+            const braking = MOTION.braking * Number(movementMods.braking || 1);
+            const turnCarrySpeed = MOTION.turnCarrySpeed * Number(movementMods.turnCarrySpeed || 1);
+            const effectiveSpeedBase = player.speed * Number(movementMods.speedMultiplier || 1);
+            const effectiveSpeed = typeof getHazardSpeedFactor === 'function'
+                ? effectiveSpeedBase * getHazardSpeedFactor()
+                : effectiveSpeedBase;
             let axis = currentAxis;
             let turnEntrySpeed = 0;
             let turnCorrectionConsumed = false;
@@ -138,13 +167,11 @@
                 player._turnEntryDir = 0;
             }
             if (!desired) {
+                // Solo limpiamos el estado de giro aquí. El frenado físico se aplica
+                // una única vez en el bloque común del eje más abajo.
                 player._turnEntrySpeed = 0;
                 player._turnEntryAxis = null;
                 player._turnEntryDir = 0;
-                if (currentAxis === 'x') player.vx = approach(player.vx, 0, MOTION.braking * frameScale);
-                if (currentAxis === 'y') player.vy = approach(player.vy, 0, MOTION.braking * frameScale);
-                if (Math.abs(player.vx) <= MOTION.stopEpsilon) player.vx = 0;
-                if (Math.abs(player.vy) <= MOTION.stopEpsilon) player.vy = 0;
             } else if (!currentAxis) {
                 axis = desired.axis;
             } else if (currentAxis !== desired.axis) {
@@ -155,7 +182,7 @@
                 if (turnReady) {
                     // Primero intentamos el giro limpio en el centro del carril.
                     if (trySnapToLane(desired.axis)) {
-                        turnEntrySpeed = Math.abs(currentVelocity) * MOTION.turnCarrySpeed;
+                        turnEntrySpeed = Math.abs(currentVelocity) * turnCarrySpeed;
                         player._turnEntrySpeed = turnEntrySpeed;
                         player._turnEntryAxis = desired.axis;
                         player._turnEntryDir = desired.dir;
@@ -204,10 +231,6 @@
                 movementDirection = desired.dir;
             }
 
-            const effectiveSpeed = typeof getHazardSpeedFactor === 'function'
-                ? player.speed * getHazardSpeedFactor()
-                : player.speed;
-
             if (turnCorrectionConsumed && turnEntrySpeed <= 0) {
                 // La corrección lateral ya movió al personaje este frame. No
                 // aplicamos después otro desplazamiento sobre el eje longitudinal.
@@ -236,7 +259,7 @@
                     player.vx = approach(
                         player.vx,
                         target,
-                        (desired ? MOTION.acceleration : MOTION.braking) * frameScale
+                        (desired ? acceleration : braking) * frameScale
                     );
                 }
                 if (Math.abs(player.vx) < MOTION.stopEpsilon) player.vx = 0;
@@ -253,7 +276,7 @@
                     player.vy = approach(
                         player.vy,
                         target,
-                        (desired ? MOTION.acceleration : MOTION.braking) * frameScale
+                        (desired ? acceleration : braking) * frameScale
                     );
                 }
                 if (Math.abs(player.vy) < MOTION.stopEpsilon) player.vy = 0;

@@ -9,3 +9,10 @@
 .biome-transition-name{margin-top:12px;font:800 clamp(28px,6vw,56px)/1 Press Start 2P,sans-serif;color:var(--biome-accent,#7dd3fc);text-shadow:0 0 28px color-mix(in srgb,var(--biome-accent,#7dd3fc) 38%,transparent)}
 .biome-transition-range{margin-top:12px;font:600 11px/1.4 Inter,sans-serif;color:#e2e8f0;letter-spacing:.08em}
 @media(max-width:620px){.biome-progression-list{grid-template-columns:1fr}.biome-transition-name{font-size:26px;text-align:center}.biome-transition-range{font-size:10px}}
+/* v5.0 — run journey summary */
+.death-journey-wrap{margin-top:14px;padding-top:12px;border-top:1px solid rgba(148,163,184,.12)}
+.death-biome-list,.death-verb-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.death-biome-chip{display:inline-flex;flex-direction:column;gap:2px;padding:6px 8px;border:1px solid rgba(148,163,184,.16);border-radius:7px;background:rgba(15,23,42,.42);min-width:74px}
+.death-biome-chip strong{font-size:.63rem;color:#e2e8f0}.death-biome-chip small{font-size:.52rem;color:rgba(203,213,225,.55);text-transform:uppercase}
+.death-verb-chip{padding:5px 8px;border-radius:999px;background:rgba(125,211,252,.10);border:1px solid rgba(125,211,252,.18);font-size:.57rem;letter-spacing:.06em;color:#dbeafe}
+

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v5.4 — Biome Progression
+// Bomberman Roguelike v5.6 — Biome Progression
 // La progresión decide qué Theme está activo en cada profundidad.
 // No contiene lógica de mecánicas ni hazards: solo composición, etapas y transición.
 (function initBiomeProgressionV49(global) {
@@ -19,6 +19,14 @@
         Object.freeze({ id:'inferno', name:'Infierno', themeId:'inferno', rooms:ROOMS_PER_BIOME, accent:'#ff7043' })
     ]);
     const TOTAL_BIOME_DEPTHS = BIOME_PROGRESSION.reduce((sum, biome) => sum + biome.rooms, 0);
+    // El fallback no puede depender de STAGE_ROLES de 41-biome-journey.js: ese
+    // módulo tiene un scope aislado y se carga después de este registro.
+    const STAGE_ROLE_IDS_V56 = Object.freeze({
+        1: 'introduction',
+        2: 'reinforcement',
+        3: 'combination',
+        4: 'exam'
+    });
     const BIOME_STAGE_PROFILES_V51 = Object.freeze({
         winter: Object.freeze({
             1: Object.freeze({
@@ -205,7 +213,7 @@
         const id = typeof biomeOrId === 'string' ? biomeOrId : biomeOrId?.id;
         const safeStage = Math.max(1, Math.min(ROOMS_PER_BIOME, Number(stage) || 1));
         const profile = BIOME_STAGE_PROFILES_V51[id]?.[safeStage];
-        if (!profile) return Object.freeze({ role: STAGE_ROLES[safeStage]?.id || 'introduction', lesson: '', mechanics: {}, hazards: {}, generation: {} });
+        if (!profile) return Object.freeze({ role: STAGE_ROLE_IDS_V56[safeStage] || 'introduction', lesson: '', mechanics: {}, hazards: {}, generation: {} });
         return profile;
     }
 

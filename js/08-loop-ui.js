@@ -1,4 +1,4 @@
-// Bomberman Roguelike v5.3 — Game loop, HUD, run flow, rewards, death summary and bootstrap
+// Bomberman Roguelike v5.6 — Game loop, HUD, run flow, rewards, death summary and bootstrap
         function gameLoop(timestamp) {
             if (!gameState.isPlaying) { gameState.rafId = 0; return; }
             let dt = timestamp - gameState.lastTime;
@@ -147,6 +147,8 @@
         window.BOMBER_ENGINE = window.BOMBER_ENGINE || {};
         window.BOMBER_ENGINE.startDepthForTest = startDepthForTestV53;
         window.BOMBER_ENGINE.nextDepth = () => { startNextDepth(); return gameState.level; };
+        window.BOMBER_ENGINE.getMaxRunDepth = getMaxRunDepthV56;
+        window.BOMBER_ENGINE.completeRun = completeRunV56;
 
         function buildRewardChoices() {
             const choices = [];
@@ -171,7 +173,45 @@
             }
         }
 
+        function getMaxRunDepthV56() {
+            const summary = typeof getBiomeProgressionSummaryV49 === 'function'
+                ? getBiomeProgressionSummaryV49()
+                : null;
+            return Math.max(1, Number(summary?.totalDepths) || 44);
+        }
+
+        function completeRunV56() {
+            const maxDepth = getMaxRunDepthV56();
+            gameState.level = maxDepth;
+            gameState.isPlaying = false;
+            gameState.paused = false;
+            if (typeof gameState.rafId === 'number' && gameState.rafId && typeof cancelAnimationFrame === 'function') {
+                cancelAnimationFrame(gameState.rafId);
+            }
+            gameState.rafId = 0;
+            if (typeof clearRunSaveV55 === 'function') clearRunSaveV55();
+            document.getElementById('level-complete-screen')?.classList.add('hidden');
+            const summary = typeof finishRun === 'function' ? finishRun('completed') : null;
+            document.getElementById('game-over-screen')?.classList.remove('hidden');
+            updateRoguePresentation();
+            updateUI(true);
+            return summary;
+        }
+
+        function advanceAfterRewardV56() {
+            if (gameState.level >= getMaxRunDepthV56()) {
+                completeRunV56();
+                return false;
+            }
+            startNextDepth();
+            return true;
+        }
+
         function startNextDepth() {
+            if (gameState.level >= getMaxRunDepthV56()) {
+                completeRunV56();
+                return;
+            }
             gameState.level++;
             document.getElementById('level-complete-screen').classList.add('hidden');
             player.isInvincible = false;
@@ -224,7 +264,7 @@
                 `;
                 card.addEventListener('click', () => {
                     applyReward(reward);
-                    startNextDepth();
+                    advanceAfterRewardV56();
                 }, { once: true });
                 options.appendChild(card);
             });
@@ -234,7 +274,7 @@
             skip.textContent = 'NO ELEGIR · +15¢';
             skip.addEventListener('click', () => {
                 gameState.coins += 15;
-                startNextDepth();
+                advanceAfterRewardV56();
             }, { once: true });
             footer.appendChild(skip);
 
@@ -267,13 +307,13 @@
                 card.className = 'upgrade-card reward-card';
                 card.style.setProperty('--rarity', RARITY_COLORS[reward.rarity]);
                 card.innerHTML = `<div class="reward-rarity">${reward.rarity}</div>${reward.category ? `<div class="relic-category-badge" style="--relic-category:${getRelicCategoryColor(reward.category)}">${getRelicCategoryLabel(reward.category)}</div>` : ''}<div class="reward-name">${reward.name}</div><div class="reward-desc">${reward.desc}</div>`;
-                card.addEventListener('click', () => { applyReward(reward); startNextDepth(); }, { once: true });
+                card.addEventListener('click', () => { applyReward(reward); advanceAfterRewardV56(); }, { once: true });
                 options.appendChild(card);
             });
             const skip = document.createElement('button');
             skip.className = 'reward-secondary';
             skip.textContent = 'NO ELEGIR · +15¢';
-            skip.addEventListener('click', () => { gameState.coins += 15; startNextDepth(); }, { once: true });
+            skip.addEventListener('click', () => { gameState.coins += 15; advanceAfterRewardV56(); }, { once: true });
             footer.appendChild(skip);
             updateUI();
         }

@@ -211,6 +211,7 @@ function finishRun(source = 'unknown') {
     RUN_LIFECYCLE.lastSummary = {
         runNumber: Number(gameState.runNumber) || 1,
         depth: finalDepth,
+        completed: String(source || '') === 'completed',
         score: finalScore,
         coins: finalCoins,
         kills: finalKills,
@@ -250,7 +251,13 @@ function renderDeathSummary(summary) {
     set('go-time', formatRunTime(summary.elapsedMs));
     set('go-best', summary.bestDepth);
     set('go-best-score', summary.bestScore);
-    set('go-cause', summary.cause);
+    set('go-cause', summary.completed ? 'Completaste todas las profundidades' : summary.cause);
+    const gameOverTitle = document.querySelector('#game-over-screen .death-title');
+    const gameOverKicker = document.querySelector('#game-over-screen .death-kicker');
+    const gameOver = document.getElementById('game-over-screen');
+    if (gameOverTitle) gameOverTitle.textContent = summary.completed ? '¡VICTORIA!' : 'GAME OVER';
+    if (gameOverKicker) gameOverKicker.textContent = summary.completed ? 'RUN COMPLETADA' : 'RUN TERMINADA';
+    gameOver?.classList.toggle('run-complete', !!summary.completed);
     const journeyBiomes = document.getElementById('go-biome-list');
     if (journeyBiomes) journeyBiomes.innerHTML = summary.journey.visitedBiomes.length
         ? summary.journey.visitedBiomes.map(item => `<span class="death-biome-chip"><strong>${item.name}</strong><small>${item.verb || ''}</small></span>`).join('')
@@ -265,8 +272,10 @@ function renderDeathSummary(summary) {
         const parts = [];
         if (summary.newBestDepth) parts.push('NUEVA PROFUNDIDAD');
         if (summary.newBestScore) parts.push('NUEVO PUNTAJE');
-        record.textContent = parts.length ? `✦ ${parts.join(' · ')}` : 'RUN FINALIZADA';
-        record.classList.toggle('record-new', parts.length > 0);
+        record.textContent = summary.completed
+            ? `✦ RUN COMPLETADA${parts.length ? ` · ${parts.join(' · ')}` : ''}`
+            : (parts.length ? `✦ ${parts.join(' · ')}` : 'RUN FINALIZADA');
+        record.classList.toggle('record-new', parts.length > 0 || !!summary.completed);
     }
 
     const relicList = document.getElementById('go-relic-list');
@@ -281,6 +290,5 @@ function renderDeathSummary(summary) {
         }
     }
 
-    const gameOver = document.getElementById('game-over-screen');
     gameOver?.classList.add('death-ready');
 }

@@ -57,7 +57,61 @@
                 hazards: Object.freeze({ blizzard: Object.freeze({ initialDelayMs: 3500, intervalMs: 11500, maxActive: 1 }) }),
                 generation: Object.freeze({ blockDensityBonus: 0.03 })
             })
-        })
+        }),
+        inferno: Object.freeze({
+            1: Object.freeze({
+                role: 'introduction',
+                lesson: 'Moverse antes de que el suelo cierre la oportunidad.',
+                mechanics: Object.freeze({
+                    darkness: Object.freeze({ visibility: Object.freeze({ radius: 170, midStop: 0.52, midAlpha: 0.28, outerAlpha: 0.84 }) })
+                }),
+                hazards: Object.freeze({
+                    lava: Object.freeze({ initialDelayMs: 6500, intervalMs: 8500, maxActive: 1 }),
+                    lightning: Object.freeze({ enabled: false }),
+                    landslide: Object.freeze({ enabled: false })
+                }),
+                generation: Object.freeze({ blockDensityBonus: -0.01 })
+            }),
+            2: Object.freeze({
+                role: 'reinforcement',
+                lesson: 'Romper, avanzar y no quedarse donde el calor se acumula.',
+                mechanics: Object.freeze({
+                    darkness: Object.freeze({ visibility: Object.freeze({ radius: 152, midStop: 0.48, midAlpha: 0.34, outerAlpha: 0.88 }) })
+                }),
+                hazards: Object.freeze({
+                    lava: Object.freeze({ initialDelayMs: 5000, intervalMs: 6800, maxActive: 2 }),
+                    lightning: Object.freeze({ initialDelayMs: 9000, intervalMs: 15000, maxActive: 1 }),
+                    landslide: Object.freeze({ enabled: false })
+                }),
+                generation: Object.freeze({ blockDensityBonus: 0.01 })
+            }),
+            3: Object.freeze({
+                role: 'combination',
+                lesson: 'Combina presión temporal, oscuridad y rutas que se abren bajo fuego.',
+                mechanics: Object.freeze({
+                    darkness: Object.freeze({ visibility: Object.freeze({ radius: 136, midStop: 0.44, midAlpha: 0.40, outerAlpha: 0.91 }) })
+                }),
+                hazards: Object.freeze({
+                    lava: Object.freeze({ initialDelayMs: 3800, intervalMs: 5200, maxActive: 2 }),
+                    lightning: Object.freeze({ initialDelayMs: 7000, intervalMs: 11200, maxActive: 1 }),
+                    landslide: Object.freeze({ initialDelayMs: 9800, intervalMs: 14000, maxActive: 1 })
+                }),
+                generation: Object.freeze({ blockDensityBonus: 0.025 })
+            }),
+            4: Object.freeze({
+                role: 'exam',
+                lesson: 'Corre contra el reloj, lee el espacio y decide dónde romper antes de que cierre.',
+                mechanics: Object.freeze({
+                    darkness: Object.freeze({ visibility: Object.freeze({ radius: 118, midStop: 0.40, midAlpha: 0.46, outerAlpha: 0.94 }) })
+                }),
+                hazards: Object.freeze({
+                    lava: Object.freeze({ initialDelayMs: 2600, intervalMs: 4100, maxActive: 3 }),
+                    lightning: Object.freeze({ initialDelayMs: 4200, intervalMs: 7800, maxActive: 2 }),
+                    landslide: Object.freeze({ initialDelayMs: 7200, intervalMs: 9800, maxActive: 1 })
+                }),
+                generation: Object.freeze({ blockDensityBonus: 0.05 })
+            })
+        }),
     });
 
     const runtime = { installed:false, originalInitLevel:null, originalUpdateRoguePresentation:null, originalDraw:null, lastBiomeId:null, transitionTimer:0, transitionNode:null };

@@ -78,7 +78,7 @@
 
     function themeHazardIds() {
         const theme = typeof global.getThemeV46 === 'function' ? global.getThemeV46() : null;
-        return Array.isArray(theme?.hazards) ? theme.hazards.filter(id => !!HAZARDS[id]) : [];
+        return Array.isArray(theme?.hazards) ? theme.hazards.filter(id => !!HAZARDS[id] && getHazardConfig(id).enabled !== false) : [];
     }
 
     function activeCount(kind) {

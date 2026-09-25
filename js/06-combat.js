@@ -183,6 +183,12 @@
             // V3.11: IA de enemigos aislada y con pathfinding dosificado.
             updateEnemyAI(dt);
 
+            // v5.3: revalidar la salida también cuando el último enemigo desaparece
+            // por una ruta distinta al evento de explosión. Evita salas sin transición.
+            if (typeof tryUnlockExitV44 === 'function' && gameState.dungeonV44?.fixedEnemyCount) {
+                tryUnlockExitV44();
+            }
+
             // Contacto jugador-enemigo: separado del movimiento para que la IA
             // no pueda romper accidentalmente el sistema de daño.
             for (let j = gameState.enemies.length - 1; j >= 0; j--) {

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v5.1 — Game loop, HUD, run flow, rewards, death summary and bootstrap
+// Bomberman Roguelike v5.3 — Game loop, HUD, run flow, rewards, death summary and bootstrap
         function gameLoop(timestamp) {
             if (!gameState.isPlaying) { gameState.rafId = 0; return; }
             let dt = timestamp - gameState.lastTime;
@@ -103,6 +103,48 @@
             updateUI(true);
             gameState.rafId = requestAnimationFrame(gameLoop);
         }
+
+        function startDepthForTestV53(targetDepth) {
+            const maxDepth = typeof getBiomeProgressionSummaryV49 === 'function'
+                ? Number(getBiomeProgressionSummaryV49().totalDepths) || 44
+                : 44;
+            const depth = Math.max(1, Math.min(maxDepth, Math.floor(Number(targetDepth) || 1)));
+            document.getElementById('start-screen')?.classList.add('hidden');
+            document.getElementById('main-menu')?.classList.add('run-active');
+            document.getElementById('game-over-screen')?.classList.add('hidden');
+            document.getElementById('level-complete-screen')?.classList.add('hidden');
+            document.getElementById('pause-screen')?.classList.add('hidden');
+            gameState.level = depth;
+            gameState.isPlaying = false;
+            gameState.paused = false;
+            gameState.rafId = 0;
+            player.isInvincible = false;
+            player.invincibleTimer = 0;
+            player.lastDamageFrame = -1;
+            gameState.lastMoveInputAt = 0;
+            if (typeof resetBombHandlingState === 'function') resetBombHandlingState();
+            if (typeof combatFeedback !== 'undefined') {
+                combatFeedback.hitStop = 0;
+                combatFeedback.flash = 0;
+                combatFeedback.playerHit = 0;
+                combatFeedback.death = 0;
+                combatFeedback.playerRecoilX = 0;
+                combatFeedback.playerRecoilY = 0;
+            }
+            initLevel();
+            gameState.isPlaying = true;
+            gameState.paused = false;
+            gameState.lastTime = performance.now();
+            updateRoguePresentation();
+            updateUI(true);
+            if (gameState.rafId) cancelAnimationFrame(gameState.rafId);
+            gameState.rafId = requestAnimationFrame(gameLoop);
+            return depth;
+        }
+
+        window.startDepthForTestV53 = startDepthForTestV53;
+        window.BOMBER_ENGINE = window.BOMBER_ENGINE || {};
+        window.BOMBER_ENGINE.startDepthForTest = startDepthForTestV53;
 
         function buildRewardChoices() {
             const choices = [];

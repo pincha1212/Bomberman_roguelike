@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOMBERMAN ROGUELIKE — v4.9</title>
+    <title>BOMBERMAN ROGUELIKE — v5.0</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/main.css">
 </head>
@@ -14,7 +14,7 @@
             <aside class="menu-rail menu-rail-left" aria-label="Resumen de la aventura">
                 <div class="menu-rail-top">
                     <span class="menu-kicker">BOMBERMAN ROGUELIKE</span>
-                    <span class="menu-version">v4.9</span>
+                    <span class="menu-version">v5.0</span>
                 </div>
                 <div class="menu-rail-content">
                     <div class="menu-mark">💣</div>
@@ -82,6 +82,12 @@
                     <div class="death-relics-wrap">
                         <div class="death-section-label">RELIQUIAS CONSEGUIDAS <span id="go-relics">0</span></div>
                         <div id="go-relic-list" class="death-relic-list"></div>
+                    </div>
+                    <div class="death-journey-wrap">
+                        <div class="death-section-label">BIOMAS RECORRIDOS</div>
+                        <div id="go-biome-list" class="death-biome-list"></div>
+                        <div class="death-section-label">VERBOS DESCUBIERTOS</div>
+                        <div id="go-verb-list" class="death-verb-list"></div>
                     </div>
                     <button id="btn-restart" class="btn-pixel death-restart">NUEVA RUN</button>
                 </div>
@@ -179,7 +185,7 @@
         </div>
     </div>
 <!-- v3.28 modular JavaScript. Feedback is layered over the existing combat/runtime systems. -->
-    <script src="js/01-core.js?v=4.9.0"></script>
+    <script src="js/01-core.js?v=5.0.0"></script>
     <script src="js/35-device-quality.js?v=4.5.0"></script>
     <script src="js/37-theme.js?v=4.9.0"></script>
     <script src="js/38-mechanics-registry.js?v=4.9.0"></script>
@@ -198,12 +204,13 @@
     <script src="js/07-render.js?v=4.6.2"></script>
     <script src="js/09-camera.js?v=3.27.0"></script>
     <script src="js/10-feedback.js?v=4.6.2"></script>
-    <script src="js/17-run-lifecycle.js?v=4.2.0"></script>
+    <script src="js/17-run-lifecycle.js?v=5.0.0"></script>
     <script src="js/08-loop-ui.js?v=3.29.0"></script>
     <script src="js/27-boss-system.js?v=4.2.0"></script>
     <script src="js/29-feedback-system.js?v=4.6.2"></script>
     <script src="js/31-roguelike-update.js?v=3.27.0"></script>
     <script src="js/39-hazards.js?v=4.9.0"></script>
-    <script src="js/40-biome-progression.js?v=4.9.0"></script>
+    <script src="js/40-biome-progression.js?v=5.0.0"></script>
+    <script src="js/41-biome-journey.js?v=5.0.0"></script>
 </body>
 </html>

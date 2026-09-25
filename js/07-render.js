@@ -236,59 +236,20 @@ function draw() {
                 : true;
             if (!visible) return;
 
-            // Una sola animación primaria: respiración/reposo o bob de movimiento.
-            // Sin aura pulsante + cuerpo desplazado + partículas animadas a la vez.
-            const t = Number(ghost.visualTime || 0) * 0.001;
-            const bob = ghost.moving
-                ? Math.sin(t * 10) * 1.25
-                : Math.sin(t * 2.2) * 0.8;
-            const alpha = ghost.hitFlash > 0 ? 0.96 : 0.78;
-            const cx = ghost.x + ghost.width / 2;
-            const cy = ghost.y + ghost.height / 2 + bob;
+            // El eco utiliza EXACTAMENTE el mismo diseño geométrico del jugador.
+            // La diferencia es monocromática + alpha 0.50. No hay aura, ojos,
+            // partículas ni una segunda animación superpuesta.
+            drawBombermanSprite(ghost.x, ghost.y, ghost, { ghost: true });
 
-            ctx.save();
-            ctx.globalAlpha = alpha;
-
-            // Sombra única y estable.
-            ctx.fillStyle = 'rgba(15,23,42,.48)';
-            ctx.beginPath();
-            ctx.ellipse(cx, ghost.y + ghost.height, ghost.width * 0.34, 3.5, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Silueta fantasma compacta.
-            ctx.fillStyle = '#c4b5fd';
-            ctx.strokeStyle = '#f5f3ff';
-            ctx.lineWidth = 1.75;
-            ctx.beginPath();
-            ctx.arc(cx, cy - 4, ghost.width * 0.29, Math.PI, 0);
-            ctx.lineTo(ghost.x + ghost.width * 0.80, cy + ghost.height * 0.30);
-            ctx.lineTo(ghost.x + ghost.width * 0.63, cy + ghost.height * 0.21);
-            ctx.lineTo(cx, cy + ghost.height * 0.31);
-            ctx.lineTo(ghost.x + ghost.width * 0.37, cy + ghost.height * 0.21);
-            ctx.lineTo(ghost.x + ghost.width * 0.20, cy + ghost.height * 0.30);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-
-            // Ojos fijos. No tienen su propia animación.
-            ctx.fillStyle = '#312e81';
-            ctx.fillRect(cx - 6, cy - 7, 3, 4);
-            ctx.fillRect(cx + 3, cy - 7, 3, 4);
-
-            // El indicador de vida no se anima: solo comunica estado.
+            // UI mínima de mini-jefe, sin alterar el cuerpo del personaje.
             const barWidth = ghost.width * 0.92;
             const healthRatio = ghost.maxHealth > 0 ? ghost.health / ghost.maxHealth : 0;
-            ctx.fillStyle = 'rgba(15,23,42,.85)';
+            ctx.save();
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = '#000000';
             ctx.fillRect(ghost.x + (ghost.width - barWidth) / 2, ghost.y - 8, barWidth, 3);
-            ctx.fillStyle = '#ddd6fe';
+            ctx.fillStyle = '#ffffff';
             ctx.fillRect(ghost.x + (ghost.width - barWidth) / 2, ghost.y - 8, barWidth * Math.max(0, Math.min(1, healthRatio)), 3);
-
-            ctx.font = '8px Arial, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom';
-            ctx.fillStyle = '#f5f3ff';
-            ctx.globalAlpha = 0.92;
-            ctx.fillText('ECO', cx, ghost.y - 11);
             ctx.restore();
         }
 
@@ -354,21 +315,32 @@ function draw() {
             ctx.fillText('🚪', x + 10, y + 32);
         }
 
-        function drawBombermanSprite(x, y) {
+        function drawBombermanSprite(x, y, actor = player, options = {}) {
             ctx.save();
 
-            const fsmState = typeof playerFSMGetState === 'function'
+            const isGhost = options.ghost === true;
+            const actorWidth = Number(actor.width) || Number(player.width) || TILE_SIZE * 0.68;
+            const actorHeight = Number(actor.height) || Number(player.height) || TILE_SIZE * 0.68;
+            const actorDir = ['up', 'down', 'left', 'right'].includes(actor.dir) ? actor.dir : 'down';
+            if (isGhost) {
+                // Misma geometría del jugador; solo cambia la composición visual.
+                ctx.filter = 'grayscale(1) contrast(1.18)';
+                ctx.globalAlpha = 0.5;
+            }
+            const walkCycle = Number(actor.walkCycle ?? ((actor.visualTime || 0) * 0.015));
+            const fsmState = !isGhost && typeof playerFSMGetState === 'function'
                 ? playerFSMGetState()
-                : (player.isMoving ? 'CAMINANDO' : 'QUIETO');
-            const walkingAnimation = fsmState === 'CAMINANDO';
-            const plantingAnimation = fsmState === 'PONIENDO_BOMBA';
-            const deadAnimation = fsmState === 'MUERTO';
+                : (actor.isMoving ? 'CAMINANDO' : 'QUIETO');
+            const walkingAnimation = actor.isMoving || fsmState === 'CAMINANDO';
+            const plantingAnimation = !isGhost && fsmState === 'PONIENDO_BOMBA';
+            const deadAnimation = !isGhost && fsmState === 'MUERTO';
 
             // v5.7: el render solo consume la FSM; no cambia gameplay ni estado.
             let bounce = plantingAnimation
                 ? Math.sin(gameState.animFrame * 0.24) * 1.5
-                : Math.sin(player.walkCycle * 4) * (walkingAnimation ? 3 : 1);
-            const recoil = getPlayerRenderRecoil();
+                : Math.sin(walkCycle * 4) * (walkingAnimation ? 3 : 1);
+            if (isGhost && !walkingAnimation) bounce = Math.sin(Number(actor.visualTime || 0) * 0.003) * 0.8;
+            const recoil = !isGhost && typeof getPlayerRenderRecoil === 'function' ? getPlayerRenderRecoil() : { x: 0, y: 0 };
             let px = x + recoil.x, py = y + bounce + recoil.y;
 
             if (deadAnimation) ctx.globalAlpha = 0.65;
@@ -376,101 +348,101 @@ function draw() {
             // Sombra
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('bombShadow') : 'rgba(0,0,0,0.5)';
             ctx.beginPath();
-            ctx.ellipse(px + player.width/2, y + player.height, player.width/2.2, 5, 0, 0, Math.PI*2);
+            ctx.ellipse(px + actorWidth/2, y + actorHeight, actorWidth/2.2, 5, 0, 0, Math.PI*2);
             ctx.fill();
 
             // Burbuja de Escudo
             if (plantingAnimation) {
                 ctx.strokeStyle = typeof themeColorV46 === 'function' ? themeColorV46('bombPlayerRing') : 'rgba(34, 211, 238, 0.78)';
                 ctx.lineWidth = 2;
-                ctx.globalAlpha = deadAnimation ? 0.35 : 0.8;
+                ctx.globalAlpha = isGhost ? 0.5 : (deadAnimation ? 0.35 : 0.8);
                 ctx.beginPath();
-                ctx.arc(px + player.width / 2, py + player.height / 2, player.width * (0.58 + Math.sin(gameState.animFrame * 0.35) * 0.05), 0, Math.PI * 2);
+                ctx.arc(px + actorWidth / 2, py + actorHeight / 2, actorWidth * (0.58 + Math.sin(gameState.animFrame * 0.35) * 0.05), 0, Math.PI * 2);
                 ctx.stroke();
-                ctx.globalAlpha = deadAnimation ? 0.65 : 1;
+                ctx.globalAlpha = isGhost ? 0.5 : (deadAnimation ? 0.65 : 1);
             }
 
-            if (player.hasShield) {
+            if (actor.hasShield) {
                 ctx.strokeStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerShield') : 'rgba(56, 189, 248, 0.8)';
                 ctx.lineWidth = 4;
                 ctx.beginPath();
-                ctx.arc(px + player.width/2, py + player.height/2, player.width*0.8, 0, Math.PI*2);
+                ctx.arc(px + actorWidth/2, py + actorHeight/2, actorWidth*0.8, 0, Math.PI*2);
                 ctx.stroke();
             }
 
             // Traje (Azul)
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerSuit') : '#2563eb';
-            ctx.fillRect(px + 6, py + 12, player.width - 12, player.height - 16);
+            ctx.fillRect(px + 6, py + 12, actorWidth - 12, actorHeight - 16);
             
             // Cinturón
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerDark') : '#0f172a';
-            ctx.fillRect(px + 6, py + 22, player.width - 12, 4);
+            ctx.fillRect(px + 6, py + 22, actorWidth - 12, 4);
             // Hebilla
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerBuckle') : '#facc15';
-            if (player.dir === 'down') {
-                ctx.fillRect(px + player.width/2 - 4, py + 21, 8, 6);
-            } else if (player.dir === 'left') {
+            if (actorDir === 'down') {
+                ctx.fillRect(px + actorWidth/2 - 4, py + 21, 8, 6);
+            } else if (actorDir === 'left') {
                 ctx.fillRect(px + 4, py + 21, 4, 6);
-            } else if (player.dir === 'right') {
-                ctx.fillRect(px + player.width - 8, py + 21, 4, 6);
+            } else if (actorDir === 'right') {
+                ctx.fillRect(px + actorWidth - 8, py + 21, 4, 6);
             }
 
             // Casco (Blanco)
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerHelmet') : '#f8fafc';
             ctx.beginPath();
-            ctx.arc(px + player.width/2, py + 10, 14, 0, Math.PI*2);
+            ctx.arc(px + actorWidth/2, py + 10, 14, 0, Math.PI*2);
             ctx.fill();
 
             // Rostro Direccional
-            if (player.dir === 'down') {
+            if (actorDir === 'down') {
                 ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerFace') : '#ffedd5';
-                ctx.fillRect(px + player.width/2 - 9, py + 4, 18, 11);
+                ctx.fillRect(px + actorWidth/2 - 9, py + 4, 18, 11);
                 ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerDark') : '#0f172a';
-                ctx.fillRect(px + player.width/2 - 5, py + 7, 3, 6);
-                ctx.fillRect(px + player.width/2 + 2, py + 7, 3, 6);
-            } else if (player.dir === 'left') {
+                ctx.fillRect(px + actorWidth/2 - 5, py + 7, 3, 6);
+                ctx.fillRect(px + actorWidth/2 + 2, py + 7, 3, 6);
+            } else if (actorDir === 'left') {
                 ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerFace') : '#ffedd5';
-                ctx.fillRect(px + player.width/2 - 12, py + 4, 14, 11);
+                ctx.fillRect(px + actorWidth/2 - 12, py + 4, 14, 11);
                 ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerDark') : '#0f172a';
-                ctx.fillRect(px + player.width/2 - 7, py + 7, 3, 6);
-            } else if (player.dir === 'right') {
+                ctx.fillRect(px + actorWidth/2 - 7, py + 7, 3, 6);
+            } else if (actorDir === 'right') {
                 ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerFace') : '#ffedd5';
-                ctx.fillRect(px + player.width/2 - 2, py + 4, 14, 11);
+                ctx.fillRect(px + actorWidth/2 - 2, py + 4, 14, 11);
                 ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerDark') : '#0f172a';
-                ctx.fillRect(px + player.width/2 + 4, py + 7, 3, 6);
+                ctx.fillRect(px + actorWidth/2 + 4, py + 7, 3, 6);
             }
 
             // Antena
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerMetal') : '#94a3b8'; 
-            ctx.fillRect(px + player.width/2 - 2, py - 6, 4, 4);
+            ctx.fillRect(px + actorWidth/2 - 2, py - 6, 4, 4);
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerAccent') : '#ec4899'; 
             ctx.beginPath();
-            ctx.arc(px + player.width/2, py - 8, 5, 0, Math.PI*2);
+            ctx.arc(px + actorWidth/2, py - 8, 5, 0, Math.PI*2);
             ctx.fill();
 
             // Guantes
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerAccent') : '#ec4899';
-            if (player.dir !== 'right') { 
+            if (actorDir !== 'right') { 
                 ctx.beginPath(); ctx.arc(px + 2, py + 18, 5, 0, Math.PI*2); ctx.fill();
             }
-            if (player.dir !== 'left') { 
-                ctx.beginPath(); ctx.arc(px + player.width - 2, py + 18, 5, 0, Math.PI*2); ctx.fill();
+            if (actorDir !== 'left') { 
+                ctx.beginPath(); ctx.arc(px + actorWidth - 2, py + 18, 5, 0, Math.PI*2); ctx.fill();
             }
 
             // Pies (Zapatos Rojos) animando
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerBoot') : '#dc2626';
-            let leftFootY = py + player.height - 4 + (walkingAnimation && Math.floor(player.walkCycle*4)%2===0 ? -4 : 0);
-            let rightFootY = py + player.height - 4 + (walkingAnimation && Math.floor(player.walkCycle*4)%2===1 ? -4 : 0);
+            let leftFootY = py + actorHeight - 4 + (walkingAnimation && Math.floor(walkCycle*4)%2===0 ? -4 : 0);
+            let rightFootY = py + actorHeight - 4 + (walkingAnimation && Math.floor(walkCycle*4)%2===1 ? -4 : 0);
             
-            if (player.dir === 'right') {
-                ctx.beginPath(); ctx.ellipse(px + player.width/2 - 2, leftFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.ellipse(px + player.width/2 + 6, rightFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
-            } else if (player.dir === 'left') {
-                ctx.beginPath(); ctx.ellipse(px + player.width/2 - 6, leftFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.ellipse(px + player.width/2 + 2, rightFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
+            if (actorDir === 'right') {
+                ctx.beginPath(); ctx.ellipse(px + actorWidth/2 - 2, leftFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(px + actorWidth/2 + 6, rightFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
+            } else if (actorDir === 'left') {
+                ctx.beginPath(); ctx.ellipse(px + actorWidth/2 - 6, leftFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(px + actorWidth/2 + 2, rightFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
             } else {
                 ctx.beginPath(); ctx.ellipse(px + 8, leftFootY, 5, 4, 0, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.ellipse(px + player.width - 8, rightFootY, 5, 4, 0, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(px + actorWidth - 8, rightFootY, 5, 4, 0, 0, Math.PI*2); ctx.fill();
             }
 
             ctx.restore();

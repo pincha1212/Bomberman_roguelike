@@ -493,8 +493,12 @@ const UI = {};
             if (depth === 1) return ROOM_TYPES.STANDARD;
             const roll = Math.random();
             const biomeStage = typeof getBiomeStageV49 === 'function' ? getBiomeStageV49(depth) : null;
-            // v5.0: el cierre de cada bioma es su examen. El boss pasa a la etapa 4.
-            if (biomeStage === 4) return ROOM_TYPES.BOSS;
+            const biomeMeta = typeof getBiomeMetadataV49 === 'function' ? getBiomeMetadataV49(depth) : null;
+            // v5.1: el primer slice de Invierno llega a la etapa 4 sin boss.
+            if (biomeStage === 4) {
+                if (biomeMeta?.bossEnabled === false) return ROOM_TYPES[biomeMeta.examRoomType] || ROOM_TYPES.ELITE;
+                return ROOM_TYPES.BOSS;
+            }
             if (depth % 5 === 1 && depth > 1) return ROOM_TYPES.SHRINE;
             if (roll < 0.16) return ROOM_TYPES.ELITE;
             if (roll < 0.34) return ROOM_TYPES.TREASURE;
@@ -562,7 +566,8 @@ const UI = {};
             totalKills: 0,
             bestDepth: Number(localStorage.getItem('bombermanBestDepth') || 0),
             dungeonV44: null,
-            runJourneyV50: { visitedBiomes: [], discoveredVerbs: [], currentBiomeId: null, currentStage: 1, maxDepth: 0 }
+            runJourneyV50: { visitedBiomes: [], discoveredVerbs: [], currentBiomeId: null, currentStage: 1, maxDepth: 0 },
+            runHistoryV51: null
         };
 
         let player = {

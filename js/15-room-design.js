@@ -657,9 +657,10 @@ function buildBombermanDungeonV44() {
     const levelFactor = Math.min(0.12, Math.max(0, gameState.level - 1) * 0.008);
     const roomBonus = Number(gameState.roomType?.blockBonus || 0);
     const diffBonus = Number(gameState.difficulty?.blockDensityBonus || 0);
+    const biomeGenerationBonus = Number(gameState.biomeV49?.stageConfig?.generation?.blockDensityBonus || 0);
     const density = Math.max(
         BOMBERMAN_DUNGEON_V44.blockDensityMin,
-        Math.min(BOMBERMAN_DUNGEON_V44.blockDensityMax, 0.60 + levelFactor + roomBonus + diffBonus)
+        Math.min(BOMBERMAN_DUNGEON_V44.blockDensityMax, 0.60 + levelFactor + roomBonus + diffBonus + biomeGenerationBonus)
     );
 
     let destructible = 0;

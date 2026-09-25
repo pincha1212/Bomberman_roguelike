@@ -6,7 +6,7 @@
 
     const ROOMS_PER_BIOME = 4;
     const BIOME_PROGRESSION = Object.freeze([
-        Object.freeze({ id:'winter', name:'Invierno', themeId:'winter', rooms:ROOMS_PER_BIOME, accent:'#7dd3fc' }),
+        Object.freeze({ id:'winter', name:'Invierno', themeId:'winter', rooms:ROOMS_PER_BIOME, accent:'#7dd3fc', bossEnabled:false, examRoomType:'ELITE' }),
         Object.freeze({ id:'autumn', name:'Otoño', themeId:'autumn', rooms:ROOMS_PER_BIOME, accent:'#f59e0b' }),
         Object.freeze({ id:'spring', name:'Primavera', themeId:'spring', rooms:ROOMS_PER_BIOME, accent:'#86efac' }),
         Object.freeze({ id:'summer', name:'Verano', themeId:'summer', rooms:ROOMS_PER_BIOME, accent:'#fbbf24' }),
@@ -19,6 +19,46 @@
         Object.freeze({ id:'inferno', name:'Infierno', themeId:'inferno', rooms:ROOMS_PER_BIOME, accent:'#ff7043' })
     ]);
     const TOTAL_BIOME_DEPTHS = BIOME_PROGRESSION.reduce((sum, biome) => sum + biome.rooms, 0);
+    const BIOME_STAGE_PROFILES_V51 = Object.freeze({
+        winter: Object.freeze({
+            1: Object.freeze({
+                role: 'introduction',
+                lesson: 'Aprende a frenar antes de necesitar frenar.',
+                mechanics: Object.freeze({
+                    slippery: Object.freeze({ movement: Object.freeze({ acceleration: 0.96, braking: 0.62, turnCarrySpeed: 1.02, speedMultiplier: 1 }) })
+                }),
+                hazards: Object.freeze({ blizzard: Object.freeze({ initialDelayMs: 9000, intervalMs: 22000, maxActive: 1 }) }),
+                generation: Object.freeze({ blockDensityBonus: -0.03 })
+            }),
+            2: Object.freeze({
+                role: 'reinforcement',
+                lesson: 'Planea el siguiente movimiento con la inercia ya activa.',
+                mechanics: Object.freeze({
+                    slippery: Object.freeze({ movement: Object.freeze({ acceleration: 0.93, braking: 0.48, turnCarrySpeed: 1.06, speedMultiplier: 1 }) })
+                }),
+                hazards: Object.freeze({ blizzard: Object.freeze({ initialDelayMs: 7000, intervalMs: 18000, maxActive: 1 }) }),
+                generation: Object.freeze({ blockDensityBonus: -0.01 })
+            }),
+            3: Object.freeze({
+                role: 'combination',
+                lesson: 'Combina deslizamiento, bombas y presión ambiental.',
+                mechanics: Object.freeze({
+                    slippery: Object.freeze({ movement: Object.freeze({ acceleration: 0.90, braking: 0.38, turnCarrySpeed: 1.09, speedMultiplier: 1 }) })
+                }),
+                hazards: Object.freeze({ blizzard: Object.freeze({ initialDelayMs: 5500, intervalMs: 14500, maxActive: 1 }) }),
+                generation: Object.freeze({ blockDensityBonus: 0.01 })
+            }),
+            4: Object.freeze({
+                role: 'exam',
+                lesson: 'Demuestra que puedes controlar el deslizamiento bajo presión.',
+                mechanics: Object.freeze({
+                    slippery: Object.freeze({ movement: Object.freeze({ acceleration: 0.87, braking: 0.30, turnCarrySpeed: 1.12, speedMultiplier: 1 }) })
+                }),
+                hazards: Object.freeze({ blizzard: Object.freeze({ initialDelayMs: 3500, intervalMs: 11500, maxActive: 1 }) }),
+                generation: Object.freeze({ blockDensityBonus: 0.03 })
+            })
+        })
+    });
 
     const runtime = { installed:false, originalInitLevel:null, originalUpdateRoguePresentation:null, originalDraw:null, lastBiomeId:null, transitionTimer:0, transitionNode:null };
 
@@ -55,8 +95,18 @@
             rooms: biome.rooms,
             startDepth: BIOME_PROGRESSION.slice(0, BIOME_PROGRESSION.findIndex(b => b.id === biome.id)).reduce((n,b) => n+b.rooms,1),
             endDepth: BIOME_PROGRESSION.slice(0, BIOME_PROGRESSION.findIndex(b => b.id === biome.id)+1).reduce((n,b) => n+b.rooms,0),
-            accent: biome.accent
+            accent: biome.accent,
+            bossEnabled: biome.bossEnabled !== false,
+            examRoomType: biome.examRoomType || 'BOSS'
         });
+    }
+
+    function getBiomeStageConfigV51(biomeOrId, stage) {
+        const id = typeof biomeOrId === 'string' ? biomeOrId : biomeOrId?.id;
+        const safeStage = Math.max(1, Math.min(ROOMS_PER_BIOME, Number(stage) || 1));
+        const profile = BIOME_STAGE_PROFILES_V51[id]?.[safeStage];
+        if (!profile) return Object.freeze({ role: STAGE_ROLES[safeStage]?.id || 'introduction', lesson: '', mechanics: {}, hazards: {}, generation: {} });
+        return profile;
     }
 
     function getBiomeRunLabelV49(depth) {
@@ -113,7 +163,7 @@
     function applyBiomeForDepthV49(depth, showTransition = true) {
         const meta = getBiomeMetadataV49(depth);
         if (typeof global.setActiveThemeV46 === 'function') global.setActiveThemeV46(meta.themeId, false);
-        if (typeof gameState !== 'undefined') gameState.biomeV49 = { id: meta.id, themeId: meta.themeId, name: meta.nombre, stage: meta.stage, startDepth: meta.startDepth, endDepth: meta.endDepth };
+        if (typeof gameState !== 'undefined') gameState.biomeV49 = { id: meta.id, themeId: meta.themeId, name: meta.nombre, stage: meta.stage, startDepth: meta.startDepth, endDepth: meta.endDepth, bossEnabled: meta.bossEnabled, examRoomType: meta.examRoomType, stageConfig: getBiomeStageConfigV51(meta.id, meta.stage) };
         syncBiomeUi(meta);
         if (typeof global.registerBiomeVisitV50 === 'function') global.registerBiomeVisitV50(meta);
         if (typeof global.touchRunDepthV50 === 'function') global.touchRunDepthV50(Number(depth) || 1);
@@ -147,11 +197,13 @@
     global.getBiomeStageV49 = getBiomeStageV49;
     global.getBiomeMetadataV49 = getBiomeMetadataV49;
     global.getBiomeRunLabelV49 = getBiomeRunLabelV49;
+    global.getBiomeStageConfigV51 = getBiomeStageConfigV51;
     global.getBiomeProgressionSummaryV49 = () => ({ totalBiomes:BIOME_PROGRESSION.length, roomsPerBiome:ROOMS_PER_BIOME, totalDepths:TOTAL_BIOME_DEPTHS });
     global.BOMBER_ENGINE = global.BOMBER_ENGINE || {};
     global.BOMBER_ENGINE.getBiomeProgression = () => BIOME_PROGRESSION.map(b => ({ ...b }));
     global.BOMBER_ENGINE.getBiomeForDepth = getBiomeForDepthV49;
     global.BOMBER_ENGINE.getBiomeMetadata = getBiomeMetadataV49;
+    global.BOMBER_ENGINE.getBiomeStageConfig = getBiomeStageConfigV51;
 
     if (global.document?.readyState === 'loading') global.document.addEventListener('DOMContentLoaded', bootstrap, { once:true });
     else bootstrap();

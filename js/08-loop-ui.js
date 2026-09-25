@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.15 — Game loop, HUD, run flow, rewards, death summary and bootstrap
+// Bomberman Roguelike v5.1 — Game loop, HUD, run flow, rewards, death summary and bootstrap
         function gameLoop(timestamp) {
             if (!gameState.isPlaying) { gameState.rafId = 0; return; }
             let dt = timestamp - gameState.lastTime;
@@ -79,11 +79,14 @@
 
         function updateRoguePresentation() {
             const runNode = UI['run-banner'];
-            if (runNode) runNode.textContent = `RUN ${String(gameState.runNumber || 1).padStart(2, '0')} · DEPTH ${String(gameState.level).padStart(2, '0')}`;
+            if (!runNode) return;
+            const biomeLabel = typeof getBiomeRunLabelV49 === 'function' ? getBiomeRunLabelV49(gameState.level) : null;
+            runNode.textContent = biomeLabel
+                ? `RUN ${String(gameState.runNumber || 1).padStart(2, '0')} · ${biomeLabel.toUpperCase()} · DEPTH ${String(gameState.level).padStart(2, '0')}`
+                : `RUN ${String(gameState.runNumber || 1).padStart(2, '0')} · DEPTH ${String(gameState.level).padStart(2, '0')}`;
         }
 
         function startGame() {
-            document.body?.classList.add('run-active');
             document.getElementById('start-screen').classList.add('hidden');
             document.getElementById('main-menu')?.classList.add('run-active');
             document.getElementById('game-over-screen').classList.add('hidden');

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v5.0 — Death & Restart Lifecycle
+// Bomberman Roguelike v5.1 — Death & Restart Lifecycle
 // Mantiene estadísticas de la run, cierre de muerte y reinicio limpio.
 
 const RUN_LIFECYCLE = {
@@ -105,6 +105,7 @@ function resetWorldRuntimeState() {
     gameState.runElapsedMs = 0;
     gameState.biomeV49 = null;
     gameState.runJourneyV50 = typeof createJourneyStateV50 === 'function' ? createJourneyStateV50() : { visitedBiomes: [], discoveredVerbs: [], currentBiomeId: null, currentStage: 1, maxDepth: 0 };
+    gameState.runHistoryV51 = null;
     gameState.rafId = 0;
 
     if (typeof resetRelicModifiers === 'function') resetRelicModifiers();
@@ -191,6 +192,8 @@ function finishRun(source = 'unknown') {
     }
 
     const finalDepth = Number(gameState.level) || 1;
+    if (typeof recordRunEventV51 === 'function') recordRunEventV51('run_finished', { cause: String(source || 'unknown'), depth: finalDepth });
+    const history = typeof getRunHistorySummaryV51 === 'function' ? getRunHistorySummaryV51() : null;
     const finalScore = Number(gameState.score) || 0;
     const finalCoins = Number(gameState.coins) || 0;
     const finalKills = Number(gameState.totalKills) || 0;
@@ -220,6 +223,7 @@ function finishRun(source = 'unknown') {
         })),
         elapsedMs: finalTime,
         journey,
+        history,
         cause: getDeathCauseLabel(source),
         bestDepth,
         bestScore,

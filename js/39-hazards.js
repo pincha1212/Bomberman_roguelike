@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.8 — Hazards Registry
+// Bomberman Roguelike v4.9 — Hazards Registry
 // Los hazards son entidades/timers independientes del Theme y del Mechanics Registry.
 (function initHazardsRegistryV48(global) {
     'use strict';
@@ -143,6 +143,7 @@
             ];
             const gust = gusts[h.gustIndex];
             pushPlayer(gust.axis, gust.dir * 5.5);
+            if (typeof global.recordRunEventV51 === 'function') global.recordRunEventV51('hazard_interaction', { kind: 'blizzard', interaction: 'gust', axis: gust.axis, dir: gust.dir });
         }
     }
 
@@ -294,6 +295,32 @@
         landslide: Object.freeze({ id: 'landslide', nombre: 'Derrumbes', intervalMs: 7200, initialDelayMs: 6000, maxActive: 2, create: landslideCreate, update: landslideUpdate })
     });
 
+
+    function mergeConfig(base, override) {
+        if (!base || typeof base !== 'object') return override && typeof override === 'object' ? { ...override } : {};
+        if (!override || typeof override !== 'object') return { ...base };
+        const result = { ...base };
+        for (const [key, value] of Object.entries(override)) {
+            if (value && typeof value === 'object' && !Array.isArray(value) && result[key] && typeof result[key] === 'object' && !Array.isArray(result[key])) result[key] = mergeConfig(result[key], value);
+            else result[key] = value;
+        }
+        return result;
+    }
+
+    function getHazardConfig(kind) {
+        const theme = typeof global.getThemeV46 === 'function' ? global.getThemeV46() : null;
+        const themeConfig = theme?.hazardConfig?.[kind] || {};
+        const stageConfig = (typeof gameState !== 'undefined' ? gameState.biomeV49?.stageConfig?.hazards?.[kind] : null) || {};
+        return mergeConfig(themeConfig, stageConfig);
+    }
+
+    function getHazardDefinition(kind) {
+        const base = HAZARDS[kind];
+        if (!base) return null;
+        const config = getHazardConfig(kind);
+        return { ...base, ...config, config };
+    }
+
     function jitter(intervalMs) {
         const span = intervalMs * 0.22;
         return intervalMs - span + Math.random() * span * 2;
@@ -306,7 +333,8 @@
         HAZARD_RUNTIME.roomToken += 1;
         HAZARD_RUNTIME.cooldowns = Object.create(null);
         for (const id of themeHazardIds()) {
-            HAZARD_RUNTIME.cooldowns[id] = Math.max(1000, HAZARDS[id].initialDelayMs);
+            const def = getHazardDefinition(id);
+            HAZARD_RUNTIME.cooldowns[id] = Math.max(1000, Number(def?.initialDelayMs) || HAZARDS[id].initialDelayMs);
         }
         return true;
     }
@@ -315,17 +343,17 @@
         const state = getState();
         if (!state || !state.isPlaying || state.paused) return;
         for (const id of themeHazardIds()) {
-            const def = HAZARDS[id];
+            const def = getHazardDefinition(id);
             if (!def) continue;
             HAZARD_RUNTIME.cooldowns[id] = Math.max(0, Number(HAZARD_RUNTIME.cooldowns[id]) - dt);
             if (HAZARD_RUNTIME.cooldowns[id] > 0) continue;
-            if (activeCount(id) >= def.maxActive || state.environmentHazards.length >= HAZARD_LIMIT) {
+            if (activeCount(id) >= Number(def.maxActive) || state.environmentHazards.length >= HAZARD_LIMIT) {
                 HAZARD_RUNTIME.cooldowns[id] = 250;
                 continue;
             }
             const entity = def.create();
             if (entity) state.environmentHazards.push(entity);
-            HAZARD_RUNTIME.cooldowns[id] = jitter(def.intervalMs);
+            HAZARD_RUNTIME.cooldowns[id] = jitter(Number(def.intervalMs) || HAZARDS[id].intervalMs);
         }
     }
 
@@ -461,8 +489,10 @@
     global.HazardV48 = Object.freeze({ reset: resetHazardsV48, update: updateHazardsV48, draw: drawHazardsV48 });
     global.getActiveHazardIdsV48 = themeHazardIds;
     global.getHazardRegistryV48 = () => ({ ...HAZARDS });
+    global.getHazardConfigV49 = getHazardConfig;
     global.BOMBER_ENGINE = global.BOMBER_ENGINE || {};
     global.BOMBER_ENGINE.getHazardRegistry = () => ({ ...HAZARDS });
+    global.BOMBER_ENGINE.getHazardConfig = getHazardConfig;
     global.BOMBER_ENGINE.getActiveHazardIds = themeHazardIds;
     global.BOMBER_ENGINE.getHazardEntities = () => [...(getState()?.environmentHazards || [])];
 

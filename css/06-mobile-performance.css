@@ -1,0 +1,15 @@
+/* v6.5 — Mobile: mostrar lo necesario durante el combate. */
+@media (max-width: 820px), (pointer: coarse) {
+    body.mobile-performance-low #run-banner,
+    body.mobile-performance-low #room-banner,
+    body.mobile-performance-low #danger-indicator,
+    body.mobile-performance-low #ui-score-badge,
+    body.mobile-performance-low #ui-coins-badge,
+    body.mobile-performance-low #ui-threat-badge,
+    body.mobile-performance-low #ui-relics-badge {
+        display: none !important;
+    }
+    body.mobile-performance-medium #ui-score-badge,
+    body.mobile-performance-medium #ui-coins-badge,
+    body.mobile-performance-medium #ui-relics-badge { display: none !important; }
+}

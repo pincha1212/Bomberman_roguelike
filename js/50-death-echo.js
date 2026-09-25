@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.3.1 — Eco de Muerte
+// Bomberman Roguelike v6.5.1 — Eco de Muerte
 // Un eco persistente por profundidad, inspirado en el concepto de fantasma
 // vengativo: conserva una copia inmutable del build que murió y la reutiliza
 // como enemigo autónomo en futuros intentos.
@@ -13,8 +13,8 @@
 (function installDeathEchoV631(global) {
     'use strict';
 
-    const VERSION = '6.3.1';
-    const COMPATIBLE_VERSIONS = new Set(['6.3.0', '6.3.1']);
+    const VERSION = '6.5.1';
+    const COMPATIBLE_VERSIONS = new Set(['6.3.0', '6.3.1', '6.5.1']);
     if (global.__DEATH_ECHO_V631_INSTALLED__) return;
     global.__DEATH_ECHO_V631_INSTALLED__ = true;
 
@@ -190,19 +190,26 @@
     }
 
     function nearestSpawnTile(origin, playerTile) {
-        const ox = clamp(Math.floor(number(origin?.x, 1)), 1, gameState.gridWidth - 2);
-        const oy = clamp(Math.floor(number(origin?.y, 1)), 1, gameState.gridHeight - 2);
-        const candidates = [];
-
-        // El eco debe aparecer en una zona que el jugador pueda ver al entrar
-        // en la profundidad. No dependemos de 07-render para resolverlo.
-        const cameraX = Number(gameState.camera?.x) || 0;
-        const cameraY = Number(gameState.camera?.y) || 0;
-        const viewRight = cameraX + Number(global.canvas?.width || 600);
-        const viewBottom = cameraY + Number(global.canvas?.height || 600);
-        const margin = TILE_SIZE * 0.25;
+        // v6.5.1: el eco aparece en la esquina inferior izquierda del mapa
+        // para dar al jugador un inicio más fácil. La casilla (1, H-2) es
+        // la esquina interior porque el perímetro exterior está amurallado.
+        const preferred = {
+            x: 1,
+            y: Math.max(1, gameState.gridHeight - 2)
+        };
         const minSeparation = 4;
 
+        if (
+            isPassableTile(preferred.x, preferred.y) &&
+            !bombAtTile(preferred.x, preferred.y) &&
+            (Math.abs(preferred.x - playerTile.x) + Math.abs(preferred.y - playerTile.y)) >= minSeparation
+        ) {
+            return preferred;
+        }
+
+        // Si la esquina exacta está ocupada, buscamos la casilla pasable más
+        // cercana a esa esquina, manteniendo una distancia mínima del jugador.
+        const candidates = [];
         for (let y = 1; y < gameState.gridHeight - 1; y++) {
             for (let x = 1; x < gameState.gridWidth - 1; x++) {
                 if (!isPassableTile(x, y) || bombAtTile(x, y)) continue;
@@ -210,52 +217,24 @@
                 const targetDistance = Math.abs(x - playerTile.x) + Math.abs(y - playerTile.y);
                 if (targetDistance < minSeparation) continue;
 
-                const worldX = x * TILE_SIZE + TILE_SIZE / 2;
-                const worldY = y * TILE_SIZE + TILE_SIZE / 2;
-                const visibleAtEntry =
-                    worldX >= cameraX + margin &&
-                    worldX <= viewRight - margin &&
-                    worldY >= cameraY + margin &&
-                    worldY <= viewBottom - margin;
-
-                if (!visibleAtEntry) continue;
-
-                const savedDistance = Math.abs(x - ox) + Math.abs(y - oy);
-                candidates.push({ x, y, targetDistance, savedDistance, visibleAtEntry });
+                const cornerDistance = Math.abs(x - preferred.x) + Math.abs(y - preferred.y);
+                candidates.push({ x, y, cornerDistance, targetDistance });
             }
         }
 
-        // Prioridad: visible al entrar → conservar cercanía al cadáver original
-        // → separación razonable del jugador → orden determinista.
-        if (candidates.length) {
-            candidates.sort((a, b) =>
-                a.savedDistance - b.savedDistance ||
-                a.targetDistance - b.targetDistance ||
-                a.y - b.y ||
-                a.x - b.x
-            );
-            return candidates[0];
-        }
-
-        // Fallback seguro para mapas/viewport excepcionales.
-        const fallback = [];
-        for (let y = 1; y < gameState.gridHeight - 1; y++) {
-            for (let x = 1; x < gameState.gridWidth - 1; x++) {
-                if (!isPassableTile(x, y) || bombAtTile(x, y)) continue;
-                fallback.push({
-                    x, y,
-                    targetDistance: Math.abs(x - playerTile.x) + Math.abs(y - playerTile.y),
-                    savedDistance: Math.abs(x - ox) + Math.abs(y - oy)
-                });
-            }
-        }
-        fallback.sort((a, b) =>
-            Math.abs(a.targetDistance - 5) - Math.abs(b.targetDistance - 5) ||
-            a.savedDistance - b.savedDistance ||
-            a.y - b.y ||
-            a.x - b.x
+        candidates.sort((a, b) =>
+            a.cornerDistance - b.cornerDistance ||
+            b.y - a.y ||
+            a.x - b.x ||
+            b.targetDistance - a.targetDistance
         );
-        return fallback[0] || { x: 1, y: 1 };
+
+        if (candidates.length) return candidates[0];
+
+        // Fallback de último recurso para mapas excepcionales.
+        const ox = clamp(Math.floor(number(origin?.x, 1)), 1, gameState.gridWidth - 2);
+        const oy = clamp(Math.floor(number(origin?.y, 1)), 1, gameState.gridHeight - 2);
+        return { x: ox, y: oy };
     }
 
     function tileFromGhost(ghost) {

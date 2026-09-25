@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.1 — Eco de Muerte
+// Bomberman Roguelike v6.3.1 — Eco de Muerte
 // Un eco persistente por profundidad, inspirado en el concepto de fantasma
 // vengativo: conserva una copia inmutable del build que murió y la reutiliza
 // como enemigo autónomo en futuros intentos.
@@ -10,12 +10,13 @@
 // - Sus bombas entran al sistema de bombas/eventos existente con owner propio.
 // - La IA es determinista por decisión: persigue, busca alineación y huye de
 //   explosiones predecibles después de colocar una bomba.
-(function installDeathEchoV63(global) {
+(function installDeathEchoV631(global) {
     'use strict';
 
-    const VERSION = '6.3.0';
-    if (global.__DEATH_ECHO_V63_INSTALLED__) return;
-    global.__DEATH_ECHO_V63_INSTALLED__ = true;
+    const VERSION = '6.3.1';
+    const COMPATIBLE_VERSIONS = new Set(['6.3.0', '6.3.1']);
+    if (global.__DEATH_ECHO_V631_INSTALLED__) return;
+    global.__DEATH_ECHO_V631_INSTALLED__ = true;
 
     const STORAGE_KEY = 'bombermanDeathEchoesV63';
     const MAX_ECHOES = 44;
@@ -84,7 +85,7 @@
     function getEcho(depth) {
         const store = readStore();
         const echo = store[String(depth)];
-        if (!echo || echo.version !== VERSION) return null;
+        if (!echo || !COMPATIBLE_VERSIONS.has(String(echo.version))) return null;
         return echo;
     }
 
@@ -429,9 +430,27 @@
         return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
     }
 
+    function canGhostTraceRouteToPlayer(ghost, danger = collectDangerCells()) {
+        if (!ghost || typeof player === 'undefined' || !player) return false;
+        const start = tileFromGhost(ghost);
+        const target = tileFromPlayer();
+        if (!isInsideGrid(start.x, start.y) || !isInsideGrid(target.x, target.y)) return false;
+
+        // La ruta puede rodear bombas/explosiones, pero no puede atravesar
+        // paredes ni otras celdas físicamente bloqueadas. Si el jugador está
+        // separado por una barrera, el eco NO tiene ataque válido todavía.
+        return pathDistance(start, target, danger) < 999;
+    }
+
     function chooseTwoTileBombTarget(ghost) {
         const target = tileFromPlayer();
         const danger = collectDangerCells();
+
+        // Regla fundamental del mini-jefe: primero tiene que existir una ruta
+        // trazable hasta el jugador. Si está encerrado detrás de paredes, no
+        // lanza bombas a distancia ni "adivina" ataques atravesándolas.
+        if (!canGhostTraceRouteToPlayer(ghost, danger)) return null;
+
         const candidates = [];
         const directions = [[1,0],[-1,0],[0,1],[0,-1]];
 
@@ -445,6 +464,12 @@
                 : [];
             const hitsPlayer = blastCells.some(cell => Number(cell.x) === target.x && Number(cell.y) === target.y);
             const attackDistance = pathDistance(tileFromGhost(ghost), { x, y }, danger);
+
+            // También exigimos ruta hasta la propia casilla de lanzamiento.
+            // Esto evita que el eco ataque desde una "posición imposible"
+            // aunque el jugador sí sea alcanzable por otro camino.
+            if (attackDistance >= 999) continue;
+
             const safePlayerExits = directions.reduce((count, [sx, sy]) => {
                 const ex = target.x + sx;
                 const ey = target.y + sy;
@@ -721,9 +746,9 @@
             state.decisionTimer = DECISION_MS;
             state.aiStep++;
 
-            // Prioridad 1: ataque espacial. Siempre intenta colocar la bomba
-            // exactamente a 2 casilleros del jugador, eligiendo el sector que
-            // mejor limita sus salidas.
+            // Prioridad 1: ataque espacial. Solo existe si el eco puede trazar
+            // una ruta físicamente válida hasta el jugador y, además, hasta la
+            // casilla concreta desde la que lanzará la bomba.
             const attackTarget = chooseTwoTileBombTarget(ghost);
             if (attackTarget) createGhostBomb(ghost, attackTarget);
 
@@ -792,7 +817,7 @@
         if (levels.length > MAX_ECHOES) errors.push(`Exceso de ecos persistidos: ${levels.length}`);
         for (const level of levels) {
             const echo = stored[level];
-            if (!echo || echo.version !== VERSION) errors.push(`Eco inválido en profundidad ${level}`);
+            if (!echo || !COMPATIBLE_VERSIONS.has(String(echo.version))) errors.push(`Eco inválido en profundidad ${level}`);
             if (!echo?.build || !Number.isFinite(Number(echo.build.bombRange))) errors.push(`Build inválida en profundidad ${level}`);
         }
 
@@ -827,6 +852,7 @@
     global.BOMBER_ENGINE.getActiveDeathEcho = getActiveDeathEchoV61;
     global.BOMBER_ENGINE.getPersistedDeathEcho = getEcho;
     global.BOMBER_ENGINE.auditDeathEcho = auditDeathEchoV61;
+    global.BOMBER_ENGINE.canDeathEchoTracePlayer = canGhostTraceRouteToPlayer;
 
     bootstrap();
 })(window);

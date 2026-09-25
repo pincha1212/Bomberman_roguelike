@@ -8,7 +8,7 @@
 (function installMaterialFieldV60(global) {
     'use strict';
 
-    const VERSION = '6.0.0';
+    const VERSION = '6.6.0';
     const EVENT = global.GAME_EVENTS_V60?.BOMBA_EXPLOTO || global.GAME_EVENTS_V59?.BOMBA_EXPLOTO;
     const LISTENER_KEY = 'bomb-explosion:materials';
     const MAX_RESIDUES = 360;
@@ -22,7 +22,11 @@
         ELECTRIC: 'electric',
         STEAM: 'steam',
         BURNING_OIL: 'burning_oil',
-        ELECTRIC_WATER: 'electric_water'
+        ELECTRIC_WATER: 'electric_water',
+        ICE: 'ice',
+        SLICK_ICE: 'slick_ice',
+        PACKED_ICE: 'packed_ice',
+        FROZEN_OIL: 'frozen_oil'
     });
 
     const MATERIAL_DEFS = Object.freeze({
@@ -102,6 +106,41 @@
             persistent: false,
             damage: true
         })
+,
+        [MATERIALS.ICE]: Object.freeze({
+            label: 'Hielo',
+            color: '#dff6ff',
+            core: '#ffffff',
+            lifeMs: 4000,
+            persistent: true,
+            damage: false
+        }),
+        [MATERIALS.SLICK_ICE]: Object.freeze({
+            label: 'Hielo pulido',
+            color: '#a5e4ff',
+            core: '#effcff',
+            lifeMs: 12000,
+            persistent: true,
+            damage: false
+        }),
+        [MATERIALS.PACKED_ICE]: Object.freeze({
+            label: 'Hielo compacto',
+            color: '#7dd3fc',
+            core: '#e0f2fe',
+            lifeMs: 3000,
+            persistent: true,
+            blocks: true,
+            damage: false
+        }),
+        [MATERIALS.FROZEN_OIL]: Object.freeze({
+            label: 'Aceite congelado',
+            color: '#8b5a2b',
+            core: '#d6a15d',
+            lifeMs: 8000,
+            persistent: true,
+            flammable: false,
+            damage: false
+        })
     });
 
     // Commutative reaction table. The first key is normalized so FIRE+WATER
@@ -110,7 +149,9 @@
         ['fire|water', Object.freeze({ result: MATERIALS.STEAM, lifeMs: 650, amount: 70, message: 'VAPOR' })],
         ['fire|oil', Object.freeze({ result: MATERIALS.BURNING_OIL, lifeMs: 3300, amount: 100, message: 'ACEITE EN LLAMAS' })],
         ['electric|water', Object.freeze({ result: MATERIALS.ELECTRIC_WATER, lifeMs: 850, amount: 90, message: 'AGUA ELECTRIFICADA' })],
-        ['acid|water', Object.freeze({ result: MATERIALS.WATER, lifeMs: 3000, amount: 45, message: 'ÁCIDO DILUIDO' })]
+        ['acid|water', Object.freeze({ result: MATERIALS.WATER, lifeMs: 3000, amount: 45, message: 'ÁCIDO DILUIDO' })],
+        ['fire|ice', Object.freeze({ result: MATERIALS.WATER, lifeMs: 3000, amount: 70, message: 'SE DERRITE' })],
+        ['ice|water', Object.freeze({ result: MATERIALS.SLICK_ICE, lifeMs: 12000, amount: 90, message: 'HIELO PULIDO' })]
     ]);
 
     function getState() {
@@ -445,9 +486,12 @@
         if (global.__MATERIAL_FIELD_V60__) return true;
         global.gameEventBus.on(EVENT, (payload) => {
             const cells = Array.isArray(payload?.cells) ? payload.cells : [];
+            const state = getState();
+            const winter = String(state?.biomeV49?.id || '') === 'winter';
+            const blastMaterial = winter ? MATERIALS.ICE : MATERIALS.FIRE;
             for (const cell of cells) {
                 if (!cell) continue;
-                deposit(MATERIALS.FIRE, cell.x, cell.y, cell.block ? 40 : 62, { source: 'bomb' });
+                deposit(blastMaterial, cell.x, cell.y, cell.block ? 40 : 62, { source: winter ? 'bomb-winter' : 'bomb' });
             }
         }, { key: LISTENER_KEY });
         global.__MATERIAL_FIELD_V60__ = true;

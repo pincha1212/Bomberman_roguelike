@@ -701,7 +701,10 @@
 
         renderCtx.save();
         const size = Number(global.BOMBER_ENGINE?.getTileSize?.() || TILE_SIZE || 48);
+        const renderBudget = Number(global.getBomberRenderProfileV65?.().bombEffectBudget) || 360;
+        let rendered = 0;
         for (const field of fields) {
+            if (rendered >= renderBudget) break;
             const def = definition(field.effectId);
             if (!def) continue;
             const alpha = clamp(0.10 + Number(field.intensity || 1) * 0.15, 0.10, 0.34);
@@ -714,6 +717,7 @@
             renderCtx.strokeStyle = def.core;
             renderCtx.lineWidth = 2;
             renderCtx.strokeRect(x + 7, y + 7, size - 14, size - 14);
+            rendered++;
         }
         renderCtx.restore();
         renderCtx.globalAlpha = 1;

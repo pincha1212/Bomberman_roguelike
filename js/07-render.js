@@ -112,6 +112,12 @@ function isWorldTileVisibleV329(tileX, tileY, margin = 1){
     return isWorldRectVisibleV329(tileX*TILE_SIZE, tileY*TILE_SIZE, TILE_SIZE, TILE_SIZE, margin*TILE_SIZE);
 }
 
+function getRenderProfileV65() {
+    return typeof getBomberRenderProfileV65 === 'function'
+        ? getBomberRenderProfileV65()
+        : { particleBudget: 96, floaterBudget: 24, bombEffectBudget: 360, showAmbientDust: true, showLighting: true, showCombatFeedback: true, showRoomDecor: true, showEnemyAISignals: true, showBombRangePreview: true, useCanvasFilter: true };
+}
+
 function draw() {
             updateRenderViewportV329();
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('background') : '#090d16';
@@ -143,7 +149,7 @@ function draw() {
             }
 
             // V3.13: acentos espaciales; las salas se leen en el propio piso, sin minimapa.
-            if (typeof drawRoomDesignLayerV313 === 'function') drawRoomDesignLayerV313();
+            if (getRenderProfileV65().showRoomDecor && typeof drawRoomDesignLayerV313 === 'function') drawRoomDesignLayerV313();
 
             // v6.0: residuos materiales persistentes; quedan por debajo de items, bombas y personajes.
             if (typeof drawMaterialResiduesV60 === 'function') drawMaterialResiduesV60(ctx);
@@ -165,7 +171,7 @@ function draw() {
                 const bombPos = typeof getBombV4WorldPosition === 'function' ? getBombV4WorldPosition(b) : {x:(b.x + .5) * TILE_SIZE, y:(b.y + .5) * TILE_SIZE};
                 if(!isWorldRectVisibleV329(bombPos.x - TILE_SIZE * .55, bombPos.y - TILE_SIZE * .55, TILE_SIZE * 1.1, TILE_SIZE * 1.1, TILE_SIZE)) continue;
                 renderStatsV329.bombs++;
-                renderBombRangePreview(b);
+                if (getRenderProfileV65().showBombRangePreview) renderBombRangePreview(b);
                 drawBombSprite(bombPos.x, bombPos.y, b);
             }
             drawBombChainLinks();
@@ -181,7 +187,7 @@ function draw() {
                 const e=gameState.enemies[i];
                 if(e && isWorldRectVisibleV329(e.x-e.width/2, e.y-e.height/2, e.width, e.height, TILE_SIZE)){ renderStatsV329.enemies++; drawEnemySprite(e); }
             }
-            if (typeof drawEnemyAISignals === 'function') drawEnemyAISignals();
+            if (getRenderProfileV65().showEnemyAISignals && typeof drawEnemyAISignals === 'function') drawEnemyAISignals();
 
             // v6.1: eco persistente del intento anterior. Se dibuja antes del boss
             // y del jugador para conservar la jerarquía visual actual.
@@ -197,7 +203,8 @@ function draw() {
             }
 
             // Draw Particles: el presupuesto visual es menor que el de simulación.
-            const particleLimit = Math.min(gameState.particles.length, largeSupport.renderParticleBudget || gameState.particles.length);
+            const profileV65 = getRenderProfileV65();
+            const particleLimit = Math.min(gameState.particles.length, Number(profileV65.particleBudget) || 24);
             for(let i=Math.max(0, gameState.particles.length-particleLimit); i<gameState.particles.length; i++){
                 const p=gameState.particles[i];
                 if(!p || !isWorldRectVisibleV329(p.x, p.y, p.size || 1, p.size || 1, TILE_SIZE)) continue;
@@ -208,7 +215,7 @@ function draw() {
 
             // Draw Floater Texts
             if (gameState.floaters.length) ctx.font = '10px "Press Start 2P"';
-            for(let i=Math.max(0, gameState.floaters.length-24); i<gameState.floaters.length; i++){
+            for(let i=Math.max(0, gameState.floaters.length-(Number(profileV65.floaterBudget) || 8)); i<gameState.floaters.length; i++){
                 const f=gameState.floaters[i];
                 if(!f || !isWorldRectVisibleV329(f.x, f.y-16, 80, 20, TILE_SIZE)) continue;
                 renderStatsV329.floaters++;
@@ -220,9 +227,9 @@ function draw() {
 
             ctx.restore();
 
-            drawAmbientDust();
-            drawLighting();
-            renderCombatFeedback();
+            if (getRenderProfileV65().showAmbientDust) drawAmbientDust();
+            if (getRenderProfileV65().showLighting) drawLighting();
+            if (getRenderProfileV65().showCombatFeedback) renderCombatFeedback();
         }
 
         function drawDeathEchoV61() {
@@ -325,8 +332,8 @@ function draw() {
             const actorHeight = Number(actor.height) || Number(player.height) || TILE_SIZE * 0.68;
             const actorDir = ['up', 'down', 'left', 'right'].includes(actor.dir) ? actor.dir : 'down';
             if (isGhost) {
-                // Misma geometría del jugador; solo cambia la composición visual.
-                ctx.filter = 'grayscale(1) contrast(1.18)';
+                // En móvil bajo evitamos ctx.filter, que es costoso en algunos Canvas 2D.
+                if (getRenderProfileV65().useCanvasFilter) ctx.filter = 'grayscale(1) contrast(1.18)';
                 ctx.globalAlpha = 0.5;
             }
             const walkCycle = Number(actor.walkCycle ?? ((actor.visualTime || 0) * 0.015));

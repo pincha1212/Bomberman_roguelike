@@ -226,7 +226,11 @@ function draw() {
         function drawDeathEchoV61() {
             // IMPORTANTE: el render usa la instancia activa, que contiene x/y/size.
             // Nunca debe dibujar directamente el snapshot persistido de localStorage.
+            // Compatibilidad API: la instancia activa se expone como getDeathEcho.
+            // Mantenemos getActiveDeathEcho como alias defensivo para evitar que un
+            // desajuste entre versiones vuelva a ocultar el eco.
             const ghost = gameState.deathEchoV61
+                || (window.BOMBER_ENGINE?.getDeathEcho ? window.BOMBER_ENGINE.getDeathEcho(gameState.level) : null)
                 || (window.BOMBER_ENGINE?.getActiveDeathEcho ? window.BOMBER_ENGINE.getActiveDeathEcho(gameState.level) : null);
 
             if (!ghost || ghost.defeated) return;

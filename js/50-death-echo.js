@@ -188,22 +188,68 @@
         const oy = clamp(Math.floor(number(origin?.y, 1)), 1, gameState.gridHeight - 2);
         const candidates = [];
 
+        // El eco debe aparecer en una zona que el jugador pueda ver al entrar
+        // en la profundidad. No dependemos de 07-render para resolverlo.
+        const cameraX = Number(gameState.camera?.x) || 0;
+        const cameraY = Number(gameState.camera?.y) || 0;
+        const viewRight = cameraX + Number(global.canvas?.width || 600);
+        const viewBottom = cameraY + Number(global.canvas?.height || 600);
+        const margin = TILE_SIZE * 0.25;
+        const minSeparation = 4;
+
         for (let y = 1; y < gameState.gridHeight - 1; y++) {
             for (let x = 1; x < gameState.gridWidth - 1; x++) {
                 if (!isPassableTile(x, y) || bombAtTile(x, y)) continue;
+
                 const targetDistance = Math.abs(x - playerTile.x) + Math.abs(y - playerTile.y);
+                if (targetDistance < minSeparation) continue;
+
+                const worldX = x * TILE_SIZE + TILE_SIZE / 2;
+                const worldY = y * TILE_SIZE + TILE_SIZE / 2;
+                const visibleAtEntry =
+                    worldX >= cameraX + margin &&
+                    worldX <= viewRight - margin &&
+                    worldY >= cameraY + margin &&
+                    worldY <= viewBottom - margin;
+
+                if (!visibleAtEntry) continue;
+
                 const savedDistance = Math.abs(x - ox) + Math.abs(y - oy);
-                candidates.push({ x, y, targetDistance, savedDistance });
+                candidates.push({ x, y, targetDistance, savedDistance, visibleAtEntry });
             }
         }
 
-        candidates.sort((a, b) => {
-            const aSafe = a.targetDistance >= 5 ? 0 : 1;
-            const bSafe = b.targetDistance >= 5 ? 0 : 1;
-            return aSafe - bSafe || a.savedDistance - b.savedDistance || a.targetDistance - b.targetDistance || a.y - b.y || a.x - b.x;
-        });
+        // Prioridad: visible al entrar → conservar cercanía al cadáver original
+        // → separación razonable del jugador → orden determinista.
+        if (candidates.length) {
+            candidates.sort((a, b) =>
+                a.savedDistance - b.savedDistance ||
+                a.targetDistance - b.targetDistance ||
+                a.y - b.y ||
+                a.x - b.x
+            );
+            return candidates[0];
+        }
 
-        return candidates[0] || { x: 1, y: 1 };
+        // Fallback seguro para mapas/viewport excepcionales.
+        const fallback = [];
+        for (let y = 1; y < gameState.gridHeight - 1; y++) {
+            for (let x = 1; x < gameState.gridWidth - 1; x++) {
+                if (!isPassableTile(x, y) || bombAtTile(x, y)) continue;
+                fallback.push({
+                    x, y,
+                    targetDistance: Math.abs(x - playerTile.x) + Math.abs(y - playerTile.y),
+                    savedDistance: Math.abs(x - ox) + Math.abs(y - oy)
+                });
+            }
+        }
+        fallback.sort((a, b) =>
+            Math.abs(a.targetDistance - 5) - Math.abs(b.targetDistance - 5) ||
+            a.savedDistance - b.savedDistance ||
+            a.y - b.y ||
+            a.x - b.x
+        );
+        return fallback[0] || { x: 1, y: 1 };
     }
 
     function tileFromGhost(ghost) {
@@ -470,7 +516,10 @@
     }
 
     function syncDeathEchoV61() {
-        if (typeof gameState === 'undefined' || !gameState.isPlaying) return state.active;
+        // La materialización también debe funcionar durante initLevel, antes de
+        // que el caller marque isPlaying=true. Así el primer render ya encuentra
+        // una instancia activa del eco.
+        if (typeof gameState === 'undefined') return state.active;
         const level = Math.floor(number(gameState.level, 0));
         if (level < 1 || level > MAX_ECHOES) return null;
 
@@ -626,6 +675,7 @@
     // Renderer/API de runtime: siempre devuelve la instancia materializada,
     // nunca el snapshot crudo de localStorage.
     global.BOMBER_ENGINE.getDeathEcho = getActiveDeathEchoV61;
+    global.BOMBER_ENGINE.getActiveDeathEcho = getActiveDeathEchoV61;
     global.BOMBER_ENGINE.getPersistedDeathEcho = getEcho;
     global.BOMBER_ENGINE.auditDeathEcho = auditDeathEchoV61;
 

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.7.1.1 — Bomb Handling + shared bomb states
+// Bomberman Roguelike v6.7.1.2 — Bomb Handling + shared bomb states
 // Núcleo de colocación, retención segura, ocupación, mecha y cadenas.
 
 const BOMB_HANDLING = {
@@ -393,12 +393,46 @@ function kickBombV67(bomb,dx,dy){
     return true;
 }
 
+function getAdjacentPlayerBombV67(){
+    if(!player||player.kickTimer<=0||player.kickCooldown>0) return null;
+    const px=Math.floor((player.x+player.width/2)/TILE_SIZE);
+    const py=Math.floor((player.y+player.height/2)/TILE_SIZE);
+    const candidates=[
+        {dx:-1,dy:0},
+        {dx:1,dy:0},
+        {dx:0,dy:-1},
+        {dx:0,dy:1}
+    ];
+    const inputDir=getBombKickDirectionV67();
+
+    const scoreCandidate=(candidate)=>{
+        let score=0;
+        if(candidate.dx===inputDir.dx&&candidate.dy===inputDir.dy) score+=100;
+        if(candidate.dx===0&&candidate.dy===-1&&player.dir==='up') score+=30;
+        if(candidate.dx===0&&candidate.dy===1&&player.dir==='down') score+=30;
+        if(candidate.dx===-1&&candidate.dy===0&&player.dir==='left') score+=30;
+        if(candidate.dx===1&&candidate.dy===0&&player.dir==='right') score+=30;
+        return score;
+    };
+
+    const found=[];
+    for(const candidate of candidates){
+        const bomb=gameState.bombs.find(b=>
+            b&&b.owner==='player'&&
+            b.x===px+candidate.dx&&
+            b.y===py+candidate.dy&&
+            b.state===BOMB_V4_STATES.ARMED
+        );
+        if(bomb) found.push({bomb,...candidate,score:scoreCandidate(candidate)});
+    }
+    found.sort((a,b)=>b.score-a.score||a.dy-b.dy||a.dx-b.dx);
+    return found[0]||null;
+}
+
 function tryKickPlayerBombsV67(){
-    if(!player||player.kickTimer<=0||player.kickCooldown>0) return false;
-    const dir=getBombKickDirectionV67(); if(!dir.dx&&!dir.dy) return false;
-    const px=Math.floor((player.x+player.width/2)/TILE_SIZE), py=Math.floor((player.y+player.height/2)/TILE_SIZE);
-    const bomb=gameState.bombs.find(b=>b&&b.owner==='player'&&b.x===px+dir.dx&&b.y===py+dir.dy&&b.state===BOMB_V4_STATES.ARMED);
-    return !!bomb&&kickBombV67(bomb,dir.dx,dir.dy);
+    const candidate=getAdjacentPlayerBombV67();
+    if(!candidate) return false;
+    return kickBombV67(candidate.bomb,candidate.dx,candidate.dy);
 }
 
 function placeBomb(reason='manual'){

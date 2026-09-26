@@ -425,6 +425,16 @@ function getAdjacentPlayerBombV67(){
         );
         if(bomb) found.push({bomb,...candidate,score:scoreCandidate(candidate)});
     }
+
+    // Una dirección explícita manda: evitamos que una bomba lateral sea
+    // confundida con otra por el orden de candidatos cuando el jugador está
+    // tocando dos bombas a la vez.
+    if(inputDir.dx || inputDir.dy){
+        const directed = found.find(item => item.dx === inputDir.dx && item.dy === inputDir.dy);
+        if(directed) return directed;
+        return null;
+    }
+
     found.sort((a,b)=>b.score-a.score||a.dy-b.dy||a.dx-b.dx);
     return found[0]||null;
 }
@@ -649,3 +659,5 @@ window.queueBombJumpSequenceV67 = queueBombJumpSequenceV67;
 window.bombUpdate = bombUpdate;
 window.updateBombHandling = updateBombHandling;
 window.tryKickPlayerBombsV67 = tryKickPlayerBombsV67;
+window.getBombKickDirectionV67 = getBombKickDirectionV67;
+window.getAdjacentPlayerBombV67 = getAdjacentPlayerBombV67;

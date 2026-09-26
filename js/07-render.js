@@ -119,6 +119,7 @@ function getRenderProfileV65() {
 }
 
 function draw() {
+            const testLabNeutralV673 = window.BOMBER_ENGINE?.isTestLabNeutral?.() === true;
             updateRenderViewportV329();
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('background') : '#090d16';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -140,7 +141,7 @@ function draw() {
             ctx.drawImage(terrainCache, 0, 0);
 
             // Exit portal stays dynamic because it is animated.
-            if (gameState.exitPos) {
+            if (!testLabNeutralV673 && gameState.exitPos) {
                 const ex = gameState.exitPos.x;
                 const ey = gameState.exitPos.y;
                 if (gameState.grid[ey]?.[ex] === TYPES.EXIT_OPEN) {
@@ -149,14 +150,14 @@ function draw() {
             }
 
             // V3.13: acentos espaciales; las salas se leen en el propio piso, sin minimapa.
-            if (getRenderProfileV65().showRoomDecor && typeof drawRoomDesignLayerV313 === 'function') drawRoomDesignLayerV313();
+            if (!testLabNeutralV673 && getRenderProfileV65().showRoomDecor && typeof drawRoomDesignLayerV313 === 'function') drawRoomDesignLayerV313();
 
             // v6.0: residuos materiales persistentes; quedan por debajo de items, bombas y personajes.
-            if (typeof drawMaterialResiduesV60 === 'function') drawMaterialResiduesV60(ctx);
+            if (!testLabNeutralV673 && typeof drawMaterialResiduesV60 === 'function') drawMaterialResiduesV60(ctx);
             if (typeof drawBombEffectsV64 === 'function') drawBombEffectsV64(ctx);
 
             // V3.3: las trampas aparecen visualmente solo después de activarse.
-            drawHazards();
+            if (!testLabNeutralV673) drawHazards();
 
             // Draw Items / Powerups
             for(let i=0;i<gameState.items.length;i++){
@@ -227,8 +228,8 @@ function draw() {
 
             ctx.restore();
 
-            if (getRenderProfileV65().showAmbientDust) drawAmbientDust();
-            if (getRenderProfileV65().showLighting) drawLighting();
+            if (!testLabNeutralV673 && getRenderProfileV65().showAmbientDust) drawAmbientDust();
+            if (!testLabNeutralV673 && getRenderProfileV65().showLighting) drawLighting();
             if (getRenderProfileV65().showCombatFeedback) renderCombatFeedback();
         }
 

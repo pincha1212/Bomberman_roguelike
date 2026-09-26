@@ -155,6 +155,7 @@
     }
 
     function saveRunV55(reason = 'manual') {
+        if (global.BOMBER_ENGINE?.isTestLabNeutral?.()) return false;
         const snapshot = createSnapshot(reason);
         if (!snapshot) return false;
         try {
@@ -306,7 +307,7 @@
         updateResumeButton();
         if (!autosaveTimer) autosaveTimer = global.setInterval(() => {
             const state = getState();
-            if (state?.isPlaying && !state.paused) saveRunV55('autosave');
+            if (state?.isPlaying && !state.paused && !global.BOMBER_ENGINE?.isTestLabNeutral?.()) saveRunV55('autosave');
         }, AUTOSAVE_MS);
         return true;
     }

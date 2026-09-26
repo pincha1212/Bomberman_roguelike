@@ -677,6 +677,12 @@
     }
 
     function syncDeathEchoV61() {
+        if (global.BOMBER_ENGINE?.isTestLabNeutral?.() || gameState?.testLabV673?.deathEcho === false) {
+            state.checkedLevel = null;
+            state.active = null;
+            if (typeof gameState !== 'undefined') gameState.deathEchoV61 = null;
+            return null;
+        }
         // La materialización también debe funcionar durante initLevel, antes de
         // que el caller marque isPlaying=true. Así el primer render ya encuentra
         // una instancia activa del eco.

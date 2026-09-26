@@ -550,6 +550,7 @@
         global.gameEventBus.on(EVENT, (payload) => {
             const cells = Array.isArray(payload?.cells) ? payload.cells : [];
             const state = getState();
+            if (state?.testLabV673?.active && state?.testLabV673?.materials === false) return;
             const winter = String(state?.biomeV49?.id || '') === 'winter';
             const blastMaterial = winter ? MATERIALS.ICE : MATERIALS.FIRE;
             for (const cell of cells) {

@@ -287,7 +287,9 @@
             p.health--;
             p.isInvincible = true;
             p.invincibleTimer = 1500 + (Number(gs.hitInvulnerabilityBonus) || 0);
-            const lethal = p.health <= 0;
+            const testLabImmortal = gs?.testLabV673?.active === true && gs?.testLabV673?.immortal === true;
+            if (testLabImmortal) p.health = Math.max(1, Number(p.health) || 1);
+            const lethal = !testLabImmortal && p.health <= 0;
             addParticles(p.x, p.y, 'particleDanger', lethal ? 26 : 15);
             triggerPlayerDamageFeedback(source, sx, sy, lethal, false);
             triggerScreenShake(lethal ? 14 : 10, lethal ? 520 : 400);

@@ -17,28 +17,33 @@
         blockBonus: 0
     });
     const BASE_POWERUP_TYPES = Object.freeze(['BOMB_UP', 'FIRE_UP', 'SPEED_UP', 'HEALTH_UP', 'SHIELD_UP']);
+    const CAPABILITY_POWERUP_TYPES = Object.freeze(['KICK', 'GRAB']);
     const BASE_POWERUP_META = Object.freeze({
         BOMB_UP: { id:'BOMB_UP', name:'BOMBA', icon:'💣', rarity:'BASE', category:'BASE', desc:'Aumenta maxBombs en 1 hasta el límite duro del jugador.', implemented:true },
         FIRE_UP: { id:'FIRE_UP', name:'RANGO', icon:'🔥', rarity:'BASE', category:'BASE', desc:'Aumenta bombRange en 1 hasta el límite duro del jugador.', implemented:true },
         SPEED_UP: { id:'SPEED_UP', name:'BOTAS', icon:'👟', rarity:'BASE', category:'BASE', desc:'Aumenta la velocidad del jugador mediante el pickup real.', implemented:true },
         HEALTH_UP: { id:'HEALTH_UP', name:'VIDA', icon:'❤️', rarity:'BASE', category:'BASE', desc:'Recupera 1 punto de vida, limitado por maxHealth.', implemented:true },
         SHIELD_UP: { id:'SHIELD_UP', name:'ESCUDO', icon:'🛡️', rarity:'BASE', category:'BASE', desc:'Activa el escudo mediante el sistema real de pickup.', implemented:true },
+        KICK: { id:'KICK', name:'PATADA', icon:'→', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: empujar bombas al caminar contra ellas. Exclusiva frente a GRAB.', implemented:true },
+        GRAB: { id:'GRAB', name:'AGARRE', icon:'✋', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: levantar y transportar bombas. Exclusiva frente a KICK.', implemented:true },
     });
     const POWERUP_CATEGORY_LABELS = Object.freeze({
-        ALL:'TODOS', BASE:'BASE', MOVIMIENTO:'MOVIMIENTO', MATERIALES:'MATERIALES / ALQUIMIA', BOMBAS:'BOMBAS', ENEMIGOS:'ENEMIGOS'
+        ALL:'TODOS', BASE:'BASE', INTERACCION:'INTERACCION', MOVIMIENTO:'MOVIMIENTO', MATERIALES:'MATERIALES / ALQUIMIA', BOMBAS:'BOMBAS', ENEMIGOS:'ENEMIGOS'
     });
     const POWERUP_RESPAWN_MS = 500;
     const DEFAULT_SHELF_FILTER = 'BASE';
 
     function getLabPowerupTypes() {
-        const extra = typeof global.BOMBER_ENGINE?.getGameplayPowerupIds === 'function' ? global.BOMBER_ENGINE.getGameplayPowerupIds() : [];
-        return Object.freeze([...BASE_POWERUP_TYPES, ...extra]);
+        const gameplay = typeof global.BOMBER_ENGINE?.getGameplayPowerupIds === 'function' ? global.BOMBER_ENGINE.getGameplayPowerupIds() : [];
+        const capability = typeof global.getCapabilityPowerupIdsV681 === 'function' ? global.getCapabilityPowerupIdsV681() : CAPABILITY_POWERUP_TYPES;
+        return Object.freeze([...BASE_POWERUP_TYPES, ...gameplay, ...capability.filter(id => !BASE_POWERUP_TYPES.includes(id) && !gameplay.includes(id))]);
     }
 
     function getPowerupMeta(type) {
         const key = String(type || '');
         return BASE_POWERUP_META[key]
             || global.GAMEPLAY_POWERUP_DEFS_V676?.[key]
+            || global.CAPABILITY_POWERUPS_V681?.[key]
             || { id:key, name:key, icon:'?', rarity:'UNKNOWN', category:'BASE', desc:'Sin descripción registrada todavía.', implemented:false };
     }
 
@@ -210,6 +215,7 @@
         player.__bombEffectStatusesV64 = {};
         if (typeof global.playerFSMReset === 'function') global.playerFSMReset('test-lab-player-reset');
         if (typeof global.resetGameplayPowerupsV676 === 'function') global.resetGameplayPowerupsV676();
+        if (typeof global.resetEntityCapabilitiesV681 === 'function') global.resetEntityCapabilitiesV681(player);
     }
 
     function centerPlayer(player, gx = TEST_ARENA.playerX, gy = TEST_ARENA.playerY) {
@@ -584,9 +590,19 @@
         const baseDefs = global.POWERUP_DEFS_V67 || {};
         push('5 power-ups base con aplicación real', BASE_POWERUP_TYPES.every(type => typeof baseDefs[type]?.apply === 'function'));
         const dropPool = typeof global.getPowerupDropPoolV67 === 'function' ? global.getPowerupDropPoolV67() : [];
-        push('Pool universal disponible', labTypes.every(type => dropPool.includes(type)));
+        push('Pool base disponible', BASE_POWERUP_TYPES.every(type => dropPool.includes(type)));
+        push('Capacidades experimentales en Test Lab', CAPABILITY_POWERUP_TYPES.every(type => labTypes.includes(type)));
+        const capabilityAudit = {
+            kickEligible: typeof global.canKick === 'function' && global.canKick(player),
+            grabEligible: typeof global.canGrab === 'function' && global.canGrab(player),
+            initiallyInactive: typeof global.isKickActiveV681 === 'function' && typeof global.isGrabActiveV681 === 'function' && !global.isKickActiveV681(player) && !global.isGrabActiveV681(player)
+        };
+        push('Capacidades KICK/GRAB declaradas', capabilityAudit.kickEligible && capabilityAudit.grabEligible);
+        push('KICK/GRAB inactivos al reset', capabilityAudit.initiallyInactive);
+        push('Grupo KICK/GRAB exclusivo', !!global.CAPABILITY_POWERUPS_V681?.KICK?.exclusiveGroup && global.CAPABILITY_POWERUPS_V681.KICK.exclusiveGroup === global.CAPABILITY_POWERUPS_V681.GRAB?.exclusiveGroup);
+
         push('Sin hooks Winter de power-ups', typeof global.winterPowerupUpdateV67 !== 'function' && typeof global.getWinterPowerupMovementModifiersV67 !== 'function');
-        push('Solo power-ups base', labTypes.length === BASE_POWERUP_TYPES.length);
+        push('Catálogo Lab = base + capacidades', labTypes.length === BASE_POWERUP_TYPES.length + CAPABILITY_POWERUP_TYPES.length);
         push('Todos los power-ups con metadatos', labTypes.every(type => !!getPowerupMeta(type)?.desc && getPowerupMeta(type)?.implemented !== false));
         push('Preview de rango eliminado', typeof global.renderBombRangePreview !== 'function' && typeof global.getBombBlastPreviewCells !== 'function' && !(state?.bombs || []).some(b => 'previewCells' in b || 'previewGrid' in b || 'previewTimer' in b));
         const valid = checks.every(check => check.ok);

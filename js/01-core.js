@@ -320,6 +320,8 @@ const UI = {};
             SPEED_UP: 'SPEED_UP',
             HEALTH_UP: 'HEALTH_UP',
             SHIELD_UP: 'SHIELD_UP',
+            KICK: 'KICK',
+            GRAB: 'GRAB',
         };
 
         const PLAYER_LIMITS_V67 = Object.freeze({
@@ -394,6 +396,11 @@ const UI = {};
             [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'BOTAS', apply:()=>{ player.speed=Math.min(player.speed+0.4,6); return true; } }),
             [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', apply:()=>{ player.health=Math.min(player.health+1,player.maxHealth); return true; } }),
             [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', apply:()=>{ player.hasShield=true; return true; } }),
+            // v6.8.1: capacidades de interacción permanentes durante la run.
+            // KICK y GRAB son mutuamente excluyentes; su estado real vive en
+            // 54-entity-capabilities.js para evitar flags sueltos en Player.
+            [POWERUPS.KICK]: Object.freeze({ id:POWERUPS.KICK, label:'PATADA', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'KICK') : false }),
+            [POWERUPS.GRAB]: Object.freeze({ id:POWERUPS.GRAB, label:'AGARRE', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'GRAB') : false }),
         });
 
         function applyPowerupV67(type){

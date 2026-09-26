@@ -371,6 +371,7 @@
         clearDynamicRuntime(state);
         createNeutralGrid(state);
         spawnNeutralTestEnemies(state);
+        if (typeof global.releaseCarriedBombV682 === 'function') global.releaseCarriedBombV682(player, 'reset');
         centerPlayer(player);
         resetPlayerToBase(player);
         centerPlayer(player);

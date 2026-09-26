@@ -53,6 +53,7 @@ function resetPlayerRuntimeState() {
     player.hazardSlowTimer = 0;
     player.hazardSlowFactor = 1;
     player.hazardSlowType = '';
+    if (typeof resetEntityCapabilitiesV681 === 'function') resetEntityCapabilitiesV681(player);
     if (typeof playerFSMReset === 'function') playerFSMReset('runtime-reset');
 }
 

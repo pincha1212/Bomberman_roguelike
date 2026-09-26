@@ -25,12 +25,12 @@ const bombHandlingFx = { chainLinks: [] };
 // v4.0: todas las bombas comparten una pequeña máquina de estados.
 // Separamos lógica de detonación (tile x/y) de su posición visual (worldX/worldY)
 // para permitir bombas lanzadas, empujadas, atrapadas o desviadas en futuras habilidades.
-const BOMB_V4_STATES = Object.freeze({ MOVING: 'moving', ARMED: 'armed', EXPLODING: 'exploding' });
+const BOMB_V4_STATES = Object.freeze({ MOVING: 'moving', ARMED: 'armed', EXPLODING: 'exploding', CARRIED: 'carried' });
 
 function ensureBombV4State(bomb){
     if (!bomb || typeof bomb !== 'object') return null;
     if (!bomb.state) bomb.state = bomb.owner === 'boss' ? BOMB_V4_STATES.MOVING : BOMB_V4_STATES.ARMED;
-    if (!bomb.motionState) bomb.motionState = bomb.state === BOMB_V4_STATES.MOVING ? BOMB_V4_STATES.MOVING : 'idle';
+    if (!bomb.motionState) bomb.motionState = bomb.state === BOMB_V4_STATES.MOVING ? BOMB_V4_STATES.MOVING : (bomb.state === BOMB_V4_STATES.CARRIED ? BOMB_V4_STATES.CARRIED : 'idle');
     if (!Number.isFinite(bomb.worldX)) bomb.worldX = (Number(bomb.x) + .5) * TILE_SIZE;
     if (!Number.isFinite(bomb.worldY)) bomb.worldY = (Number(bomb.y) + .5) * TILE_SIZE;
     if (!Number.isFinite(bomb.motionProgress)) bomb.motionProgress = bomb.state === BOMB_V4_STATES.MOVING ? 0 : 1;
@@ -58,6 +58,7 @@ function ensureBombV4State(bomb){
 function startBombV4Motion(bomb, targetX, targetY, durationMs = 360, arc = 18){
     if (!bomb) return false;
     ensureBombV4State(bomb);
+    if (bomb.state === BOMB_V4_STATES.CARRIED) return false;
 
     const worldTargetX = Number(targetX);
     const worldTargetY = Number(targetY);
@@ -271,8 +272,10 @@ function queueBombMotionSequenceV67(bomb, dx, dy, distance, durationMs = 190, ar
 
 function getBombAtTile(gx, gy){
     return gameState.bombs.find(b => {
-        if (!b || b.x !== gx || b.y !== gy) return false;
+        if (!b) return false;
         ensureBombV4State(b);
+        if (b.state === BOMB_V4_STATES.CARRIED) return false;
+        if (b.x !== gx || b.y !== gy) return false;
         return b.state !== BOMB_V4_STATES.MOVING;
     }) || null;
 }
@@ -280,6 +283,7 @@ function getBombAtTile(gx, gy){
 function isBombSolidForPlayer(gx, gy){
     const bomb = getBombAtTile(gx, gy);
     if (!bomb) return false;
+    if (bomb.state === BOMB_V4_STATES.CARRIED) return false;
     return !bomb.playerPassThrough;
 }
 
@@ -321,6 +325,9 @@ function markBombEscapeState(){
 
 function beginBombHold(source='input'){
     if (bombInputState.held) return false;
+    if (typeof globalThis.handleBombActionV682 === 'function' && globalThis.handleBombActionV682(source)) {
+        return true;
+    }
     bombInputState.held = true;
     bombInputState.source = source;
     bombInputState.startedAt = performance.now();
@@ -359,6 +366,7 @@ function requestBombPlacement(reason='press'){
 function placeBomb(reason='manual'){
     if (!gameState.isPlaying || gameState.paused) return false;
     if ((player.bombCooldown || 0) > 0) return false;
+    if (typeof globalThis.getCarriedBombForEntityV682 === 'function' && globalThis.getCarriedBombForEntityV682(player)) return false;
     if (player.bombsPlaced >= player.maxBombs) return false;
 
     const gx = Math.floor((player.x + player.width / 2) / TILE_SIZE);
@@ -482,6 +490,9 @@ function bombUpdate(dt){
     player.bombCooldown=Math.max(0,(player.bombCooldown||0)-dt);
     updateBombInput(dt);
     markBombEscapeState();
+    if (typeof globalThis.updateBombEntityInteractionsV682 === 'function') {
+        globalThis.updateBombEntityInteractionsV682(dt);
+    }
 
     for(let i=bombHandlingFx.chainLinks.length-1;i>=0;i--){
         bombHandlingFx.chainLinks[i].timer-=dt;
@@ -492,13 +503,23 @@ function bombUpdate(dt){
         const bomb=gameState.bombs[i];
         if(!bomb) continue;
         ensureBombV4State(bomb);
+        if (bomb.state === BOMB_V4_STATES.CARRIED) {
+            if (typeof globalThis.updateCarriedBombPositionV682 === 'function') {
+                globalThis.updateCarriedBombPositionV682(bomb);
+            }
+            continue;
+        }
 
         // La mecha corre también durante el vuelo. Si llega a cero, se marca
         // pendiente y se resuelve al aterrizar; nunca explota en mitad del aire.
         bomb.timer-=dt;
         if(bomb.timer<=0) bomb.pendingDetonation=true;
 
-        updateBombV4Motion(bomb, dt);
+        if (bomb.interactionMotionV682 === 'kick' && typeof globalThis.updateBombKickMotionV682 === 'function') {
+            globalThis.updateBombKickMotionV682(bomb, dt);
+        } else {
+            updateBombV4Motion(bomb, dt);
+        }
         ensureBombV4State(bomb);
 
         if(bomb.state !== BOMB_V4_STATES.ARMED) continue;

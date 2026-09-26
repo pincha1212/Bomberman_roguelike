@@ -2,6 +2,9 @@
         function explodeBomb(bombIndex) {
             const first = gameState.bombs[bombIndex];
             if (!first) return;
+            if (first.state === 'carried' && typeof globalThis.prepareCarriedBombForExplosionV682 === 'function') {
+                globalThis.prepareCarriedBombForExplosionV682(first);
+            }
 
             // La cola evita recursión y mantiene una secuencia determinista
             // para las detonaciones en cadena.
@@ -300,6 +303,9 @@
             triggerPlayerDamageFeedback(source, sx, sy, lethal, false);
             triggerScreenShake(lethal ? 14 : 10, lethal ? 520 : 400);
             if (lethal) sfx('death');
+            if (lethal && typeof globalThis.releaseCarriedBombV682 === 'function') {
+                globalThis.releaseCarriedBombV682(p, 'death');
+            }
             if (lethal && typeof playerFSMDeath === 'function') playerFSMDeath(source);
             updateUI(true);
             if (typeof gameplayPowerupOnDamageV676 === 'function') gameplayPowerupOnDamageV676();

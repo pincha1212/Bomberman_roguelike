@@ -49,6 +49,10 @@
 
         const state = getState();
         if (state?.boss && entity === state.boss) return 'boss';
+        const activeEcho = typeof global.getActiveDeathEchoV61 === 'function'
+            ? global.getActiveDeathEchoV61(state?.level)
+            : (state?.deathEchoV61 || null);
+        if (activeEcho && entity === activeEcho) return 'echo';
 
         const aiArchetype = entity.ai?.archetype;
         if (aiArchetype) return normalizeArchetype(aiArchetype);

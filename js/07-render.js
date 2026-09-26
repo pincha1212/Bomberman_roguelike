@@ -169,6 +169,7 @@ function draw() {
             for(let i=0;i<gameState.bombs.length;i++){
                 const b=gameState.bombs[i];
                 if(!b) continue;
+                if (b.state === 'carried' || b.motionState === 'carried') continue;
                 const bombPos = typeof getBombV4WorldPosition === 'function' ? getBombV4WorldPosition(b) : {x:(b.x + .5) * TILE_SIZE, y:(b.y + .5) * TILE_SIZE};
                 if(!isWorldRectVisibleV329(bombPos.x - TILE_SIZE * .55, bombPos.y - TILE_SIZE * .55, TILE_SIZE * 1.1, TILE_SIZE * 1.1, TILE_SIZE)) continue;
                 renderStatsV329.bombs++;
@@ -200,6 +201,16 @@ function draw() {
             if (!player.isInvincible || Math.floor(gameState.animFrame / 4) % 2 === 0) {
                 drawBombermanSprite(player.x, player.y);
                 if (typeof drawWinterBodyEffectsV64 === 'function') drawWinterBodyEffectsV64(player);
+            }
+            // Una bomba agarrada pertenece visualmente al portador, no al suelo.
+            const carriedPlayerBomb = typeof globalThis.getCarriedBombForEntityV682 === 'function'
+                ? globalThis.getCarriedBombForEntityV682(player)
+                : null;
+            if (carriedPlayerBomb) {
+                const carriedPos = typeof globalThis.getBombV4WorldPosition === 'function'
+                    ? globalThis.getBombV4WorldPosition(carriedPlayerBomb)
+                    : { x: player.x + player.width / 2, y: player.y - TILE_SIZE * 0.38 };
+                drawBombSprite(carriedPos.x, carriedPos.y, carriedPlayerBomb);
             }
 
             // Draw Particles: el presupuesto visual es menor que el de simulación.

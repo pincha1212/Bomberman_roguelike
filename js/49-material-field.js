@@ -2,13 +2,13 @@
 // Noita-inspired direction, but intentionally discrete and small:
 // persistent tile residues + deterministic pair reactions + bounded spreading.
 //
-// This module is a consumer of the v5.9 event bus. A bomb does not know
-// anything about materials; BOMBA_EXPLOTO creates FIRE residue here.
+// This module is a consumer of the shared event bus. A bomb does not know
+// anything about materials; BOMBA_EXPLOTO creates the biome-appropriate residue here.
 
 (function installMaterialFieldV60(global) {
     'use strict';
 
-    const VERSION = '6.6.0';
+    const VERSION = '6.7.0';
     const EVENT = global.GAME_EVENTS_V60?.BOMBA_EXPLOTO || global.GAME_EVENTS_V59?.BOMBA_EXPLOTO;
     const LISTENER_KEY = 'bomb-explosion:materials';
     const MAX_RESIDUES = 360;
@@ -151,7 +151,13 @@
         ['electric|water', Object.freeze({ result: MATERIALS.ELECTRIC_WATER, lifeMs: 850, amount: 90, message: 'AGUA ELECTRIFICADA' })],
         ['acid|water', Object.freeze({ result: MATERIALS.WATER, lifeMs: 3000, amount: 45, message: 'ÁCIDO DILUIDO' })],
         ['fire|ice', Object.freeze({ result: MATERIALS.WATER, lifeMs: 3000, amount: 70, message: 'SE DERRITE' })],
-        ['ice|water', Object.freeze({ result: MATERIALS.SLICK_ICE, lifeMs: 12000, amount: 90, message: 'HIELO PULIDO' })]
+        ['ice|water', Object.freeze({ result: MATERIALS.SLICK_ICE, lifeMs: 12000, amount: 90, message: 'HIELO PULIDO' })],
+        ['ice|electric', Object.freeze({ result: MATERIALS.WATER, lifeMs: 2000, amount: 60, message: 'SE ROMPE' })],
+        ['ice|oil', Object.freeze({ result: MATERIALS.FROZEN_OIL, lifeMs: 8000, amount: 100, message: 'ACEITE CONGELADO' })],
+        ['fire|frozen_oil', Object.freeze({ result: MATERIALS.BURNING_OIL, lifeMs: 3300, amount: 100, message: 'SE ENCIENDE TARDE' })],
+        ['frozen_oil|water', Object.freeze({ result: MATERIALS.OIL, lifeMs: 7200, amount: 60, message: 'SE DESCONGELA' })],
+        ['ice|acid', Object.freeze({ result: MATERIALS.WATER, lifeMs: 2500, amount: 45, message: 'ÁCIDO DILUIDO' })],
+        ['ice|ice', Object.freeze({ result: MATERIALS.PACKED_ICE, lifeMs: 3000, amount: 100, message: 'HIELO COMPACTO' })]
     ]);
 
     function getState() {
@@ -183,6 +189,7 @@
         const block = Number(global.BOMBER_ENGINE?.getWorldTypes?.()?.BLOCK ?? 2);
         if (type === wall || type === locked) return false;
         if (type === block && materialType !== MATERIALS.ACID) return false;
+        if (materialType !== MATERIALS.ACID && isMaterialBlockingTile(x, y)) return false;
         return true;
     }
 
@@ -248,6 +255,7 @@
                 spreadTimerMs: Number(options.spreadTimerMs) || 0,
                 source: String(options.source || 'system'),
                 reactionCount: 0,
+                layers: 1,
                 contactCooldownMs: 0
             };
             store.push(residue);
@@ -258,6 +266,15 @@
         if (existing.type === type) {
             existing.amount = Math.min(100, existing.amount + normalizeAmount(amount) * 0.55);
             existing.lifeMs = Math.max(existing.lifeMs, Number(options.lifeMs) || def.lifeMs);
+            existing.layers = Math.min(9, Number(existing.layers || 1) + 1);
+            if (type === MATERIALS.ICE && existing.layers >= 3) {
+                const selfReaction = REACTIONS.get('ice|ice');
+                if (selfReaction) {
+                    writeResidue(store, existing, selfReaction.result, selfReaction.amount, selfReaction.lifeMs, 'reaction');
+                    existing.reactionCount = (existing.reactionCount || 0) + 1;
+                    showReactionMessage(selfReaction, tx, ty);
+                }
+            }
             return true;
         }
 
@@ -281,6 +298,51 @@
         // from inventing chemistry and makes future reactions explicit.
         return false;
     }
+
+    function getResidueAtTile(x, y){
+        const store = ensureStore();
+        const found = store ? findResidue(store, Math.trunc(x), Math.trunc(y)) : null;
+        return found?.residue || null;
+    }
+
+    function entityCell(entity){
+        const size = Number(global.TILE_SIZE || 48);
+        if (!entity || !Number.isFinite(Number(entity.x)) || !Number.isFinite(Number(entity.y))) return null;
+        return {
+            x: Math.floor((Number(entity.x) + Number(entity.width || 0) / 2) / size),
+            y: Math.floor((Number(entity.y) + Number(entity.height || 0) / 2) / size)
+        };
+    }
+
+    function getMaterialMovementModifiersV67(entity){
+        const cell = entityCell(entity);
+        const residue = cell ? getResidueAtTile(cell.x, cell.y) : null;
+        const result = { acceleration:1, braking:1, turnCarry:1, speedMultiplier:1, inputBufferMultiplier:1 };
+        if (!residue) return Object.freeze(result);
+        const table = {
+            [MATERIALS.ICE]: { braking:.55, acceleration:.92, turnCarry:1.05, speedMultiplier:1 },
+            [MATERIALS.SLICK_ICE]: { braking:.28, acceleration:.85, turnCarry:1.15, speedMultiplier:1 },
+            [MATERIALS.WATER]: { braking:.80, acceleration:.95, turnCarry:1.02, speedMultiplier:.98 },
+            [MATERIALS.FROZEN_OIL]: { braking:.40, acceleration:.90, turnCarry:1.10, speedMultiplier:1 },
+            [MATERIALS.BURNING_OIL]: { speedMultiplier:.85 },
+            [MATERIALS.ELECTRIC_WATER]: { speedMultiplier:.85 }
+        };
+        return Object.freeze({ ...result, ...(table[residue.type] || {}) });
+    }
+
+    function getBombMaterialModifiersV67(x, y){
+        const residue = getResidueAtTile(x, y);
+        const result = { fuseMultiplier:1, canPlace:true, kickOnPlace:false };
+        if (!residue) return Object.freeze(result);
+        if (residue.type === MATERIALS.ICE) result.fuseMultiplier=1.15;
+        if (residue.type === MATERIALS.SLICK_ICE) result.kickOnPlace=true;
+        if (residue.type === MATERIALS.PACKED_ICE || residue.type === MATERIALS.FROZEN_OIL) result.canPlace=false;
+        if (residue.type === MATERIALS.WATER) result.fuseMultiplier=.85;
+        if (residue.type === MATERIALS.BURNING_OIL) result.fuseMultiplier=.60;
+        return Object.freeze(result);
+    }
+
+    function isMaterialBlockingTile(x,y){ const residue=getResidueAtTile(x,y); return !!residue && !!definition(residue.type)?.blocks; }
 
     function removeAt(x, y) {
         const store = ensureStore();
@@ -451,7 +513,8 @@
             amount: residue.amount,
             lifeMs: residue.lifeMs,
             spreadTimerMs: residue.spreadTimerMs,
-            source: residue.source
+            source: residue.source,
+            layers: Number(residue.layers || 1)
         }));
     }
 
@@ -509,6 +572,10 @@
     global.materialResetV60 = reset;
     global.materialValidateV60 = validate;
     global.materialSnapshotV60 = snapshot;
+    global.getResidueAtTileV67 = getResidueAtTile;
+    global.getMaterialMovementModifiersV67 = getMaterialMovementModifiersV67;
+    global.getBombMaterialModifiersV67 = getBombMaterialModifiersV67;
+    global.isMaterialBlockingTileV67 = isMaterialBlockingTile;
     global.drawMaterialResiduesV60 = draw;
     global.BOMBER_ENGINE = global.BOMBER_ENGINE || {};
     global.BOMBER_ENGINE.getMaterials = () => ({

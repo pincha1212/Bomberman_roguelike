@@ -160,7 +160,8 @@
                 id: `relic_${relic.id}`, kind: 'RELIC', rarity: relic.rarity,
                 name: `${relic.icon} ${relic.name}`, desc: relic.desc, category: relic.category, relic
             }));
-            const pool = [...REWARDS, ...availableRelics];
+            const safeRewards = REWARDS.filter(reward => !['bomb','range','health'].includes(reward.id));
+            const pool = [...safeRewards, ...availableRelics];
             for (let i = pool.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [pool[i], pool[j]] = [pool[j], pool[i]];

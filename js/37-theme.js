@@ -139,7 +139,7 @@
             pool: Object.freeze(['RASTRERO', 'VOLADOR', 'ESPECIAL']),
             colors: Object.freeze({ RASTRERO: 'enemyRastrero', VOLADOR: 'enemyVolador', ESPECIAL: 'enemyEspecial' })
         }),
-        powerups: Object.freeze({ pool: Object.freeze(['BOMB_UP', 'FIRE_UP', 'SPEED_UP', 'HEALTH_UP', 'SHIELD_UP', 'RELIC']) })
+        powerups: Object.freeze({ pool: Object.freeze(['SPEED_UP', 'HEALTH_UP', 'SHIELD_UP', 'BOMB_KICK', 'RELIC']) })
     });
 
     function createVisualThemeV461(id, nombre, paletteOverrides, spriteOverrides, ambientOverrides) {

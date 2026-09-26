@@ -319,8 +319,95 @@ const UI = {};
             FIRE_UP: 'FIRE_UP',
             SPEED_UP: 'SPEED_UP',
             HEALTH_UP: 'HEALTH_UP',
-            SHIELD_UP: 'SHIELD_UP'
+            SHIELD_UP: 'SHIELD_UP',
+            BOMB_KICK: 'BOMB_KICK'
         };
+
+        const PLAYER_LIMITS_V67 = Object.freeze({
+            base: Object.freeze({ maxHealth: 5, maxBombs: 1, bombRange: 1 }),
+            hard: Object.freeze({ maxHealth: 10, maxBombs: 8, bombRange: 12 }),
+            kickDurationMs: 12000
+        });
+
+        const LEGACY_RELIC_CAP_BONUSES_V67 = Object.freeze({
+            ember_core: Object.freeze({ bombRange: 1 }),
+            twin_fuse: Object.freeze({ maxBombs: 1 }),
+            heart_engine: Object.freeze({ maxHealth: 1 }),
+            unstable_powder: Object.freeze({ bombRange: 1 }),
+            heat_lens: Object.freeze({ bombRange: 1 })
+        });
+
+        function getPlayerCapacityCapsV67(){
+            const cap = { ...PLAYER_LIMITS_V67.base };
+            const owned = new Set();
+            for (const relic of (Array.isArray(gameState?.relics) ? gameState.relics : [])) {
+                const id = String(relic?.id || ''); if (id) owned.add(id);
+            }
+            const v327 = window.ROGUELIKE_V327;
+            if (Array.isArray(v327?.relics)) for (const id of v327.relics) owned.add(String(id));
+
+            for (const id of owned){
+                const v327Relic = Array.isArray(window.ROGUELIKE_RELICS_V327) ? window.ROGUELIKE_RELICS_V327.find(r => r.id === id) : null;
+                const bonus = v327Relic?.bonuses
+                    ? { maxBombs:Number(v327Relic.bonuses.bombs)||0, bombRange:Number(v327Relic.bonuses.range)||0, maxHealth:Number(v327Relic.bonuses.maxHealth)||0 }
+                    : (LEGACY_RELIC_CAP_BONUSES_V67[id] || null);
+                if (!bonus) continue;
+                cap.maxBombs += Number(bonus.maxBombs) || 0;
+                cap.bombRange += Number(bonus.bombRange) || 0;
+                cap.maxHealth += Number(bonus.maxHealth) || 0;
+            }
+
+            const synergies = typeof window.rogueV327GetActiveSynergies === 'function' ? window.rogueV327GetActiveSynergies() : [];
+            for (const synergy of synergies){
+                if (synergy.id === 'double_burn' || synergy.id === 'volatile_chain') cap.bombRange += 1;
+                if (synergy.id === 'chain_crew') cap.maxBombs += 1;
+                if (synergy.id === 'fortress') cap.maxHealth += 1;
+            }
+
+            cap.maxHealth = Math.max(1, Math.min(PLAYER_LIMITS_V67.hard.maxHealth, Math.floor(cap.maxHealth)));
+            cap.maxBombs = Math.max(1, Math.min(PLAYER_LIMITS_V67.hard.maxBombs, Math.floor(cap.maxBombs)));
+            cap.bombRange = Math.max(1, Math.min(PLAYER_LIMITS_V67.hard.bombRange, Math.floor(cap.bombRange)));
+            return Object.freeze(cap);
+        }
+
+        function clampPlayerCapacitiesV67(options = {}){
+            if (typeof player === 'undefined' || !player) return getPlayerCapacityCapsV67();
+            const cap = getPlayerCapacityCapsV67();
+            const oldMaxHealth = Number(player.maxHealth) || cap.maxHealth;
+            player.maxHealth = cap.maxHealth;
+            player.maxBombs = cap.maxBombs;
+            player.bombRange = cap.bombRange;
+            player.health = Math.max(1, Math.min(player.maxHealth, Number(player.health) || player.maxHealth));
+            if (options.healNewMax && cap.maxHealth > oldMaxHealth) player.health = Math.min(player.maxHealth, player.health + (cap.maxHealth - oldMaxHealth));
+            return cap;
+        }
+
+        const POWERUP_DEFS_V67 = Object.freeze({
+            [POWERUPS.BOMB_UP]: Object.freeze({ id:POWERUPS.BOMB_UP, label:'BOMBA', apply:()=>false }),
+            [POWERUPS.FIRE_UP]: Object.freeze({ id:POWERUPS.FIRE_UP, label:'RANGO', apply:()=>false }),
+            [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'BOTAS', apply:()=>{ player.speed=Math.min(player.speed+0.4,6); return true; } }),
+            [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', apply:()=>{ player.health=Math.min(player.health+1,player.maxHealth); return true; } }),
+            [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', apply:()=>{ player.hasShield=true; return true; } }),
+            [POWERUPS.BOMB_KICK]: Object.freeze({ id:POWERUPS.BOMB_KICK, label:'PATADA', apply:()=>{ player.kickTimer=PLAYER_LIMITS_V67.kickDurationMs; return true; } })
+        });
+
+        function applyPowerupV67(type){
+            const def=POWERUP_DEFS_V67[String(type)]; if(!def) return false;
+            const applied=!!def.apply();
+            clampPlayerCapacitiesV67();
+            if((type===POWERUPS.BOMB_UP||type===POWERUPS.FIRE_UP)&&typeof addFloatingText==='function') addFloatingText('SOLO RELIQUIA',player.x,player.y,'#c084fc');
+            if(typeof updateUI==='function') updateUI();
+            return applied;
+        }
+
+        function getPowerupDropPoolV67(){ return Object.freeze([POWERUPS.SPEED_UP,POWERUPS.HEALTH_UP,POWERUPS.SHIELD_UP,POWERUPS.BOMB_KICK]); }
+
+        window.PLAYER_LIMITS_V67=PLAYER_LIMITS_V67;
+        window.POWERUP_DEFS_V67=POWERUP_DEFS_V67;
+        window.getPlayerCapacityCapsV67=getPlayerCapacityCapsV67;
+        window.clampPlayerCapacitiesV67=clampPlayerCapacitiesV67;
+        window.applyPowerupV67=applyPowerupV67;
+        window.getPowerupDropPoolV67=getPowerupDropPoolV67;
 
         const ENEMY_TYPES = {
             RASTRERO: { name: 'Rastrero', color: '#ef4444', speed: 1.4, canFly: false },
@@ -417,13 +504,13 @@ const UI = {};
 
         const RELICS = [
             { id: 'ember_core', icon: '🔥', name: 'NÚCLEO ÍGNEO', rarity: 'RARE', desc: '+1 rango de bomba. Las explosiones valen +25 puntos extra.',
-              apply: () => { player.bombRange += 1; } },
+              apply: () => { clampPlayerCapacitiesV67(); } },
             { id: 'twin_fuse', icon: '💣', name: 'MECHA GEMELA', rarity: 'UNCOMMON', desc: '+1 bomba máxima.',
-              apply: () => { player.maxBombs += 1; } },
+              apply: () => { clampPlayerCapacitiesV67(); } },
             { id: 'iron_boots', icon: '👟', name: 'BOTAS DE HIERRO', rarity: 'UNCOMMON', desc: '+0.6 velocidad permanente.',
               apply: () => { player.speed = Math.min(player.speed + 0.6, 6); } },
             { id: 'heart_engine', icon: '♥', name: 'MOTOR VITAL', rarity: 'RARE', desc: '+1 vida máxima y recuperas 1 vida ahora.',
-              apply: () => { player.maxHealth += 1; player.health = Math.min(player.health + 1, player.maxHealth); } },
+              apply: () => { clampPlayerCapacitiesV67({ healNewMax: true }); } },
             { id: 'ward_plate', icon: '🛡', name: 'PLACA DE GUARDA', rarity: 'RARE', desc: 'Obtienes un escudo. Un golpe no destruye la run.',
               apply: () => { player.hasShield = true; } },
             { id: 'lucky_charm', icon: '✦', name: 'AMULETO AFORTUNADO', rarity: 'EPIC', desc: '+40% de monedas obtenidas.',
@@ -435,13 +522,11 @@ const UI = {};
         ];
 
         const REWARDS = [
-            { id: 'bomb', kind: 'UPGRADE', rarity: 'COMMON', name: '+1 BOMBA', desc: 'Aumenta las bombas simultáneas.', action: () => player.maxBombs++ },
-            { id: 'range', kind: 'UPGRADE', rarity: 'COMMON', name: '+1 RANGO', desc: 'Las explosiones llegan una casilla más lejos.', action: () => player.bombRange++ },
             { id: 'speed', kind: 'UPGRADE', rarity: 'COMMON', name: 'BOTAS', desc: '+0.4 velocidad.', action: () => { player.speed = Math.min(player.speed + 0.4, 6); } },
-            { id: 'health', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'CORAZÓN', desc: '+1 vida máxima y recupera 1.', action: () => { player.maxHealth++; player.health = Math.min(player.health + 1, player.maxHealth); } },
             { id: 'shield', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'ESCUDO', desc: 'Protección contra un golpe.', action: () => player.hasShield = true },
             { id: 'coin', kind: 'UPGRADE', rarity: 'COMMON', name: 'BOTÍN', desc: '+35 monedas.', action: () => gameState.coins += 35 },
-            { id: 'heal', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'KIT MÉDICO', desc: 'Recupera 2 vidas sin superar el máximo.', action: () => player.health = Math.min(player.health + 2, player.maxHealth) }
+            { id: 'heal', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'KIT MÉDICO', desc: 'Recupera 2 vidas sin superar el máximo.', action: () => player.health = Math.min(player.health + 2, player.maxHealth) },
+            { id: 'bomb_kick', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'PATADA TEMPORAL', desc: 'Podés patear bombas durante 12 segundos.', action: () => typeof applyPowerupV67 === 'function' ? applyPowerupV67(POWERUPS.BOMB_KICK) : null }
         ];
 
         const RARITY_COLORS = {
@@ -532,6 +617,9 @@ const UI = {};
             maxBombs: 1,
             bombsPlaced: 0,
             bombCooldown: 0,
+            kickTimer: 0,
+            kickCooldown: 0,
+            lastKickInputAt: 0,
             bombRange: 1,
             health: 3,
             maxHealth: 5,

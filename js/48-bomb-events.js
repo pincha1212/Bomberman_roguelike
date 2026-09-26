@@ -81,12 +81,8 @@
                     );
                 }
             } else if (Math.random() < gameState.roomType.dropChance) {
-                const ps = Object.keys(POWERUPS);
-                gameState.items.push({
-                    x: tx,
-                    y: ty,
-                    type: POWERUPS[ps[Math.floor(Math.random() * ps.length)]]
-                });
+                const pool = typeof getPowerupDropPoolV67 === 'function' ? getPowerupDropPoolV67() : [POWERUPS.SPEED_UP, POWERUPS.HEALTH_UP, POWERUPS.SHIELD_UP];
+                gameState.items.push({ x: tx, y: ty, type: pool[Math.floor(Math.random() * pool.length)] });
             }
 
             if (

@@ -249,17 +249,6 @@ function draw() {
             // La diferencia es monocromática + alpha 0.50. No hay aura, ojos,
             // partículas ni una segunda animación superpuesta.
             drawBombermanSprite(ghost.x, ghost.y, ghost, { ghost: true });
-
-            // UI mínima de mini-jefe, sin alterar el cuerpo del personaje.
-            const barWidth = ghost.width * 0.92;
-            const healthRatio = ghost.maxHealth > 0 ? ghost.health / ghost.maxHealth : 0;
-            ctx.save();
-            ctx.globalAlpha = 0.5;
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(ghost.x + (ghost.width - barWidth) / 2, ghost.y - 8, barWidth, 3);
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(ghost.x + (ghost.width - barWidth) / 2, ghost.y - 8, barWidth * Math.max(0, Math.min(1, healthRatio)), 3);
-            ctx.restore();
         }
 
         function drawSteelWall(x, y, targetCtx = ctx) {
@@ -648,9 +637,10 @@ function draw() {
                 ctx.setLineDash([]);
             }
 
-            // Sombra bomba
+            // La sombra queda en el suelo para que el salto de la bomba sea legible.
+            const jumpArc = moving ? Math.sin(Math.PI * (b?.motionProgress || 0)) * Number(b?.motionArc || 0) : 0;
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('bombShadow') : 'rgba(0,0,0,0.5)';
-            ctx.beginPath(); ctx.ellipse(0, TILE_SIZE*0.3, TILE_SIZE*0.3, 4, 0, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(0, TILE_SIZE*0.3 + jumpArc, TILE_SIZE*0.3, 4, 0, 0, Math.PI*2); ctx.fill();
 
             // Cuerpo brillante
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('bombBody') : '#0f172a';
@@ -727,6 +717,7 @@ function draw() {
             if (type === POWERUPS.SPEED_UP) icon = '👟';
             if (type === POWERUPS.HEALTH_UP) icon = '❤️';
             if (type === POWERUPS.SHIELD_UP) icon = '🛡️';
+            if (type === POWERUPS.BOMB_KICK) icon = '👢';
             ctx.fillText(icon, x + 10, y + 30 + floaty);
         }
 

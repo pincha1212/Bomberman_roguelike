@@ -44,6 +44,8 @@ function ensureBombV4State(bomb){
     if (!Number.isFinite(bomb.motionRotation)) bomb.motionRotation = 0;
     if (!Number.isFinite(bomb.motionRotationSpeed)) bomb.motionRotationSpeed = 0;
     if (!Number.isFinite(bomb.bobPhase)) bomb.bobPhase = 0;
+    if (!Array.isArray(bomb.motionQueue)) bomb.motionQueue = [];
+    if (typeof bomb.preserveTimerOnArm !== 'boolean') bomb.preserveTimerOnArm = false;
     if (!bomb.interactionState) bomb.interactionState = 'free';
     if (typeof bomb.canKick !== 'boolean') bomb.canKick = bomb.owner !== 'boss';
     if (typeof bomb.canPush !== 'boolean') bomb.canPush = bomb.owner !== 'boss';
@@ -75,6 +77,8 @@ function startBombV4Motion(bomb, targetX, targetY, durationMs = 360, arc = 18){
 function armBombV4(bomb){
     if (!bomb) return false;
     ensureBombV4State(bomb);
+    const preserveTimer = bomb.preserveTimerOnArm === true;
+    const remainingTimer = Number(bomb.timer);
     bomb.state = BOMB_V4_STATES.ARMED;
     bomb.motionState = 'idle';
     bomb.motionProgress = 1;
@@ -84,7 +88,8 @@ function armBombV4(bomb){
     bomb.worldY = (Number(bomb.y) + .5) * TILE_SIZE;
     bomb.playerPassThrough = false;
     bomb.justArmed = true;
-    bomb.timer = Math.max(120, Number(bomb.fuseTotal || bomb.timer || 120));
+    bomb.timer = preserveTimer && Number.isFinite(remainingTimer) ? Math.max(120, remainingTimer) : Math.max(120, Number(bomb.fuseTotal || bomb.timer || 120));
+    bomb.preserveTimerOnArm = false;
     bomb.warnBucket = Math.ceil(bomb.timer / 300);
     return true;
 }
@@ -116,6 +121,12 @@ function updateBombV4Motion(bomb, dt){
     if (bomb.motionTimer <= 0) {
         bomb.x = Math.round(bomb.motionTargetX / TILE_SIZE - .5);
         bomb.y = Math.round(bomb.motionTargetY / TILE_SIZE - .5);
+        if (bomb.motionQueue.length) {
+            const next = bomb.motionQueue.shift();
+            bomb.preserveTimerOnArm = true;
+            startBombV4Motion(bomb, Number(next.x), Number(next.y), Number(next.durationMs) || 220, Number(next.arc) || TILE_SIZE*.22);
+            return true;
+        }
         armBombV4(bomb);
         return true;
     }
@@ -215,6 +226,56 @@ function requestBombPlacement(reason='press'){
     return placed;
 }
 
+function getBombKickDirectionV67(){
+    const touch=gameState?.touchControls||{};
+    if(Math.abs(Number(touch.x))>=Math.abs(Number(touch.y)) && Math.abs(Number(touch.x))>=.25) return {dx:Math.sign(Number(touch.x)),dy:0};
+    if(Math.abs(Number(touch.y))>=.25) return {dx:0,dy:Math.sign(Number(touch.y))};
+    const keys=gameState?.keys||{};
+    if(keys.ArrowLeft||keys.KeyA) return {dx:-1,dy:0};
+    if(keys.ArrowRight||keys.KeyD) return {dx:1,dy:0};
+    if(keys.ArrowUp||keys.KeyW) return {dx:0,dy:-1};
+    if(keys.ArrowDown||keys.KeyS) return {dx:0,dy:1};
+    if (['up','down','left','right'].includes(player?.dir)) {
+        if (player.dir === 'left') return {dx:-1,dy:0};
+        if (player.dir === 'right') return {dx:1,dy:0};
+        if (player.dir === 'up') return {dx:0,dy:-1};
+        if (player.dir === 'down') return {dx:0,dy:1};
+    }
+    return {dx:0,dy:0};
+}
+
+function isBombKickTileFreeV67(gx,gy,bomb){
+    if(gx<0||gy<0||gx>=gameState.gridWidth||gy>=gameState.gridHeight) return false;
+    const tile=gameState.grid?.[gy]?.[gx];
+    if(tile===TYPES.WALL||tile===TYPES.BLOCK) return false;
+    if(typeof isMaterialBlockingTileV67==='function' && isMaterialBlockingTileV67(gx,gy)) return false;
+    return !gameState.bombs.some(other=>other&&other!==bomb&&other.x===gx&&other.y===gy);
+}
+
+function kickBombV67(bomb,dx,dy){
+    if(!bomb||!player||player.kickTimer<=0) return false;
+    ensureBombV4State(bomb);
+    if(!bomb.canKick||bomb.owner!=='player'||bomb.state!==BOMB_V4_STATES.ARMED||player.kickCooldown>0) return false;
+    if(Math.abs(dx)+Math.abs(dy)!==1) return false;
+    const tx=bomb.x+dx,ty=bomb.y+dy;
+    if(!isBombKickTileFreeV67(tx,ty,bomb)) return false;
+    bomb.preserveTimerOnArm=true;
+    bomb.interactionState='kicked';
+    bomb.kickCount=Number(bomb.kickCount||0)+1;
+    bomb.motionQueue.length=0;
+    startBombV4Motion(bomb,(tx+.5)*TILE_SIZE,(ty+.5)*TILE_SIZE,220,TILE_SIZE*.22);
+    player.kickCooldown=180;
+    return true;
+}
+
+function tryKickPlayerBombsV67(){
+    if(!player||player.kickTimer<=0||player.kickCooldown>0) return false;
+    const dir=getBombKickDirectionV67(); if(!dir.dx&&!dir.dy) return false;
+    const px=Math.floor((player.x+player.width/2)/TILE_SIZE), py=Math.floor((player.y+player.height/2)/TILE_SIZE);
+    const bomb=gameState.bombs.find(b=>b&&b.owner==='player'&&b.x===px+dir.dx&&b.y===py+dir.dy&&b.state===BOMB_V4_STATES.ARMED);
+    return !!bomb&&kickBombV67(bomb,dir.dx,dir.dy);
+}
+
 function placeBomb(reason='manual'){
     if (!gameState.isPlaying || gameState.paused) return false;
     if ((player.bombCooldown || 0) > 0) return false;
@@ -224,9 +285,11 @@ function placeBomb(reason='manual'){
     const gy = Math.floor((player.y + player.height / 2) / TILE_SIZE);
     if (getBombAtTile(gx, gy)) return false;
     if (!gameState.grid[gy] || gameState.grid[gy][gx] === TYPES.WALL || gameState.grid[gy][gx] === TYPES.BLOCK) return false;
+    const materialMods = typeof getBombMaterialModifiersV67 === 'function' ? getBombMaterialModifiersV67(gx, gy) : { fuseMultiplier:1, canPlace:true, kickOnPlace:false };
+    if (!materialMods.canPlace) return false;
 
     const baseFuse = gameState.roomType.id === 'CURSED' ? BOMB_HANDLING.cursedFuse : BOMB_HANDLING.normalFuse;
-    const fuseTotal = Math.max(700, Math.round(baseFuse * (typeof getBombFuseMultiplier === 'function' ? getBombFuseMultiplier() : 1)));
+    const fuseTotal = Math.max(700, Math.round(baseFuse * (typeof getBombFuseMultiplier === 'function' ? getBombFuseMultiplier() : 1) * materialMods.fuseMultiplier));
     const bomb = {
         id: `bomb-${gameState.animFrame}-${Math.random().toString(36).slice(2,7)}`,
         owner: 'player',
@@ -259,11 +322,23 @@ function placeBomb(reason='manual'){
         motionRotation: 0,
         motionRotationSpeed: 0,
         bobPhase: 0,
+        motionQueue: [],
+        preserveTimerOnArm: false,
         countsTowardPlayerCapacity: true
     };
 
     gameState.bombs.push(bomb);
     player.bombsPlaced++;
+    if (materialMods.kickOnPlace) {
+        const dir = getBombKickDirectionV67();
+        if (dir.dx || dir.dy) {
+            const tx = gx + dir.dx, ty = gy + dir.dy;
+            if (isBombKickTileFreeV67(tx, ty, bomb)) {
+                bomb.preserveTimerOnArm = true;
+                startBombV4Motion(bomb, (tx+.5)*TILE_SIZE, (ty+.5)*TILE_SIZE, 220, TILE_SIZE*.22);
+            }
+        }
+    }
     if (typeof playerFSMStartBomb === 'function') playerFSMStartBomb();
     player.bombCooldown = BOMB_HANDLING.placementCooldown;
     if (typeof triggerBombPlacedFeedback === 'function') triggerBombPlacedFeedback(bomb);
@@ -333,6 +408,9 @@ function updateBombInput(dt){
 
 function updateBombHandling(dt){
     player.bombCooldown=Math.max(0,(player.bombCooldown||0)-dt);
+    player.kickTimer=Math.max(0,(player.kickTimer||0)-dt);
+    player.kickCooldown=Math.max(0,(player.kickCooldown||0)-dt);
+    tryKickPlayerBombsV67();
     updateBombInput(dt);
     markBombEscapeState();
 
@@ -384,3 +462,5 @@ window.startBombV4Motion = startBombV4Motion;
 window.armBombV4 = armBombV4;
 window.getBombV4WorldPosition = getBombV4WorldPosition;
 window.bombV4StateSummary = bombV4StateSummary;
+window.kickBombV67 = kickBombV67;
+window.tryKickPlayerBombsV67 = tryKickPlayerBombsV67;

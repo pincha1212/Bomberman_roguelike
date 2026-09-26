@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.5.1 — Eco de Muerte
+// Bomberman Roguelike v6.7.0 — Eco de Muerte
 // Un eco persistente por profundidad, inspirado en el concepto de fantasma
 // vengativo: conserva una copia inmutable del build que murió y la reutiliza
 // como enemigo autónomo en futuros intentos.
@@ -13,8 +13,8 @@
 (function installDeathEchoV631(global) {
     'use strict';
 
-    const VERSION = '6.5.1';
-    const COMPATIBLE_VERSIONS = new Set(['6.3.0', '6.3.1', '6.5.1']);
+    const VERSION = '6.7.0';
+    const COMPATIBLE_VERSIONS = new Set(['6.3.0', '6.3.1', '6.5.1', '6.7.0']);
     if (global.__DEATH_ECHO_V631_INSTALLED__) return;
     global.__DEATH_ECHO_V631_INSTALLED__ = true;
 
@@ -23,10 +23,8 @@
     const GHOST_OWNER = 'death_echo';
     const DECISION_MS = 200;
     const BOMB_COOLDOWN_MS = 1400;
-    const GHOST_MOVE_SPEED = 1.15;
     const GHOST_SPATIAL_RANGE = 2;
     const GHOST_THROW_DURATION_MS = 180;
-    const GHOST_HEALTH_DEFAULT = 3;
 
     const state = {
         checkedLevel: null,
@@ -108,13 +106,26 @@
     }
 
     function snapshotRelics() {
-        if (typeof gameState === 'undefined' || !Array.isArray(gameState.relics)) return [];
-        return gameState.relics.map(relic => ({
-            id: String(relic?.id || ''),
-            name: String(relic?.name || ''),
-            icon: String(relic?.icon || '◆'),
-            category: String(relic?.category || 'BOMB')
-        })).filter(item => item.id);
+        const result = [];
+        const seen = new Set();
+        const legacy = typeof gameState !== 'undefined' && Array.isArray(gameState.relics) ? gameState.relics : [];
+        for (const relic of legacy) {
+            const id = String(relic?.id || '');
+            if (!id || seen.has(id)) continue;
+            seen.add(id);
+            result.push({ id, name:String(relic?.name || ''), icon:String(relic?.icon || '◆'), category:String(relic?.category || 'BOMB') });
+        }
+        const v327Ids = global.ROGUELIKE_V327?.relics;
+        const v327Defs = Array.isArray(global.ROGUELIKE_RELICS_V327) ? global.ROGUELIKE_RELICS_V327 : [];
+        for (const idRaw of (Array.isArray(v327Ids) ? v327Ids : [])) {
+            const id=String(idRaw || '');
+            if (!id || seen.has(id)) continue;
+            const relic=v327Defs.find(item => item.id === id);
+            if (!relic) continue;
+            seen.add(id);
+            result.push({ id, name:String(relic.name || ''), icon:String(relic.icon || '◆'), category:String(relic.category || 'BOMB') });
+        }
+        return result;
     }
 
     function snapshotPlayerBuild() {
@@ -131,12 +142,14 @@
 
         return {
             sourceSpeed: clamp(number(player?.speed, 3), 1, 8),
-            speed: GHOST_MOVE_SPEED,
+            speed: clamp(number(player?.speed, 3), 1, 8),
             maxBombs: clamp(Math.floor(number(player?.maxBombs, 1)), 1, 8),
             bombRange: clamp(Math.floor(number(player?.bombRange, 1)), 1, 12),
             maxHealth: clamp(Math.floor(number(player?.maxHealth, 5)), 1, 10),
-            hasShield: !!player?.hasShield,
+            hasShield: false,
+            kickTimer: Math.max(0, number(player?.kickTimer, 0)),
             dir: ['up', 'down', 'left', 'right'].includes(player?.dir) ? player.dir : 'down',
+            effectStatuses: clone(player?.__bombEffectStatusesV64 || {}),
             relicMods
         };
     }
@@ -533,13 +546,20 @@
             canPush: false,
             canCarry: false,
             carriedBy: null,
-            interactionState: 'free'
+            interactionState: 'free',
+            motionQueue: [],
+            preserveTimerOnArm: true
         };
 
         // Reutilizamos el movimiento de bomba existente: no creamos un segundo
         // sistema de proyectiles. El bomb state pasa a ARMED cuando llega al destino.
         if (typeof startBombV4Motion === 'function') {
-            startBombV4Motion(bomb, targetX, targetY, GHOST_THROW_DURATION_MS, 10);
+            const sx = bomb.x, sy = bomb.y;
+            const dx = Math.sign(targetTile.x - sx), dy = Math.sign(targetTile.y - sy);
+            const firstX = sx + dx, firstY = sy + dy;
+            if (!isPassableTile(firstX, firstY) || bombAtTile(firstX, firstY)) return false;
+            bomb.motionQueue.push({ x: targetTile.x, y: targetTile.y, durationMs: GHOST_THROW_DURATION_MS, arc: TILE_SIZE*.22 });
+            startBombV4Motion(bomb, (firstX+.5)*TILE_SIZE, (firstY+.5)*TILE_SIZE, GHOST_THROW_DURATION_MS, TILE_SIZE*.22);
         }
 
         gameState.bombs.push(bomb);
@@ -586,11 +606,14 @@
     function recoverEchoItems(ghost) {
         const relics = Array.isArray(ghost.relics) ? ghost.relics : [];
         const recovered = [];
-        if (typeof RELICS !== 'undefined' && typeof grantRelic === 'function') {
-            for (const saved of relics) {
+        for (const saved of relics) {
+            let restored = false;
+            if (typeof RELICS !== 'undefined' && typeof grantRelic === 'function') {
                 const relic = RELICS.find(candidate => candidate.id === saved.id);
-                if (!relic) continue;
-                if (grantRelic(relic)) recovered.push(relic);
+                if (relic && grantRelic(relic)) { recovered.push(relic); restored = true; }
+            }
+            if (!restored && typeof global.rogueV327AcquireRelic === 'function') {
+                if (global.rogueV327AcquireRelic(saved.id)) { restored = true; recovered.push({ ...saved }); }
             }
         }
 
@@ -628,20 +651,13 @@
         if (!overlap) return false;
 
         ghost.lastHitBlastId = explosion.blastId;
-        if (ghost.hasShield) {
-            ghost.hasShield = false;
-            ghost.hitFlash = 180;
-            if (typeof addParticles === 'function') addParticles(ghost.x + ghost.width / 2, ghost.y + ghost.height / 2, 'particleShield', 12);
-            return true;
-        }
-
-        ghost.health = Math.max(0, ghost.health - 1);
-        ghost.hitFlash = 130;
-        if (typeof addParticles === 'function') addParticles(ghost.x + ghost.width / 2, ghost.y + ghost.height / 2, 'particleDanger', 10);
-        if (ghost.health <= 0) {
-            ghost.defeated = true;
-            recoverEchoItems(ghost);
-        }
+        ghost.health = 0;
+        ghost.maxHealth = 1;
+        ghost.hasShield = false;
+        ghost.defeated = true;
+        ghost.hitFlash = 180;
+        if (typeof addParticles === 'function') addParticles(ghost.x + ghost.width / 2, ghost.y + ghost.height / 2, 'particleDanger', 16);
+        recoverEchoItems(ghost);
         return true;
     }
 
@@ -672,13 +688,15 @@
             y: spawn.y * TILE_SIZE + TILE_SIZE / 2 - TILE_SIZE * 0.68 / 2,
             width: TILE_SIZE * 0.68,
             height: TILE_SIZE * 0.68,
-            speed: GHOST_MOVE_SPEED,
+            speed: clamp(number(build.speed, number(build.sourceSpeed, 3)), 1, 8),
+            sourceSpeed: clamp(number(build.sourceSpeed, 3), 1, 8),
             maxBombs: clamp(Math.floor(number(build.maxBombs, 1)), 1, 8),
             bombRange: Math.max(GHOST_SPATIAL_RANGE, clamp(Math.floor(number(build.bombRange, 1)), 1, 12)),
             bombFuseMultiplier: Math.max(0.5, number(build.bombFuseMultiplier, number(relicMods.bombFuseMultiplier, 1))),
-            maxHealth: clamp(Math.floor(number(build.maxHealth, GHOST_HEALTH_DEFAULT)), 1, 10),
-            health: clamp(Math.floor(number(build.maxHealth, GHOST_HEALTH_DEFAULT)), 1, 10),
-            hasShield: !!build.hasShield,
+            maxHealth: 1,
+            health: 1,
+            hasShield: false,
+            kickTimer: Math.max(0, number(build.kickTimer, 0)),
             dir: ['up', 'down', 'left', 'right'].includes(build.dir) ? build.dir : 'down',
             hitFlash: 0,
             attackFlash: 0,
@@ -689,12 +707,17 @@
             moving: false,
             aiTargetTile: null
         };
+        if (build.effectStatuses && typeof ghost === 'object') {
+            try { Object.defineProperty(ghost, '__bombEffectStatusesV64', { value: clone(build.effectStatuses), enumerable:false, configurable:true, writable:true }); }
+            catch (_) { ghost.__bombEffectStatusesV64 = clone(build.effectStatuses); }
+        }
 
         ghost.echoStrength = Object.freeze({
             bombRange: ghost.bombRange,
             maxBombs: ghost.maxBombs,
             speed: ghost.speed,
             sourceSpeed: number(build.sourceSpeed, number(build.speed, 3)),
+            kickTimer: ghost.kickTimer,
             spatialRange: GHOST_SPATIAL_RANGE,
             bombFuseMultiplier: ghost.bombFuseMultiplier,
             unstablePowder: !!relicMods.unstablePowder

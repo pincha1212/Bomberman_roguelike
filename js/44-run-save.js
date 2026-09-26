@@ -82,7 +82,7 @@
         return clone({
             x: player.x, y: player.y, width: player.width, height: player.height,
             speed: player.speed, maxBombs: player.maxBombs, bombsPlaced: player.bombsPlaced,
-            bombCooldown: player.bombCooldown, bombRange: player.bombRange,
+            bombCooldown: player.bombCooldown, kickTimer: player.kickTimer, kickCooldown: player.kickCooldown, lastKickInputAt: player.lastKickInputAt, bombRange: player.bombRange,
             health: player.health, maxHealth: player.maxHealth, hasShield: player.hasShield,
             isInvincible: player.isInvincible, invincibleTimer: player.invincibleTimer,
             lastDamageFrame: player.lastDamageFrame, dir: player.dir, isMoving: player.isMoving,
@@ -122,7 +122,8 @@
                 lastMoveAxis: state.lastMoveAxis || 'vertical',
                 lastMoveInputAt: Number(state.lastMoveInputAt) || 0,
                 blocksBroken: Number(state.blocksBroken) || 0,
-                totalKills: Number(state.totalKills) || 0
+                totalKills: Number(state.totalKills) || 0,
+                roguelikeV327Relics: clone(global.ROGUELIKE_V327?.relics || [])
             },
             player: serializePlayer(player),
             biome: clone(state.biomeV49),
@@ -243,7 +244,16 @@
             if (dungeon && Array.isArray(dungeon.hardWallCells)) dungeon.hardWallCells = new Set(dungeon.hardWallCells);
             state.dungeonV44 = dungeon;
 
+            if (global.ROGUELIKE_V327 && Array.isArray(save.run.roguelikeV327Relics)) {
+                global.ROGUELIKE_V327.relics = save.run.roguelikeV327Relics.slice();
+                global.ROGUELIKE_V327.selectedRelic = null;
+                global.ROGUELIKE_V327.relicOffers = [];
+                global.ROGUELIKE_V327.appliedBonus = { bombs: 0, range: 0, speed: 0, maxHealth: 0 };
+                if (state.roguelikeV327) state.roguelikeV327.relics = save.run.roguelikeV327Relics.slice();
+            }
+
             Object.assign(player, clone(save.player) || {});
+            if (typeof clampPlayerCapacitiesV67 === 'function') clampPlayerCapacitiesV67();
             if (typeof playerFSMReset === 'function') playerFSMReset('save-restore');
             state.keys = {};
             state.touchControls = { x:0, y:0 };

@@ -86,7 +86,7 @@ const RELICS_V314 = [
     {
         id: 'unstable_powder', icon: '🧨', name: 'PÓLVORA INESTABLE', rarity: 'RARE', category: 'RISK',
         desc: '+1 rango de bomba. Tus propias explosiones son menos tolerantes al roce.',
-        apply: () => { player.bombRange += 1; gameState.relicMods.unstablePowder = true; }
+        apply: () => { gameState.relicMods.unstablePowder = true; if (typeof clampPlayerCapacitiesV67 === 'function') clampPlayerCapacitiesV67(); }
     },
     {
         id: 'magnetic_boots', icon: '🧲', name: 'BOTAS MAGNÉTICAS', rarity: 'RARE', category: 'MOVEMENT',
@@ -100,7 +100,7 @@ const RELICS_V314 = [
     {
         id: 'heat_lens', icon: '🔆', name: 'LENTE TÉRMICA', rarity: 'UNCOMMON', category: 'FIRE',
         desc: '+1 rango de bomba y +10% de puntuación por objetivos dañados con fuego.',
-        apply: () => { player.bombRange += 1; gameState.fireScoreMult = (gameState.fireScoreMult || 1) + 0.10; }
+        apply: () => { gameState.fireScoreMult = (gameState.fireScoreMult || 1) + 0.10; }
     },
     {
         id: 'salvage_core', icon: '🪙', name: 'NÚCLEO DE SALVAMENTO', rarity: 'UNCOMMON', category: 'ECONOMY',

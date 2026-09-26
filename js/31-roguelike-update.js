@@ -412,27 +412,9 @@ function rogueV327GetActiveSynergies() {
 function rogueV327ApplyDerivedBonuses() {
     if (!player) return;
     const target = rogueV327GetRelicBonuses();
-    const delta = {
-        bombs: target.bombs - ROGUELIKE_V327.appliedBonus.bombs,
-        range: target.range - ROGUELIKE_V327.appliedBonus.range,
-        speed: target.speed - ROGUELIKE_V327.appliedBonus.speed,
-        maxHealth: target.maxHealth - ROGUELIKE_V327.appliedBonus.maxHealth
-    };
-
-    if ('maxBombs' in player) player.maxBombs = Math.max(1, rogueV327Num(player.maxBombs, 1) + delta.bombs);
-    if ('bombRange' in player) player.bombRange = Math.max(1, rogueV327Num(player.bombRange, 1) + delta.range);
+    const delta = { speed: target.speed - ROGUELIKE_V327.appliedBonus.speed };
     if ('speed' in player) player.speed = rogueV327Clamp(rogueV327Num(player.speed, 3) + delta.speed, 1, 7);
-
-    if (delta.maxHealth !== 0) {
-        if ('maxHealth' in player) player.maxHealth = Math.max(1, rogueV327Num(player.maxHealth, 1) + delta.maxHealth);
-        else if ('maxHp' in player) player.maxHp = Math.max(1, rogueV327Num(player.maxHp, 1) + delta.maxHealth);
-
-        const cap = 'maxHealth' in player ? player.maxHealth : player.maxHp;
-        if (delta.maxHealth > 0 && 'health' in player) player.health = Math.min(cap, rogueV327Num(player.health) + delta.maxHealth);
-        if ('health' in player) player.health = Math.max(1, Math.min(cap, rogueV327Num(player.health, cap)));
-        if ('hp' in player) player.hp = Math.max(1, Math.min(cap, rogueV327Num(player.hp, cap)));
-    }
-
+    if (typeof clampPlayerCapacitiesV67 === 'function') clampPlayerCapacitiesV67();
     ROGUELIKE_V327.appliedBonus = target;
 }
 

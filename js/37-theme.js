@@ -138,8 +138,9 @@
             pool: Object.freeze(['RASTRERO', 'VOLADOR', 'ESPECIAL']),
             colors: Object.freeze({ RASTRERO: 'enemyRastrero', VOLADOR: 'enemyVolador', ESPECIAL: 'enemyEspecial' })
         }),
-        // Power-up pool base. Mantener solo los cinco genéricos hasta que un nuevo power-up pase por el Test Lab.
-        powerups: Object.freeze({ pool: Object.freeze(['BOMB_UP','FIRE_UP','SPEED_UP','HEALTH_UP','SHIELD_UP']) })
+        // Pool universal: genéricos + KICK/GRAB ya validados en Test Lab.
+        // THROW permanece fuera del loot normal hasta completar su auditoría.
+        powerups: Object.freeze({ pool: Object.freeze(['BOMB_UP','FIRE_UP','SPEED_UP','HEALTH_UP','SHIELD_UP','KICK','GRAB']) })
     });
 
     function createVisualThemeV461(id, nombre, paletteOverrides, spriteOverrides, ambientOverrides) {
@@ -216,7 +217,7 @@
         // Winter conserva identidad visual, pero no declara mecánicas, hazards ni power-ups propios.
         mecanicas: Object.freeze([]),
         enemigos: WINTER_THEME_BASE.enemigos,
-        powerups: Object.freeze({ pool: Object.freeze(['BOMB_UP','FIRE_UP','SPEED_UP','HEALTH_UP','SHIELD_UP']) })
+        powerups: Object.freeze({ pool: Object.freeze(['BOMB_UP','FIRE_UP','SPEED_UP','HEALTH_UP','SHIELD_UP','KICK','GRAB']) })
     });
 
     const INFERNO_THEME = createVisualThemeV461(

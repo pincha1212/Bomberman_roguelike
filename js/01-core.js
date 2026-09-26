@@ -418,8 +418,11 @@ const UI = {};
         }
 
         function getPowerupDropPoolV67(){
+                // Pool universal: KICK y GRAB ya están validados en Test Lab y
+                // pasan a formar parte del gameplay normal. THROW sigue experimental.
                 return Object.freeze([...new Set([
-                POWERUPS.BOMB_UP, POWERUPS.FIRE_UP, POWERUPS.SPEED_UP, POWERUPS.HEALTH_UP, POWERUPS.SHIELD_UP
+                POWERUPS.BOMB_UP, POWERUPS.FIRE_UP, POWERUPS.SPEED_UP, POWERUPS.HEALTH_UP, POWERUPS.SHIELD_UP,
+                POWERUPS.KICK, POWERUPS.GRAB
             ])]);
         }
 

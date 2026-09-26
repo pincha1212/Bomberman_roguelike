@@ -14,13 +14,13 @@
 
     const CAPABILITY_POWERUPS = Object.freeze({
         KICK: Object.freeze({
-            id:'KICK', capability:'kick', label:'PATADA', icon:'→',
+            id:'KICK', capability:'kick', label:'PATADA', icon:'🥾',
             category:'INTERACCION', rarity:'BASE', permanent:true,
             exclusiveGroup:'bomb-interaction',
             desc:'Capacidad permanente de empujar bombas al caminar contra ellas.'
         }),
         GRAB: Object.freeze({
-            id:'GRAB', capability:'grab', label:'AGARRE', icon:'✋',
+            id:'GRAB', capability:'grab', label:'AGARRE', icon:'🧤',
             category:'INTERACCION', rarity:'BASE', permanent:true,
             exclusiveGroup:'bomb-interaction',
             desc:'Capacidad permanente de levantar una bomba y transportarla.'

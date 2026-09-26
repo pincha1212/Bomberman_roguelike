@@ -24,9 +24,9 @@
         SPEED_UP: { id:'SPEED_UP', name:'BOTAS', icon:'👟', rarity:'BASE', category:'BASE', desc:'Aumenta la velocidad del jugador mediante el pickup real.', implemented:true },
         HEALTH_UP: { id:'HEALTH_UP', name:'VIDA', icon:'❤️', rarity:'BASE', category:'BASE', desc:'Recupera 1 punto de vida, limitado por maxHealth.', implemented:true },
         SHIELD_UP: { id:'SHIELD_UP', name:'ESCUDO', icon:'🛡️', rarity:'BASE', category:'BASE', desc:'Activa el escudo mediante el sistema real de pickup.', implemented:true },
-        KICK: { id:'KICK', name:'PATADA', icon:'→', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: empujar bombas al caminar contra ellas. Exclusiva frente a GRAB.', implemented:true },
-        GRAB: { id:'GRAB', name:'AGARRE', icon:'✋', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: levantar y transportar bombas; GRAB implica CARRY. Exclusiva frente a KICK.', implemented:true },
-        THROW: { id:'THROW', name:'LANZAMIENTO', icon:'➜', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: lanzar la bomba transportada hasta 3 celdas. Requiere GRAB.', implemented:true },
+        KICK: { id:'KICK', name:'PATADA', icon:'🥾', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: empujar bombas al caminar contra ellas. Exclusiva frente a GRAB.', implemented:true },
+        GRAB: { id:'GRAB', name:'AGARRE', icon:'🧤', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: levantar y transportar bombas; GRAB implica CARRY. Exclusiva frente a KICK.', implemented:true },
+        THROW: { id:'THROW', name:'LANZAMIENTO', icon:'🎯', rarity:'BASE', category:'INTERACCION', desc:'PRUEBA: lanzar la bomba transportada hasta 3 celdas. Requiere GRAB; todavía no entra al gameplay normal.', implemented:true, experimental:true },
     });
     const POWERUP_CATEGORY_LABELS = Object.freeze({
         ALL:'TODOS', BASE:'BASE', INTERACCION:'INTERACCION', MOVIMIENTO:'MOVIMIENTO', BOMBAS:'BOMBAS', ENEMIGOS:'ENEMIGOS'

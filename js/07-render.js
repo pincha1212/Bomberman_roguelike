@@ -630,7 +630,7 @@ function draw() {
             const x = item.x * TILE_SIZE;
             const y = item.y * TILE_SIZE;
             const type = item.type;
-            const gameplayMeta = globalThis.GAMEPLAY_POWERUP_DEFS_V676?.[type] || null;
+            const gameplayMeta = globalThis.GAMEPLAY_POWERUP_DEFS_V676?.[type] || globalThis.CAPABILITY_POWERUPS_V681?.[type] || null;
             let floaty = Math.sin((gameState.animFrame + x) * 0.1) * 3;
             if (type === 'RELIC') {
                 ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('relicBase') : '#3b1d6b';

@@ -63,12 +63,33 @@
                     </div>
                 </div>
 
-                <div id="test-controls" class="test-controls hidden" aria-label="Controles de pruebas">
-                    <div class="test-controls-title">PRUEBAS · NIVEL</div>
-                    <button type="button" data-test-step="-1" aria-label="Nivel anterior">−</button>
-                    <input id="test-depth-input" type="number" min="1" max="44" value="1" inputmode="numeric" aria-label="Profundidad de prueba">
-                    <button type="button" data-test-step="1" aria-label="Siguiente nivel">+</button>
-                    <button type="button" id="test-depth-go">IR</button>
+                <div id="test-controls" class="test-controls hidden" aria-label="Laboratorio de pruebas">
+                    <div class="test-controls-title">PRUEBAS</div>
+                    <div class="test-controls-level">
+                        <span>NIVEL</span>
+                        <button type="button" data-test-step="-1" aria-label="Nivel anterior">−</button>
+                        <input id="test-depth-input" type="number" min="1" max="44" value="1" inputmode="numeric" aria-label="Profundidad de prueba">
+                        <button type="button" data-test-step="1" aria-label="Siguiente nivel">+</button>
+                        <button type="button" id="test-depth-go">IR</button>
+                    </div>
+                    <div class="test-tools-divider" aria-hidden="true"></div>
+                    <div class="test-tools-group">
+                        <span class="test-tools-label">MAPA</span>
+                        <button type="button" id="test-bomb-arena">BOMBAS</button>
+                        <button type="button" id="test-arena-reset">RESET</button>
+                    </div>
+                    <div class="test-tools-group test-kick-group" aria-label="Pruebas de patada de bomba">
+                        <span class="test-tools-label">PATADA</span>
+                        <button type="button" data-test-kick="up" aria-label="Probar patada hacia arriba">↑</button>
+                        <button type="button" data-test-kick="left" aria-label="Probar patada hacia la izquierda">←</button>
+                        <button type="button" data-test-kick="down" aria-label="Probar patada hacia abajo">↓</button>
+                        <button type="button" data-test-kick="right" aria-label="Probar patada hacia la derecha">→</button>
+                    </div>
+                    <div class="test-tools-group test-powerup-group" aria-label="Pruebas de power-ups">
+                        <span class="test-tools-label">POWER-UPS</span>
+                        <div id="test-powerup-buttons" class="test-powerup-buttons"></div>
+                    </div>
+                    <div id="test-lab-status" class="test-lab-status" role="status" aria-live="polite">Mapa normal</div>
                 </div>
 
                 <!-- Death / Run Summary -->
@@ -207,7 +228,7 @@
     <script src="js/24-difficulty.js?v=3.27.0"></script>
     <script src="js/03-world.js?v=6.4.0"></script>
     <script src="js/04-enemies.js?v=6.3.0"></script>
-    <script src="js/11-bombs.js?v=6.7.1.2"></script>
+    <script src="js/11-bombs.js?v=6.7.2"></script>
     <script src="js/13-collision.js?v=3.27.0"></script>
     <script src="js/14-traps.js?v=4.6.2"></script>
     <script src="js/05-player.js?v=6.7.0"></script>
@@ -228,7 +249,7 @@
     <script src="js/41-biome-journey.js?v=6.3.0"></script>
     <script src="js/42-run-history.js?v=5.6.0"></script>
     <script src="js/44-run-save.js?v=6.7.0"></script>
-    <script src="js/43-test-controls.js?v=5.6.0"></script>
+    <script src="js/43-test-controls.js?v=6.7.2"></script>
     <script src="js/46-ecs.js?v=6.0.0"></script>
     <script src="js/47-event-bus.js?v=6.0.0"></script>
     <script src="js/48-bomb-events.js?v=6.7.0"></script>

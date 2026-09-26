@@ -364,6 +364,14 @@ const UI = {};
                 if (synergy.id === 'fortress') cap.maxHealth += 1;
             }
 
+            // Las mejoras de capacidad obtenidas como power-up forman parte del
+            // estado actual del jugador. Se incorporan al techo calculado para que
+            // clampPlayerCapacitiesV67 no las elimine inmediatamente después del pickup.
+            if (typeof player !== 'undefined' && player) {
+                cap.maxBombs = Math.max(cap.maxBombs, Number(player.maxBombs) || 0);
+                cap.bombRange = Math.max(cap.bombRange, Number(player.bombRange) || 0);
+                cap.maxHealth = Math.max(cap.maxHealth, Number(player.maxHealth) || 0);
+            }
             cap.maxHealth = Math.max(1, Math.min(PLAYER_LIMITS_V67.hard.maxHealth, Math.floor(cap.maxHealth)));
             cap.maxBombs = Math.max(1, Math.min(PLAYER_LIMITS_V67.hard.maxBombs, Math.floor(cap.maxBombs)));
             cap.bombRange = Math.max(1, Math.min(PLAYER_LIMITS_V67.hard.bombRange, Math.floor(cap.bombRange)));
@@ -383,8 +391,8 @@ const UI = {};
         }
 
         const POWERUP_DEFS_V67 = Object.freeze({
-            [POWERUPS.BOMB_UP]: Object.freeze({ id:POWERUPS.BOMB_UP, label:'BOMBA', apply:()=>false }),
-            [POWERUPS.FIRE_UP]: Object.freeze({ id:POWERUPS.FIRE_UP, label:'RANGO', apply:()=>false }),
+            [POWERUPS.BOMB_UP]: Object.freeze({ id:POWERUPS.BOMB_UP, label:'BOMBA', apply:()=>{ const before=player.maxBombs; player.maxBombs=Math.min(PLAYER_LIMITS_V67.hard.maxBombs, Number(player.maxBombs||1)+1); clampPlayerCapacitiesV67(); return player.maxBombs>before; } }),
+            [POWERUPS.FIRE_UP]: Object.freeze({ id:POWERUPS.FIRE_UP, label:'RANGO', apply:()=>{ const before=player.bombRange; player.bombRange=Math.min(PLAYER_LIMITS_V67.hard.bombRange, Number(player.bombRange||1)+1); clampPlayerCapacitiesV67(); return player.bombRange>before; } }),
             [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'BOTAS', apply:()=>{ player.speed=Math.min(player.speed+0.4,6); return true; } }),
             [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', apply:()=>{ player.health=Math.min(player.health+1,player.maxHealth); return true; } }),
             [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', apply:()=>{ player.hasShield=true; return true; } }),
@@ -397,15 +405,20 @@ const UI = {};
             if(def){
                 const applied=!!def.apply();
                 clampPlayerCapacitiesV67();
-                if((type===POWERUPS.BOMB_UP||type===POWERUPS.FIRE_UP)&&typeof addFloatingText==='function') addFloatingText('SOLO RELIQUIA',player.x,player.y,'#c084fc');
                 if(typeof updateUI==='function') updateUI();
                 return applied;
             }
-            if(typeof window.applyWinterPowerupV67==='function') return !!window.applyWinterPowerupV67(key);
+            if(typeof window.applyGameplayPowerupV676==='function') return !!window.applyGameplayPowerupV676(key);
             return false;
         }
 
-        function getPowerupDropPoolV67(){ return Object.freeze([POWERUPS.SPEED_UP,POWERUPS.HEALTH_UP,POWERUPS.SHIELD_UP,POWERUPS.BOMB_KICK]); }
+        function getPowerupDropPoolV67(){
+            const extra = typeof window.getGameplayPowerupIdsV676 === 'function' ? window.getGameplayPowerupIdsV676() : [];
+            return Object.freeze([...new Set([
+                POWERUPS.BOMB_UP, POWERUPS.FIRE_UP, POWERUPS.SPEED_UP, POWERUPS.HEALTH_UP, POWERUPS.SHIELD_UP, POWERUPS.BOMB_KICK,
+                ...extra
+            ])]);
+        }
 
         window.PLAYER_LIMITS_V67=PLAYER_LIMITS_V67;
         window.POWERUP_DEFS_V67=POWERUP_DEFS_V67;

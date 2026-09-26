@@ -125,50 +125,6 @@ function canApplyPlayerDamage(){
     return true;
 }
 
-function getBombBlastPreviewCells(bomb){
-    if(!bomb) return [];
-    if (bomb.previewCells && bomb.previewGrid === gameState.grid && bomb.previewGridRevision === (gameState.gridRevision || 0)) return bomb.previewCells;
-    if(typeof calculateBombBlastCells === 'function') {
-        bomb.previewCells = calculateBombBlastCells(bomb);
-        bomb.previewGrid = gameState.grid;
-        bomb.previewGridRevision = gameState.gridRevision || 0;
-        return bomb.previewCells;
-    }
-    const cells = [{x:bomb.x,y:bomb.y}];
-    const dirs = [{dx:0,dy:-1},{dx:0,dy:1},{dx:-1,dy:0},{dx:1,dy:0}];
-    for(const dir of dirs){
-        for(let r=1;r<=bomb.range;r++){
-            const x=bomb.x+dir.dx*r, y=bomb.y+dir.dy*r;
-            if(x<0||x>=gameState.gridWidth||y<0||y>=gameState.gridHeight) break;
-            const type=gameState.grid[y][x];
-            if(type===TYPES.WALL) break;
-            cells.push({x,y,block:type===TYPES.BLOCK});
-            if(type===TYPES.BLOCK) break;
-        }
-    }
-    return cells;
-}
-
-function renderBombRangePreview(bomb){
-    if(!bomb || !bomb.previewTimer || bomb.previewTimer<=0) return;
-    const cells=getBombBlastPreviewCells(bomb);
-    const alpha=0.08 + clamp01(bomb.previewTimer/650)*0.15;
-    ctx.save();
-    ctx.lineWidth=2;
-    for(const c of cells){
-        const x=c.x*TILE_SIZE+4, y=c.y*TILE_SIZE+4;
-        ctx.fillStyle=`rgba(251,191,36,${alpha})`;
-        ctx.fillRect(x,y,TILE_SIZE-8,TILE_SIZE-8);
-        ctx.strokeStyle=`rgba(254,240,138,${Math.min(.85,alpha*4.3)})`;
-        ctx.strokeRect(x,y,TILE_SIZE-8,TILE_SIZE-8);
-        if(c.block){
-            ctx.strokeStyle='rgba(249,115,22,.7)';
-            ctx.strokeRect(x+5,y+5,TILE_SIZE-18,TILE_SIZE-18);
-        }
-    }
-    ctx.restore();
-}
-
 function renderBombFuseFeedback(cx,cy,bomb){
     const max= Math.max(1, bomb.maxTimer || 2000);
     const progress=1-clamp01(bomb.timer/max);

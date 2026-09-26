@@ -557,7 +557,7 @@
                 ? MATERIALS[bomb.materialOverrideV67.toUpperCase()]
                 : null;
             const blastMaterial = explicitMaterial || (winter ? MATERIALS.ICE : MATERIALS.FIRE);
-            const amountMultiplier = Number(bomb.winterPowerupModifiersV67?.residualAmountMultiplier) || 1;
+            const amountMultiplier = Number(bomb.gameplayPowerupModifiersV676?.residualAmountMultiplier) || 1;
             for (const cell of cells) {
                 if (!cell) continue;
                 deposit(blastMaterial, cell.x, cell.y, (cell.block ? 40 : 62) * amountMultiplier, { source: explicitMaterial ? 'bomb-powerup' : (winter ? 'bomb-winter' : 'bomb') });

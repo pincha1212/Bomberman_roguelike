@@ -408,7 +408,6 @@
         const entity = target?.entity || target;
         const cold = getEffectStatusV64(entity, EFFECTS.COLD);
         if (!cold) return false;
-        if (target?.kind === 'player' && typeof global.winterPowerupBlocksHeatHealingV67 === 'function' && global.winterPowerupBlocksHeatHealingV67()) return false;
         const config = getEffectConfigV64(EFFECTS.HEAT);
         cold.exposureMs = Math.max(0, finite(cold.exposureMs, 0) - (config?.warmingPerSecond || 2400) * Math.max(0, Number(dt) || 0) / 1000 * Math.max(0.1, intensity));
         if (cold.exposureMs <= 25) delete entity.__bombEffectStatusesV64[EFFECTS.COLD];
@@ -491,15 +490,8 @@
             status.tickAccumulatorMs -= config.tickMs;
 
             if (status.effectId === EFFECTS.COLD) {
-                if (target?.kind === 'player' && typeof global.winterPowerupBlocksColdV67 === 'function' && global.winterPowerupBlocksColdV67()) {
-                    delete target.entity.__bombEffectStatusesV64[EFFECTS.COLD];
-                    continue;
-                }
-                const exposureMultiplier = target?.kind === 'player' && typeof global.getWinterPowerupColdExposureMultiplierV67 === 'function'
-                    ? Number(global.getWinterPowerupColdExposureMultiplierV67()) || 1
-                    : 1;
                 status.exposureMs = clamp(
-                    finite(status.exposureMs, 0) + config.tickMs * Math.max(0.1, status.intensity) * exposureMultiplier,
+                    finite(status.exposureMs, 0) + config.tickMs * Math.max(0.1, status.intensity),
                     0,
                     config.maxExposureMs
                 );

@@ -23,6 +23,7 @@
                 if (gameState.relics.some(r => r.id === 'ember_core')) gameState.score += 25;
 
                 const blastId = ++gameState.blastSerial;
+                if (typeof gameplayPowerupOnBombExplodedV676 === 'function') gameplayPowerupOnBombExplodedV676(bomb);
                 const cells = calculateBombBlastCells(bomb);
                 const blastKeys = new Set(cells.map(c => `${c.x},${c.y}`));
                 // V3.12.3: algunas trampas reaccionan al paso de una explosión.
@@ -75,6 +76,10 @@
         function update(dt) {
             clampLargeEntities();
             if (!gameState.isPlaying || gameState.paused) return;
+
+            // Fuente única de actualización para power-ups universales.
+            // Se ejecuta tanto en gameplay normal como en ?test=1.
+            if (typeof gameplayPowerupUpdateV676 === 'function') gameplayPowerupUpdateV676(dt);
             if (typeof tickRunClock === 'function') tickRunClock(dt);
             gameState.animFrame++;
             updateCombatFeedback(dt);
@@ -159,7 +164,7 @@
                         gameState.score += killScore;
                         gameState.coins += killCoins;
                         gameState.totalKills++;
-                        if (typeof winterPowerupOnEnemyDefeatedV67 === 'function') winterPowerupOnEnemyDefeatedV67(e);
+                        if (typeof gameplayPowerupOnEnemyDefeatedV676 === 'function') gameplayPowerupOnEnemyDefeatedV676(e);
                         addFloatingText(`+${killScore}  +${killCoins}¢`, e.x, e.y, e.elite ? '#fb7185' : '#38bdf8');
                         if (typeof tryUnlockExitV44 === 'function') tryUnlockExitV44();
                     }
@@ -297,7 +302,7 @@
             if (lethal) sfx('death');
             if (lethal && typeof playerFSMDeath === 'function') playerFSMDeath(source);
             updateUI(true);
-            if (typeof winterPowerupOnDamageV67 === 'function') winterPowerupOnDamageV67();
+            if (typeof gameplayPowerupOnDamageV676 === 'function') gameplayPowerupOnDamageV676();
             if (lethal) gameOver(source);
             return true;
         }

@@ -458,10 +458,10 @@ function placeBomb(reason='manual'){
     if (!materialMods.canPlace) return false;
 
     const baseFuse = gameState.roomType.id === 'CURSED' ? BOMB_HANDLING.cursedFuse : BOMB_HANDLING.normalFuse;
-    const winterBombMods = typeof getWinterPowerupBombModifiersV67 === 'function'
-        ? getWinterPowerupBombModifiersV67({ owner: 'player' })
+    const gameplayBombMods = typeof getGameplayPowerupBombModifiersV676 === 'function'
+        ? getGameplayPowerupBombModifiersV676({ owner: 'player' })
         : { fuseMultiplier: 1 };
-    const fuseTotal = Math.max(700, Math.round(baseFuse * (typeof getBombFuseMultiplier === 'function' ? getBombFuseMultiplier() : 1) * materialMods.fuseMultiplier * Number(winterBombMods.fuseMultiplier || 1)));
+    const fuseTotal = Math.max(700, Math.round(baseFuse * (typeof getBombFuseMultiplier === 'function' ? getBombFuseMultiplier() : 1) * materialMods.fuseMultiplier * Number(gameplayBombMods.fuseMultiplier || 1)));
     const bomb = {
         id: `bomb-${gameState.animFrame}-${Math.random().toString(36).slice(2,7)}`,
         owner: 'player',
@@ -471,14 +471,10 @@ function placeBomb(reason='manual'){
         fuseTotal,
         warnBucket: Math.ceil(fuseTotal / 300),
         scalePulse: 1,
-        previewTimer: 650,
         playerPassThrough: true,
         justArmed: false,
         placedAtFrame: gameState.animFrame,
         placementReason: reason,
-        previewCells: calculateBombBlastCells({ x: gx, y: gy, range: Math.max(1, player.bombRange) }),
-        previewGrid: gameState.grid,
-        previewGridRevision: gameState.gridRevision || 0,
         state: BOMB_V4_STATES.ARMED,
         motionState: 'idle',
         worldX: (gx + .5) * TILE_SIZE,
@@ -501,7 +497,7 @@ function placeBomb(reason='manual'){
 
     gameState.bombs.push(bomb);
     player.bombsPlaced++;
-    if (typeof applyWinterPowerupToBombV67 === 'function') applyWinterPowerupToBombV67(bomb);
+    if (typeof applyGameplayPowerupToBombV676 === 'function') applyGameplayPowerupToBombV676(bomb);
     if (materialMods.kickOnPlace) {
         const dir = getBombKickDirectionV67();
         if (dir.dx || dir.dy) {

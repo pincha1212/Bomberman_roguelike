@@ -20,7 +20,6 @@
             showCombatFeedback: false,
             showRoomDecor: false,
             showEnemyAISignals: false,
-            showBombRangePreview: false,
             useCanvasFilter: false
         }),
         medium: Object.freeze({
@@ -33,7 +32,6 @@
             showCombatFeedback: true,
             showRoomDecor: true,
             showEnemyAISignals: false,
-            showBombRangePreview: true,
             useCanvasFilter: true
         }),
         high: Object.freeze({
@@ -46,7 +44,6 @@
             showCombatFeedback: true,
             showRoomDecor: true,
             showEnemyAISignals: true,
-            showBombRangePreview: true,
             useCanvasFilter: true
         })
     });

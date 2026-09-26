@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.7.5 — Gameplay Test Lab
+// Bomberman Roguelike v6.7.6 — Gameplay Test Lab
 // ?test=1 convierte el runtime en un entorno neutral para verificar gameplay real.
 (function initTestLabV675(global) {
     'use strict';
@@ -18,29 +18,28 @@
     });
     const BASE_POWERUP_TYPES = Object.freeze(['BOMB_UP', 'FIRE_UP', 'SPEED_UP', 'HEALTH_UP', 'SHIELD_UP', 'BOMB_KICK']);
     const BASE_POWERUP_META = Object.freeze({
-        BOMB_UP: { id:'BOMB_UP', name:'BOMBA', icon:'💣', rarity:'BASE', category:'BASE', desc:'No aumenta maxBombs. Los aumentos permanentes de capacidad provienen de reliquias.', implemented:true },
-        FIRE_UP: { id:'FIRE_UP', name:'RANGO', icon:'🔥', rarity:'BASE', category:'BASE', desc:'No aumenta bombRange. Los aumentos permanentes de rango provienen de reliquias.', implemented:true },
+        BOMB_UP: { id:'BOMB_UP', name:'BOMBA', icon:'💣', rarity:'BASE', category:'BASE', desc:'Aumenta maxBombs en 1 hasta el límite duro del jugador.', implemented:true },
+        FIRE_UP: { id:'FIRE_UP', name:'RANGO', icon:'🔥', rarity:'BASE', category:'BASE', desc:'Aumenta bombRange en 1 hasta el límite duro del jugador.', implemented:true },
         SPEED_UP: { id:'SPEED_UP', name:'BOTAS', icon:'👟', rarity:'BASE', category:'BASE', desc:'Aumenta la velocidad del jugador mediante el pickup real.', implemented:true },
         HEALTH_UP: { id:'HEALTH_UP', name:'VIDA', icon:'❤️', rarity:'BASE', category:'BASE', desc:'Recupera 1 punto de vida, limitado por maxHealth.', implemented:true },
         SHIELD_UP: { id:'SHIELD_UP', name:'ESCUDO', icon:'🛡️', rarity:'BASE', category:'BASE', desc:'Activa el escudo mediante el sistema real de pickup.', implemented:true },
         BOMB_KICK: { id:'BOMB_KICK', name:'PATADA', icon:'👢', rarity:'BASE', category:'BASE', desc:'Permite patear bombas durante la duración real configurada.', implemented:true }
     });
     const POWERUP_CATEGORY_LABELS = Object.freeze({
-        ALL:'TODOS', BASE:'BASE', MOVIMIENTO:'MOVIMIENTO', TEMPERATURA:'TEMPERATURA',
-        ALQUIMIA:'MATERIALES / ALQUIMIA', BOMBAS:'BOMBAS', ENEMIGOS:'ENEMIGOS', ESPECIFICO:'ESPECIALES'
+        ALL:'TODOS', BASE:'BASE', MOVIMIENTO:'MOVIMIENTO', MATERIALES:'MATERIALES / ALQUIMIA', BOMBAS:'BOMBAS', ENEMIGOS:'ENEMIGOS'
     });
-    const POWERUP_RESPAWN_MS = 650;
+    const POWERUP_RESPAWN_MS = 500;
     const DEFAULT_SHELF_FILTER = 'BASE';
 
     function getLabPowerupTypes() {
-        const winter = typeof global.BOMBER_ENGINE?.getWinterPowerupIds === 'function' ? global.BOMBER_ENGINE.getWinterPowerupIds() : [];
-        return Object.freeze([...BASE_POWERUP_TYPES, ...winter]);
+        const extra = typeof global.BOMBER_ENGINE?.getGameplayPowerupIds === 'function' ? global.BOMBER_ENGINE.getGameplayPowerupIds() : [];
+        return Object.freeze([...BASE_POWERUP_TYPES, ...extra]);
     }
 
     function getPowerupMeta(type) {
         const key = String(type || '');
         return BASE_POWERUP_META[key]
-            || global.WINTER_POWERUP_DEFS_V67?.[key]
+            || global.GAMEPLAY_POWERUP_DEFS_V676?.[key]
             || { id:key, name:key, icon:'?', rarity:'UNKNOWN', category:'BASE', desc:'Sin descripción registrada todavía.', implemented:false };
     }
 
@@ -57,8 +56,8 @@
 
     function getVisiblePowerupTypes(state = getState()) {
         const all = getLabPowerupTypes();
-        if (!state?.testLabV673?.active || state.testLabShelfVisibleV674 === false) return [];
-        const filter = String(state.testLabPowerupFilterV674 || DEFAULT_SHELF_FILTER);
+        if (!state?.testLabV673?.active || state.testLabShelfVisibleV676 === false) return [];
+        const filter = String(state.testLabPowerupFilterV676 || DEFAULT_SHELF_FILTER);
         if (filter === 'ALL') return all;
         return all.filter(type => getPowerupCategory(type) === filter);
     }
@@ -112,7 +111,7 @@
         const desc = getNode('test-powerup-info-desc');
         const status = getNode('test-powerup-info-status');
         const state = getState();
-        const pickups = Number(state?.testLabPowerupPickupsV674?.[type] || 0);
+        const pickups = Number(state?.testLabPowerupPickupsV676?.[type] || 0);
         const implemented = meta.implemented !== false;
         if (icon) icon.textContent = meta.icon || '?';
         if (name) name.textContent = meta.name || String(type);
@@ -120,9 +119,8 @@
         if (rarity) rarity.textContent = String(meta.rarity || '—');
         if (desc) desc.textContent = meta.desc || 'Sin descripción registrada todavía.';
         if (status) {
-            if (!implemented) status.textContent = `REGISTRADO · PENDIENTE DE IMPLEMENTACIÓN · pickups: ${pickups}`;
-            else if (result === false && (type === 'BOMB_UP' || type === 'FIRE_UP')) status.textContent = `RECHAZADO POR REGLA REAL · SOLO RELIQUIA · pickups: ${pickups}`;
-            else if (result === false) status.textContent = `NO APLICADO · revisar flujo real · pickups: ${pickups}`;
+            if (!implemented) status.textContent = `NO IMPLEMENTADO · pickups: ${pickups}`;
+            else if (result === false) status.textContent = `SIN CAMBIO · límite o condición real · pickups: ${pickups}`;
             else status.textContent = `APLICADO · pickups: ${pickups}`;
         }
         info.classList.remove('is-empty');
@@ -215,7 +213,7 @@
         player.hazardSlowType = '';
         player.__bombEffectStatusesV64 = {};
         if (typeof global.playerFSMReset === 'function') global.playerFSMReset('test-lab-player-reset');
-        if (typeof global.resetWinterPowerupsV67 === 'function') global.resetWinterPowerupsV67();
+        if (typeof global.resetGameplayPowerupsV676 === 'function') global.resetGameplayPowerupsV676();
     }
 
     function centerPlayer(player, gx = TEST_ARENA.playerX, gy = TEST_ARENA.playerY) {
@@ -275,6 +273,29 @@
         state.totalKills = 0;
     }
 
+    function spawnNeutralTestEnemies(state) {
+        const defs = [
+            { type: global.ENEMY_TYPES?.RASTRERO || { name:'Rastrero', color:'#ef4444', speed:1.4, canFly:false }, x:2, y:2 },
+            { type: global.ENEMY_TYPES?.ESPECIAL || { name:'Especial', color:'#22c55e', speed:2.2, canFly:false }, x:10, y:10 }
+        ];
+        state.enemies = defs.map((entry, index) => ({
+            x: entry.x * TILE_SIZE + TILE_SIZE / 2,
+            y: entry.y * TILE_SIZE + TILE_SIZE / 2,
+            width: TILE_SIZE * 0.75,
+            height: TILE_SIZE * 0.75,
+            type: entry.type,
+            vx: Number(entry.type?.speed) || 1.2,
+            vy: 0,
+            baseSpeed: Number(entry.type?.speed) || 1.2,
+            changeTimer: 0,
+            elite: false,
+            lastDirection: index === 0 ? 'right' : 'left',
+            __gridAnchor: 'center',
+            desiredDirection: index === 0 ? 'right' : 'left',
+            aiBehavior: null
+        }));
+    }
+
     function spawnShelfPowerups(state) {
         const types = getVisiblePowerupTypes(state);
         const slots = getPowerupSlots(types);
@@ -282,9 +303,9 @@
             const [x, y] = slots[type];
             return {
                 x, y, type,
-                testLabShelfSlotV674: type,
+                testLabShelfSlotV676: type,
                 testLabShelfSlotV673: type,
-                testLabRespawnableV674: true,
+                testLabRespawnableV676: true,
                 testLabRespawnableV673: true
             };
         });
@@ -295,7 +316,7 @@
         if (!isActive()) return false;
         const state = getState();
         if (!state) return false;
-        state.items = Array.isArray(state.items) ? state.items.filter(item => !item?.testLabShelfSlotV674 && !item?.testLabShelfSlotV673) : [];
+        state.items = Array.isArray(state.items) ? state.items.filter(item => !item?.testLabShelfSlotV676 && !item?.testLabShelfSlotV673) : [];
         spawnShelfPowerups(state);
         updatePowerupShelfControls();
         if (typeof global.updateUI === 'function') global.updateUI(true);
@@ -308,10 +329,10 @@
         const select = getNode('test-powerup-filter');
         const toggle = getNode('test-powerup-shelf-toggle');
         if (select) {
-            const filter = String(state?.testLabPowerupFilterV674 || DEFAULT_SHELF_FILTER);
+            const filter = String(state?.testLabPowerupFilterV676 || DEFAULT_SHELF_FILTER);
             select.value = getAvailableShelfCategories().includes(filter) ? filter : DEFAULT_SHELF_FILTER;
         }
-        if (toggle) toggle.textContent = state?.testLabShelfVisibleV674 === false ? 'MOSTRAR ESTANTERÍA' : 'OCULTAR ESTANTERÍA';
+        if (toggle) toggle.textContent = state?.testLabShelfVisibleV676 === false ? 'MOSTRAR ESTANTERÍA' : 'OCULTAR ESTANTERÍA';
     }
 
     function applyNeutralTestLabEnvironment(reason = 'neutralize') {
@@ -325,15 +346,15 @@
             immortal: true,
             biomeEffects: false,
             hazards: false,
-            enemies: false,
+            enemies: true,
             deathEcho: false,
             materials: true,
             powerupRespawn: true,
             reason: String(reason)
         };
-        state.testLabPowerupFilterV674 = String(state.testLabPowerupFilterV674 || DEFAULT_SHELF_FILTER);
-        state.testLabShelfVisibleV674 = state.testLabShelfVisibleV674 !== false;
-        state.testLabPowerupPickupsV674 = Object.create(null);
+        state.testLabPowerupFilterV676 = String(state.testLabPowerupFilterV676 || DEFAULT_SHELF_FILTER);
+        state.testLabShelfVisibleV676 = state.testLabShelfVisibleV676 !== false;
+        state.testLabPowerupPickupsV676 = Object.create(null);
 
         if (typeof global.setActiveThemeV46 === 'function') global.setActiveThemeV46('classic', false);
         state.biomeV49 = null;
@@ -347,13 +368,14 @@
         state.roomDesign = null;
         clearDynamicRuntime(state);
         createNeutralGrid(state);
+        spawnNeutralTestEnemies(state);
         centerPlayer(player);
         resetPlayerToBase(player);
         centerPlayer(player);
         // Las bombas no se precargan en el laboratorio.
         // Deben colocarse exclusivamente mediante el flujo real del jugador.
         state.bombs = [];
-        if (typeof global.resetWinterPowerupsV67 === 'function') global.resetWinterPowerupsV67();
+        if (typeof global.resetGameplayPowerupsV676 === 'function') global.resetGameplayPowerupsV676();
         clearPowerupInfo();
         spawnShelfPowerups(state);
         state.isPlaying = true;
@@ -456,9 +478,9 @@
     function refillPowerups() {
         if (!isActive()) return false;
         const state = getState();
-        if (state.testLabShelfVisibleV674 === false) state.testLabShelfVisibleV674 = true;
+        if (state.testLabShelfVisibleV676 === false) state.testLabShelfVisibleV676 = true;
         refreshPowerupShelf();
-        setStatus(`TEST LAB · ${POWERUP_CATEGORY_LABELS[String(state.testLabPowerupFilterV674 || DEFAULT_SHELF_FILTER)] || 'filtro'} repuesto`);
+        setStatus(`TEST LAB · ${POWERUP_CATEGORY_LABELS[String(state.testLabPowerupFilterV676 || DEFAULT_SHELF_FILTER)] || 'filtro'} repuesto`);
         return true;
     }
 
@@ -467,8 +489,8 @@
         const state = getState();
         const value = String(filter || DEFAULT_SHELF_FILTER);
         if (!getAvailableShelfCategories().includes(value)) return false;
-        state.testLabPowerupFilterV674 = value;
-        state.testLabShelfVisibleV674 = true;
+        state.testLabPowerupFilterV676 = value;
+        state.testLabShelfVisibleV676 = true;
         refreshPowerupShelf();
         clearPowerupInfo();
         setStatus(`TEST LAB · estantería: ${POWERUP_CATEGORY_LABELS[value] || value}`);
@@ -478,10 +500,10 @@
     function togglePowerupShelf() {
         if (!isActive()) return false;
         const state = getState();
-        state.testLabShelfVisibleV674 = state.testLabShelfVisibleV674 === false;
+        state.testLabShelfVisibleV676 = state.testLabShelfVisibleV676 === false;
         refreshPowerupShelf();
         clearPowerupInfo();
-        setStatus(state.testLabShelfVisibleV674 ? 'TEST LAB · estantería visible' : 'TEST LAB · estantería oculta');
+        setStatus(state.testLabShelfVisibleV676 ? 'TEST LAB · estantería visible' : 'TEST LAB · estantería oculta');
         return true;
     }
 
@@ -511,7 +533,7 @@
         const types = getVisiblePowerupTypes(state);
         const slots = getPowerupSlots(types);
         for (const type of types) {
-            const present = state.items.some(item => item?.testLabShelfSlotV674 === type || item?.testLabShelfSlotV673 === type);
+            const present = state.items.some(item => item?.testLabShelfSlotV676 === type || item?.testLabShelfSlotV673 === type);
             if (present) {
                 runtime.respawnDue.delete(type);
                 continue;
@@ -527,7 +549,7 @@
                 runtime.respawnDue.set(type, now + 150);
                 continue;
             }
-            state.items.push({ x, y, type, testLabShelfSlotV674: type, testLabShelfSlotV673: type, testLabRespawnableV674: true, testLabRespawnableV673: true });
+            state.items.push({ x, y, type, testLabShelfSlotV676: type, testLabShelfSlotV673: type, testLabRespawnableV676: true, testLabRespawnableV673: true });
             runtime.respawnDue.delete(type);
         }
     }
@@ -537,8 +559,8 @@
         const key = String(type || '');
         if (!getLabPowerupTypes().includes(key)) return;
         const state = getState();
-        state.testLabPowerupPickupsV674 = state.testLabPowerupPickupsV674 || Object.create(null);
-        state.testLabPowerupPickupsV674[key] = Number(state.testLabPowerupPickupsV674[key] || 0) + 1;
+        state.testLabPowerupPickupsV676 = state.testLabPowerupPickupsV676 || Object.create(null);
+        state.testLabPowerupPickupsV676[key] = Number(state.testLabPowerupPickupsV676[key] || 0) + 1;
         updatePowerupInfo(key, result);
         const meta = getPowerupMeta(key);
         setStatus(`${meta.name || key} · ${meta.implemented === false ? 'registrado' : 'pickup real aplicado'}`);
@@ -555,6 +577,55 @@
         };
         runtime.wrappedApplyPowerup = true;
         return true;
+    }
+
+    function runGameplayAuditV676() {
+        if (!isActive()) return false;
+        const state = getState();
+        const player = getPlayer();
+        const checks = [];
+        const push = (name, ok, detail='') => checks.push({ name, ok: !!ok, detail });
+        const expectedUniversalIds = new Set([
+            'LONG_FUSE','BOMB_SLIDE','ALCHEMIST_GLOVE','CATALYST','ACID_FLASK','AVALANCHE','SLOW_AURA','HUNTER_MARK'
+        ]);
+        push('TEST LAB activo', !!state?.testLabV673?.active);
+        push('Entorno neutral', !!state?.testLabV673?.neutral && !state?.biomeV49);
+        push('Jugador presente', !!player);
+        push('Bombas manuales', Array.isArray(state?.bombs));
+        push('Enemigos básicos de auditoría', Array.isArray(state?.enemies) && state.enemies.length >= 2);
+        push('Capacidad válida', !!player && Number.isFinite(player.maxBombs) && Number.isFinite(player.bombRange) && player.maxBombs >= 1 && player.bombRange >= 1);
+        push('Capacidad dentro de límites', !!player && player.maxBombs <= Number(global.PLAYER_LIMITS_V67?.hard?.maxBombs || Infinity) && player.bombRange <= Number(global.PLAYER_LIMITS_V67?.hard?.bombRange || Infinity));
+        const bombCount = (state?.bombs || []).filter(b => b?.countsTowardPlayerCapacity !== false).length;
+        push('BombsPlaced coherente', !!player && Number(player.bombsPlaced) === bombCount, `${player?.bombsPlaced ?? '—'} / ${bombCount}`);
+        const occupied = new Set();
+        let bombBounds = true;
+        for (const b of state?.bombs || []) {
+            const key = `${b.x},${b.y}`;
+            if (occupied.has(key)) bombBounds = false;
+            occupied.add(key);
+            if (!(b.x >= 0 && b.y >= 0 && b.x < state.gridWidth && b.y < state.gridHeight)) bombBounds = false;
+        }
+        push('Bombas sin duplicados/fuera de grid', bombBounds);
+        const gameplayAudit = typeof global.auditGameplayPowerupsV676 === 'function' ? global.auditGameplayPowerupsV676() : null;
+        push('Power-ups universales auditables', !!gameplayAudit?.valid, gameplayAudit?.errors?.join('; ') || '');
+        const labTypes = getLabPowerupTypes();
+        const baseDefs = global.POWERUP_DEFS_V67 || {};
+        push('6 power-ups base con aplicación real', BASE_POWERUP_TYPES.every(type => typeof baseDefs[type]?.apply === 'function'));
+        const dropPool = typeof global.getPowerupDropPoolV67 === 'function' ? global.getPowerupDropPoolV67() : [];
+        push('Pool universal disponible', labTypes.every(type => dropPool.includes(type)));
+        push('Hooks universales conectados', typeof global.gameplayPowerupUpdateV676 === 'function' && typeof global.getGameplayPowerupEnemySpeedMultiplierV676 === 'function' && typeof global.applyGameplayPowerupToBombV676 === 'function');
+        push('Sin hooks Winter de power-ups', typeof global.winterPowerupUpdateV67 !== 'function' && typeof global.getWinterPowerupMovementModifiersV67 !== 'function');
+        push('Catálogo universal', labTypes.filter(type => !BASE_POWERUP_TYPES.includes(type)).every(type => expectedUniversalIds.has(type)) && labTypes.length === BASE_POWERUP_TYPES.length + expectedUniversalIds.size);
+        push('Todos los power-ups con metadatos', labTypes.every(type => !!getPowerupMeta(type)?.desc && getPowerupMeta(type)?.implemented !== false));
+        push('Preview de rango eliminado', typeof global.renderBombRangePreview !== 'function' && typeof global.getBombBlastPreviewCells !== 'function' && !(state?.bombs || []).some(b => 'previewCells' in b || 'previewGrid' in b || 'previewTimer' in b));
+        const valid = checks.every(check => check.ok);
+        const audit = getNode('test-lab-audit');
+        if (audit) {
+            audit.textContent = `${valid ? 'PASS' : 'FAIL'} · ${checks.filter(c=>c.ok).length}/${checks.length} checks` + (checks.filter(c=>!c.ok).length ? ` · ${checks.filter(c=>!c.ok).map(c=>c.name).join(', ')}` : '');
+            audit.classList.toggle('is-fail', !valid);
+        }
+        setStatus(valid ? 'TEST LAB · AUDITORÍA PASS' : `TEST LAB · AUDITORÍA FAIL · ${checks.filter(c=>!c.ok).map(c=>c.name).join(', ')}`);
+        return valid;
     }
 
     function bindControls() {
@@ -575,6 +646,7 @@
         getNode('test-arena-reset')?.addEventListener('click', resetMap);
         getNode('test-player-reset')?.addEventListener('click', resetPlayerOnly);
         getNode('test-powerups-refill')?.addEventListener('click', refillPowerups);
+        getNode('test-lab-audit-btn')?.addEventListener('click', runGameplayAuditV676);
         getNode('test-powerup-filter')?.addEventListener('change', event => setPowerupFilter(event.currentTarget.value));
         getNode('test-powerup-shelf-toggle')?.addEventListener('click', togglePowerupShelf);
         root.querySelectorAll('[data-test-kick]').forEach(button => {
@@ -624,18 +696,17 @@
     global.BOMBER_TEST_MODE_V53 = TEST_MODE;
     global.BOMBER_TEST_MODE_V672 = TEST_MODE;
     global.BOMBER_TEST_MODE_V673 = TEST_MODE;
-    global.BOMBER_TEST_MODE_V674 = TEST_MODE;
-    global.BOMBER_TEST_MODE_V675 = TEST_MODE;
+    global.BOMBER_TEST_MODE_V676 = TEST_MODE;
     global.BOMBER_ENGINE = global.BOMBER_ENGINE || {};
     global.BOMBER_ENGINE.isTestMode = () => TEST_MODE;
     global.BOMBER_ENGINE.isTestLabNeutral = () => isActive();
     global.BOMBER_ENGINE.getTestLabConfig = () => ({
         active: isActive(),
-        version: '6.7.5',
+        version: '6.7.6',
         neutral: true,
         arena: { ...TEST_ARENA },
-        powerupFilter: getState()?.testLabPowerupFilterV674 || DEFAULT_SHELF_FILTER,
-        shelfVisible: getState()?.testLabShelfVisibleV674 !== false,
+        powerupFilter: getState()?.testLabPowerupFilterV676 || DEFAULT_SHELF_FILTER,
+        shelfVisible: getState()?.testLabShelfVisibleV676 !== false,
         powerups: [...getLabPowerupTypes()]
     });
     global.BOMBER_ENGINE.getTestLabPowerupCatalog = () => Object.freeze(Object.fromEntries(getLabPowerupTypes().map(type => [type, getPowerupMeta(type)])));
@@ -644,6 +715,7 @@
     global.BOMBER_ENGINE.skipToDepth = jump;
     global.BOMBER_ENGINE.buildBombKickTestArena = resetMap;
     global.BOMBER_ENGINE.testBombKickDirection = testKickDirection;
+    global.BOMBER_ENGINE.auditTestLabGameplay = runGameplayAuditV676;
     global.BOMBER_ENGINE.spawnTestPowerup = (type) => {
         // Compatibilidad API: devuelve/restituye un power-up real en la estantería;
         // nunca altera capacidades directamente.
@@ -651,8 +723,8 @@
         const state = getState();
         if (!isActive() || !state) return false;
         const [x, y] = getPowerupSlots()[type];
-        if (!state.items.some(item => item?.testLabShelfSlotV674 === type || item?.testLabShelfSlotV673 === type)) {
-            state.items.push({ x, y, type, testLabShelfSlotV674: type, testLabShelfSlotV673: type, testLabRespawnableV674: true, testLabRespawnableV673: true });
+        if (!state.items.some(item => item?.testLabShelfSlotV676 === type || item?.testLabShelfSlotV673 === type)) {
+            state.items.push({ x, y, type, testLabShelfSlotV676: type, testLabShelfSlotV673: type, testLabRespawnableV676: true, testLabRespawnableV673: true });
         }
         return true;
     };

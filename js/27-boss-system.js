@@ -183,7 +183,6 @@ function bossV41SpawnBomb() {
         fuseTotal: BOSS_V41_CONFIG.bombFuseMs,
         warnBucket: Math.ceil(BOSS_V41_CONFIG.bombFuseMs / 300),
         scalePulse: 1,
-        previewTimer: 0,
         playerPassThrough: true,
         justArmed: false,
         placedAtFrame: gameState.animFrame,

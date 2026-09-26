@@ -1042,7 +1042,10 @@ function applyEnemyDirectionAtCenterV312(e) {
 function moveEnemyV312(e, dt) {
     const ai = e.ai;
     const profile = enemyBehaviorProfileV324(e);
-    const speed = e.baseSpeed * Number(profile.speedMultiplier || 1) * (1 + gameState.threatLevel * 0.04);
+    const gameplaySpeedMultiplier = typeof getGameplayPowerupEnemySpeedMultiplierV676 === 'function'
+        ? Math.max(0.1, Number(getGameplayPowerupEnemySpeedMultiplierV676(e)) || 1)
+        : 1;
+    const speed = e.baseSpeed * Number(profile.speedMultiplier || 1) * (1 + gameState.threatLevel * 0.04) * gameplaySpeedMultiplier;
     const scale = Math.min(dt / 16.6667, 2);
 
     // La dirección solicitada se aplica en un centro de celda, como en un juego

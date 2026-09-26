@@ -529,10 +529,6 @@
             fuseTotal,
             warnBucket: Math.ceil(fuseTotal / 300),
             scalePulse: 1,
-            previewTimer: 0,
-            previewCells: [],
-            previewGrid: gameState.grid,
-            previewGridRevision: gameState.gridRevision || 0,
             state: typeof BOMB_V4_STATES !== 'undefined' ? BOMB_V4_STATES.MOVING : 'moving',
             motionState: 'moving',
             worldX: startX,
@@ -677,12 +673,6 @@
     }
 
     function syncDeathEchoV61() {
-        if (global.BOMBER_ENGINE?.isTestLabNeutral?.() || gameState?.testLabV673?.deathEcho === false) {
-            state.checkedLevel = null;
-            state.active = null;
-            if (typeof gameState !== 'undefined') gameState.deathEchoV61 = null;
-            return null;
-        }
         // La materialización también debe funcionar durante initLevel, antes de
         // que el caller marque isPlaying=true. Así el primer render ya encuentra
         // una instancia activa del eco.

@@ -115,7 +115,7 @@ function isWorldTileVisibleV329(tileX, tileY, margin = 1){
 function getRenderProfileV65() {
     return typeof getBomberRenderProfileV65 === 'function'
         ? getBomberRenderProfileV65()
-        : { particleBudget: 96, floaterBudget: 24, bombEffectBudget: 360, showAmbientDust: true, showLighting: true, showCombatFeedback: true, showRoomDecor: true, showEnemyAISignals: true, showBombRangePreview: true, useCanvasFilter: true };
+        : { particleBudget: 96, floaterBudget: 24, bombEffectBudget: 360, showAmbientDust: true, showLighting: true, showCombatFeedback: true, showRoomDecor: true, showEnemyAISignals: true, useCanvasFilter: true };
 }
 
 function draw() {
@@ -153,7 +153,8 @@ function draw() {
             if (!testLabNeutralV673 && getRenderProfileV65().showRoomDecor && typeof drawRoomDesignLayerV313 === 'function') drawRoomDesignLayerV313();
 
             // v6.0: residuos materiales persistentes; quedan por debajo de items, bombas y personajes.
-            if (!testLabNeutralV673 && typeof drawMaterialResiduesV60 === 'function') drawMaterialResiduesV60(ctx);
+            if (typeof drawMaterialResiduesV60 === 'function') drawMaterialResiduesV60(ctx);
+            if (typeof drawAlchemistMaterialHighlightsV676 === 'function') drawAlchemistMaterialHighlightsV676();
             if (typeof drawBombEffectsV64 === 'function') drawBombEffectsV64(ctx);
 
             // V3.3: las trampas aparecen visualmente solo después de activarse.
@@ -172,7 +173,6 @@ function draw() {
                 const bombPos = typeof getBombV4WorldPosition === 'function' ? getBombV4WorldPosition(b) : {x:(b.x + .5) * TILE_SIZE, y:(b.y + .5) * TILE_SIZE};
                 if(!isWorldRectVisibleV329(bombPos.x - TILE_SIZE * .55, bombPos.y - TILE_SIZE * .55, TILE_SIZE * 1.1, TILE_SIZE * 1.1, TILE_SIZE)) continue;
                 renderStatsV329.bombs++;
-                if (getRenderProfileV65().showBombRangePreview) renderBombRangePreview(b);
                 drawBombSprite(bombPos.x, bombPos.y, b);
             }
             drawBombChainLinks();
@@ -597,6 +597,16 @@ function draw() {
                 ctx.stroke();
             }
 
+            if (e.hunterMarkedV676) {
+                ctx.strokeStyle = '#facc15';
+                ctx.globalAlpha = 0.8;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(e.x, e.y + floaty, TILE_SIZE * 0.50, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+
             ctx.restore();
         }
 
@@ -694,7 +704,7 @@ function draw() {
             const x = item.x * TILE_SIZE;
             const y = item.y * TILE_SIZE;
             const type = item.type;
-            const winterMeta = globalThis.WINTER_POWERUP_DEFS_V67?.[type] || null;
+            const gameplayMeta = globalThis.GAMEPLAY_POWERUP_DEFS_V676?.[type] || null;
             let floaty = Math.sin((gameState.animFrame + x) * 0.1) * 3;
             if (type === 'RELIC') {
                 ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('relicBase') : '#3b1d6b';
@@ -708,35 +718,35 @@ function draw() {
                 ctx.fillText(relic?.icon || '✦', x + 11, y + 31 + floaty);
                 return;
             }
-            const rarityColor = winterMeta ? (globalThis.WINTER_POWERUP_RARITY_COLORS_V67?.[winterMeta.rarity] || '#94a3b8') : null;
-            ctx.fillStyle = winterMeta ? 'rgba(15,23,42,.90)' : (typeof themeColorV46 === 'function' ? themeColorV46('powerupBase') : '#0284c7');
+            const rarityColor = gameplayMeta ? (globalThis.GAMEPLAY_POWERUP_RARITY_COLORS_V676?.[gameplayMeta.rarity] || '#94a3b8') : null;
+            ctx.fillStyle = gameplayMeta ? 'rgba(15,23,42,.90)' : (typeof themeColorV46 === 'function' ? themeColorV46('powerupBase') : '#0284c7');
             ctx.fillRect(x + 8, y + 8 + floaty, TILE_SIZE - 16, TILE_SIZE - 16);
             ctx.strokeStyle = rarityColor || (typeof themeColorV46 === 'function' ? themeColorV46('powerupAccent') : '#38bdf8');
             ctx.strokeRect(x + 8, y + 8 + floaty, TILE_SIZE - 16, TILE_SIZE - 16);
 
             ctx.font = '14px "Press Start 2P"';
-            let icon = winterMeta?.icon || '💣';
+            let icon = gameplayMeta?.icon || '💣';
             if (type === POWERUPS.FIRE_UP) icon = '🔥';
             if (type === POWERUPS.SPEED_UP) icon = '👟';
             if (type === POWERUPS.HEALTH_UP) icon = '❤️';
             if (type === POWERUPS.SHIELD_UP) icon = '🛡️';
-            if (type === POWERUPS.BOMB_KICK && !winterMeta) icon = '👢';
+            if (type === POWERUPS.BOMB_KICK && !gameplayMeta) icon = '👢';
             ctx.fillText(icon, x + 10, y + 30 + floaty);
-            if (winterMeta) {
+            if (gameplayMeta) {
                 ctx.font = '7px Inter, sans-serif';
                 ctx.fillStyle = rarityColor || '#cbd5e1';
                 ctx.textAlign = 'center';
-                ctx.fillText(winterMeta.rarity, x + TILE_SIZE / 2, y + TILE_SIZE - 7 + floaty);
+                ctx.fillText(gameplayMeta.rarity, x + TILE_SIZE / 2, y + TILE_SIZE - 7 + floaty);
                 ctx.textAlign = 'start';
             }
         }
 
-        function drawAlchemistMaterialHighlightsV674() {
-            if (!globalThis.isWinterPowerupActiveV67?.('ALCHEMIST_GLOVE')) return;
+        function drawAlchemistMaterialHighlightsV676() {
+            if (!globalThis.isGameplayPowerupActiveV676?.('ALCHEMIST_GLOVE')) return;
             const residues = Array.isArray(gameState.materialResiduesV60) ? gameState.materialResiduesV60 : [];
             const px = Math.floor((player.x + player.width / 2) / TILE_SIZE);
             const py = Math.floor((player.y + player.height / 2) / TILE_SIZE);
-            const gloveState = gameState.winterPowerupsV67;
+            const gloveState = gameState.gameplayPowerupsV676;
             if (gloveState) gloveState.gloveTimer = Math.max(0, Number(gloveState.gloveTimer || 0));
             if (Number(gloveState?.gloveTimer || 0) <= 0) return;
             ctx.save();

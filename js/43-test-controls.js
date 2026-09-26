@@ -628,6 +628,21 @@
         return valid;
     }
 
+    function setTestPanelVisible(visible) {
+        const root = getNode('test-controls');
+        if (!root || !TEST_MODE) return false;
+        const show = !!visible;
+        root.classList.toggle('hidden', !show);
+        root.setAttribute('aria-hidden', show ? 'false' : 'true');
+        return show;
+    }
+
+    function toggleTestPanel() {
+        const root = getNode('test-controls');
+        if (!root || !TEST_MODE) return false;
+        return setTestPanelVisible(root.classList.contains('hidden'));
+    }
+
     function bindControls() {
         const root = getNode('test-controls');
         if (!root || root.dataset.bound === '1') return !!root;
@@ -654,7 +669,13 @@
         });
 
         global.document.addEventListener('keydown', event => {
-            if (!TEST_MODE || event.target?.matches?.('input,textarea,select,button')) return;
+            if (!TEST_MODE) return;
+            if (event.key === 'F2') {
+                event.preventDefault();
+                toggleTestPanel();
+                return;
+            }
+            if (event.target?.matches?.('input,textarea,select,button')) return;
             if (event.key === '[') { event.preventDefault(); jump((Number(getState()?.level) || 1) - 1); }
             if (event.key === ']') { event.preventDefault(); jump((Number(getState()?.level) || 1) + 1); }
         });
@@ -680,7 +701,7 @@
             return;
         }
         const root = getNode('test-controls');
-        if (root) root.classList.remove('hidden');
+        setTestPanelVisible(false);
         updatePowerupShelfControls();
         if (!runtime.installed) {
             runtime.installed = true;
@@ -702,7 +723,7 @@
     global.BOMBER_ENGINE.isTestLabNeutral = () => isActive();
     global.BOMBER_ENGINE.getTestLabConfig = () => ({
         active: isActive(),
-        version: '6.7.6',
+        version: '6.7.8',
         neutral: true,
         arena: { ...TEST_ARENA },
         powerupFilter: getState()?.testLabPowerupFilterV676 || DEFAULT_SHELF_FILTER,
@@ -712,6 +733,7 @@
     global.BOMBER_ENGINE.getTestLabPowerupCatalog = () => Object.freeze(Object.fromEntries(getLabPowerupTypes().map(type => [type, getPowerupMeta(type)])));
     global.BOMBER_ENGINE.setTestLabPowerupFilter = setPowerupFilter;
     global.BOMBER_ENGINE.toggleTestLabPowerupShelf = togglePowerupShelf;
+    global.BOMBER_ENGINE.toggleTestLabPanel = toggleTestPanel;
     global.BOMBER_ENGINE.skipToDepth = jump;
     global.BOMBER_ENGINE.buildBombKickTestArena = resetMap;
     global.BOMBER_ENGINE.testBombKickDirection = testKickDirection;

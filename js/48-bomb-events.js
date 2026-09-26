@@ -121,11 +121,11 @@
     function audit() {
         const base = bus.audit();
         const actual = bus.getListenerKeys(EVENT).slice().sort();
-        const expected = Object.values(LISTENER_KEYS).concat('bomb-explosion:materials').slice().sort();
+        const expected = Object.values(LISTENER_KEYS).slice().sort();
         const errors = base.errors.slice();
 
         if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
-            errors.push(`BOMBA_EXPLOTO debe tener exactamente ${expected.length} listeners en v6.0`);
+            errors.push(`BOMBA_EXPLOTO debe tener exactamente ${expected.length} listeners base`);
         }
 
         return {

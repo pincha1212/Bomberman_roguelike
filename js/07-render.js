@@ -115,7 +115,7 @@ function isWorldTileVisibleV329(tileX, tileY, margin = 1){
 function getRenderProfileV65() {
     return typeof getBomberRenderProfileV65 === 'function'
         ? getBomberRenderProfileV65()
-        : { particleBudget: 96, floaterBudget: 24, bombEffectBudget: 360, showAmbientDust: true, showLighting: true, showCombatFeedback: true, showRoomDecor: true, showEnemyAISignals: true, useCanvasFilter: true };
+        : { particleBudget: 96, floaterBudget: 24, showAmbientDust: true, showLighting: true, showCombatFeedback: true, showRoomDecor: true, showEnemyAISignals: true, useCanvasFilter: true };
 }
 
 function draw() {
@@ -154,7 +154,6 @@ function draw() {
 
             // v6.0: residuos materiales persistentes; quedan por debajo de items, bombas y personajes.
             if (typeof drawMaterialResiduesV60 === 'function') drawMaterialResiduesV60(ctx);
-            if (typeof drawBombEffectsV64 === 'function') drawBombEffectsV64(ctx);
 
             // V3.3: las trampas aparecen visualmente solo después de activarse.
             if (!testLabNeutralV673) drawHazards();
@@ -457,50 +456,6 @@ function draw() {
             ctx.restore();
         }
 
-        function drawWinterBodyEffectsV64(actor) {
-            if (!actor || typeof getBombEffectVisualStateV64 !== 'function') return;
-            if (String(gameState.biomeV49?.id || '') !== 'winter') return;
-            const visual = getBombEffectVisualStateV64(actor);
-            const severity = Math.max(0, Math.min(1, Number(visual.coldSeverity) || 0));
-            if (severity < 0.20 && !visual.heatActive) return;
-
-            const w = Number(actor.width) || TILE_SIZE * 0.68;
-            const h = Number(actor.height) || TILE_SIZE * 0.68;
-            ctx.save();
-            if (visual.heatActive) {
-                ctx.globalAlpha = 0.14;
-                ctx.strokeStyle = '#ffb347';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(actor.x + w / 2, actor.y + h / 2, Math.max(w, h) * 0.50, 0, Math.PI * 2);
-                ctx.stroke();
-            }
-
-            if (severity >= 0.20) {
-                const alpha = 0.10 + severity * 0.28;
-                ctx.globalAlpha = alpha;
-                ctx.strokeStyle = '#eff6ff';
-                ctx.fillStyle = '#dbeafe';
-                ctx.lineWidth = 1.5;
-                const x = actor.x, y = actor.y;
-                const frost = Math.max(2, Math.floor(2 + severity * 4));
-                for (let i = 0; i < frost; i++) {
-                    const px = x + 4 + (i * 13) % Math.max(8, w - 8);
-                    const py = y + 4 + ((i * 17) % Math.max(8, h - 8));
-                    ctx.beginPath();
-                    ctx.moveTo(px - 3, py);
-                    ctx.lineTo(px + 3, py);
-                    ctx.moveTo(px, py - 3);
-                    ctx.lineTo(px, py + 3);
-                    ctx.stroke();
-                }
-                if (severity >= 0.40) {
-                    ctx.globalAlpha = Math.min(0.28, alpha + 0.05);
-                    ctx.strokeRect(x + 3, y + 3, w - 6, h - 6);
-                }
-            }
-            ctx.restore();
-        }
 
         function drawEnemySprite(e) {
             ctx.save();
@@ -522,7 +477,7 @@ function draw() {
             ctx.fill();
 
             // Cuerpo
-            const enemyThemeKey = e?.type?.winterRole === 'bear' ? 'enemyBear' : e?.type?.winterRole === 'obstructor' ? 'enemyObstructor' : e?.type?.name === 'Rastrero' ? 'enemyRastrero' : e?.type?.name === 'Volador' ? 'enemyVolador' : e?.type?.name === 'Especial' ? 'enemyEspecial' : null;
+            const enemyThemeKey = e?.type?.name === 'Rastrero' ? 'enemyRastrero' : e?.type?.name === 'Volador' ? 'enemyVolador' : e?.type?.name === 'Especial' ? 'enemyEspecial' : null;
             ctx.fillStyle = enemyThemeKey && typeof themeColorV46 === 'function' ? themeColorV46(enemyThemeKey, e.type.color) : e.type.color;
             ctx.beginPath();
             if (e.type.canFly) {
@@ -539,46 +494,7 @@ function draw() {
                 ctx.fill();
             }
 
-            if (e.type?.winterRole === 'bear') {
-                // Oso polar: orejas + hocico + nariz.
-                ctx.fillStyle = '#cbd5e1';
-                ctx.beginPath();
-                ctx.arc(e.x - 7, e.y - e.height * 0.31 + floaty, 4.2, 0, Math.PI * 2);
-                ctx.arc(e.x + 7, e.y - e.height * 0.31 + floaty, 4.2, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#f8fafc';
-                ctx.beginPath();
-                ctx.ellipse(e.x, e.y + e.height * 0.10 + floaty, e.width * 0.22, e.height * 0.16, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#334155';
-                ctx.beginPath();
-                ctx.arc(e.x, e.y + e.height * 0.06 + floaty, 2.2, 0, Math.PI * 2);
-                ctx.fill();
-            } else if (e.type?.winterRole === 'obstructor') {
-                // Estorbador de hielo: silueta cristalina en vez de un simple aro.
-                ctx.fillStyle = '#dff7ff';
-                ctx.globalAlpha = 0.58;
-                ctx.beginPath();
-                ctx.moveTo(e.x, e.y - e.height * 0.43 + floaty);
-                ctx.lineTo(e.x + e.width * 0.38, e.y - e.height * 0.08 + floaty);
-                ctx.lineTo(e.x + e.width * 0.25, e.y + e.height * 0.40 + floaty);
-                ctx.lineTo(e.x - e.width * 0.28, e.y + e.height * 0.43 + floaty);
-                ctx.lineTo(e.x - e.width * 0.42, e.y - e.height * 0.08 + floaty);
-                ctx.closePath();
-                ctx.fill();
-                ctx.globalAlpha = 1;
-                ctx.strokeStyle = '#e0f2fe';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                ctx.strokeStyle = 'rgba(255,255,255,.65)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(e.x, e.y - e.height * 0.28 + floaty);
-                ctx.lineTo(e.x - e.width * 0.16, e.y + e.height * 0.30 + floaty);
-                ctx.moveTo(e.x, e.y - e.height * 0.12 + floaty);
-                ctx.lineTo(e.x + e.width * 0.17, e.y + e.height * 0.30 + floaty);
-                ctx.stroke();
-            }
+
 
             // Ojos mirando a la dirección de movimiento
             let eyeOffsetX = e.vx > 0 ? 3 : (e.vx < 0 ? -3 : 0);

@@ -918,14 +918,9 @@ function updateEnemyIntentV312(e, index, dt) {
     const playerDistance = enemyDistanceToV312(tile.x, tile.y, playerTile.x, playerTile.y);
     const evasiveEngaged = profile.id === 'evasive' && (ai.seesPlayer || playerDistance <= Number(profile.fleeRadius || 5));
     const patrollerEngaged = profile.id === 'patroller' && playerDistance <= 4 && (ai.seesPlayer || ai.memoryTimer > 0);
-    const winterPassive = !!e.type?.winterRole;
 
     if (dangerHere || imminentDanger || evasiveEngaged) {
         ai.alert = 'flee';
-        ai.behavior = profile.id;
-    } else if (winterPassive) {
-        // Enemigos de Invierno: patrullan y ocupan espacio; no persiguen al jugador.
-        ai.alert = 'patrol';
         ai.behavior = profile.id;
     } else if ((ai.seesPlayer || ai.memoryTimer > 0) && profile.id !== 'patroller') {
         ai.alert = profile.id === 'aggressive' ? 'aggressive' : 'chase';

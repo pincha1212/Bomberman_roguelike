@@ -2,15 +2,14 @@
 // Noita-inspired direction, but intentionally discrete and small:
 // persistent tile residues + deterministic pair reactions + bounded spreading.
 //
-// This module is a consumer of the shared event bus. A bomb does not know
-// anything about materials; BOMBA_EXPLOTO creates the biome-appropriate residue here.
+// Material field infrastructure. Producers are intentionally absent while the field is disabled.
 
 (function installMaterialFieldV60(global) {
     'use strict';
 
     const VERSION = '6.7.0';
-    const EVENT = global.GAME_EVENTS_V60?.BOMBA_EXPLOTO || global.GAME_EVENTS_V59?.BOMBA_EXPLOTO;
-    const LISTENER_KEY = 'bomb-explosion:materials';
+    const MATERIAL_FIELD_ENABLED_V60 = false; // true = reactiva todo el campo de materiales.
+
     const MAX_RESIDUES = 360;
     const MAX_SPREADS_PER_FRAME = 14;
 
@@ -278,9 +277,7 @@
             return true;
         }
 
-        // Special internal marker for lightning. Actual lightning remains an
-        // independent hazard; this material is only an optional reaction input.
-        const directReaction = REACTIONS.get(reactionKey(existing.type, type));
+                const directReaction = REACTIONS.get(reactionKey(existing.type, type));
         if (directReaction) {
             const resultDef = definition(directReaction.result);
             writeResidue(store, existing, directReaction.result, directReaction.amount, directReaction.lifeMs, 'reaction');
@@ -315,6 +312,7 @@
     }
 
     function getMaterialMovementModifiersV67(entity){
+        if (!MATERIAL_FIELD_ENABLED_V60) return Object.freeze({ acceleration:1, braking:1, turnCarry:1, speedMultiplier:1, inputBufferMultiplier:1 });
         const cell = entityCell(entity);
         const residue = cell ? getResidueAtTile(cell.x, cell.y) : null;
         const result = { acceleration:1, braking:1, turnCarry:1, speedMultiplier:1, inputBufferMultiplier:1 };
@@ -330,18 +328,8 @@
         return Object.freeze({ ...result, ...(table[residue.type] || {}) });
     }
 
-    function getBombMaterialModifiersV67(x, y){
-        const residue = getResidueAtTile(x, y);
-        const result = { fuseMultiplier:1, canPlace:true };
-        if (!residue) return Object.freeze(result);
-        if (residue.type === MATERIALS.ICE) result.fuseMultiplier=1.15;
-        if (residue.type === MATERIALS.PACKED_ICE || residue.type === MATERIALS.FROZEN_OIL) result.canPlace=false;
-        if (residue.type === MATERIALS.WATER) result.fuseMultiplier=.85;
-        if (residue.type === MATERIALS.BURNING_OIL) result.fuseMultiplier=.60;
-        return Object.freeze(result);
-    }
 
-    function isMaterialBlockingTile(x,y){ const residue=getResidueAtTile(x,y); return !!residue && !!definition(residue.type)?.blocks; }
+    function isMaterialBlockingTile(x,y){ if (!MATERIAL_FIELD_ENABLED_V60) return false; const residue=getResidueAtTile(x,y); return !!residue && !!definition(residue.type)?.blocks; }
 
     function removeAt(x, y) {
         const store = ensureStore();
@@ -404,41 +392,15 @@
         if (typeof global.takeDamage === 'function') global.takeDamage('material', (residue.x + 0.5) * Number(global.TILE_SIZE || 48), (residue.y + 0.5) * Number(global.TILE_SIZE || 48));
     }
 
-    function syncEnvironmentSources(state) {
-        const hazards = Array.isArray(state?.hazards) ? state.hazards : [];
-        for (const hazard of hazards) {
-            if (!hazard || hazard.state === 'telegraph') continue;
-            if (hazard.kind === 'lava' && Number.isFinite(hazard.x) && Number.isFinite(hazard.y)) {
-                deposit(MATERIALS.FIRE, hazard.x, hazard.y, 34, { source: 'lava', lifeMs: 900 });
-            }
-            if (hazard.kind === 'tide' && hazard.state === 'active' && Number.isFinite(hazard.line) && Number.isFinite(hazard.progress)) {
-                const waveCell = Math.floor(hazard.progress);
-                if (hazard.axis === 'x') {
-                    deposit(MATERIALS.WATER, waveCell, hazard.line, 42, { source: 'tide' });
-                } else {
-                    deposit(MATERIALS.WATER, hazard.line, waveCell, 42, { source: 'tide' });
-                }
-            }
-            if (hazard.kind === 'lightning' && hazard.state === 'strike' && !hazard.materialMarked) {
-                hazard.materialMarked = true;
-                // Only fire/electric water becomes a gameplay reaction. Pure
-                // electricity is a transient input, not persistent material.
-                const existing = findResidue(ensureStore(), hazard.x, hazard.y);
-                if (existing?.residue?.type === MATERIALS.WATER) {
-                    deposit(MATERIALS.ELECTRIC, hazard.x, hazard.y, 90, { source: 'lightning' });
-                }
-            }
-        }
-    }
+
 
     function update(dt = 16.6667) {
+        if (!MATERIAL_FIELD_ENABLED_V60) return;
         const state = getState();
         const store = ensureStore();
         if (!state || !store || !state.isPlaying || state.paused) return;
 
         const safeDt = Math.max(0, Math.min(100, Number(dt) || 16.6667));
-        syncEnvironmentSources(state);
-
         let spreads = 0;
         for (let i = store.length - 1; i >= 0; i--) {
             const residue = store[i];
@@ -518,6 +480,7 @@
     }
 
     function draw(targetCtx) {
+        if (!MATERIAL_FIELD_ENABLED_V60) return;
         const state = getState();
         const store = ensureStore();
         const ctx = targetCtx;
@@ -543,31 +506,12 @@
         ctx.globalAlpha = 1;
     }
 
-    function installListener() {
-        if (!global.gameEventBus || !EVENT) return false;
-        if (global.__MATERIAL_FIELD_V60__) return true;
-        global.gameEventBus.on(EVENT, (payload) => {
-            const cells = Array.isArray(payload?.cells) ? payload.cells : [];
-            const state = getState();
-            if (state?.testLabV673?.active && state?.testLabV673?.materials === false) return;
-            const winter = String(state?.biomeV49?.id || '') === 'winter';
-            const bomb = payload?.bomb || {};
-            const explicitMaterial = bomb.materialOverrideV67 && MATERIALS[bomb.materialOverrideV67.toUpperCase()]
-                ? MATERIALS[bomb.materialOverrideV67.toUpperCase()]
-                : null;
-            const blastMaterial = explicitMaterial || (winter ? MATERIALS.ICE : MATERIALS.FIRE);
-            const amountMultiplier = Number(bomb.gameplayPowerupModifiersV676?.residualAmountMultiplier) || 1;
-            for (const cell of cells) {
-                if (!cell) continue;
-                deposit(blastMaterial, cell.x, cell.y, (cell.block ? 40 : 62) * amountMultiplier, { source: explicitMaterial ? 'bomb-powerup' : (winter ? 'bomb-winter' : 'bomb') });
-            }
-        }, { key: LISTENER_KEY });
-        global.__MATERIAL_FIELD_V60__ = true;
-        return true;
-    }
+    // Sin listener de BOMBA_EXPLOTO: el campo queda como infraestructura desacoplada.
+    // Para reactivar producción externa de materiales, registrar aquí un consumidor explícito.
 
-    installListener();
 
+
+    global.MATERIAL_FIELD_ENABLED_V60 = MATERIAL_FIELD_ENABLED_V60;
     global.MATERIALS_V60 = MATERIALS;
     global.MATERIAL_DEFS_V60 = MATERIAL_DEFS;
     global.MATERIAL_REACTIONS_V60 = REACTIONS;
@@ -579,7 +523,6 @@
     global.materialSnapshotV60 = snapshot;
     global.getResidueAtTileV67 = getResidueAtTile;
     global.getMaterialMovementModifiersV67 = getMaterialMovementModifiersV67;
-    global.getBombMaterialModifiersV67 = getBombMaterialModifiersV67;
     global.isMaterialBlockingTileV67 = isMaterialBlockingTile;
     global.drawMaterialResiduesV60 = draw;
     global.BOMBER_ENGINE = global.BOMBER_ENGINE || {};
@@ -593,9 +536,10 @@
     global.BOMBER_ENGINE.spawnMaterial = deposit;
     global.BOMBER_ENGINE.resetMaterials = reset;
     global.BOMBER_ENGINE.auditMaterialEventListener = () => ({
-        valid: !!global.gameEventBus && global.gameEventBus.listenerCount(EVENT) > 0,
-        event: EVENT,
-        key: LISTENER_KEY,
-        listenerCount: global.gameEventBus?.listenerCount?.(EVENT) || 0
+        enabled: MATERIAL_FIELD_ENABLED_V60,
+        valid: !MATERIAL_FIELD_ENABLED_V60,
+        event: null,
+        key: null,
+        listenerCount: 0
     });
 })(window);

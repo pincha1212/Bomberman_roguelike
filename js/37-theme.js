@@ -133,7 +133,6 @@
         }),
 
         mecanicas: Object.freeze([]),
-        hazards: Object.freeze([]),
         nivelGen: Object.freeze({ source: 'v4.4-bomberman-number-generator', densityMin: 0.25, densityMax: 0.72, classicPillarSpacing: 2, symmetry: 'current' }),
         enemigos: Object.freeze({
             pool: Object.freeze(['RASTRERO', 'VOLADOR', 'ESPECIAL']),
@@ -151,8 +150,7 @@
             paleta: Object.freeze({ ...CLASSIC_THEME.paleta, ...paletteOverrides }),
             sprites: Object.freeze({ ...CLASSIC_THEME.sprites, ...spriteOverrides }),
             ambiente: Object.freeze({ ...CLASSIC_THEME.ambiente, ...ambientOverrides }),
-            mecanicas: Object.freeze([]),
-            hazards: Object.freeze([])
+            mecanicas: Object.freeze([])
         });
     }
 
@@ -201,8 +199,6 @@
             particleLoot: '#e0f2fe',
             particleEnemy: '#67e8f9',
             particleEnemyElite: '#fda4af',
-            enemyBear: '#e5e7eb',
-            enemyObstructor: '#93c5fd',
             particleBoss: '#fb7185',
             feedbackRingSoft: '#dbeafe',
             feedbackFlash: '#e0f2fe',
@@ -217,15 +213,10 @@
 
     const WINTER_THEME = Object.freeze({
         ...WINTER_THEME_BASE,
-        mecanicas: Object.freeze(['slippery']),
-        mechanics: Object.freeze(['slippery']),
-        hazards: Object.freeze(['blizzard']),
-        enemigos: Object.freeze({
-            ...WINTER_THEME_BASE.enemigos,
-            pool: Object.freeze(['OSO_NIEVE', 'ESTORBADOR_HIELO']),
-            colors: Object.freeze({ OSO_NIEVE: 'enemyBear', ESTORBADOR_HIELO: 'enemyObstructor' })
-        }),
-        bombEffects: Object.freeze({ heat: Object.freeze({ durationMs: 3000 }) })
+        // Winter conserva identidad visual, pero no declara mecánicas, hazards ni power-ups propios.
+        mecanicas: Object.freeze([]),
+        enemigos: WINTER_THEME_BASE.enemigos,
+        powerups: Object.freeze({ pool: Object.freeze(['BOMB_UP','FIRE_UP','SPEED_UP','HEALTH_UP','SHIELD_UP']) })
     });
 
     const INFERNO_THEME = createVisualThemeV461(
@@ -397,7 +388,7 @@
             type: theme.tipo,
             visualOnly: theme.tipo === 'visual-only',
             mechanics: [...theme.mecanicas],
-            hazards: [...theme.hazards],
+            hazards: [],
             levelGeneration: { ...theme.nivelGen },
             enemyPool: [...theme.enemigos.pool],
             powerupPool: [...theme.powerups.pool]

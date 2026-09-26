@@ -29,151 +29,23 @@
     });
     const BIOME_STAGE_PROFILES_V51 = Object.freeze({
         winter: Object.freeze({
-            1: Object.freeze({
-                role: 'introduction',
-                lesson: 'Aprende a frenar antes de necesitar frenar.',
-                mechanics: Object.freeze({
-                    slippery: Object.freeze({ movement: Object.freeze({ acceleration: 0.96, braking: 0.62, turnCarrySpeed: 1.02, speedMultiplier: 1 }) })
-                }),
-                hazards: Object.freeze({ blizzard: Object.freeze({ initialDelayMs: 9000, intervalMs: 22000, maxActive: 1 }) }),
-                enemies: Object.freeze({ bearRatio: 0.45, blockerRatio: 0.20 }),
-
-                generation: Object.freeze({ blockDensityBonus: -0.03, topology: Object.freeze({ longCorridors: 1, corridorSpacing: 4 }) }),
-            }),
-            2: Object.freeze({
-                role: 'reinforcement',
-                lesson: 'Planea el siguiente movimiento con la inercia ya activa.',
-                mechanics: Object.freeze({
-                    slippery: Object.freeze({ movement: Object.freeze({ acceleration: 0.93, braking: 0.48, turnCarrySpeed: 1.06, speedMultiplier: 1 }) })
-                }),
-                hazards: Object.freeze({ blizzard: Object.freeze({ initialDelayMs: 7000, intervalMs: 18000, maxActive: 1 }) }),
-                enemies: Object.freeze({ bearRatio: 0.45, blockerRatio: 0.35 }),
-
-                generation: Object.freeze({ blockDensityBonus: -0.01, topology: Object.freeze({ longCorridors: 1, corridorSpacing: 4 }) }),
-            }),
-            3: Object.freeze({
-                role: 'combination',
-                lesson: 'Combina deslizamiento, bombas y presión ambiental.',
-                mechanics: Object.freeze({
-                    slippery: Object.freeze({ movement: Object.freeze({ acceleration: 0.90, braking: 0.38, turnCarrySpeed: 1.09, speedMultiplier: 1 }) })
-                }),
-                hazards: Object.freeze({ blizzard: Object.freeze({ initialDelayMs: 5500, intervalMs: 14500, maxActive: 1 }) }),
-                enemies: Object.freeze({ bearRatio: 0.50, blockerRatio: 0.40 }),
-
-                generation: Object.freeze({ blockDensityBonus: 0.01, topology: Object.freeze({ longCorridors: 2, corridorSpacing: 4 }) }),
-            }),
-            4: Object.freeze({
-                role: 'exam',
-                lesson: 'Demuestra que puedes controlar el deslizamiento bajo presión.',
-                mechanics: Object.freeze({
-                    slippery: Object.freeze({ movement: Object.freeze({ acceleration: 0.87, braking: 0.30, turnCarrySpeed: 1.12, speedMultiplier: 1 }) })
-                }),
-                hazards: Object.freeze({ blizzard: Object.freeze({ initialDelayMs: 3500, intervalMs: 11500, maxActive: 1 }) }),
-                enemies: Object.freeze({ bearRatio: 0.50, blockerRatio: 0.50 }),
-
-                generation: Object.freeze({ blockDensityBonus: 0.03, topology: Object.freeze({ longCorridors: 2, corridorSpacing: 4 }) }),
-            })
+            1: Object.freeze({ role:'introduction', lesson:'Explora la sala y establece una ruta segura.', mechanics:Object.freeze({}), hazards:Object.freeze({}), generation:Object.freeze({ blockDensityBonus:-0.03 }) }),
+            2: Object.freeze({ role:'reinforcement', lesson:'Consolida una ruta y administra tus recursos.', mechanics:Object.freeze({}), hazards:Object.freeze({}), generation:Object.freeze({ blockDensityBonus:-0.01 }) }),
+            3: Object.freeze({ role:'combination', lesson:'Combina bombas, movimiento y recursos disponibles.', mechanics:Object.freeze({}), hazards:Object.freeze({}), generation:Object.freeze({ blockDensityBonus:0.01 }) }),
+            4: Object.freeze({ role:'exam', lesson:'Demuestra dominio del gameplay base bajo presión.', mechanics:Object.freeze({}), hazards:Object.freeze({}), generation:Object.freeze({ blockDensityBonus:0.03 }) })
         }),
         space: Object.freeze({
-            1: Object.freeze({
-                role: 'introduction',
-                lesson: 'Aprende a soltar antes de llegar: el movimiento conserva impulso.',
-                mechanics: Object.freeze({
-                    low_gravity: Object.freeze({ enabled: true, movement: Object.freeze({ acceleration: 0.94, braking: 0.82, turnCarrySpeed: 1.04, speedMultiplier: 1.00 }) })
-                }),
-                hazards: Object.freeze({
-                    lightning: Object.freeze({ enabled: false })
-                }),
-                generation: Object.freeze({ blockDensityBonus: -0.03 })
-            }),
-            2: Object.freeze({
-                role: 'reinforcement',
-                lesson: 'Conserva la trayectoria y cambia de dirección antes de la intersección.',
-                mechanics: Object.freeze({
-                    low_gravity: Object.freeze({ enabled: true, movement: Object.freeze({ acceleration: 0.86, braking: 0.70, turnCarrySpeed: 1.10, speedMultiplier: 1.02 }) })
-                }),
-                hazards: Object.freeze({
-                    lightning: Object.freeze({ initialDelayMs: 11000, intervalMs: 12800, maxActive: 1 })
-                }),
-                generation: Object.freeze({ blockDensityBonus: -0.01 })
-            }),
-            3: Object.freeze({
-                role: 'combination',
-                lesson: 'Combina impulso, bombas y ventanas eléctricas sin perder la línea de escape.',
-                mechanics: Object.freeze({
-                    low_gravity: Object.freeze({ enabled: true, movement: Object.freeze({ acceleration: 0.77, braking: 0.60, turnCarrySpeed: 1.17, speedMultiplier: 1.04 }) })
-                }),
-                hazards: Object.freeze({
-                    lightning: Object.freeze({ initialDelayMs: 8500, intervalMs: 9400, maxActive: 1 })
-                }),
-                generation: Object.freeze({ blockDensityBonus: 0.015 })
-            }),
-            4: Object.freeze({
-                role: 'exam',
-                lesson: 'Examen: calcula dónde vas a terminar, no solo dónde estás apuntando.',
-                mechanics: Object.freeze({
-                    low_gravity: Object.freeze({ enabled: true, movement: Object.freeze({ acceleration: 0.69, braking: 0.51, turnCarrySpeed: 1.23, speedMultiplier: 1.06 }) })
-                }),
-                hazards: Object.freeze({
-                    lightning: Object.freeze({ initialDelayMs: 6000, intervalMs: 7600, maxActive: 2 })
-                }),
-                generation: Object.freeze({ blockDensityBonus: 0.035 })
-            })
+            1: Object.freeze({ role:'introduction', lesson:'Explora la sala y establece una ruta segura.', mechanics:Object.freeze({}), hazards:Object.freeze({}), generation:Object.freeze({ blockDensityBonus:-0.03 }) }),
+            2: Object.freeze({ role:'reinforcement', lesson:'Consolida una ruta y administra tus recursos.', mechanics:Object.freeze({}), hazards:Object.freeze({}), generation:Object.freeze({ blockDensityBonus:-0.01 }) }),
+            3: Object.freeze({ role:'combination', lesson:'Combina bombas, movimiento y recursos disponibles.', mechanics:Object.freeze({}), hazards:Object.freeze({}), generation:Object.freeze({ blockDensityBonus:0.015 }) }),
+            4: Object.freeze({ role:'exam', lesson:'Demuestra dominio del gameplay base bajo presión.', mechanics:Object.freeze({}), hazards:Object.freeze({}), generation:Object.freeze({ blockDensityBonus:0.035 }) })
         }),
         inferno: Object.freeze({
-            1: Object.freeze({
-                role: 'introduction',
-                lesson: 'Moverse antes de que el suelo cierre la oportunidad.',
-                mechanics: Object.freeze({
-                    darkness: Object.freeze({ visibility: Object.freeze({ radius: 170, midStop: 0.52, midAlpha: 0.28, outerAlpha: 0.84 }) })
-                }),
-                hazards: Object.freeze({
-                    lava: Object.freeze({ initialDelayMs: 6500, intervalMs: 8500, maxActive: 1 }),
-                    lightning: Object.freeze({ enabled: false }),
-                    landslide: Object.freeze({ enabled: false })
-                }),
-                generation: Object.freeze({ blockDensityBonus: -0.01 })
-            }),
-            2: Object.freeze({
-                role: 'reinforcement',
-                lesson: 'Romper, avanzar y no quedarse donde el calor se acumula.',
-                mechanics: Object.freeze({
-                    darkness: Object.freeze({ visibility: Object.freeze({ radius: 152, midStop: 0.48, midAlpha: 0.34, outerAlpha: 0.88 }) })
-                }),
-                hazards: Object.freeze({
-                    lava: Object.freeze({ initialDelayMs: 5000, intervalMs: 6800, maxActive: 2 }),
-                    lightning: Object.freeze({ initialDelayMs: 9000, intervalMs: 15000, maxActive: 1 }),
-                    landslide: Object.freeze({ enabled: false })
-                }),
-                generation: Object.freeze({ blockDensityBonus: 0.01 })
-            }),
-            3: Object.freeze({
-                role: 'combination',
-                lesson: 'Combina presión temporal, oscuridad y rutas que se abren bajo fuego.',
-                mechanics: Object.freeze({
-                    darkness: Object.freeze({ visibility: Object.freeze({ radius: 136, midStop: 0.44, midAlpha: 0.40, outerAlpha: 0.91 }) })
-                }),
-                hazards: Object.freeze({
-                    lava: Object.freeze({ initialDelayMs: 3800, intervalMs: 5200, maxActive: 2 }),
-                    lightning: Object.freeze({ initialDelayMs: 7000, intervalMs: 11200, maxActive: 1 }),
-                    landslide: Object.freeze({ initialDelayMs: 9800, intervalMs: 14000, maxActive: 1 })
-                }),
-                generation: Object.freeze({ blockDensityBonus: 0.025 })
-            }),
-            4: Object.freeze({
-                role: 'exam',
-                lesson: 'Corre contra el reloj, lee el espacio y decide dónde romper antes de que cierre.',
-                mechanics: Object.freeze({
-                    darkness: Object.freeze({ visibility: Object.freeze({ radius: 118, midStop: 0.40, midAlpha: 0.46, outerAlpha: 0.94 }) })
-                }),
-                hazards: Object.freeze({
-                    lava: Object.freeze({ initialDelayMs: 2600, intervalMs: 4100, maxActive: 3 }),
-                    lightning: Object.freeze({ initialDelayMs: 4200, intervalMs: 7800, maxActive: 2 }),
-                    landslide: Object.freeze({ initialDelayMs: 7200, intervalMs: 9800, maxActive: 1 })
-                }),
-                generation: Object.freeze({ blockDensityBonus: 0.05 })
-            })
-        }),
+            1: Object.freeze({ role:'introduction', lesson:'Explora la sala y establece una ruta segura.', mechanics:Object.freeze({}), hazards:Object.freeze({}), generation:Object.freeze({ blockDensityBonus:-0.01 }) }),
+            2: Object.freeze({ role:'reinforcement', lesson:'Consolida una ruta y administra tus recursos.', mechanics:Object.freeze({}), hazards:Object.freeze({}), generation:Object.freeze({ blockDensityBonus:0.01 }) }),
+            3: Object.freeze({ role:'combination', lesson:'Combina bombas, movimiento y recursos disponibles.', mechanics:Object.freeze({}), hazards:Object.freeze({}), generation:Object.freeze({ blockDensityBonus:0.025 }) }),
+            4: Object.freeze({ role:'exam', lesson:'Demuestra dominio del gameplay base bajo presión.', mechanics:Object.freeze({}), hazards:Object.freeze({}), generation:Object.freeze({ blockDensityBonus:0.05 }) })
+        })
     });
 
     const runtime = { installed:false, originalInitLevel:null, originalUpdateRoguePresentation:null, originalDraw:null, lastBiomeId:null, transitionTimer:0, transitionNode:null };
@@ -274,7 +146,7 @@
             node.setAttribute('aria-current', active ? 'step' : 'false');
         });
         const summary = global.document?.getElementById?.('theme-selected-summary');
-        if (summary) summary.textContent = `${meta.nombre.toUpperCase()} ${meta.stage} · MECÁNICAS + HAZARDS`;
+        if (summary) summary.textContent = `${meta.nombre.toUpperCase()} ${meta.stage} · GAMEPLAY BASE`;
     }
 
     function applyBiomeForDepthV49(depth, showTransition = true) {

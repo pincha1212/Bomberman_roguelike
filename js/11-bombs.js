@@ -223,7 +223,6 @@ function isBombMotionLandingTileFreeV67(gx, gy, bomb){
     if(gx<0 || gy<0 || gx>=gameState.gridWidth || gy>=gameState.gridHeight) return false;
     const tile=gameState.grid?.[gy]?.[gx];
     if(tile===TYPES.WALL || tile===TYPES.BLOCK) return false;
-    if(typeof isMaterialBlockingTileV67==='function' && isMaterialBlockingTileV67(gx,gy)) return false;
     return !gameState.bombs.some(other=>other && other!==bomb && other.x===gx && other.y===gy);
 }
 
@@ -373,14 +372,11 @@ function placeBomb(reason='manual'){
     const gy = Math.floor((player.y + player.height / 2) / TILE_SIZE);
     if (getBombAtTile(gx, gy)) return false;
     if (!gameState.grid[gy] || gameState.grid[gy][gx] === TYPES.WALL || gameState.grid[gy][gx] === TYPES.BLOCK) return false;
-    const materialMods = typeof getBombMaterialModifiersV67 === 'function' ? getBombMaterialModifiersV67(gx, gy) : { fuseMultiplier:1, canPlace:true };
-    if (!materialMods.canPlace) return false;
-
     const baseFuse = gameState.roomType.id === 'CURSED' ? BOMB_HANDLING.cursedFuse : BOMB_HANDLING.normalFuse;
     const gameplayBombMods = typeof getGameplayPowerupBombModifiersV676 === 'function'
         ? getGameplayPowerupBombModifiersV676({ owner: 'player' })
         : { fuseMultiplier: 1 };
-    const fuseTotal = Math.max(700, Math.round(baseFuse * (typeof getBombFuseMultiplier === 'function' ? getBombFuseMultiplier() : 1) * materialMods.fuseMultiplier * Number(gameplayBombMods.fuseMultiplier || 1)));
+    const fuseTotal = Math.max(700, Math.round(baseFuse * (typeof getBombFuseMultiplier === 'function' ? getBombFuseMultiplier() : 1) * Number(gameplayBombMods.fuseMultiplier || 1)));
     const bomb = {
         id: `bomb-${gameState.animFrame}-${Math.random().toString(36).slice(2,7)}`,
         owner: 'player',
@@ -517,6 +513,8 @@ function bombUpdate(dt){
 
         if (bomb.interactionMotionV682 === 'kick' && typeof globalThis.updateBombKickMotionV682 === 'function') {
             globalThis.updateBombKickMotionV682(bomb, dt);
+        } else if (bomb.interactionMotionV682 === 'throw' && typeof globalThis.updateBombThrowMotionV685 === 'function') {
+            globalThis.updateBombThrowMotionV685(bomb, dt);
         } else {
             updateBombV4Motion(bomb, dt);
         }

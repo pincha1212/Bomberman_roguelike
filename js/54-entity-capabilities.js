@@ -1,10 +1,10 @@
-// Bomberman Roguelike v6.8.1 — Entity Capability Foundation
+// Bomberman Roguelike v6.8.5 — Entity Capability Foundation
 // Capacidades declarativas + power-ups permanentes y mutuamente excluyentes.
 (function initEntityCapabilitiesV681(global) {
     'use strict';
 
     const ARCHETYPE_CAPABILITIES = Object.freeze({
-        player:  Object.freeze({ kick:true,  grab:true,  carry:true,  throw:false }),
+        player:  Object.freeze({ kick:true,  grab:true,  carry:true,  throw:true }),
         chaser:  Object.freeze({ kick:false, grab:false, carry:false, throw:false }),
         flyer:   Object.freeze({ kick:false, grab:false, carry:false, throw:false }),
         boss:    Object.freeze({ kick:true,  grab:true,  carry:true,  throw:true  }),
@@ -24,6 +24,12 @@
             category:'INTERACCION', rarity:'BASE', permanent:true,
             exclusiveGroup:'bomb-interaction',
             desc:'Capacidad permanente de levantar una bomba y transportarla.'
+        }),
+        THROW: Object.freeze({
+            id:'THROW', capability:'throw', label:'LANZAMIENTO', icon:'➜',
+            category:'INTERACCION', rarity:'BASE', permanent:true,
+            requires:['grab'],
+            desc:'Capacidad permanente de lanzar la bomba que transportas hacia adelante. Requiere GRAB.'
         })
     });
 
@@ -103,6 +109,7 @@
     function canCarry(entity) { return canUseCapability(entity, 'carry'); }
     function canThrow(entity) { return canUseCapability(entity, 'throw'); }
     function isKickActiveV681(entity) { return isCapabilityActiveV681(entity, 'kick'); }
+    function isThrowActiveV681(entity) { return isCapabilityActiveV681(entity, 'throw'); }
     // GRAB implica CARRY: transportar no es un power-up separado.
     function isGrabActiveV681(entity) { return isCapabilityActiveV681(entity, 'grab'); }
     function isCarryActiveV681(entity) { return isCapabilityActiveV681(entity, 'grab') && canUseCapability(entity, 'carry'); }
@@ -115,7 +122,11 @@
         const archetypeCaps = ARCHETYPE_CAPABILITIES[archetype] || ARCHETYPE_CAPABILITIES.generic;
         if (archetypeCaps[def.capability] !== true) return false;
 
+        if (Array.isArray(def.requires) && !def.requires.every(required => hasPermanentCapability(entity, required))) return false;
+
         const profile = getCapabilityProfile(entity, true);
+        // THROW depende de GRAB: un cambio posterior a KICK elimina THROW.
+        if (def.capability === 'throw' && !hasPermanentCapability(entity, 'grab')) return false;
         if (profile.permanent.includes(def.capability)) return false;
 
         let switchedExclusiveGroup = false;
@@ -131,7 +142,7 @@
                 if (oldDef) {
                     profile.permanent = profile.permanent.filter(capability => {
                         if (capability === oldDef.capability) return false;
-                        if (oldDef.capability === 'grab' && capability === 'carry') return false;
+                        if (oldDef.capability === 'grab' && (capability === 'carry' || capability === 'throw')) return false;
                         return true;
                     });
                 }
@@ -176,6 +187,7 @@
     global.isKickActiveV681 = isKickActiveV681;
     global.isGrabActiveV681 = isGrabActiveV681;
     global.isCarryActiveV681 = isCarryActiveV681;
+    global.isThrowActiveV681 = isThrowActiveV681;
     global.activateCapabilityPowerupV681 = activateCapabilityPowerupV681;
     global.resetEntityCapabilitiesV681 = resetEntityCapabilitiesV681;
     global.getActiveCapabilityPowerupsV681 = getActiveCapabilityPowerupsV681;
@@ -192,6 +204,7 @@
     global.BOMBER_ENGINE.isKickActive = isKickActiveV681;
     global.BOMBER_ENGINE.isGrabActive = isGrabActiveV681;
     global.BOMBER_ENGINE.isCarryActive = isCarryActiveV681;
+    global.BOMBER_ENGINE.isThrowActive = isThrowActiveV681;
     global.BOMBER_ENGINE.activateCapabilityPowerup = activateCapabilityPowerupV681;
     global.BOMBER_ENGINE.resetEntityCapabilities = resetEntityCapabilitiesV681;
     global.BOMBER_ENGINE.getCapabilityPowerupIds = getCapabilityPowerupIdsV681;

@@ -44,22 +44,6 @@
                 maxStep: MOTION.maxStep
             });
             if (!result.moved) return false;
-
-            // Invierno: oso/estorbador ocupan espacio, pero no hacen daño de contacto.
-            // Si el jugador intenta atravesarlos, revertimos solo este paso físico.
-            if (gameState.biomeV49?.id === 'winter' && Array.isArray(gameState.enemies)) {
-                const hitbox = { left: player.x, right: player.x + player.width, top: player.y, bottom: player.y + player.height };
-                const blocked = gameState.enemies.some(e => {
-                    if (!e?.type?.winterRole) return false;
-                    const er = { left: e.x - e.width / 2, right: e.x + e.width / 2, top: e.y - e.height / 2, bottom: e.y + e.height / 2 };
-                    return hitbox.right > er.left && hitbox.left < er.right && hitbox.bottom > er.top && hitbox.top < er.bottom;
-                });
-                if (blocked) {
-                    player.x = beforeX;
-                    player.y = beforeY;
-                    return false;
-                }
-            }
             return true;
         }
 
@@ -132,11 +116,7 @@
 
             if (input.axis) {
                 player.inputBuffer = input;
-                const effectMods = typeof getBombEffectMovementModifiersV64 === 'function'
-                    ? getBombEffectMovementModifiersV64(player)
-                    : { inputBufferMultiplier: 1 };
-                player.inputBufferTimer = (MOTION.inputBufferMs + (Number(gameState.relicMods?.inputBufferBonus) || 0))
-                    * Number(effectMods.inputBufferMultiplier || 1);
+                player.inputBufferTimer = MOTION.inputBufferMs + (Number(gameState.relicMods?.inputBufferBonus) || 0);
             } else if (player.inputBufferTimer > 0) {
                 player.inputBufferTimer -= dt;
                 if (player.inputBufferTimer <= 0) player.inputBuffer = null;
@@ -147,9 +127,7 @@
             const movementMods = typeof getMovementModifiersV47 === 'function'
                 ? getMovementModifiersV47()
                 : { acceleration: 1, braking: 1, turnCarrySpeed: 1, speedMultiplier: 1 };
-            const effectMods = typeof getBombEffectMovementModifiersV64 === 'function'
-                ? getBombEffectMovementModifiersV64(player)
-                : { accelerationMultiplier: 1, brakingMultiplier: 1, turnCarryMultiplier: 1, speedMultiplier: 1 };
+            const effectMods = { accelerationMultiplier: 1, brakingMultiplier: 1, turnCarryMultiplier: 1, speedMultiplier: 1 };
             const materialMods = typeof getMaterialMovementModifiersV67 === 'function'
                 ? getMaterialMovementModifiersV67(player)
                 : { acceleration: 1, braking: 1, turnCarry: 1, speedMultiplier: 1, inputBufferMultiplier: 1 };

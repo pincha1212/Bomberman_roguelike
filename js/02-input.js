@@ -116,6 +116,12 @@
             window.addEventListener('keyup', (e) => {
                 if (e.code === 'Space' || e.code === 'KeyZ') endHold(e);
             });
+            window.addEventListener('keydown', (e) => {
+                if (e.code !== 'ShiftLeft' && e.code !== 'ShiftRight') return;
+                if (!gameState.isPlaying || gameState.paused || e.repeat) return;
+                // THROW: solo actúa si existe una bomba realmente CARRIED por el jugador.
+                if (typeof handleBombThrowV685 === 'function' && handleBombThrowV685()) e.preventDefault();
+            });
             window.addEventListener('blur', () => endHold());
 
             if (!bombBtn) return;

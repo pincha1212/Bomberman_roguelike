@@ -148,7 +148,6 @@
             maxHealth: clamp(Math.floor(number(player?.maxHealth, 5)), 1, 10),
             hasShield: false,
             dir: ['up', 'down', 'left', 'right'].includes(player?.dir) ? player.dir : 'down',
-            effectStatuses: clone(player?.__bombEffectStatusesV64 || {}),
             relicMods
         };
     }
@@ -713,10 +712,6 @@
             moving: false,
             aiTargetTile: null
         };
-        if (build.effectStatuses && typeof ghost === 'object') {
-            try { Object.defineProperty(ghost, '__bombEffectStatusesV64', { value: clone(build.effectStatuses), enumerable:false, configurable:true, writable:true }); }
-            catch (_) { ghost.__bombEffectStatusesV64 = clone(build.effectStatuses); }
-        }
 
         ghost.echoStrength = Object.freeze({
             bombRange: ghost.bombRange,

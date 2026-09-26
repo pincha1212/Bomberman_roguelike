@@ -17,7 +17,7 @@
         blockBonus: 0
     });
     const BASE_POWERUP_TYPES = Object.freeze(['BOMB_UP', 'FIRE_UP', 'SPEED_UP', 'HEALTH_UP', 'SHIELD_UP']);
-    const CAPABILITY_POWERUP_TYPES = Object.freeze(['KICK', 'GRAB']);
+    const CAPABILITY_POWERUP_TYPES = Object.freeze(['KICK', 'GRAB', 'THROW']);
     const BASE_POWERUP_META = Object.freeze({
         BOMB_UP: { id:'BOMB_UP', name:'BOMBA', icon:'💣', rarity:'BASE', category:'BASE', desc:'Aumenta maxBombs en 1 hasta el límite duro del jugador.', implemented:true },
         FIRE_UP: { id:'FIRE_UP', name:'RANGO', icon:'🔥', rarity:'BASE', category:'BASE', desc:'Aumenta bombRange en 1 hasta el límite duro del jugador.', implemented:true },
@@ -26,9 +26,10 @@
         SHIELD_UP: { id:'SHIELD_UP', name:'ESCUDO', icon:'🛡️', rarity:'BASE', category:'BASE', desc:'Activa el escudo mediante el sistema real de pickup.', implemented:true },
         KICK: { id:'KICK', name:'PATADA', icon:'→', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: empujar bombas al caminar contra ellas. Exclusiva frente a GRAB.', implemented:true },
         GRAB: { id:'GRAB', name:'AGARRE', icon:'✋', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: levantar y transportar bombas; GRAB implica CARRY. Exclusiva frente a KICK.', implemented:true },
+        THROW: { id:'THROW', name:'LANZAMIENTO', icon:'➜', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: lanzar la bomba transportada hasta 3 celdas. Requiere GRAB.', implemented:true },
     });
     const POWERUP_CATEGORY_LABELS = Object.freeze({
-        ALL:'TODOS', BASE:'BASE', INTERACCION:'INTERACCION', MOVIMIENTO:'MOVIMIENTO', MATERIALES:'MATERIALES / ALQUIMIA', BOMBAS:'BOMBAS', ENEMIGOS:'ENEMIGOS'
+        ALL:'TODOS', BASE:'BASE', INTERACCION:'INTERACCION', MOVIMIENTO:'MOVIMIENTO', BOMBAS:'BOMBAS', ENEMIGOS:'ENEMIGOS'
     });
     const POWERUP_RESPAWN_MS = 500;
     const DEFAULT_SHELF_FILTER = 'BASE';
@@ -209,10 +210,6 @@
         player.inputAxis = null;
         player.inputBuffer = null;
         player.inputBufferTimer = 0;
-        player.hazardSlowTimer = 0;
-        player.hazardSlowFactor = 1;
-        player.hazardSlowType = '';
-        player.__bombEffectStatusesV64 = {};
         if (typeof global.playerFSMReset === 'function') global.playerFSMReset('test-lab-player-reset');
         if (typeof global.resetGameplayPowerupsV676 === 'function') global.resetGameplayPowerupsV676();
         if (typeof global.resetEntityCapabilitiesV681 === 'function') global.resetEntityCapabilitiesV681(player);
@@ -254,7 +251,6 @@
         state.floaters = [];
         state.hazards = [];
         state.environmentHazards = [];
-        state.materialResiduesV60 = [];
         state.deathEchoV61 = null;
         state.boss = null;
         state.bossProjectiles = [];
@@ -350,7 +346,6 @@
             hazards: false,
             enemies: true,
             deathEcho: false,
-            materials: true,
             powerupRespawn: true,
             reason: String(reason)
         };
@@ -360,7 +355,6 @@
 
         if (typeof global.setActiveThemeV46 === 'function') global.setActiveThemeV46('classic', false);
         state.biomeV49 = null;
-        state.winterWindV64 = null;
         state.roomType = TEST_ROOM_TYPE;
         state.roomTime = Number.POSITIVE_INFINITY;
         state.nextReinforcement = Number.MAX_SAFE_INTEGER;
@@ -369,6 +363,7 @@
         state.dungeonV44 = null;
         state.roomDesign = null;
         clearDynamicRuntime(state);
+        if (typeof global.materialResetV60 === 'function') global.materialResetV60();
         createNeutralGrid(state);
         spawnNeutralTestEnemies(state);
         if (typeof global.releaseCarriedBombV682 === 'function') global.releaseCarriedBombV682(player, 'reset');
@@ -601,11 +596,11 @@
         push('Capacidades KICK/GRAB declaradas', capabilityAudit.kickEligible && capabilityAudit.grabEligible);
         push('KICK/GRAB inactivos al reset', capabilityAudit.initiallyInactive);
         push('Grupo KICK/GRAB exclusivo', !!global.CAPABILITY_POWERUPS_V681?.KICK?.exclusiveGroup && global.CAPABILITY_POWERUPS_V681.KICK.exclusiveGroup === global.CAPABILITY_POWERUPS_V681.GRAB?.exclusiveGroup);
+        push('THROW registrado', labTypes.includes('THROW') && !!global.CAPABILITY_POWERUPS_V681?.THROW);
+        push('THROW requiere GRAB', Array.isArray(global.CAPABILITY_POWERUPS_V681?.THROW?.requires) && global.CAPABILITY_POWERUPS_V681.THROW.requires.includes('grab'));
 
-        push('Sin hooks Winter de power-ups', typeof global.winterPowerupUpdateV67 !== 'function' && typeof global.getWinterPowerupMovementModifiersV67 !== 'function');
         push('Catálogo Lab = base + capacidades', labTypes.length === BASE_POWERUP_TYPES.length + CAPABILITY_POWERUP_TYPES.length);
         push('Todos los power-ups con metadatos', labTypes.every(type => !!getPowerupMeta(type)?.desc && getPowerupMeta(type)?.implemented !== false));
-        push('Preview de rango eliminado', typeof global.renderBombRangePreview !== 'function' && typeof global.getBombBlastPreviewCells !== 'function' && !(state?.bombs || []).some(b => 'previewCells' in b || 'previewGrid' in b || 'previewTimer' in b));
         const valid = checks.every(check => check.ok);
         const audit = getNode('test-lab-audit');
         if (audit) {

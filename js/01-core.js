@@ -322,6 +322,7 @@ const UI = {};
             SHIELD_UP: 'SHIELD_UP',
             KICK: 'KICK',
             GRAB: 'GRAB',
+            THROW: 'THROW',
         };
 
         const PLAYER_LIMITS_V67 = Object.freeze({
@@ -396,11 +397,12 @@ const UI = {};
             [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'BOTAS', apply:()=>{ player.speed=Math.min(player.speed+0.4,6); return true; } }),
             [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', apply:()=>{ player.health=Math.min(player.health+1,player.maxHealth); return true; } }),
             [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', apply:()=>{ player.hasShield=true; return true; } }),
-            // v6.8.1: capacidades de interacción permanentes durante la run.
+            // v6.8.5: capacidades de interacción permanentes durante la run.
             // KICK y GRAB son mutuamente excluyentes; su estado real vive en
             // 54-entity-capabilities.js para evitar flags sueltos en Player.
             [POWERUPS.KICK]: Object.freeze({ id:POWERUPS.KICK, label:'PATADA', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'KICK') : false }),
             [POWERUPS.GRAB]: Object.freeze({ id:POWERUPS.GRAB, label:'AGARRE', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'GRAB') : false }),
+            [POWERUPS.THROW]: Object.freeze({ id:POWERUPS.THROW, label:'LANZAMIENTO', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'THROW') : false }),
         });
 
         function applyPowerupV67(type){
@@ -432,8 +434,6 @@ const UI = {};
             RASTRERO: { name: 'Rastrero', color: '#ef4444', speed: 1.4, canFly: false },
             VOLADOR: { name: 'Volador', color: '#3b82f6', speed: 1.1, canFly: true },
             ESPECIAL: { name: 'Especial', color: '#22c55e', speed: 2.2, canFly: false },
-            OSO_NIEVE: { name: 'Oso de nieve', color: '#e5e7eb', speed: 0.72, canFly: false, winterRole: 'bear', contactDamage: 0 },
-            ESTORBADOR_HIELO: { name: 'Estorbador', color: '#93c5fd', speed: 0.52, canFly: false, winterRole: 'obstructor', contactDamage: 0 }
         };
 
         // v3.24: perfiles de comportamiento separados del tipo visual/fisico.
@@ -468,7 +468,6 @@ const UI = {};
         });
 
         function pickEnemyBehaviorV324(type, level = 1, index = 0, roll = Math.random()) {
-            if (type?.winterRole) return ENEMY_BEHAVIORS_V324.PATROLLER;
             if (type === ENEMY_TYPES.VOLADOR || type?.canFly) return ENEMY_BEHAVIORS_V324.FLYER;
             if (type === ENEMY_TYPES.ESPECIAL) return ENEMY_BEHAVIORS_V324.AGGRESSIVE;
 

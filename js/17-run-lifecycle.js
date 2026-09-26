@@ -180,9 +180,6 @@ function getDeathCauseLabel(source) {
         'boss-projectile': 'Proyectil del jefe',
         enemy: 'Enemigo',
         'enemy-contact': 'Enemigo',
-        lava: 'Lava',
-        lightning: 'Rayo',
-        landslide: 'Derrumbe',
         'unknown': 'Daño recibido'
     };
     return labels[source] || 'Daño recibido';

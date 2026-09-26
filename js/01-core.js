@@ -320,13 +320,11 @@ const UI = {};
             SPEED_UP: 'SPEED_UP',
             HEALTH_UP: 'HEALTH_UP',
             SHIELD_UP: 'SHIELD_UP',
-            BOMB_KICK: 'BOMB_KICK'
         };
 
         const PLAYER_LIMITS_V67 = Object.freeze({
             base: Object.freeze({ maxHealth: 5, maxBombs: 1, bombRange: 1 }),
             hard: Object.freeze({ maxHealth: 10, maxBombs: 8, bombRange: 12 }),
-            kickDurationMs: 12000
         });
 
         const LEGACY_RELIC_CAP_BONUSES_V67 = Object.freeze({
@@ -396,7 +394,6 @@ const UI = {};
             [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'BOTAS', apply:()=>{ player.speed=Math.min(player.speed+0.4,6); return true; } }),
             [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', apply:()=>{ player.health=Math.min(player.health+1,player.maxHealth); return true; } }),
             [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', apply:()=>{ player.hasShield=true; return true; } }),
-            [POWERUPS.BOMB_KICK]: Object.freeze({ id:POWERUPS.BOMB_KICK, label:'PATADA', apply:()=>{ player.kickTimer=PLAYER_LIMITS_V67.kickDurationMs; return true; } })
         });
 
         function applyPowerupV67(type){
@@ -413,7 +410,7 @@ const UI = {};
 
         function getPowerupDropPoolV67(){
                 return Object.freeze([...new Set([
-                POWERUPS.BOMB_UP, POWERUPS.FIRE_UP, POWERUPS.SPEED_UP, POWERUPS.HEALTH_UP, POWERUPS.SHIELD_UP, POWERUPS.BOMB_KICK
+                POWERUPS.BOMB_UP, POWERUPS.FIRE_UP, POWERUPS.SPEED_UP, POWERUPS.HEALTH_UP, POWERUPS.SHIELD_UP
             ])]);
         }
 
@@ -541,7 +538,6 @@ const UI = {};
             { id: 'shield', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'ESCUDO', desc: 'Protección contra un golpe.', action: () => player.hasShield = true },
             { id: 'coin', kind: 'UPGRADE', rarity: 'COMMON', name: 'BOTÍN', desc: '+35 monedas.', action: () => gameState.coins += 35 },
             { id: 'heal', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'KIT MÉDICO', desc: 'Recupera 2 vidas sin superar el máximo.', action: () => player.health = Math.min(player.health + 2, player.maxHealth) },
-            { id: 'bomb_kick', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'PATADA TEMPORAL', desc: 'Podés patear bombas durante 12 segundos.', action: () => typeof applyPowerupV67 === 'function' ? applyPowerupV67(POWERUPS.BOMB_KICK) : null }
         ];
 
         const RARITY_COLORS = {
@@ -632,9 +628,6 @@ const UI = {};
             maxBombs: 1,
             bombsPlaced: 0,
             bombCooldown: 0,
-            kickTimer: 0,
-            kickCooldown: 0,
-            lastKickInputAt: 0,
             bombRange: 1,
             health: 3,
             maxHealth: 5,

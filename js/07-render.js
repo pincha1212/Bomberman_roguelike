@@ -729,7 +729,6 @@ function draw() {
             if (type === POWERUPS.SPEED_UP) icon = '👟';
             if (type === POWERUPS.HEALTH_UP) icon = '❤️';
             if (type === POWERUPS.SHIELD_UP) icon = '🛡️';
-            if (type === POWERUPS.BOMB_KICK && !gameplayMeta) icon = '👢';
             ctx.fillText(icon, x + 10, y + 30 + floaty);
             if (gameplayMeta) {
                 ctx.font = '7px Inter, sans-serif';

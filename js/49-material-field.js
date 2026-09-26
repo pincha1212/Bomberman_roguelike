@@ -332,10 +332,9 @@
 
     function getBombMaterialModifiersV67(x, y){
         const residue = getResidueAtTile(x, y);
-        const result = { fuseMultiplier:1, canPlace:true, kickOnPlace:false };
+        const result = { fuseMultiplier:1, canPlace:true };
         if (!residue) return Object.freeze(result);
         if (residue.type === MATERIALS.ICE) result.fuseMultiplier=1.15;
-        if (residue.type === MATERIALS.SLICK_ICE) result.kickOnPlace=true;
         if (residue.type === MATERIALS.PACKED_ICE || residue.type === MATERIALS.FROZEN_OIL) result.canPlace=false;
         if (residue.type === MATERIALS.WATER) result.fuseMultiplier=.85;
         if (residue.type === MATERIALS.BURNING_OIL) result.fuseMultiplier=.60;

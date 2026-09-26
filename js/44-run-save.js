@@ -82,7 +82,7 @@
         return clone({
             x: player.x, y: player.y, width: player.width, height: player.height,
             speed: player.speed, maxBombs: player.maxBombs, bombsPlaced: player.bombsPlaced,
-            bombCooldown: player.bombCooldown, kickTimer: player.kickTimer, kickCooldown: player.kickCooldown, lastKickInputAt: player.lastKickInputAt, bombRange: player.bombRange,
+            bombCooldown: player.bombCooldown, bombRange: player.bombRange,
             health: player.health, maxHealth: player.maxHealth, hasShield: player.hasShield,
             isInvincible: player.isInvincible, invincibleTimer: player.invincibleTimer,
             lastDamageFrame: player.lastDamageFrame, dir: player.dir, isMoving: player.isMoving,
@@ -155,7 +155,6 @@
     }
 
     function saveRunV55(reason = 'manual') {
-        if (global.BOMBER_ENGINE?.isTestLabNeutral?.()) return false;
         const snapshot = createSnapshot(reason);
         if (!snapshot) return false;
         try {
@@ -307,7 +306,7 @@
         updateResumeButton();
         if (!autosaveTimer) autosaveTimer = global.setInterval(() => {
             const state = getState();
-            if (state?.isPlaying && !state.paused && !global.BOMBER_ENGINE?.isTestLabNeutral?.()) saveRunV55('autosave');
+            if (state?.isPlaying && !state.paused) saveRunV55('autosave');
         }, AUTOSAVE_MS);
         return true;
     }

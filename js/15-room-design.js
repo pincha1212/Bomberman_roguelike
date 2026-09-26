@@ -833,11 +833,6 @@ function placeRoomDesignItemsV313() {
     if (!gameState.roomDesign) return;
     const used = new Set(gameState.items.map(it => roomKeyV313(it.x, it.y)));
 
-    if (gameState.roomType.id === 'TREASURE') {
-        const treasure = chooseRoomDesignItemCellV313(gameState.roomDesign.treasureCells, used);
-        if (treasure) gameState.items.push({ x: treasure.x, y: treasure.y, type: POWERUPS.BOMB_KICK });
-    }
-
     const secret = chooseRoomDesignItemCellV313(gameState.roomDesign.secretInterior, used);
     if (secret) gameState.items.push({ x: secret.x, y: secret.y, type: POWERUPS.HEALTH_UP });
 }

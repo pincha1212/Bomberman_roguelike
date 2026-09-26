@@ -203,9 +203,6 @@ function bossV41SpawnBomb() {
         motionRotation: 0,
         motionRotationSpeed: 0.22,
         bobPhase: 0,
-        interactionState: 'free',
-        canKick: false,
-        canPush: false,
         canCarry: false,
         carriedBy: null
     };
@@ -248,7 +245,6 @@ function bossV41BuildSlamBomb() {
         motionProgress: 1,
         motionTimer: 0,
         motionDuration: 0,
-        interactionState: 'slam'
     };
 }
 

@@ -147,7 +147,6 @@
             bombRange: clamp(Math.floor(number(player?.bombRange, 1)), 1, 12),
             maxHealth: clamp(Math.floor(number(player?.maxHealth, 5)), 1, 10),
             hasShield: false,
-            kickTimer: Math.max(0, number(player?.kickTimer, 0)),
             dir: ['up', 'down', 'left', 'right'].includes(player?.dir) ? player.dir : 'down',
             effectStatuses: clone(player?.__bombEffectStatusesV64 || {}),
             relicMods
@@ -551,11 +550,8 @@
             spatialRange: GHOST_SPATIAL_RANGE,
             spatialTarget: { x: targetTile.x, y: targetTile.y },
             countsTowardPlayerCapacity: false,
-            canKick: false,
-            canPush: false,
             canCarry: false,
             carriedBy: null,
-            interactionState: 'free',
             motionQueue: [],
             preserveTimerOnArm: true
         };
@@ -563,8 +559,8 @@
         // Reutilizamos exactamente la misma secuencia de salto del jugador, pero
         // limitada a 2 casillas para el eco. Las paredes intermedias no bloquean
         // el salto; la segunda casilla debe ser un piso válido para caer.
-        if (typeof queueBombJumpSequenceV67 !== 'function') return false;
-        if (!queueBombJumpSequenceV67(
+        if (typeof queueBombMotionSequenceV67 !== 'function') return false;
+        if (!queueBombMotionSequenceV67(
             bomb,
             jumpDx,
             jumpDy,
@@ -707,7 +703,6 @@
             maxHealth: 1,
             health: 1,
             hasShield: false,
-            kickTimer: Math.max(0, number(build.kickTimer, 0)),
             dir: ['up', 'down', 'left', 'right'].includes(build.dir) ? build.dir : 'down',
             hitFlash: 0,
             attackFlash: 0,
@@ -728,7 +723,6 @@
             maxBombs: ghost.maxBombs,
             speed: ghost.speed,
             sourceSpeed: number(build.sourceSpeed, number(build.speed, 3)),
-            kickTimer: ghost.kickTimer,
             spatialRange: GHOST_SPATIAL_RANGE,
             bombFuseMultiplier: ghost.bombFuseMultiplier,
             unstablePowder: !!relicMods.unstablePowder

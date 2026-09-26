@@ -16,14 +16,13 @@
         rewardCoins: 0,
         blockBonus: 0
     });
-    const BASE_POWERUP_TYPES = Object.freeze(['BOMB_UP', 'FIRE_UP', 'SPEED_UP', 'HEALTH_UP', 'SHIELD_UP', 'BOMB_KICK']);
+    const BASE_POWERUP_TYPES = Object.freeze(['BOMB_UP', 'FIRE_UP', 'SPEED_UP', 'HEALTH_UP', 'SHIELD_UP']);
     const BASE_POWERUP_META = Object.freeze({
         BOMB_UP: { id:'BOMB_UP', name:'BOMBA', icon:'💣', rarity:'BASE', category:'BASE', desc:'Aumenta maxBombs en 1 hasta el límite duro del jugador.', implemented:true },
         FIRE_UP: { id:'FIRE_UP', name:'RANGO', icon:'🔥', rarity:'BASE', category:'BASE', desc:'Aumenta bombRange en 1 hasta el límite duro del jugador.', implemented:true },
         SPEED_UP: { id:'SPEED_UP', name:'BOTAS', icon:'👟', rarity:'BASE', category:'BASE', desc:'Aumenta la velocidad del jugador mediante el pickup real.', implemented:true },
         HEALTH_UP: { id:'HEALTH_UP', name:'VIDA', icon:'❤️', rarity:'BASE', category:'BASE', desc:'Recupera 1 punto de vida, limitado por maxHealth.', implemented:true },
         SHIELD_UP: { id:'SHIELD_UP', name:'ESCUDO', icon:'🛡️', rarity:'BASE', category:'BASE', desc:'Activa el escudo mediante el sistema real de pickup.', implemented:true },
-        BOMB_KICK: { id:'BOMB_KICK', name:'PATADA', icon:'👢', rarity:'BASE', category:'BASE', desc:'Permite patear bombas durante la duración real configurada.', implemented:true }
     });
     const POWERUP_CATEGORY_LABELS = Object.freeze({
         ALL:'TODOS', BASE:'BASE', MOVIMIENTO:'MOVIMIENTO', MATERIALES:'MATERIALES / ALQUIMIA', BOMBAS:'BOMBAS', ENEMIGOS:'ENEMIGOS'
@@ -195,9 +194,6 @@
         player.isInvincible = false;
         player.invincibleTimer = 0;
         player.lastDamageFrame = -1;
-        player.kickTimer = 0;
-        player.kickCooldown = 0;
-        player.lastKickInputAt = 0;
         player.dir = 'down';
         player.isMoving = false;
         player.walkCycle = 0;
@@ -454,27 +450,6 @@
         return true;
     }
 
-    function testKickDirection(direction) {
-        if (!isActive()) return false;
-        const state = getState();
-        const player = getPlayer();
-        const keyByDir = { up:'ArrowUp', down:'ArrowDown', left:'ArrowLeft', right:'ArrowRight' };
-        const key = keyByDir[direction];
-        if (!state || !player || !key) return false;
-
-        state.keys.ArrowUp = state.keys.ArrowDown = state.keys.ArrowLeft = state.keys.ArrowRight = false;
-        state.keys[key] = true;
-        player.dir = direction;
-        player.kickCooldown = 0;
-        const ok = typeof global.tryKickPlayerBombsV67 === 'function' ? global.tryKickPlayerBombsV67() : false;
-        state.keys[key] = false;
-        const labels = { up:'ARRIBA', down:'ABAJO', left:'IZQUIERDA', right:'DERECHA' };
-        setStatus(ok
-            ? `PASS · PATADA ${labels[direction]} · bomba real colocada por el jugador`
-            : `FAIL · PATADA ${labels[direction]} · coloca una bomba adyacente y activa BOMB_KICK`);
-        return ok;
-    }
-
     function refillPowerups() {
         if (!isActive()) return false;
         const state = getState();
@@ -585,9 +560,6 @@
         const player = getPlayer();
         const checks = [];
         const push = (name, ok, detail='') => checks.push({ name, ok: !!ok, detail });
-        const expectedUniversalIds = new Set([
-            'LONG_FUSE','BOMB_SLIDE','ALCHEMIST_GLOVE','CATALYST','ACID_FLASK','AVALANCHE','SLOW_AURA','HUNTER_MARK'
-        ]);
         push('TEST LAB activo', !!state?.testLabV673?.active);
         push('Entorno neutral', !!state?.testLabV673?.neutral && !state?.biomeV49);
         push('Jugador presente', !!player);
@@ -610,12 +582,11 @@
         push('Power-ups universales auditables', !!gameplayAudit?.valid, gameplayAudit?.errors?.join('; ') || '');
         const labTypes = getLabPowerupTypes();
         const baseDefs = global.POWERUP_DEFS_V67 || {};
-        push('6 power-ups base con aplicación real', BASE_POWERUP_TYPES.every(type => typeof baseDefs[type]?.apply === 'function'));
+        push('5 power-ups base con aplicación real', BASE_POWERUP_TYPES.every(type => typeof baseDefs[type]?.apply === 'function'));
         const dropPool = typeof global.getPowerupDropPoolV67 === 'function' ? global.getPowerupDropPoolV67() : [];
         push('Pool universal disponible', labTypes.every(type => dropPool.includes(type)));
-        push('Hooks universales conectados', typeof global.gameplayPowerupUpdateV676 === 'function' && typeof global.getGameplayPowerupEnemySpeedMultiplierV676 === 'function' && typeof global.applyGameplayPowerupToBombV676 === 'function');
         push('Sin hooks Winter de power-ups', typeof global.winterPowerupUpdateV67 !== 'function' && typeof global.getWinterPowerupMovementModifiersV67 !== 'function');
-        push('Catálogo universal', labTypes.filter(type => !BASE_POWERUP_TYPES.includes(type)).every(type => expectedUniversalIds.has(type)) && labTypes.length === BASE_POWERUP_TYPES.length + expectedUniversalIds.size);
+        push('Solo power-ups base', labTypes.length === BASE_POWERUP_TYPES.length);
         push('Todos los power-ups con metadatos', labTypes.every(type => !!getPowerupMeta(type)?.desc && getPowerupMeta(type)?.implemented !== false));
         push('Preview de rango eliminado', typeof global.renderBombRangePreview !== 'function' && typeof global.getBombBlastPreviewCells !== 'function' && !(state?.bombs || []).some(b => 'previewCells' in b || 'previewGrid' in b || 'previewTimer' in b));
         const valid = checks.every(check => check.ok);
@@ -664,9 +635,6 @@
         getNode('test-lab-audit-btn')?.addEventListener('click', runGameplayAuditV676);
         getNode('test-powerup-filter')?.addEventListener('change', event => setPowerupFilter(event.currentTarget.value));
         getNode('test-powerup-shelf-toggle')?.addEventListener('click', togglePowerupShelf);
-        root.querySelectorAll('[data-test-kick]').forEach(button => {
-            button.addEventListener('click', () => testKickDirection(button.getAttribute('data-test-kick')));
-        });
 
         global.document.addEventListener('keydown', event => {
             if (!TEST_MODE) return;
@@ -723,7 +691,7 @@
     global.BOMBER_ENGINE.isTestLabNeutral = () => isActive();
     global.BOMBER_ENGINE.getTestLabConfig = () => ({
         active: isActive(),
-        version: '6.7.8',
+        version: '6.7.9',
         neutral: true,
         arena: { ...TEST_ARENA },
         powerupFilter: getState()?.testLabPowerupFilterV676 || DEFAULT_SHELF_FILTER,
@@ -735,8 +703,6 @@
     global.BOMBER_ENGINE.toggleTestLabPowerupShelf = togglePowerupShelf;
     global.BOMBER_ENGINE.toggleTestLabPanel = toggleTestPanel;
     global.BOMBER_ENGINE.skipToDepth = jump;
-    global.BOMBER_ENGINE.buildBombKickTestArena = resetMap;
-    global.BOMBER_ENGINE.testBombKickDirection = testKickDirection;
     global.BOMBER_ENGINE.auditTestLabGameplay = runGameplayAuditV676;
     global.BOMBER_ENGINE.spawnTestPowerup = (type) => {
         // Compatibilidad API: devuelve/restituye un power-up real en la estantería;

@@ -155,60 +155,6 @@
         if (typeof global.invalidateRenderCacheV317 === 'function') global.invalidateRenderCacheV317();
     }
 
-    function makeTestBomb(owner, x, y) {
-        return {
-            id: `test-bomb-${owner}-${x}-${y}`,
-            owner,
-            x, y,
-            range: 1,
-            timer: 15000,
-            fuseTotal: 15000,
-            warnBucket: Math.ceil(15000 / 300),
-            scalePulse: 1,
-            previewTimer: 0,
-            previewCells: [],
-            previewGrid: null,
-            previewGridRevision: 0,
-            playerPassThrough: true,
-            justArmed: false,
-            placedAtFrame: 0,
-            placementReason: 'test-lab-cardinal',
-            state: 'armed',
-            motionState: 'idle',
-            worldX: (x + 0.5) * TILE_SIZE,
-            worldY: (y + 0.5) * TILE_SIZE,
-            motionProgress: 1,
-            motionTimer: 0,
-            motionDuration: 0,
-            motionStartX: (x + 0.5) * TILE_SIZE,
-            motionStartY: (y + 0.5) * TILE_SIZE,
-            motionTargetX: (x + 0.5) * TILE_SIZE,
-            motionTargetY: (y + 0.5) * TILE_SIZE,
-            motionTargetTileX: x,
-            motionTargetTileY: y,
-            motionArc: 0,
-            motionRotation: 0,
-            motionRotationSpeed: 0,
-            bobPhase: 0,
-            motionQueue: [],
-            preserveTimerOnArm: false,
-            interactionState: 'free',
-            canKick: owner === 'player',
-            canPush: owner === 'player',
-            canCarry: false,
-            carriedBy: null,
-            pendingDetonation: false,
-            countsTowardPlayerCapacity: owner === 'player'
-        };
-    }
-
-    function createKickTestBombs(state) {
-        const bombPositions = [[5,6], [7,6], [6,5], [6,7]];
-        state.bombs = bombPositions.map(([x, y]) => makeTestBomb('player', x, y));
-        const player = getPlayer();
-        if (player) player.bombsPlaced = state.bombs.length;
-    }
-
     function clearDynamicRuntime(state) {
         state.bombs = [];
         state.explosions = [];
@@ -284,7 +230,9 @@
         centerPlayer(player);
         resetPlayerToBase(player);
         centerPlayer(player);
-        createKickTestBombs(state);
+        // Las bombas no se precargan en el laboratorio.
+        // Deben colocarse exclusivamente mediante el flujo real del jugador.
+        state.bombs = [];
         spawnShelfPowerups(state);
         state.isPlaying = true;
         state.paused = false;
@@ -295,7 +243,7 @@
         setTestUiState();
         syncDepthInput();
         getNode('test-controls')?.classList.add('test-arena-active');
-        setStatus(`TEST LAB · neutral · ${POWERUP_TYPES.length} power-ups · bombas cardinales · ${reason}`);
+        setStatus(`TEST LAB · neutral · ${POWERUP_TYPES.length} power-ups · bombas manuales · ${reason}`);
         if (typeof global.updateUI === 'function') global.updateUI(true);
         setTestUiState();
         if (typeof global.draw === 'function') global.draw();
@@ -378,8 +326,8 @@
         state.keys[key] = false;
         const labels = { up:'ARRIBA', down:'ABAJO', left:'IZQUIERDA', right:'DERECHA' };
         setStatus(ok
-            ? `PASS · PATADA ${labels[direction]} · flujo real`
-            : `FAIL · PATADA ${labels[direction]} · requiere BOMB_KICK activo`);
+            ? `PASS · PATADA ${labels[direction]} · bomba real colocada por el jugador`
+            : `FAIL · PATADA ${labels[direction]} · coloca una bomba adyacente y activa BOMB_KICK`);
         return ok;
     }
 

@@ -104,8 +104,10 @@
 
             updateAdaptiveInterface();
 
-            // V3.10: manejo completo de bombas aislado.
-            updateBombHandling(dt);
+            // v6.7.1: bombUpdate() es la única fuente de verdad del ciclo de
+            // vida de las bombas. updateBombHandling() queda solo como wrapper
+            // de compatibilidad para llamadas heredadas.
+            bombUpdate(dt);
 
             // Hitbox estándar para recoger objetos (ocupa casi todo el sprite)
             let pRect = { left: player.x, right: player.x + player.width, top: player.y, bottom: player.y + player.height };

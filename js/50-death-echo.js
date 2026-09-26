@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.7.0 — Eco de Muerte
+// Bomberman Roguelike v6.7.1.1 — Eco de Muerte
 // Un eco persistente por profundidad, inspirado en el concepto de fantasma
 // vengativo: conserva una copia inmutable del build que murió y la reutiliza
 // como enemigo autónomo en futuros intentos.
@@ -13,8 +13,8 @@
 (function installDeathEchoV631(global) {
     'use strict';
 
-    const VERSION = '6.7.0';
-    const COMPATIBLE_VERSIONS = new Set(['6.3.0', '6.3.1', '6.5.1', '6.7.0']);
+    const VERSION = '6.7.1.1';
+    const COMPATIBLE_VERSIONS = new Set(['6.3.0', '6.3.1', '6.5.1', '6.7.0', '6.7.1','6.7.1.1']);
     if (global.__DEATH_ECHO_V631_INSTALLED__) return;
     global.__DEATH_ECHO_V631_INSTALLED__ = true;
 
@@ -498,10 +498,23 @@
         if (!isPassableTile(targetTile.x, targetTile.y) || bombAtTile(targetTile.x, targetTile.y)) return false;
         if (!canGhostEscapeAfterBombAt(ghost, targetTile)) return false;
 
+        const ghostTile = tileFromGhost(ghost);
+        const jumpDx = Math.sign(targetTile.x - ghostTile.x);
+        const jumpDy = Math.sign(targetTile.y - ghostTile.y);
+        const jumpDistance = Math.abs(targetTile.x - ghostTile.x) + Math.abs(targetTile.y - ghostTile.y);
+
+        // El eco NO lanza la bomba a distancia arbitraria.
+        // Solo puede hacer el mismo tipo de salto discreto que una patada:
+        // exactamente 2 casillas y en una sola dirección cardinal.
+        if (jumpDistance !== GHOST_SPATIAL_RANGE || (jumpDx !== 0 && jumpDy !== 0)) return false;
+
         const baseFuse = gameState.roomType?.id === 'CURSED' ? BOMB_HANDLING.cursedFuse : BOMB_HANDLING.normalFuse;
         const fuseTotal = Math.max(700, Math.round(baseFuse * ghost.bombFuseMultiplier));
-        const startX = ghost.x + ghost.width / 2;
-        const startY = ghost.y + ghost.height / 2;
+        // La bomba siempre nace en el CENTRO DE LA CASILLA del eco.
+        // No reutilizamos la posición visual del sprite, que puede estar entre
+        // píxeles y provocar un desfasaje en el resolver de movimiento.
+        const startX = (ghostTile.x + 0.5) * TILE_SIZE;
+        const startY = (ghostTile.y + 0.5) * TILE_SIZE;
         const targetX = (targetTile.x + 0.5) * TILE_SIZE;
         const targetY = (targetTile.y + 0.5) * TILE_SIZE;
 
@@ -551,16 +564,18 @@
             preserveTimerOnArm: true
         };
 
-        // Reutilizamos el movimiento de bomba existente: no creamos un segundo
-        // sistema de proyectiles. El bomb state pasa a ARMED cuando llega al destino.
-        if (typeof startBombV4Motion === 'function') {
-            const sx = bomb.x, sy = bomb.y;
-            const dx = Math.sign(targetTile.x - sx), dy = Math.sign(targetTile.y - sy);
-            const firstX = sx + dx, firstY = sy + dy;
-            if (!isPassableTile(firstX, firstY) || bombAtTile(firstX, firstY)) return false;
-            bomb.motionQueue.push({ x: targetTile.x, y: targetTile.y, durationMs: GHOST_THROW_DURATION_MS, arc: TILE_SIZE*.22 });
-            startBombV4Motion(bomb, (firstX+.5)*TILE_SIZE, (firstY+.5)*TILE_SIZE, GHOST_THROW_DURATION_MS, TILE_SIZE*.22);
-        }
+        // Reutilizamos exactamente la misma secuencia de salto del jugador, pero
+        // limitada a 2 casillas para el eco. Las paredes intermedias no bloquean
+        // el salto; la segunda casilla debe ser un piso válido para caer.
+        if (typeof queueBombJumpSequenceV67 !== 'function') return false;
+        if (!queueBombJumpSequenceV67(
+            bomb,
+            jumpDx,
+            jumpDy,
+            GHOST_SPATIAL_RANGE,
+            GHOST_THROW_DURATION_MS,
+            TILE_SIZE * .30
+        )) return false;
 
         gameState.bombs.push(bomb);
         state.bombCooldown = BOMB_COOLDOWN_MS;

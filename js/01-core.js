@@ -408,15 +408,12 @@ const UI = {};
                 if(typeof updateUI==='function') updateUI();
                 return applied;
             }
-            if(typeof window.applyGameplayPowerupV676==='function') return !!window.applyGameplayPowerupV676(key);
             return false;
         }
 
         function getPowerupDropPoolV67(){
-            const extra = typeof window.getGameplayPowerupIdsV676 === 'function' ? window.getGameplayPowerupIdsV676() : [];
-            return Object.freeze([...new Set([
-                POWERUPS.BOMB_UP, POWERUPS.FIRE_UP, POWERUPS.SPEED_UP, POWERUPS.HEALTH_UP, POWERUPS.SHIELD_UP, POWERUPS.BOMB_KICK,
-                ...extra
+                return Object.freeze([...new Set([
+                POWERUPS.BOMB_UP, POWERUPS.FIRE_UP, POWERUPS.SPEED_UP, POWERUPS.HEALTH_UP, POWERUPS.SHIELD_UP, POWERUPS.BOMB_KICK
             ])]);
         }
 

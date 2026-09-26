@@ -154,7 +154,6 @@ function draw() {
 
             // v6.0: residuos materiales persistentes; quedan por debajo de items, bombas y personajes.
             if (typeof drawMaterialResiduesV60 === 'function') drawMaterialResiduesV60(ctx);
-            if (typeof drawAlchemistMaterialHighlightsV676 === 'function') drawAlchemistMaterialHighlightsV676();
             if (typeof drawBombEffectsV64 === 'function') drawBombEffectsV64(ctx);
 
             // V3.3: las trampas aparecen visualmente solo después de activarse.
@@ -740,25 +739,3 @@ function draw() {
                 ctx.textAlign = 'start';
             }
         }
-
-        function drawAlchemistMaterialHighlightsV676() {
-            if (!globalThis.isGameplayPowerupActiveV676?.('ALCHEMIST_GLOVE')) return;
-            const residues = Array.isArray(gameState.materialResiduesV60) ? gameState.materialResiduesV60 : [];
-            const px = Math.floor((player.x + player.width / 2) / TILE_SIZE);
-            const py = Math.floor((player.y + player.height / 2) / TILE_SIZE);
-            const gloveState = gameState.gameplayPowerupsV676;
-            if (gloveState) gloveState.gloveTimer = Math.max(0, Number(gloveState.gloveTimer || 0));
-            if (Number(gloveState?.gloveTimer || 0) <= 0) return;
-            ctx.save();
-            ctx.lineWidth = 2;
-            for (const residue of residues) {
-                if (!residue) continue;
-                if (Math.abs(Number(residue.x) - px) + Math.abs(Number(residue.y) - py) > 3) continue;
-                ctx.strokeStyle = '#f8fafc';
-                ctx.globalAlpha = 0.55;
-                ctx.strokeRect(residue.x * TILE_SIZE + 5, residue.y * TILE_SIZE + 5, TILE_SIZE - 10, TILE_SIZE - 10);
-            }
-            ctx.restore();
-        }
-
-

@@ -139,7 +139,8 @@
             pool: Object.freeze(['RASTRERO', 'VOLADOR', 'ESPECIAL']),
             colors: Object.freeze({ RASTRERO: 'enemyRastrero', VOLADOR: 'enemyVolador', ESPECIAL: 'enemyEspecial' })
         }),
-        powerups: Object.freeze({ pool: Object.freeze(['BOMB_UP','FIRE_UP','SPEED_UP','HEALTH_UP','SHIELD_UP','BOMB_KICK','LONG_FUSE','BOMB_SLIDE','ALCHEMIST_GLOVE','CATALYST','ACID_FLASK','AVALANCHE','SLOW_AURA','HUNTER_MARK','RELIC']) })
+        // Power-up pool base. Mantener solo los cinco genéricos hasta que un nuevo power-up pase por el Test Lab.
+        powerups: Object.freeze({ pool: Object.freeze(['BOMB_UP','FIRE_UP','SPEED_UP','HEALTH_UP','SHIELD_UP']) })
     });
 
     function createVisualThemeV461(id, nombre, paletteOverrides, spriteOverrides, ambientOverrides) {

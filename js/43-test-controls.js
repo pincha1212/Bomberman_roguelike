@@ -25,7 +25,7 @@
         HEALTH_UP: { id:'HEALTH_UP', name:'VIDA', icon:'❤️', rarity:'BASE', category:'BASE', desc:'Recupera 1 punto de vida, limitado por maxHealth.', implemented:true },
         SHIELD_UP: { id:'SHIELD_UP', name:'ESCUDO', icon:'🛡️', rarity:'BASE', category:'BASE', desc:'Activa el escudo mediante el sistema real de pickup.', implemented:true },
         KICK: { id:'KICK', name:'PATADA', icon:'→', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: empujar bombas al caminar contra ellas. Exclusiva frente a GRAB.', implemented:true },
-        GRAB: { id:'GRAB', name:'AGARRE', icon:'✋', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: levantar y transportar bombas. Exclusiva frente a KICK.', implemented:true },
+        GRAB: { id:'GRAB', name:'AGARRE', icon:'✋', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: levantar y transportar bombas; GRAB implica CARRY. Exclusiva frente a KICK.', implemented:true },
     });
     const POWERUP_CATEGORY_LABELS = Object.freeze({
         ALL:'TODOS', BASE:'BASE', INTERACCION:'INTERACCION', MOVIMIENTO:'MOVIMIENTO', MATERIALES:'MATERIALES / ALQUIMIA', BOMBAS:'BOMBAS', ENEMIGOS:'ENEMIGOS'

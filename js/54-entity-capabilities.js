@@ -4,7 +4,7 @@
     'use strict';
 
     const ARCHETYPE_CAPABILITIES = Object.freeze({
-        player:  Object.freeze({ kick:true,  grab:true,  carry:false, throw:false }),
+        player:  Object.freeze({ kick:true,  grab:true,  carry:true,  throw:false }),
         chaser:  Object.freeze({ kick:false, grab:false, carry:false, throw:false }),
         flyer:   Object.freeze({ kick:false, grab:false, carry:false, throw:false }),
         boss:    Object.freeze({ kick:true,  grab:true,  carry:true,  throw:true  }),
@@ -99,7 +99,9 @@
     function canCarry(entity) { return canUseCapability(entity, 'carry'); }
     function canThrow(entity) { return canUseCapability(entity, 'throw'); }
     function isKickActiveV681(entity) { return isCapabilityActiveV681(entity, 'kick'); }
+    // GRAB implica CARRY: transportar no es un power-up separado.
     function isGrabActiveV681(entity) { return isCapabilityActiveV681(entity, 'grab'); }
+    function isCarryActiveV681(entity) { return isCapabilityActiveV681(entity, 'grab') && canUseCapability(entity, 'carry'); }
 
     function activateCapabilityPowerupV681(entity, powerupId) {
         const def = getCapabilityPowerupDefV681(powerupId);
@@ -118,6 +120,10 @@
         }
 
         profile.permanent.push(def.capability);
+        // GRAB habilita automáticamente CARRY: es parte de la capacidad de agarre.
+        if (def.capability === 'grab' && !profile.permanent.includes('carry') && archetypeCaps.carry === true) {
+            profile.permanent.push('carry');
+        }
         if (def.exclusiveGroup) profile.byGroup[def.exclusiveGroup] = def.capability;
         return true;
     }
@@ -149,6 +155,7 @@
     global.isCapabilityActiveV681 = isCapabilityActiveV681;
     global.isKickActiveV681 = isKickActiveV681;
     global.isGrabActiveV681 = isGrabActiveV681;
+    global.isCarryActiveV681 = isCarryActiveV681;
     global.activateCapabilityPowerupV681 = activateCapabilityPowerupV681;
     global.resetEntityCapabilitiesV681 = resetEntityCapabilitiesV681;
     global.getActiveCapabilityPowerupsV681 = getActiveCapabilityPowerupsV681;
@@ -164,6 +171,7 @@
     global.BOMBER_ENGINE.isCapabilityActive = isCapabilityActiveV681;
     global.BOMBER_ENGINE.isKickActive = isKickActiveV681;
     global.BOMBER_ENGINE.isGrabActive = isGrabActiveV681;
+    global.BOMBER_ENGINE.isCarryActive = isCarryActiveV681;
     global.BOMBER_ENGINE.activateCapabilityPowerup = activateCapabilityPowerupV681;
     global.BOMBER_ENGINE.resetEntityCapabilities = resetEntityCapabilitiesV681;
     global.BOMBER_ENGINE.getCapabilityPowerupIds = getCapabilityPowerupIdsV681;

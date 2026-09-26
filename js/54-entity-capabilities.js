@@ -118,14 +118,30 @@
         const profile = getCapabilityProfile(entity, true);
         if (profile.permanent.includes(def.capability)) return false;
 
+        let switchedExclusiveGroup = false;
         if (def.exclusiveGroup) {
             const activeGroup = profile.byGroup[def.exclusiveGroup];
-            if (activeGroup && activeGroup !== def.capability) return false;
+            if (activeGroup === def.capability) return false;
+            if (activeGroup) {
+                // Las capacidades del grupo representan la capacidad activa, no un
+                // historial de pickups. Cambiar KICK ↔ GRAB reemplaza la anterior.
+                const oldDef = Object.values(CAPABILITY_POWERUPS).find(item =>
+                    item.exclusiveGroup === def.exclusiveGroup && item.capability === activeGroup
+                );
+                if (oldDef) {
+                    profile.permanent = profile.permanent.filter(capability => {
+                        if (capability === oldDef.capability) return false;
+                        if (oldDef.capability === 'grab' && capability === 'carry') return false;
+                        return true;
+                    });
+                }
+                switchedExclusiveGroup = true;
+            }
         }
 
-        profile.permanent.push(def.capability);
+        if (!profile.permanent.includes(def.capability)) profile.permanent.push(def.capability);
         // GRAB habilita automáticamente CARRY: es parte de la capacidad de agarre.
-        if (def.capability === 'grab' && !profile.permanent.includes('carry') && archetypeCaps.carry === true) {
+        if (def.capability === 'grab' && archetypeCaps.carry === true && !profile.permanent.includes('carry')) {
             profile.permanent.push('carry');
         }
         if (def.exclusiveGroup) profile.byGroup[def.exclusiveGroup] = def.capability;

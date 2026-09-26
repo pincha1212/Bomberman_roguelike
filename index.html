@@ -87,8 +87,30 @@
                         <button type="button" data-test-kick="right" aria-label="Probar patada hacia la derecha">→</button>
                     </div>
                     <div class="test-tools-group test-powerup-group" aria-label="Estantería física de power-ups">
-                        <span class="test-tools-label">ESTANTERÍA</span>
-                        <span class="test-shelf-note">PICKUP REAL · RESPAWN</span>
+                        <span class="test-tools-label">POWER-UPS</span>
+                        <select id="test-powerup-filter" aria-label="Filtrar categoría de power-ups">
+                            <option value="BASE">BASE</option>
+                            <option value="MOVIMIENTO">MOVIMIENTO</option>
+                            <option value="TEMPERATURA">TEMPERATURA</option>
+                            <option value="ALQUIMIA">MATERIALES / ALQUIMIA</option>
+                            <option value="BOMBAS">BOMBAS</option>
+                            <option value="ENEMIGOS">ENEMIGOS</option>
+                            <option value="ESPECIFICO">ESPECIALES</option>
+                            <option value="ALL">TODOS</option>
+                        </select>
+                        <button type="button" id="test-powerup-shelf-toggle">OCULTAR ESTANTERÍA</button>
+                    </div>
+                    <div id="test-powerup-info" class="test-powerup-info is-empty" aria-label="Información del power-up actual">
+                        <div class="test-powerup-info-main">
+                            <div id="test-powerup-info-icon" class="test-powerup-info-icon" aria-hidden="true">·</div>
+                            <div class="test-powerup-info-copy">
+                                <div class="test-powerup-info-kicker">ÚLTIMO POWER-UP</div>
+                                <div id="test-powerup-info-name" class="test-powerup-info-name">Ninguno</div>
+                                <div class="test-powerup-info-tags"><span id="test-powerup-info-category">—</span><span id="test-powerup-info-rarity">—</span></div>
+                            </div>
+                        </div>
+                        <div id="test-powerup-info-desc" class="test-powerup-info-desc">Recogé un power-up físico del laboratorio para ver qué debería hacer.</div>
+                        <div id="test-powerup-info-status" class="test-powerup-info-status">ESPERANDO PICKUP REAL</div>
                     </div>
                     <div id="test-lab-status" class="test-lab-status" role="status" aria-live="polite">TEST LAB · ENTORNO NEUTRO</div>
                 </div>
@@ -250,7 +272,7 @@
     <script src="js/41-biome-journey.js?v=6.3.0"></script>
     <script src="js/42-run-history.js?v=5.6.0"></script>
     <script src="js/44-run-save.js?v=6.7.3"></script>
-    <script src="js/43-test-controls.js?v=6.7.4"></script>
+    <script src="js/43-test-controls.js?v=6.7.5"></script>
     <script src="js/46-ecs.js?v=6.0.0"></script>
     <script src="js/47-event-bus.js?v=6.0.0"></script>
     <script src="js/48-bomb-events.js?v=6.7.0"></script>

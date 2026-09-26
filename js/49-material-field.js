@@ -552,10 +552,15 @@
             const state = getState();
             if (state?.testLabV673?.active && state?.testLabV673?.materials === false) return;
             const winter = String(state?.biomeV49?.id || '') === 'winter';
-            const blastMaterial = winter ? MATERIALS.ICE : MATERIALS.FIRE;
+            const bomb = payload?.bomb || {};
+            const explicitMaterial = bomb.materialOverrideV67 && MATERIALS[bomb.materialOverrideV67.toUpperCase()]
+                ? MATERIALS[bomb.materialOverrideV67.toUpperCase()]
+                : null;
+            const blastMaterial = explicitMaterial || (winter ? MATERIALS.ICE : MATERIALS.FIRE);
+            const amountMultiplier = Number(bomb.winterPowerupModifiersV67?.residualAmountMultiplier) || 1;
             for (const cell of cells) {
                 if (!cell) continue;
-                deposit(blastMaterial, cell.x, cell.y, cell.block ? 40 : 62, { source: winter ? 'bomb-winter' : 'bomb' });
+                deposit(blastMaterial, cell.x, cell.y, (cell.block ? 40 : 62) * amountMultiplier, { source: explicitMaterial ? 'bomb-powerup' : (winter ? 'bomb-winter' : 'bomb') });
             }
         }, { key: LISTENER_KEY });
         global.__MATERIAL_FIELD_V60__ = true;

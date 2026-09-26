@@ -458,7 +458,10 @@ function placeBomb(reason='manual'){
     if (!materialMods.canPlace) return false;
 
     const baseFuse = gameState.roomType.id === 'CURSED' ? BOMB_HANDLING.cursedFuse : BOMB_HANDLING.normalFuse;
-    const fuseTotal = Math.max(700, Math.round(baseFuse * (typeof getBombFuseMultiplier === 'function' ? getBombFuseMultiplier() : 1) * materialMods.fuseMultiplier));
+    const winterBombMods = typeof getWinterPowerupBombModifiersV67 === 'function'
+        ? getWinterPowerupBombModifiersV67({ owner: 'player' })
+        : { fuseMultiplier: 1 };
+    const fuseTotal = Math.max(700, Math.round(baseFuse * (typeof getBombFuseMultiplier === 'function' ? getBombFuseMultiplier() : 1) * materialMods.fuseMultiplier * Number(winterBombMods.fuseMultiplier || 1)));
     const bomb = {
         id: `bomb-${gameState.animFrame}-${Math.random().toString(36).slice(2,7)}`,
         owner: 'player',
@@ -498,6 +501,7 @@ function placeBomb(reason='manual'){
 
     gameState.bombs.push(bomb);
     player.bombsPlaced++;
+    if (typeof applyWinterPowerupToBombV67 === 'function') applyWinterPowerupToBombV67(bomb);
     if (materialMods.kickOnPlace) {
         const dir = getBombKickDirectionV67();
         if (dir.dx || dir.dy) {

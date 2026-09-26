@@ -159,6 +159,7 @@
                         gameState.score += killScore;
                         gameState.coins += killCoins;
                         gameState.totalKills++;
+                        if (typeof winterPowerupOnEnemyDefeatedV67 === 'function') winterPowerupOnEnemyDefeatedV67(e);
                         addFloatingText(`+${killScore}  +${killCoins}¢`, e.x, e.y, e.elite ? '#fb7185' : '#38bdf8');
                         if (typeof tryUnlockExitV44 === 'function') tryUnlockExitV44();
                     }
@@ -296,6 +297,7 @@
             if (lethal) sfx('death');
             if (lethal && typeof playerFSMDeath === 'function') playerFSMDeath(source);
             updateUI(true);
+            if (typeof winterPowerupOnDamageV67 === 'function') winterPowerupOnDamageV67();
             if (lethal) gameOver(source);
             return true;
         }

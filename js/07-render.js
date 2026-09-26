@@ -694,6 +694,7 @@ function draw() {
             const x = item.x * TILE_SIZE;
             const y = item.y * TILE_SIZE;
             const type = item.type;
+            const winterMeta = globalThis.WINTER_POWERUP_DEFS_V67?.[type] || null;
             let floaty = Math.sin((gameState.animFrame + x) * 0.1) * 3;
             if (type === 'RELIC') {
                 ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('relicBase') : '#3b1d6b';
@@ -707,19 +708,47 @@ function draw() {
                 ctx.fillText(relic?.icon || '✦', x + 11, y + 31 + floaty);
                 return;
             }
-            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('powerupBase') : '#0284c7';
+            const rarityColor = winterMeta ? (globalThis.WINTER_POWERUP_RARITY_COLORS_V67?.[winterMeta.rarity] || '#94a3b8') : null;
+            ctx.fillStyle = winterMeta ? 'rgba(15,23,42,.90)' : (typeof themeColorV46 === 'function' ? themeColorV46('powerupBase') : '#0284c7');
             ctx.fillRect(x + 8, y + 8 + floaty, TILE_SIZE - 16, TILE_SIZE - 16);
-            ctx.strokeStyle = typeof themeColorV46 === 'function' ? themeColorV46('powerupAccent') : '#38bdf8';
+            ctx.strokeStyle = rarityColor || (typeof themeColorV46 === 'function' ? themeColorV46('powerupAccent') : '#38bdf8');
             ctx.strokeRect(x + 8, y + 8 + floaty, TILE_SIZE - 16, TILE_SIZE - 16);
 
             ctx.font = '14px "Press Start 2P"';
-            let icon = '💣';
+            let icon = winterMeta?.icon || '💣';
             if (type === POWERUPS.FIRE_UP) icon = '🔥';
             if (type === POWERUPS.SPEED_UP) icon = '👟';
             if (type === POWERUPS.HEALTH_UP) icon = '❤️';
             if (type === POWERUPS.SHIELD_UP) icon = '🛡️';
-            if (type === POWERUPS.BOMB_KICK) icon = '👢';
+            if (type === POWERUPS.BOMB_KICK && !winterMeta) icon = '👢';
             ctx.fillText(icon, x + 10, y + 30 + floaty);
+            if (winterMeta) {
+                ctx.font = '7px Inter, sans-serif';
+                ctx.fillStyle = rarityColor || '#cbd5e1';
+                ctx.textAlign = 'center';
+                ctx.fillText(winterMeta.rarity, x + TILE_SIZE / 2, y + TILE_SIZE - 7 + floaty);
+                ctx.textAlign = 'start';
+            }
+        }
+
+        function drawAlchemistMaterialHighlightsV674() {
+            if (!globalThis.isWinterPowerupActiveV67?.('ALCHEMIST_GLOVE')) return;
+            const residues = Array.isArray(gameState.materialResiduesV60) ? gameState.materialResiduesV60 : [];
+            const px = Math.floor((player.x + player.width / 2) / TILE_SIZE);
+            const py = Math.floor((player.y + player.height / 2) / TILE_SIZE);
+            const gloveState = gameState.winterPowerupsV67;
+            if (gloveState) gloveState.gloveTimer = Math.max(0, Number(gloveState.gloveTimer || 0));
+            if (Number(gloveState?.gloveTimer || 0) <= 0) return;
+            ctx.save();
+            ctx.lineWidth = 2;
+            for (const residue of residues) {
+                if (!residue) continue;
+                if (Math.abs(Number(residue.x) - px) + Math.abs(Number(residue.y) - py) > 3) continue;
+                ctx.strokeStyle = '#f8fafc';
+                ctx.globalAlpha = 0.55;
+                ctx.strokeRect(residue.x * TILE_SIZE + 5, residue.y * TILE_SIZE + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+            }
+            ctx.restore();
         }
 
 

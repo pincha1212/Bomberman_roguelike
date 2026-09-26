@@ -153,10 +153,13 @@
             const materialMods = typeof getMaterialMovementModifiersV67 === 'function'
                 ? getMaterialMovementModifiersV67(player)
                 : { acceleration: 1, braking: 1, turnCarry: 1, speedMultiplier: 1, inputBufferMultiplier: 1 };
-            const acceleration = MOTION.acceleration * Number(movementMods.acceleration || 1) * Number(effectMods.accelerationMultiplier || 1) * Number(materialMods.acceleration || 1);
-            const braking = MOTION.braking * Number(movementMods.braking || 1) * Number(effectMods.brakingMultiplier || 1) * Number(materialMods.braking || 1);
-            const turnCarrySpeed = MOTION.turnCarrySpeed * Number(movementMods.turnCarrySpeed || 1) * Number(effectMods.turnCarryMultiplier || 1) * Number(materialMods.turnCarry || 1);
-            const effectiveSpeedBase = player.speed * Number(movementMods.speedMultiplier || 1) * Number(effectMods.speedMultiplier || 1) * Number(materialMods.speedMultiplier || 1);
+            const winterMods = typeof getWinterPowerupMovementModifiersV67 === 'function'
+                ? getWinterPowerupMovementModifiersV67(player)
+                : { acceleration: 1, braking: 1, turnCarry: 1, speedMultiplier: 1, inputBufferMultiplier: 1 };
+            const acceleration = MOTION.acceleration * Number(movementMods.acceleration || 1) * Number(effectMods.accelerationMultiplier || 1) * Number(materialMods.acceleration || 1) * Number(winterMods.acceleration || 1);
+            const braking = MOTION.braking * Number(movementMods.braking || 1) * Number(effectMods.brakingMultiplier || 1) * Number(materialMods.braking || 1) * Number(winterMods.braking || 1);
+            const turnCarrySpeed = MOTION.turnCarrySpeed * Number(movementMods.turnCarrySpeed || 1) * Number(effectMods.turnCarryMultiplier || 1) * Number(materialMods.turnCarry || 1) * Number(winterMods.turnCarry || 1);
+            const effectiveSpeedBase = player.speed * Number(movementMods.speedMultiplier || 1) * Number(effectMods.speedMultiplier || 1) * Number(materialMods.speedMultiplier || 1) * Number(winterMods.speedMultiplier || 1);
             const effectiveSpeed = typeof getHazardSpeedFactor === 'function'
                 ? effectiveSpeedBase * getHazardSpeedFactor()
                 : effectiveSpeedBase;
@@ -293,9 +296,14 @@
                 if (player.vy !== 0) player.dir = player.vy < 0 ? 'up' : 'down';
             }
 
+            const beforeMoveX = player.x;
+            const beforeMoveY = player.y;
             let moved = false;
             if (player.vx) moved = moveAxisWithCollision('x', player.vx * frameScale);
             else if (player.vy) moved = moveAxisWithCollision('y', player.vy * frameScale);
+            if (moved && typeof globalThis.winterPowerupAfterPlayerMovementV67 === 'function') {
+                globalThis.winterPowerupAfterPlayerMovementV67(beforeMoveX, beforeMoveY);
+            }
 
             if (!moved && (player.vx || player.vy)) {
                 if (player.vx) player.vx = 0;

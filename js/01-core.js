@@ -392,12 +392,17 @@ const UI = {};
         });
 
         function applyPowerupV67(type){
-            const def=POWERUP_DEFS_V67[String(type)]; if(!def) return false;
-            const applied=!!def.apply();
-            clampPlayerCapacitiesV67();
-            if((type===POWERUPS.BOMB_UP||type===POWERUPS.FIRE_UP)&&typeof addFloatingText==='function') addFloatingText('SOLO RELIQUIA',player.x,player.y,'#c084fc');
-            if(typeof updateUI==='function') updateUI();
-            return applied;
+            const key=String(type);
+            const def=POWERUP_DEFS_V67[key];
+            if(def){
+                const applied=!!def.apply();
+                clampPlayerCapacitiesV67();
+                if((type===POWERUPS.BOMB_UP||type===POWERUPS.FIRE_UP)&&typeof addFloatingText==='function') addFloatingText('SOLO RELIQUIA',player.x,player.y,'#c084fc');
+                if(typeof updateUI==='function') updateUI();
+                return applied;
+            }
+            if(typeof window.applyWinterPowerupV67==='function') return !!window.applyWinterPowerupV67(key);
+            return false;
         }
 
         function getPowerupDropPoolV67(){ return Object.freeze([POWERUPS.SPEED_UP,POWERUPS.HEALTH_UP,POWERUPS.SHIELD_UP,POWERUPS.BOMB_KICK]); }

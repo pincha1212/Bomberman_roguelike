@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.7.3 — Gameplay Test Lab
+// Bomberman Roguelike v6.7.4 — Gameplay Test Lab
 // ?test=1 convierte el runtime en un entorno neutral para verificar gameplay real.
 (function initTestLabV673(global) {
     'use strict';
@@ -16,7 +16,11 @@
         rewardCoins: 0,
         blockBonus: 0
     });
-    const POWERUP_TYPES = Object.freeze(['BOMB_UP', 'FIRE_UP', 'SPEED_UP', 'HEALTH_UP', 'SHIELD_UP', 'BOMB_KICK']);
+    const BASE_POWERUP_TYPES = Object.freeze(['BOMB_UP', 'FIRE_UP', 'SPEED_UP', 'HEALTH_UP', 'SHIELD_UP', 'BOMB_KICK']);
+    function getLabPowerupTypes() {
+        const winter = typeof global.BOMBER_ENGINE?.getWinterPowerupIds === 'function' ? global.BOMBER_ENGINE.getWinterPowerupIds() : [];
+        return Object.freeze([...BASE_POWERUP_TYPES, ...winter]);
+    }
     const POWERUP_LABELS = Object.freeze({
         BOMB_KICK: 'PATADA',
         SPEED_UP: 'BOTAS',
@@ -25,14 +29,17 @@
         BOMB_UP: 'BOMBA*',
         FIRE_UP: 'RANGO*'
     });
-    const POWERUP_SLOTS = Object.freeze({
-        BOMB_KICK: [10, 2],
-        SPEED_UP: [10, 3],
-        HEALTH_UP: [10, 4],
-        SHIELD_UP: [10, 5],
-        BOMB_UP: [10, 6],
-        FIRE_UP: [10, 7]
-    });
+    function getPowerupSlots() {
+        const types = getLabPowerupTypes();
+        const slots = {};
+        const columns = [8, 9, 10, 11];
+        types.forEach((type, index) => {
+            const column = columns[index % columns.length];
+            const row = 1 + Math.floor(index / columns.length);
+            slots[type] = [column, row];
+        });
+        return slots;
+    }
     const POWERUP_RESPAWN_MS = 650;
 
     const runtime = {
@@ -69,6 +76,9 @@
     }
 
     function setTestUiState() {
+        // La presentación del juego puede recalcular tema/bioma en otros módulos;
+        // el Test Lab vuelve a fijar el tema neutral clásico después de cada actualización.
+        if (typeof global.setActiveThemeV46 === 'function') global.setActiveThemeV46('classic', false);
         const body = global.document?.body;
         if (body) body.setAttribute('data-test-lab', TEST_MODE ? 'neutral' : 'off');
         const roomIntro = getNode('room-intro');
@@ -126,6 +136,7 @@
         player.hazardSlowType = '';
         player.__bombEffectStatusesV64 = {};
         if (typeof global.playerFSMReset === 'function') global.playerFSMReset('test-lab-player-reset');
+        if (typeof global.resetWinterPowerupsV67 === 'function') global.resetWinterPowerupsV67();
     }
 
     function centerPlayer(player, gx = TEST_ARENA.playerX, gy = TEST_ARENA.playerY) {
@@ -148,7 +159,7 @@
         );
 
         // Obstáculos básicos. No hay geometría temática ni layout de bioma.
-        const basicBlocks = [[3,3], [3,9], [8,3], [8,9]];
+        const basicBlocks = [[3,3], [3,9], [7,3], [7,9]];
         for (const [x, y] of basicBlocks) state.grid[y][x] = TYPES.BLOCK;
         state.exitPos = null;
         state.gridRevision = Number(state.gridRevision || 0) + 1;
@@ -186,8 +197,10 @@
     }
 
     function spawnShelfPowerups(state) {
-        state.items = POWERUP_TYPES.map(type => {
-            const [x, y] = POWERUP_SLOTS[type];
+        const types = getLabPowerupTypes();
+        const slots = getPowerupSlots();
+        state.items = types.map(type => {
+            const [x, y] = slots[type];
             return {
                 x, y, type,
                 testLabShelfSlotV673: type,
@@ -210,7 +223,7 @@
             hazards: false,
             enemies: false,
             deathEcho: false,
-            materials: false,
+            materials: true,
             powerupRespawn: true,
             reason: String(reason)
         };
@@ -233,6 +246,7 @@
         // Las bombas no se precargan en el laboratorio.
         // Deben colocarse exclusivamente mediante el flujo real del jugador.
         state.bombs = [];
+        if (typeof global.resetWinterPowerupsV67 === 'function') global.resetWinterPowerupsV67();
         spawnShelfPowerups(state);
         state.isPlaying = true;
         state.paused = false;
@@ -243,7 +257,7 @@
         setTestUiState();
         syncDepthInput();
         getNode('test-controls')?.classList.add('test-arena-active');
-        setStatus(`TEST LAB · neutral · ${POWERUP_TYPES.length} power-ups · bombas manuales · ${reason}`);
+        setStatus(`TEST LAB · neutral · ${getLabPowerupTypes().length} power-ups · bombas manuales · ${reason}`);
         if (typeof global.updateUI === 'function') global.updateUI(true);
         setTestUiState();
         if (typeof global.draw === 'function') global.draw();
@@ -337,9 +351,10 @@
         const existing = new Set((Array.isArray(state.items) ? state.items : [])
             .filter(item => item?.testLabShelfSlotV673)
             .map(item => item.testLabShelfSlotV673));
-        POWERUP_TYPES.forEach(type => {
+        const slots = getPowerupSlots();
+        getLabPowerupTypes().forEach(type => {
             if (!existing.has(type)) {
-                const [x, y] = POWERUP_SLOTS[type];
+                const [x, y] = slots[type];
                 state.items.push({ x, y, type, testLabShelfSlotV673: type, testLabRespawnableV673: true });
             }
         });
@@ -372,7 +387,8 @@
         const now = global.performance.now();
         if (!Array.isArray(state.items)) state.items = [];
 
-        POWERUP_TYPES.forEach(type => {
+        const slots = getPowerupSlots();
+        getLabPowerupTypes().forEach(type => {
             const present = state.items.some(item => item?.testLabShelfSlotV673 === type);
             if (present) {
                 runtime.respawnDue.delete(type);
@@ -384,7 +400,7 @@
                 return;
             }
             if (now < due) return;
-            const [x, y] = POWERUP_SLOTS[type];
+            const [x, y] = slots[type];
             if (playerOverTile(x, y)) {
                 // No recolocamos el objeto debajo del jugador: espera a que el
                 // tester abandone la celda y vuelve a habilitar el pickup.
@@ -460,26 +476,27 @@
     global.BOMBER_TEST_MODE_V53 = TEST_MODE;
     global.BOMBER_TEST_MODE_V672 = TEST_MODE;
     global.BOMBER_TEST_MODE_V673 = TEST_MODE;
+    global.BOMBER_TEST_MODE_V674 = TEST_MODE;
     global.BOMBER_ENGINE = global.BOMBER_ENGINE || {};
     global.BOMBER_ENGINE.isTestMode = () => TEST_MODE;
     global.BOMBER_ENGINE.isTestLabNeutral = () => isActive();
     global.BOMBER_ENGINE.getTestLabConfig = () => ({
         active: isActive(),
-        version: '6.7.3',
+        version: '6.7.4',
         neutral: true,
         arena: { ...TEST_ARENA },
-        powerups: [...POWERUP_TYPES]
+        powerups: [...getLabPowerupTypes()]
     });
     global.BOMBER_ENGINE.skipToDepth = jump;
     global.BOMBER_ENGINE.buildBombKickTestArena = resetMap;
     global.BOMBER_ENGINE.testBombKickDirection = testKickDirection;
     global.BOMBER_ENGINE.spawnTestPowerup = (type) => {
-        // Compatibilidad API: solo permite devolver/reponer un power-up real en
-        // la estantería, nunca altera capacidades directamente.
-        if (!POWERUP_TYPES.includes(type)) return false;
+        // Compatibilidad API: devuelve/restituye un power-up real en la estantería;
+        // nunca altera capacidades directamente.
+        if (!getLabPowerupTypes().includes(type)) return false;
         const state = getState();
         if (!isActive() || !state) return false;
-        const [x, y] = POWERUP_SLOTS[type];
+        const [x, y] = getPowerupSlots()[type];
         if (!state.items.some(item => item?.testLabShelfSlotV673 === type)) {
             state.items.push({ x, y, type, testLabShelfSlotV673: type, testLabRespawnableV673: true });
         }

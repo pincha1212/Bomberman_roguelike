@@ -97,6 +97,7 @@
 
     function update(dt = 16.6667) {
         const s = state();
+        if (typeof global.winterPowerupUpdateV67 === 'function') global.winterPowerupUpdateV67(dt);
         if (!s || !s.isPlaying || s.paused || !isWinter(s)) {
             if (s) s.winterWindV64 = null;
             runtime.rollTimer = 0;

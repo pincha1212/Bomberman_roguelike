@@ -208,16 +208,30 @@
                 let it = gameState.items[i];
                 let itRect = { left: it.x * TILE_SIZE, right: (it.x+1)*TILE_SIZE, top: it.y*TILE_SIZE, bottom: (it.y+1)*TILE_SIZE };
                 if (checkOverlap(pRect, itRect)) {
-                    if (typeof applyPowerupV67 === 'function') applyPowerupV67(it.type);
+                    let pickupApplied = true;
                     if (it.type === 'RELIC') {
                         const relic = RELICS.find(r => r.id === it.relicId);
+                        pickupApplied = !!relic;
                         if (relic) grantRelic(relic);
+                    } else if (typeof applyPowerupV67 === 'function') {
+                        pickupApplied = !!applyPowerupV67(it.type);
                     }
-                    
+
+                    if (typeof showPowerupFeedbackV688 === 'function') {
+                        showPowerupFeedbackV688(it, pickupApplied);
+                    }
+
+                    // Un pickup que no puede aplicarse no se consume. Esto evita
+                    // perder capacidades ya activas o mejoras que llegaron a su límite.
+                    if (!pickupApplied) {
+                        addFloatingText('NO APLICADO', (it.x + 0.5) * TILE_SIZE, (it.y + 0.25) * TILE_SIZE, '#f97316');
+                        continue;
+                    }
+
                     addParticles((it.x + 0.5) * TILE_SIZE, (it.y + 0.5) * TILE_SIZE, 'particleLoot', 10);
                     gameState.items.splice(i, 1);
                     sfx('pickup');
-                    updateUI();
+                    updateUI(true);
                 }
             }
 

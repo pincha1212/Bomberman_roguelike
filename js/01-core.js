@@ -299,7 +299,9 @@ const UI = {};
 [
     'ui-health','ui-score','ui-level','ui-bombs','ui-range','ui-speed','ui-coins','ui-relics',
     'ui-timer','ui-threat','ui-shield-badge','boss-hud','boss-bar','boss-phase','room-banner',
-    'run-banner','relic-strip','danger-indicator','immersion-vignette'
+    'run-banner','relic-strip','danger-indicator','immersion-vignette',
+    'ui-ability-kick','ui-ability-grab','ui-ability-throw',
+    'ui-ability-kick-status','ui-ability-grab-status','ui-ability-throw-status','ui-ability-detail'
 ].forEach(id => UI[id] = document.getElementById(id));
 
         // World and Zoom settings
@@ -392,17 +394,17 @@ const UI = {};
         }
 
         const POWERUP_DEFS_V67 = Object.freeze({
-            [POWERUPS.BOMB_UP]: Object.freeze({ id:POWERUPS.BOMB_UP, label:'BOMBA', apply:()=>{ const before=player.maxBombs; player.maxBombs=Math.min(PLAYER_LIMITS_V67.hard.maxBombs, Number(player.maxBombs||1)+1); clampPlayerCapacitiesV67(); return player.maxBombs>before; } }),
-            [POWERUPS.FIRE_UP]: Object.freeze({ id:POWERUPS.FIRE_UP, label:'RANGO', apply:()=>{ const before=player.bombRange; player.bombRange=Math.min(PLAYER_LIMITS_V67.hard.bombRange, Number(player.bombRange||1)+1); clampPlayerCapacitiesV67(); return player.bombRange>before; } }),
-            [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'BOTAS', apply:()=>{ player.speed=Math.min(player.speed+0.4,6); return true; } }),
-            [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', apply:()=>{ player.health=Math.min(player.health+1,player.maxHealth); return true; } }),
-            [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', apply:()=>{ player.hasShield=true; return true; } }),
+            [POWERUPS.BOMB_UP]: Object.freeze({ id:POWERUPS.BOMB_UP, label:'BOMBA', icon:'💣', desc:'Aumenta en 1 la capacidad máxima de bombas.', apply:()=>{ const before=player.maxBombs; player.maxBombs=Math.min(PLAYER_LIMITS_V67.hard.maxBombs, Number(player.maxBombs||1)+1); clampPlayerCapacitiesV67(); return player.maxBombs>before; } }),
+            [POWERUPS.FIRE_UP]: Object.freeze({ id:POWERUPS.FIRE_UP, label:'RANGO', icon:'🔥', desc:'Aumenta en 1 el alcance máximo de la explosión.', apply:()=>{ const before=player.bombRange; player.bombRange=Math.min(PLAYER_LIMITS_V67.hard.bombRange, Number(player.bombRange||1)+1); clampPlayerCapacitiesV67(); return player.bombRange>before; } }),
+            [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'VELOCIDAD', icon:'👟', desc:'Aumenta la velocidad de movimiento.', apply:()=>{ player.speed=Math.min(player.speed+0.4,6); return true; } }),
+            [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', icon:'❤️', desc:'Recupera 1 punto de vida.', apply:()=>{ player.health=Math.min(player.health+1,player.maxHealth); return true; } }),
+            [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', icon:'🛡️', desc:'Activa el escudo del jugador.', apply:()=>{ player.hasShield=true; return true; } }),
             // v6.8.5: capacidades de interacción permanentes durante la run.
             // KICK y GRAB son mutuamente excluyentes; su estado real vive en
             // 54-entity-capabilities.js para evitar flags sueltos en Player.
-            [POWERUPS.KICK]: Object.freeze({ id:POWERUPS.KICK, label:'PATADA', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'KICK') : false }),
-            [POWERUPS.GRAB]: Object.freeze({ id:POWERUPS.GRAB, label:'AGARRE', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'GRAB') : false }),
-            [POWERUPS.THROW]: Object.freeze({ id:POWERUPS.THROW, label:'LANZAMIENTO', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'THROW') : false }),
+            [POWERUPS.KICK]: Object.freeze({ id:POWERUPS.KICK, label:'PATADA', icon:'🥾', desc:'Empuja bombas al caminar contra ellas.', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'KICK') : false }),
+            [POWERUPS.GRAB]: Object.freeze({ id:POWERUPS.GRAB, label:'AGARRE', icon:'🧤', desc:'Levanta una bomba y permite transportarla.', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'GRAB') : false }),
+            [POWERUPS.THROW]: Object.freeze({ id:POWERUPS.THROW, label:'LANZAMIENTO', icon:'🎯', desc:'Lanza hacia adelante una bomba transportada. Solo laboratorio.', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'THROW') : false }),
         });
 
         function applyPowerupV67(type){

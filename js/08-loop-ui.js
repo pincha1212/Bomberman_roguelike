@@ -37,11 +37,46 @@
             }
         }
 
+        function showPowerupFeedbackV688(item, applied = true) {
+            const node = UI['ui-powerup-toast'];
+            if (!node || !item) return;
+
+            const type = String(item.type || '');
+            let meta = globalThis.POWERUP_DEFS_V67?.[type] || null;
+            if (type === 'RELIC') {
+                const relic = typeof RELICS !== 'undefined' ? RELICS.find(r => r.id === item.relicId) : null;
+                meta = relic ? { icon: relic.icon || '✦', label: relic.name, desc: relic.desc || 'Reliquia permanente.' } : null;
+            }
+
+            const icon = meta?.icon || globalThis.CAPABILITY_POWERUPS_V681?.[type]?.icon || '◆';
+            const name = meta?.label || globalThis.CAPABILITY_POWERUPS_V681?.[type]?.label || type;
+            const desc = meta?.desc || globalThis.CAPABILITY_POWERUPS_V681?.[type]?.desc || 'Objeto recogido.';
+
+            const iconNode = UI['ui-powerup-toast-icon'];
+            const nameNode = UI['ui-powerup-toast-name'];
+            const descNode = UI['ui-powerup-toast-desc'];
+            if (iconNode) iconNode.textContent = icon;
+            if (nameNode) nameNode.textContent = applied ? name : `${name} · NO APLICADO`;
+            if (descNode) descNode.textContent = applied ? desc : 'Ya está activo, no se consume.';
+
+            node.dataset.applied = applied ? 'true' : 'false';
+            node.classList.remove('hidden');
+            gameState.powerupFeedbackV688Until = performance.now() + 2600;
+        }
+
+        window.showPowerupFeedbackV688 = showPowerupFeedbackV688;
+
         function updateUI(force = false) {
             const now = performance.now();
             // DOM writes are expensive on mobile/low-end hardware; HUD does not need 60 updates/sec.
             if (!force && now - perf.lastUi < 100) return;
             perf.lastUi = now;
+
+            const pickupToast = UI['ui-powerup-toast'];
+            if (pickupToast && Number(gameState.powerupFeedbackV688Until || 0) > 0 && now >= gameState.powerupFeedbackV688Until) {
+                pickupToast.classList.add('hidden');
+                gameState.powerupFeedbackV688Until = 0;
+            }
 
             UI['ui-health'].innerText = player.health;
             UI['ui-score'].innerText = gameState.score;
@@ -60,6 +95,35 @@
             if (UI['ui-threat']) UI['ui-threat'].innerText = gameState.threatLevel;
 
             if (UI['ui-shield-badge']) UI['ui-shield-badge'].classList.toggle('hidden', !player.hasShield);
+
+            // V6.8.7: las capacidades se leen desde la fuente de verdad declarativa.
+            // THROW sigue siendo experimental y solo se presenta como activo dentro del Test Lab.
+            const capabilityDefs = globalThis.CAPABILITY_POWERUPS_V681 || {};
+            const testLabActive = !!globalThis.BOMBER_ENGINE?.isTestLabNeutral?.();
+            const activeCapabilities = typeof globalThis.getActiveCapabilityPowerupsV681 === 'function'
+                ? globalThis.getActiveCapabilityPowerupsV681(player) : [];
+            const capabilityUI = [
+                ['KICK','ui-ability-kick','ui-ability-kick-status'],
+                ['GRAB','ui-ability-grab','ui-ability-grab-status'],
+                ['THROW','ui-ability-throw','ui-ability-throw-status']
+            ];
+            for (const [id,nodeId,statusId] of capabilityUI) {
+                const node = UI[nodeId];
+                const status = UI[statusId];
+                const active = activeCapabilities.includes(id);
+                if (node) node.dataset.active = active ? 'true' : 'false';
+                if (status) {
+                    if (id === 'THROW' && !testLabActive) status.textContent = 'LAB';
+                    else status.textContent = active ? 'ACTIVA' : '—';
+                }
+            }
+            if (UI['ui-ability-detail']) {
+                const activeId = activeCapabilities.find(id => id !== 'THROW' || testLabActive) || null;
+                const meta = activeId ? capabilityDefs[activeId] : null;
+                UI['ui-ability-detail'].textContent = meta
+                    ? `${meta.icon || ''} ${meta.label}: ${meta.desc}`
+                    : 'Sin habilidad de interacción activa';
+            }
 
             const b = gameState.boss;
             const visible = !!b && !b.defeated;

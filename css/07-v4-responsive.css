@@ -193,15 +193,11 @@
 }
 @media (max-width:480px){
     .v4-theme #mobile-controls{min-height:70px;padding:6px 7px;}
-    .v4-theme #joystick-zone{width:82px;height:82px;}
-    .v4-theme #joystick-knob{width:36px;height:36px;}
-    .v4-theme .bomb-btn{width:68px;height:68px;font-size:24px;}
+.v4-theme .bomb-btn{width:68px;height:68px;font-size:24px;}
 }
 @media (orientation:landscape) and (max-height:620px){
     .v4-theme #mobile-controls{min-height:58px;padding:4px 7px;bottom:max(4px,env(safe-area-inset-bottom));}
-    .v4-theme #joystick-zone{width:58px;height:58px;}
-    .v4-theme #joystick-knob{width:26px;height:26px;}
-    .v4-theme .bomb-btn{width:56px;height:56px;font-size:20px;}
+.v4-theme .bomb-btn{width:56px;height:56px;font-size:20px;}
 }
 
 /* Pantallas de resultado: el contenido se desplaza dentro del propio overlay. */

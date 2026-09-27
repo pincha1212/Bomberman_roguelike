@@ -143,32 +143,7 @@
             border-radius: 16px;
             backdrop-filter: blur(4px);
         }
-
-        #joystick-zone {
-            width: 100px;
-            height: 100px;
-            background: rgba(255, 255, 255, 0.08);
-            border: 2px dashed rgba(255, 255, 255, 0.25);
-            border-radius: 50%;
-            position: relative;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            touch-action: none;
-        }
-
-        #joystick-knob {
-            width: 44px;
-            height: 44px;
-            background: radial-gradient(circle at 30% 30%, #60a5fa, #1d4ed8);
-            border: 2px solid #ffffff;
-            border-radius: 50%;
-            position: absolute;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.6);
-            pointer-events: none;
-        }
-
-        .bomb-btn {
+.bomb-btn {
             width: 80px;
             height: 80px;
             background: radial-gradient(circle at 30% 30%, #f87171, #dc2626);

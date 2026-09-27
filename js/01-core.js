@@ -393,12 +393,16 @@ const UI = {};
             return cap;
         }
 
+        const POWERUP_RUNTIME_LIMITS_V689 = Object.freeze({
+            speed: 6
+        });
+
         const POWERUP_DEFS_V67 = Object.freeze({
-            [POWERUPS.BOMB_UP]: Object.freeze({ id:POWERUPS.BOMB_UP, label:'BOMBA', icon:'💣', desc:'Aumenta en 1 la capacidad máxima de bombas.', apply:()=>{ const before=player.maxBombs; player.maxBombs=Math.min(PLAYER_LIMITS_V67.hard.maxBombs, Number(player.maxBombs||1)+1); clampPlayerCapacitiesV67(); return player.maxBombs>before; } }),
-            [POWERUPS.FIRE_UP]: Object.freeze({ id:POWERUPS.FIRE_UP, label:'RANGO', icon:'🔥', desc:'Aumenta en 1 el alcance máximo de la explosión.', apply:()=>{ const before=player.bombRange; player.bombRange=Math.min(PLAYER_LIMITS_V67.hard.bombRange, Number(player.bombRange||1)+1); clampPlayerCapacitiesV67(); return player.bombRange>before; } }),
-            [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'VELOCIDAD', icon:'👟', desc:'Aumenta la velocidad de movimiento.', apply:()=>{ player.speed=Math.min(player.speed+0.4,6); return true; } }),
-            [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', icon:'❤️', desc:'Recupera 1 punto de vida.', apply:()=>{ player.health=Math.min(player.health+1,player.maxHealth); return true; } }),
-            [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', icon:'🛡️', desc:'Activa el escudo del jugador.', apply:()=>{ player.hasShield=true; return true; } }),
+            [POWERUPS.BOMB_UP]: Object.freeze({ id:POWERUPS.BOMB_UP, label:'BOMBA', icon:'💣', desc:'Aumenta en 1 la capacidad máxima de bombas.', apply:()=>{ const before=Number(player.maxBombs)||1; if (before >= PLAYER_LIMITS_V67.hard.maxBombs) return false; player.maxBombs=before+1; clampPlayerCapacitiesV67(); return player.maxBombs>before; } }),
+            [POWERUPS.FIRE_UP]: Object.freeze({ id:POWERUPS.FIRE_UP, label:'RANGO', icon:'🔥', desc:'Aumenta en 1 el alcance máximo de la explosión.', apply:()=>{ const before=Number(player.bombRange)||1; if (before >= PLAYER_LIMITS_V67.hard.bombRange) return false; player.bombRange=before+1; clampPlayerCapacitiesV67(); return player.bombRange>before; } }),
+            [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'VELOCIDAD', icon:'👟', desc:'Aumenta la velocidad de movimiento.', apply:()=>{ const before=Number(player.speed)||0; if (before >= POWERUP_RUNTIME_LIMITS_V689.speed) return false; player.speed=Math.min(before+0.4,POWERUP_RUNTIME_LIMITS_V689.speed); return player.speed>before; } }),
+            [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', icon:'❤️', desc:'Recupera 1 punto de vida.', apply:()=>{ const before=Number(player.health)||0; const max=Number(player.maxHealth)||1; if (before >= max) return false; player.health=Math.min(before+1,max); return player.health>before; } }),
+            [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', icon:'🛡️', desc:'Activa el escudo del jugador.', apply:()=>{ if (player.hasShield) return false; player.hasShield=true; return true; } }),
             // v6.8.5: capacidades de interacción permanentes durante la run.
             // KICK y GRAB son mutuamente excluyentes; su estado real vive en
             // 54-entity-capabilities.js para evitar flags sueltos en Player.

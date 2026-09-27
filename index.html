@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOMBERMAN ROGUELIKE — v6.8.3</title>
+    <title>BOMBERMAN ROGUELIKE — v6.8.8</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/11-test-controls.css">
@@ -17,7 +17,7 @@
             <aside class="menu-rail menu-rail-left" aria-label="Resumen de la aventura">
                 <div class="menu-rail-top">
                     <span class="menu-kicker">BOMBERMAN ROGUELIKE</span>
-                    <span class="menu-version">v5.9</span>
+                    <span class="menu-version">v6.8.8</span>
                 </div>
                 <div class="menu-rail-content">
                     <div class="menu-mark">💣</div>
@@ -59,6 +59,25 @@
                             <div class="stat-badge text-orange-400">🔥 <span id="ui-range">1</span></div>
                             <div class="stat-badge text-emerald-400">👟 <span id="ui-speed">3</span></div>
                             <div id="ui-relics-badge" class="stat-badge text-purple-300">✦ <span id="ui-relics">0</span></div><div class="stat-badge text-rose-300 v4-boss-bomb-badge hidden" id="ui-boss-bombs">☠ <span>0</span></div>
+                        </div>
+                        <div id="ui-abilities" class="ability-strip" aria-label="Habilidades de interacción">
+                            <div class="ability-strip-title">HABILIDADES</div>
+                            <div class="ability-slots">
+                                <div id="ui-ability-kick" class="ability-slot" data-active="false" title="PATADA: empuja bombas al caminar contra ellas">
+                                    <span class="ability-icon" aria-hidden="true">🥾</span><span class="ability-copy"><strong>PATADA</strong><small id="ui-ability-kick-status">—</small></span>
+                                </div>
+                                <div id="ui-ability-grab" class="ability-slot" data-active="false" title="AGARRE: levanta y transporta una bomba">
+                                    <span class="ability-icon" aria-hidden="true">🧤</span><span class="ability-copy"><strong>AGARRE</strong><small id="ui-ability-grab-status">—</small></span>
+                                </div>
+                                <div id="ui-ability-throw" class="ability-slot ability-slot-experimental" data-active="false" title="LANZAMIENTO: experimental; requiere AGARRE">
+                                    <span class="ability-icon" aria-hidden="true">🎯</span><span class="ability-copy"><strong>LANZAMIENTO</strong><small id="ui-ability-throw-status">LAB</small></span>
+                                </div>
+                            </div>
+                            <div id="ui-ability-detail" class="ability-detail" aria-live="polite">Sin habilidad de interacción activa</div>
+                            <div id="ui-powerup-toast" class="powerup-toast hidden" aria-live="polite" aria-atomic="true">
+                                <span id="ui-powerup-toast-icon" class="powerup-toast-icon" aria-hidden="true">◆</span>
+                                <span class="powerup-toast-copy"><strong id="ui-powerup-toast-name">POWER-UP</strong><small id="ui-powerup-toast-desc">—</small></span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -234,10 +253,10 @@
         </div>
     </div>
 <!-- v3.28 modular JavaScript. Feedback is layered over the existing combat/runtime systems. -->
-    <script src="js/01-core.js?v=6.8.6"></script>
-    <script src="js/54-entity-capabilities.js?v=6.8.6"></script>
+    <script src="js/01-core.js?v=6.8.8"></script>
+    <script src="js/54-entity-capabilities.js?v=6.8.7"></script>
     <script src="js/35-device-quality.js?v=4.5.0"></script>
-    <script src="js/37-theme.js?v=6.8.6"></script>
+    <script src="js/37-theme.js?v=6.8.7"></script>
     <script src="js/38-mechanics-registry.js?v=6.3.0"></script>
     <script src="js/16-relics.js?v=6.7.0"></script>
     <script src="js/02-input.js?v=6.8.5"></script>
@@ -252,13 +271,13 @@
     <script src="js/05-player.js?v=6.7.6"></script>
     <script src="js/45-player-fsm.js?v=5.7.0"></script>
     <script src="js/12-enemy-ai.js?v=6.8.5"></script>
-    <script src="js/06-combat.js?v=6.8.5"></script>
+    <script src="js/06-combat.js?v=6.8.8"></script>
     <script src="js/53-mobile-performance.js?v=6.7.6"></script>
-    <script src="js/07-render.js?v=6.8.6"></script>
+    <script src="js/07-render.js?v=6.8.7"></script>
     <script src="js/09-camera.js?v=3.27.0"></script>
     <script src="js/10-feedback.js?v=4.6.2"></script>
     <script src="js/17-run-lifecycle.js?v=6.7.0"></script>
-    <script src="js/08-loop-ui.js?v=6.7.0"></script>
+    <script src="js/08-loop-ui.js?v=6.8.8"></script>
     <script src="js/27-boss-system.js?v=6.7.9"></script>
     <script src="js/29-feedback-system.js?v=4.6.2"></script>
     <script src="js/31-roguelike-update.js?v=6.7.0"></script>
@@ -266,7 +285,7 @@
     <script src="js/41-biome-journey.js?v=6.3.0"></script>
     <script src="js/42-run-history.js?v=5.6.0"></script>
     <script src="js/44-run-save.js?v=6.7.9"></script>
-    <script src="js/43-test-controls.js?v=6.8.6"></script>
+    <script src="js/43-test-controls.js?v=6.8.7"></script>
     <script src="js/46-ecs.js?v=6.0.0"></script>
     <script src="js/47-event-bus.js?v=6.0.0"></script>
     <script src="js/48-bomb-events.js?v=6.7.0"></script>

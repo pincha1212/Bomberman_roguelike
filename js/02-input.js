@@ -74,6 +74,9 @@
         if (!value) return;
         gameState.touchControls.x = value[0];
         gameState.touchControls.y = value[1];
+        gameState.touchControls.queuedX = value[0];
+        gameState.touchControls.queuedY = value[1];
+        gameState.lastMoveAxis = value[0] ? 'horizontal' : 'vertical';
         gameState.lastMoveInputAt = performance.now();
     }
 
@@ -116,5 +119,7 @@
         buttons.forEach((button) => button.classList.remove('is-pressed'));
         gameState.touchControls.x = 0;
         gameState.touchControls.y = 0;
+        gameState.touchControls.queuedX = 0;
+        gameState.touchControls.queuedY = 0;
     });
 })();

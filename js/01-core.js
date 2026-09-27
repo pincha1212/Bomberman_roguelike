@@ -299,9 +299,7 @@ const UI = {};
 [
     'ui-health','ui-score','ui-level','ui-bombs','ui-range','ui-speed','ui-coins','ui-relics',
     'ui-timer','ui-threat','ui-shield-badge','boss-hud','boss-bar','boss-phase','room-banner',
-    'run-banner','relic-strip','danger-indicator','immersion-vignette',
-    'ui-ability-kick','ui-ability-grab','ui-ability-throw',
-    'ui-ability-kick-status','ui-ability-grab-status','ui-ability-throw-status','ui-ability-detail'
+    'run-banner','relic-strip','danger-indicator','immersion-vignette'
 ].forEach(id => UI[id] = document.getElementById(id));
 
         // World and Zoom settings
@@ -322,14 +320,13 @@ const UI = {};
             SPEED_UP: 'SPEED_UP',
             HEALTH_UP: 'HEALTH_UP',
             SHIELD_UP: 'SHIELD_UP',
-            KICK: 'KICK',
-            GRAB: 'GRAB',
-            THROW: 'THROW',
+            BOMB_KICK: 'BOMB_KICK'
         };
 
         const PLAYER_LIMITS_V67 = Object.freeze({
             base: Object.freeze({ maxHealth: 5, maxBombs: 1, bombRange: 1 }),
             hard: Object.freeze({ maxHealth: 10, maxBombs: 8, bombRange: 12 }),
+            kickDurationMs: 12000
         });
 
         const LEGACY_RELIC_CAP_BONUSES_V67 = Object.freeze({
@@ -367,14 +364,6 @@ const UI = {};
                 if (synergy.id === 'fortress') cap.maxHealth += 1;
             }
 
-            // Las mejoras de capacidad obtenidas como power-up forman parte del
-            // estado actual del jugador. Se incorporan al techo calculado para que
-            // clampPlayerCapacitiesV67 no las elimine inmediatamente después del pickup.
-            if (typeof player !== 'undefined' && player) {
-                cap.maxBombs = Math.max(cap.maxBombs, Number(player.maxBombs) || 0);
-                cap.bombRange = Math.max(cap.bombRange, Number(player.bombRange) || 0);
-                cap.maxHealth = Math.max(cap.maxHealth, Number(player.maxHealth) || 0);
-            }
             cap.maxHealth = Math.max(1, Math.min(PLAYER_LIMITS_V67.hard.maxHealth, Math.floor(cap.maxHealth)));
             cap.maxBombs = Math.max(1, Math.min(PLAYER_LIMITS_V67.hard.maxBombs, Math.floor(cap.maxBombs)));
             cap.bombRange = Math.max(1, Math.min(PLAYER_LIMITS_V67.hard.bombRange, Math.floor(cap.bombRange)));
@@ -393,62 +382,39 @@ const UI = {};
             return cap;
         }
 
-        const POWERUP_RUNTIME_LIMITS_V689 = Object.freeze({
-            speed: 6
-        });
-
         const POWERUP_DEFS_V67 = Object.freeze({
-            [POWERUPS.BOMB_UP]: Object.freeze({ id:POWERUPS.BOMB_UP, label:'BOMBA', icon:'💣', category:'BASE', rarity:'COMÚN', universal:true, desc:'Aumenta en 1 la capacidad máxima de bombas.', apply:()=>{ const before=Number(player.maxBombs)||1; if (before >= PLAYER_LIMITS_V67.hard.maxBombs) return false; player.maxBombs=before+1; clampPlayerCapacitiesV67(); return player.maxBombs>before; } }),
-            [POWERUPS.FIRE_UP]: Object.freeze({ id:POWERUPS.FIRE_UP, label:'RANGO', icon:'🔥', category:'BASE', rarity:'COMÚN', universal:true, desc:'Aumenta en 1 el alcance máximo de la explosión.', apply:()=>{ const before=Number(player.bombRange)||1; if (before >= PLAYER_LIMITS_V67.hard.bombRange) return false; player.bombRange=before+1; clampPlayerCapacitiesV67(); return player.bombRange>before; } }),
-            [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'VELOCIDAD', icon:'👟', category:'BASE', rarity:'COMÚN', universal:true, desc:'Aumenta la velocidad de movimiento.', apply:()=>{ const before=Number(player.speed)||0; if (before >= POWERUP_RUNTIME_LIMITS_V689.speed) return false; player.speed=Math.min(before+0.4,POWERUP_RUNTIME_LIMITS_V689.speed); return player.speed>before; } }),
-            [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', icon:'❤️', category:'BASE', rarity:'COMÚN', universal:true, desc:'Recupera 1 punto de vida.', apply:()=>{ const before=Number(player.health)||0; const max=Number(player.maxHealth)||1; if (before >= max) return false; player.health=Math.min(before+1,max); return player.health>before; } }),
-            [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', icon:'🛡️', category:'BASE', rarity:'RARA', universal:true, desc:'Activa el escudo del jugador.', apply:()=>{ if (player.hasShield) return false; player.hasShield=true; return true; } }),
-            // v6.8.5: capacidades de interacción permanentes durante la run.
-            // KICK y GRAB son mutuamente excluyentes; su estado real vive en
-            // 54-entity-capabilities.js para evitar flags sueltos en Player.
-            [POWERUPS.KICK]: Object.freeze({ id:POWERUPS.KICK, label:'PATADA', icon:'🥾', category:'INTERACCION', rarity:'BASE', universal:true, desc:'Empuja bombas al caminar contra ellas.', apply:()=>{ if (typeof window.getCarriedBombForEntityV682 === 'function' && window.getCarriedBombForEntityV682(player)) return false; return typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'KICK') : false; } }),
-            [POWERUPS.GRAB]: Object.freeze({ id:POWERUPS.GRAB, label:'AGARRE', icon:'🧤', category:'INTERACCION', rarity:'BASE', universal:true, desc:'Levanta una bomba y permite transportarla.', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'GRAB') : false }),
-            [POWERUPS.THROW]: Object.freeze({ id:POWERUPS.THROW, label:'LANZAMIENTO', icon:'🎯', category:'INTERACCION', rarity:'EXPERIMENTAL', universal:false, desc:'Lanza hacia adelante una bomba transportada. Solo laboratorio.', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'THROW') : false }),
+            [POWERUPS.BOMB_UP]: Object.freeze({ id:POWERUPS.BOMB_UP, label:'BOMBA', apply:()=>false }),
+            [POWERUPS.FIRE_UP]: Object.freeze({ id:POWERUPS.FIRE_UP, label:'RANGO', apply:()=>false }),
+            [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'BOTAS', apply:()=>{ player.speed=Math.min(player.speed+0.4,6); return true; } }),
+            [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', apply:()=>{ player.health=Math.min(player.health+1,player.maxHealth); return true; } }),
+            [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', apply:()=>{ player.hasShield=true; return true; } }),
+            [POWERUPS.BOMB_KICK]: Object.freeze({ id:POWERUPS.BOMB_KICK, label:'PATADA', apply:()=>{ player.kickTimer=PLAYER_LIMITS_V67.kickDurationMs; return true; } })
         });
-
-        function getPowerupDefinitionV69(type){
-            const key = String(type || '');
-            return POWERUP_DEFS_V67[key] || null;
-        }
 
         function applyPowerupV67(type){
-            const key=String(type);
-            const def=POWERUP_DEFS_V67[key];
-            if(def){
-                const applied=!!def.apply();
-                clampPlayerCapacitiesV67();
-                if(typeof updateUI==='function') updateUI();
-                return applied;
-            }
-            return false;
+            const def=POWERUP_DEFS_V67[String(type)]; if(!def) return false;
+            const applied=!!def.apply();
+            clampPlayerCapacitiesV67();
+            if((type===POWERUPS.BOMB_UP||type===POWERUPS.FIRE_UP)&&typeof addFloatingText==='function') addFloatingText('SOLO RELIQUIA',player.x,player.y,'#c084fc');
+            if(typeof updateUI==='function') updateUI();
+            return applied;
         }
 
-        function getPowerupDropPoolV67(){
-                // Pool universal: KICK y GRAB ya están validados en Test Lab y
-                // pasan a formar parte del gameplay normal. THROW sigue experimental.
-                return Object.freeze([...new Set([
-                POWERUPS.BOMB_UP, POWERUPS.FIRE_UP, POWERUPS.SPEED_UP, POWERUPS.HEALTH_UP, POWERUPS.SHIELD_UP,
-                POWERUPS.KICK, POWERUPS.GRAB
-            ])]);
-        }
+        function getPowerupDropPoolV67(){ return Object.freeze([POWERUPS.SPEED_UP,POWERUPS.HEALTH_UP,POWERUPS.SHIELD_UP,POWERUPS.BOMB_KICK]); }
 
         window.PLAYER_LIMITS_V67=PLAYER_LIMITS_V67;
         window.POWERUP_DEFS_V67=POWERUP_DEFS_V67;
         window.getPlayerCapacityCapsV67=getPlayerCapacityCapsV67;
         window.clampPlayerCapacitiesV67=clampPlayerCapacitiesV67;
         window.applyPowerupV67=applyPowerupV67;
-        window.getPowerupDefinitionV69=getPowerupDefinitionV69;
         window.getPowerupDropPoolV67=getPowerupDropPoolV67;
 
         const ENEMY_TYPES = {
             RASTRERO: { name: 'Rastrero', color: '#ef4444', speed: 1.4, canFly: false },
             VOLADOR: { name: 'Volador', color: '#3b82f6', speed: 1.1, canFly: true },
             ESPECIAL: { name: 'Especial', color: '#22c55e', speed: 2.2, canFly: false },
+            OSO_NIEVE: { name: 'Oso de nieve', color: '#e5e7eb', speed: 0.72, canFly: false, winterRole: 'bear', contactDamage: 0 },
+            ESTORBADOR_HIELO: { name: 'Estorbador', color: '#93c5fd', speed: 0.52, canFly: false, winterRole: 'obstructor', contactDamage: 0 }
         };
 
         // v3.24: perfiles de comportamiento separados del tipo visual/fisico.
@@ -483,6 +449,7 @@ const UI = {};
         });
 
         function pickEnemyBehaviorV324(type, level = 1, index = 0, roll = Math.random()) {
+            if (type?.winterRole) return ENEMY_BEHAVIORS_V324.PATROLLER;
             if (type === ENEMY_TYPES.VOLADOR || type?.canFly) return ENEMY_BEHAVIORS_V324.FLYER;
             if (type === ENEMY_TYPES.ESPECIAL) return ENEMY_BEHAVIORS_V324.AGGRESSIVE;
 
@@ -559,6 +526,7 @@ const UI = {};
             { id: 'shield', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'ESCUDO', desc: 'Protección contra un golpe.', action: () => player.hasShield = true },
             { id: 'coin', kind: 'UPGRADE', rarity: 'COMMON', name: 'BOTÍN', desc: '+35 monedas.', action: () => gameState.coins += 35 },
             { id: 'heal', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'KIT MÉDICO', desc: 'Recupera 2 vidas sin superar el máximo.', action: () => player.health = Math.min(player.health + 2, player.maxHealth) },
+            { id: 'bomb_kick', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'PATADA TEMPORAL', desc: 'Podés patear bombas durante 12 segundos.', action: () => typeof applyPowerupV67 === 'function' ? applyPowerupV67(POWERUPS.BOMB_KICK) : null }
         ];
 
         const RARITY_COLORS = {
@@ -616,7 +584,7 @@ const UI = {};
             exitPos: null,
             lastTime: 0,
             keys: {},
-            touchControls: { x: 0, y: 0 },
+            touchControls: { x: 0, y: 0, queuedX: 0, queuedY: 0 },
             lastMoveAxis: 'vertical',
             camera: { x: 0, y: 0, targetX: 0, targetY: 0 },
             shakeTimer: 0,
@@ -649,6 +617,9 @@ const UI = {};
             maxBombs: 1,
             bombsPlaced: 0,
             bombCooldown: 0,
+            kickTimer: 0,
+            kickCooldown: 0,
+            lastKickInputAt: 0,
             bombRange: 1,
             health: 3,
             maxHealth: 5,

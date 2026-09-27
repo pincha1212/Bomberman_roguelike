@@ -106,6 +106,14 @@
             let dx = gameState.touchControls.x;
             let dy = gameState.touchControls.y;
 
+            // v6.9.6: un toque corto puede dejar una orden de UN tile en cola.
+            // Esto evita que el jugador tenga que mantener el dedo apoyado durante
+            // todo el desplazamiento entre dos centros de tile.
+            if (!dx && !dy) {
+                dx = Number(gameState.touchControls.queuedX || 0);
+                dy = Number(gameState.touchControls.queuedY || 0);
+            }
+
             if (Math.abs(dx) < MOTION.axisDeadzone && Math.abs(dy) < MOTION.axisDeadzone) {
                 dx = 0; dy = 0;
                 if (gameState.keys['ArrowUp'] || gameState.keys['KeyW']) dy = -1;
@@ -146,19 +154,12 @@
                 * Number(gameplayMods.speedMultiplier || 1)
                 * (typeof getHazardSpeedFactor === 'function' ? getHazardSpeedFactor() : 1));
 
-            // v6.9.3: durante un movimiento activo NO se puede recalcular el
-            // tile actual y volver a hacer snap a su centro. Mientras se cruza
-            // una celda, el centro del jugador puede seguir perteneciendo al
-            // tile de origen durante varios frames; hacer snap aquí anulaba
-            // cada avance y dejaba la animación caminando indefinidamente.
-            if (!player._tileMoveActive) {
-                const playerTile = gridCurrentTile(player, 'player');
-                const playerTilePos = gridGetEntityTileCenterPosition(player, playerTile.x, playerTile.y, 'player');
-                if (!player._tileMoveInitialized
-                    || Math.abs(player.x - playerTilePos.x) > 0.01
-                    || Math.abs(player.y - playerTilePos.y) > 0.01) {
-                    gridSnapEntityToTile(player, playerTile.x, playerTile.y, 'player');
-                }
+            const playerTile = gridCurrentTile(player, 'player');
+            const playerTilePos = gridGetEntityTileCenterPosition(player, playerTile.x, playerTile.y, 'player');
+            if (!player._tileMoveActive && (!player._tileMoveInitialized
+                || Math.abs(player.x - playerTilePos.x) > 0.01
+                || Math.abs(player.y - playerTilePos.y) > 0.01)) {
+                gridSnapEntityToTile(player, playerTile.x, playerTile.y, 'player');
                 player._tileMoveInitialized = true;
             }
 
@@ -170,6 +171,11 @@
                 const gy = current.y + (input.axis === 'y' ? input.dir : 0);
                 const started = gridBeginTileMove(player, gx, gy, { kind: 'player' });
                 if (started) {
+                    // La orden en cola ya fue consumida al iniciar este tile.
+                    if (gameState.touchControls) {
+                        gameState.touchControls.queuedX = 0;
+                        gameState.touchControls.queuedY = 0;
+                    }
                     player.dir = input.axis === 'x' ? (input.dir < 0 ? 'left' : 'right') : (input.dir < 0 ? 'up' : 'down');
                     player.vx = input.axis === 'x' ? input.dir * effectiveSpeed : 0;
                     player.vy = input.axis === 'y' ? input.dir * effectiveSpeed : 0;

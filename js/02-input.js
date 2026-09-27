@@ -116,12 +116,6 @@
             window.addEventListener('keyup', (e) => {
                 if (e.code === 'Space' || e.code === 'KeyZ') endHold(e);
             });
-            window.addEventListener('keydown', (e) => {
-                if (e.code !== 'ShiftLeft' && e.code !== 'ShiftRight') return;
-                if (!gameState.isPlaying || gameState.paused || e.repeat) return;
-                // THROW: solo actúa si existe una bomba realmente CARRIED por el jugador.
-                if (typeof handleBombThrowV685 === 'function' && handleBombThrowV685()) e.preventDefault();
-            });
             window.addEventListener('blur', () => endHold());
 
             if (!bombBtn) return;
@@ -135,3 +129,69 @@
         };
         setupBombInput();
 
+
+
+// v6.9.4 — Controles móviles orientados a movimiento por tiles.
+// D-pad digital: cada dirección representa una orden cardinal estable y puede
+// mantenerse presionada para encadenar tiles. Usa Pointer Events para evitar
+// conflictos entre touch/mouse y permite multitouch independiente con bomba.
+(function setupMobileTileControls() {
+    const pad = document.getElementById('mobile-dpad');
+    if (!pad) return;
+
+    const buttons = Array.from(pad.querySelectorAll('[data-mobile-dir]'));
+    const activePointers = new Map();
+
+    function setDirection(dir) {
+        if (!gameState.touchControls) return;
+        const values = {
+            up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0]
+        };
+        const value = values[dir];
+        if (!value) return;
+        gameState.touchControls.x = value[0];
+        gameState.touchControls.y = value[1];
+        gameState.lastMoveInputAt = performance.now();
+    }
+
+    function releasePointer(pointerId) {
+        activePointers.delete(pointerId);
+        const remaining = Array.from(activePointers.values()).pop();
+        if (remaining) setDirection(remaining);
+        else {
+            gameState.touchControls.x = 0;
+            gameState.touchControls.y = 0;
+        }
+    }
+
+    buttons.forEach((button) => {
+        const dir = button.dataset.mobileDir;
+        button.addEventListener('pointerdown', (event) => {
+            event.preventDefault();
+            activePointers.set(event.pointerId, dir);
+            button.classList.add('is-pressed');
+            try { button.setPointerCapture(event.pointerId); } catch (_) {}
+            setDirection(dir);
+        }, { passive: false });
+
+        const release = (event) => {
+            event.preventDefault();
+            button.classList.remove('is-pressed');
+            releasePointer(event.pointerId);
+        };
+        button.addEventListener('pointerup', release, { passive: false });
+        button.addEventListener('pointercancel', release, { passive: false });
+        button.addEventListener('lostpointercapture', (event) => {
+            if (activePointers.has(event.pointerId)) releasePointer(event.pointerId);
+            button.classList.remove('is-pressed');
+        });
+        button.addEventListener('contextmenu', (event) => event.preventDefault());
+    });
+
+    window.addEventListener('blur', () => {
+        activePointers.clear();
+        buttons.forEach((button) => button.classList.remove('is-pressed'));
+        gameState.touchControls.x = 0;
+        gameState.touchControls.y = 0;
+    });
+})();

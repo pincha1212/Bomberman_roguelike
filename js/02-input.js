@@ -26,6 +26,7 @@
             };
             const endHold = (event) => {
                 event?.preventDefault?.();
+                bombBtn?.classList.remove('is-pressed');
                 if (typeof endBombHold === 'function') endBombHold();
             };
 
@@ -43,6 +44,7 @@
 
             if (!bombBtn) return;
             bombBtn.addEventListener('pointerdown', (e) => {
+                bombBtn.classList.add('is-pressed');
                 startHold(e, 'pointer');
                 try { bombBtn.setPointerCapture(e.pointerId); } catch (_) {}
             }, {passive:false});
@@ -64,62 +66,96 @@
 
     const buttons = Array.from(pad.querySelectorAll('[data-mobile-dir]'));
     const activePointers = new Map();
+    const values = {
+        up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0]
+    };
+
+    function clearPressed() {
+        buttons.forEach((button) => button.classList.remove('is-pressed'));
+    }
 
     function setDirection(dir) {
-        if (!gameState.touchControls) return;
-        const values = {
-            up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0]
-        };
         const value = values[dir];
-        if (!value) return;
+        if (!value || !gameState.touchControls) return;
         gameState.touchControls.x = value[0];
         gameState.touchControls.y = value[1];
+        // La cola representa SOLO la próxima orden. Mientras un tile está
+        // avanzando puede reemplazarse por la dirección más reciente.
         gameState.touchControls.queuedX = value[0];
         gameState.touchControls.queuedY = value[1];
         gameState.lastMoveAxis = value[0] ? 'horizontal' : 'vertical';
         gameState.lastMoveInputAt = performance.now();
     }
 
+    function getButtonAtPoint(clientX, clientY) {
+        const element = document.elementFromPoint(clientX, clientY);
+        const button = element?.closest?.('[data-mobile-dir]');
+        return button && pad.contains(button) ? button : null;
+    }
+
+    function activateButton(button, pointerId) {
+        if (!button) return;
+        const dir = button.dataset.mobileDir;
+        if (!values[dir]) return;
+        activePointers.set(pointerId, dir);
+        clearPressed();
+        buttons.forEach((candidate) => {
+            if (Array.from(activePointers.values()).includes(candidate.dataset.mobileDir)) {
+                candidate.classList.add('is-pressed');
+            }
+        });
+        setDirection(dir);
+    }
+
     function releasePointer(pointerId) {
         activePointers.delete(pointerId);
         const remaining = Array.from(activePointers.values()).pop();
-        if (remaining) setDirection(remaining);
-        else {
+        clearPressed();
+        if (remaining) {
+            setDirection(remaining);
+            buttons.find((button) => button.dataset.mobileDir === remaining)?.classList.add('is-pressed');
+        } else if (gameState.touchControls) {
             gameState.touchControls.x = 0;
             gameState.touchControls.y = 0;
+            // No borrar la cola: un toque corto debe terminar exactamente
+            // el tile que ya fue ordenado, sin iniciar una segunda orden.
         }
     }
 
     buttons.forEach((button) => {
-        const dir = button.dataset.mobileDir;
         button.addEventListener('pointerdown', (event) => {
             event.preventDefault();
-            activePointers.set(event.pointerId, dir);
-            button.classList.add('is-pressed');
+            activateButton(button, event.pointerId);
             try { button.setPointerCapture(event.pointerId); } catch (_) {}
-            setDirection(dir);
+        }, { passive: false });
+
+        button.addEventListener('pointermove', (event) => {
+            event.preventDefault();
+            if (!activePointers.has(event.pointerId)) return;
+            const hovered = getButtonAtPoint(event.clientX, event.clientY);
+            if (hovered && hovered !== button) activateButton(hovered, event.pointerId);
         }, { passive: false });
 
         const release = (event) => {
             event.preventDefault();
-            button.classList.remove('is-pressed');
             releasePointer(event.pointerId);
         };
         button.addEventListener('pointerup', release, { passive: false });
         button.addEventListener('pointercancel', release, { passive: false });
         button.addEventListener('lostpointercapture', (event) => {
             if (activePointers.has(event.pointerId)) releasePointer(event.pointerId);
-            button.classList.remove('is-pressed');
         });
         button.addEventListener('contextmenu', (event) => event.preventDefault());
     });
 
     window.addEventListener('blur', () => {
         activePointers.clear();
-        buttons.forEach((button) => button.classList.remove('is-pressed'));
-        gameState.touchControls.x = 0;
-        gameState.touchControls.y = 0;
-        gameState.touchControls.queuedX = 0;
-        gameState.touchControls.queuedY = 0;
+        clearPressed();
+        if (gameState.touchControls) {
+            gameState.touchControls.x = 0;
+            gameState.touchControls.y = 0;
+            gameState.touchControls.queuedX = 0;
+            gameState.touchControls.queuedY = 0;
+        }
     });
 })();

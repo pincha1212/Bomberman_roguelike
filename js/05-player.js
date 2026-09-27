@@ -146,12 +146,19 @@
                 * Number(gameplayMods.speedMultiplier || 1)
                 * (typeof getHazardSpeedFactor === 'function' ? getHazardSpeedFactor() : 1));
 
-            const playerTile = gridCurrentTile(player, 'player');
-            const playerTilePos = gridGetEntityTileCenterPosition(player, playerTile.x, playerTile.y, 'player');
-            if (!player._tileMoveInitialized
-                || Math.abs(player.x - playerTilePos.x) > 0.01
-                || Math.abs(player.y - playerTilePos.y) > 0.01) {
-                gridSnapEntityToTile(player, playerTile.x, playerTile.y, 'player');
+            // v6.9.3: durante un movimiento activo NO se puede recalcular el
+            // tile actual y volver a hacer snap a su centro. Mientras se cruza
+            // una celda, el centro del jugador puede seguir perteneciendo al
+            // tile de origen durante varios frames; hacer snap aquí anulaba
+            // cada avance y dejaba la animación caminando indefinidamente.
+            if (!player._tileMoveActive) {
+                const playerTile = gridCurrentTile(player, 'player');
+                const playerTilePos = gridGetEntityTileCenterPosition(player, playerTile.x, playerTile.y, 'player');
+                if (!player._tileMoveInitialized
+                    || Math.abs(player.x - playerTilePos.x) > 0.01
+                    || Math.abs(player.y - playerTilePos.y) > 0.01) {
+                    gridSnapEntityToTile(player, playerTile.x, playerTile.y, 'player');
+                }
                 player._tileMoveInitialized = true;
             }
 

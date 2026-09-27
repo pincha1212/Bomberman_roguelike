@@ -77,3 +77,9 @@
 
     #btn-bomb-mobile:active { transform:scale(.94); }
 }
+
+/* v6.9.7 — respuesta táctil: deslizar un dedo entre direcciones y feedback de bomba */
+@media (max-width: 820px), (pointer: coarse) {
+    #mobile-dpad button { touch-action:none; }
+    #btn-bomb-mobile.is-pressed { transform:scale(.92); filter:brightness(1.18); }
+}

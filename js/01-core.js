@@ -398,18 +398,23 @@ const UI = {};
         });
 
         const POWERUP_DEFS_V67 = Object.freeze({
-            [POWERUPS.BOMB_UP]: Object.freeze({ id:POWERUPS.BOMB_UP, label:'BOMBA', icon:'💣', desc:'Aumenta en 1 la capacidad máxima de bombas.', apply:()=>{ const before=Number(player.maxBombs)||1; if (before >= PLAYER_LIMITS_V67.hard.maxBombs) return false; player.maxBombs=before+1; clampPlayerCapacitiesV67(); return player.maxBombs>before; } }),
-            [POWERUPS.FIRE_UP]: Object.freeze({ id:POWERUPS.FIRE_UP, label:'RANGO', icon:'🔥', desc:'Aumenta en 1 el alcance máximo de la explosión.', apply:()=>{ const before=Number(player.bombRange)||1; if (before >= PLAYER_LIMITS_V67.hard.bombRange) return false; player.bombRange=before+1; clampPlayerCapacitiesV67(); return player.bombRange>before; } }),
-            [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'VELOCIDAD', icon:'👟', desc:'Aumenta la velocidad de movimiento.', apply:()=>{ const before=Number(player.speed)||0; if (before >= POWERUP_RUNTIME_LIMITS_V689.speed) return false; player.speed=Math.min(before+0.4,POWERUP_RUNTIME_LIMITS_V689.speed); return player.speed>before; } }),
-            [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', icon:'❤️', desc:'Recupera 1 punto de vida.', apply:()=>{ const before=Number(player.health)||0; const max=Number(player.maxHealth)||1; if (before >= max) return false; player.health=Math.min(before+1,max); return player.health>before; } }),
-            [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', icon:'🛡️', desc:'Activa el escudo del jugador.', apply:()=>{ if (player.hasShield) return false; player.hasShield=true; return true; } }),
+            [POWERUPS.BOMB_UP]: Object.freeze({ id:POWERUPS.BOMB_UP, label:'BOMBA', icon:'💣', category:'BASE', rarity:'COMÚN', universal:true, desc:'Aumenta en 1 la capacidad máxima de bombas.', apply:()=>{ const before=Number(player.maxBombs)||1; if (before >= PLAYER_LIMITS_V67.hard.maxBombs) return false; player.maxBombs=before+1; clampPlayerCapacitiesV67(); return player.maxBombs>before; } }),
+            [POWERUPS.FIRE_UP]: Object.freeze({ id:POWERUPS.FIRE_UP, label:'RANGO', icon:'🔥', category:'BASE', rarity:'COMÚN', universal:true, desc:'Aumenta en 1 el alcance máximo de la explosión.', apply:()=>{ const before=Number(player.bombRange)||1; if (before >= PLAYER_LIMITS_V67.hard.bombRange) return false; player.bombRange=before+1; clampPlayerCapacitiesV67(); return player.bombRange>before; } }),
+            [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'VELOCIDAD', icon:'👟', category:'BASE', rarity:'COMÚN', universal:true, desc:'Aumenta la velocidad de movimiento.', apply:()=>{ const before=Number(player.speed)||0; if (before >= POWERUP_RUNTIME_LIMITS_V689.speed) return false; player.speed=Math.min(before+0.4,POWERUP_RUNTIME_LIMITS_V689.speed); return player.speed>before; } }),
+            [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', icon:'❤️', category:'BASE', rarity:'COMÚN', universal:true, desc:'Recupera 1 punto de vida.', apply:()=>{ const before=Number(player.health)||0; const max=Number(player.maxHealth)||1; if (before >= max) return false; player.health=Math.min(before+1,max); return player.health>before; } }),
+            [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', icon:'🛡️', category:'BASE', rarity:'RARA', universal:true, desc:'Activa el escudo del jugador.', apply:()=>{ if (player.hasShield) return false; player.hasShield=true; return true; } }),
             // v6.8.5: capacidades de interacción permanentes durante la run.
             // KICK y GRAB son mutuamente excluyentes; su estado real vive en
             // 54-entity-capabilities.js para evitar flags sueltos en Player.
-            [POWERUPS.KICK]: Object.freeze({ id:POWERUPS.KICK, label:'PATADA', icon:'🥾', desc:'Empuja bombas al caminar contra ellas.', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'KICK') : false }),
-            [POWERUPS.GRAB]: Object.freeze({ id:POWERUPS.GRAB, label:'AGARRE', icon:'🧤', desc:'Levanta una bomba y permite transportarla.', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'GRAB') : false }),
-            [POWERUPS.THROW]: Object.freeze({ id:POWERUPS.THROW, label:'LANZAMIENTO', icon:'🎯', desc:'Lanza hacia adelante una bomba transportada. Solo laboratorio.', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'THROW') : false }),
+            [POWERUPS.KICK]: Object.freeze({ id:POWERUPS.KICK, label:'PATADA', icon:'🥾', category:'INTERACCION', rarity:'BASE', universal:true, desc:'Empuja bombas al caminar contra ellas.', apply:()=>{ if (typeof window.getCarriedBombForEntityV682 === 'function' && window.getCarriedBombForEntityV682(player)) return false; return typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'KICK') : false; } }),
+            [POWERUPS.GRAB]: Object.freeze({ id:POWERUPS.GRAB, label:'AGARRE', icon:'🧤', category:'INTERACCION', rarity:'BASE', universal:true, desc:'Levanta una bomba y permite transportarla.', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'GRAB') : false }),
+            [POWERUPS.THROW]: Object.freeze({ id:POWERUPS.THROW, label:'LANZAMIENTO', icon:'🎯', category:'INTERACCION', rarity:'EXPERIMENTAL', universal:false, desc:'Lanza hacia adelante una bomba transportada. Solo laboratorio.', apply:()=>typeof window.activateCapabilityPowerupV681 === 'function' ? window.activateCapabilityPowerupV681(player,'THROW') : false }),
         });
+
+        function getPowerupDefinitionV69(type){
+            const key = String(type || '');
+            return POWERUP_DEFS_V67[key] || null;
+        }
 
         function applyPowerupV67(type){
             const key=String(type);
@@ -437,6 +442,7 @@ const UI = {};
         window.getPlayerCapacityCapsV67=getPlayerCapacityCapsV67;
         window.clampPlayerCapacitiesV67=clampPlayerCapacitiesV67;
         window.applyPowerupV67=applyPowerupV67;
+        window.getPowerupDefinitionV69=getPowerupDefinitionV69;
         window.getPowerupDropPoolV67=getPowerupDropPoolV67;
 
         const ENEMY_TYPES = {

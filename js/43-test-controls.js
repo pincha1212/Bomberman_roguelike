@@ -42,7 +42,8 @@
 
     function getPowerupMeta(type) {
         const key = String(type || '');
-        return BASE_POWERUP_META[key]
+        return global.getPowerupDefinitionV69?.(key)
+            || BASE_POWERUP_META[key]
             || global.GAMEPLAY_POWERUP_DEFS_V676?.[key]
             || global.CAPABILITY_POWERUPS_V681?.[key]
             || { id:key, name:key, icon:'?', rarity:'UNKNOWN', category:'BASE', desc:'Sin descripción registrada todavía.', implemented:false };

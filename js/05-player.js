@@ -139,12 +139,12 @@
             const gameplayMods = typeof getGameplayPowerupMovementModifiersV676 === 'function'
                 ? getGameplayPowerupMovementModifiersV676(player)
                 : { speedMultiplier: 1 };
-            const effectiveSpeed = player.speed
+            const effectiveSpeed = Math.max(0.1, player.speed
                 * Number(movementMods.speedMultiplier || 1)
                 * Number(effectMods.speedMultiplier || 1)
                 * Number(materialMods.speedMultiplier || 1)
                 * Number(gameplayMods.speedMultiplier || 1)
-                * (typeof getHazardSpeedFactor === 'function' ? getHazardSpeedFactor() : 1);
+                * (typeof getHazardSpeedFactor === 'function' ? getHazardSpeedFactor() : 1));
 
             const playerTile = gridCurrentTile(player, 'player');
             const playerTilePos = gridGetEntityTileCenterPosition(player, playerTile.x, playerTile.y, 'player');
@@ -175,7 +175,10 @@
             const beforeMoveX = player.x;
             const beforeMoveY = player.y;
             const result = gridAdvanceTileMove(player, effectiveSpeed, motionDt);
-            const moved = result.moved || result.active;
+            // 'active' no significa que la entidad haya avanzado: también puede
+            // quedar activo un movimiento si el delta/speed del frame fue 0.
+            // La animación debe depender exclusivamente de desplazamiento real.
+            const moved = result.moved;
 
             if (result.arrived) {
                 // La posición final es siempre exactamente el centro del tile.

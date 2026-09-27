@@ -175,8 +175,15 @@ function gridBeginTileMove(entity, gx, gy, options = {}) {
 
 function gridAdvanceTileMove(entity, speedPxPerFrame, dt, options = {}) {
     if (!entity?._tileMoveActive) return { active: false, arrived: false, moved: false };
-    const scale = Math.min(Math.max(Number(dt) || 0, 0) / 16.6667, 2);
-    let remaining = Math.max(0, Number(speedPxPerFrame) || 0) * scale;
+    const safeDt = Math.max(0, Number(dt) || 0);
+    const safeSpeed = Math.max(0, Number(speedPxPerFrame) || 0);
+    const scale = Math.min(safeDt / 16.6667, 2);
+    let remaining = safeSpeed * scale;
+
+    // Si este frame no tiene delta o velocidad efectiva, no inventamos
+    // desplazamiento ni animación. El movimiento queda pendiente para el
+    // siguiente frame con un delta válido.
+    if (remaining <= 0) return { active: true, arrived: false, moved: false };
     const tx = Number(entity._tileMoveTargetX);
     const ty = Number(entity._tileMoveTargetY);
     const cx = Number(entity.x);

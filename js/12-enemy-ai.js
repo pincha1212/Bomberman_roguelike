@@ -918,9 +918,14 @@ function updateEnemyIntentV312(e, index, dt) {
     const playerDistance = enemyDistanceToV312(tile.x, tile.y, playerTile.x, playerTile.y);
     const evasiveEngaged = profile.id === 'evasive' && (ai.seesPlayer || playerDistance <= Number(profile.fleeRadius || 5));
     const patrollerEngaged = profile.id === 'patroller' && playerDistance <= 4 && (ai.seesPlayer || ai.memoryTimer > 0);
+    const winterPassive = !!e.type?.winterRole;
 
     if (dangerHere || imminentDanger || evasiveEngaged) {
         ai.alert = 'flee';
+        ai.behavior = profile.id;
+    } else if (winterPassive) {
+        // Enemigos de Invierno: patrullan y ocupan espacio; no persiguen al jugador.
+        ai.alert = 'patrol';
         ai.behavior = profile.id;
     } else if ((ai.seesPlayer || ai.memoryTimer > 0) && profile.id !== 'patroller') {
         ai.alert = profile.id === 'aggressive' ? 'aggressive' : 'chase';
@@ -1040,36 +1045,48 @@ function moveEnemyV312(e, dt) {
     const gameplaySpeedMultiplier = typeof getGameplayPowerupEnemySpeedMultiplierV676 === 'function'
         ? Math.max(0.1, Number(getGameplayPowerupEnemySpeedMultiplierV676(e)) || 1)
         : 1;
-    const speed = e.baseSpeed * Number(profile.speedMultiplier || 1) * (1 + gameState.threatLevel * 0.04) * gameplaySpeedMultiplier;
-    const scale = Math.min(dt / 16.6667, 2);
+    const speed = e.baseSpeed * Number(profile.speedMultiplier || 1)
+        * (1 + gameState.threatLevel * 0.04) * gameplaySpeedMultiplier;
 
-    // La dirección solicitada se aplica en un centro de celda, como en un juego
-    // de laberinto: no se corta una esquina y no se cambia X/Y a la vez.
-    if (enemyIsNearCenterV312(e)) applyEnemyDirectionAtCenterV312(e);
-
-    let dir = enemyDirectionV312(ai.direction);
-    const result = gridMoveCardinal(e, dir.x * speed * scale, dir.y * speed * scale, {
-        kind: 'enemy',
-        canFly: !!e.type.canFly,
-        maxStep: 2.0,
-        laneLock: true,
-        laneTolerance: 2.0,
-        laneCorrectionStep: 1.8,
-        allowCurrentBombTile: true
-    });
-
-    if (result.laneCorrected && !result.blocked) {
-        // La corrección de carril es un movimiento cardinal de alineación; no
-        // contamos ese frame como avance en la dirección anterior. Esto evita
-        // que el diagnóstico confunda "se está corrigiendo" con "está atascado".
-        e.vx = 0;
-        e.vy = 0;
-        ai.lastX = e.x;
-        ai.lastY = e.y;
-        return;
+    if (!e._tileMoveInitialized) {
+        const tile = enemyTileV312(e);
+        gridSnapEntityToTile(e, tile.x, tile.y, 'enemy');
+        e._tileMoveInitialized = true;
     }
 
-    if (result.moved) {
+    // Los enemigos también se desplazan de centro a centro. La IA puede cambiar
+    // de dirección en cada intersección, pero nunca deja una entidad entre tiles.
+    if (!e._tileMoveActive) {
+        if (enemyIsNearCenterV312(e)) applyEnemyDirectionAtCenterV312(e);
+        const dir = enemyDirectionV312(ai.direction);
+        const tile = enemyTileV312(e);
+        const gx = tile.x + dir.x;
+        const gy = tile.y + dir.y;
+        const started = gridBeginTileMove(e, gx, gy, {
+            kind: 'enemy',
+            canFly: !!e.type.canFly,
+            allowCurrentBombTile: true
+        });
+        if (!started) {
+            const fallback = enemyChooseDirectionAtIntersectionV312(e);
+            if (fallback) {
+                ai.direction = fallback.dir;
+                ai.desiredDirection = fallback.dir;
+                e.lastDirection = fallback.dir;
+            }
+            e.vx = 0;
+            e.vy = 0;
+            e.blockedTimer = (e.blockedTimer || 0) + (Number(dt) || 0);
+            return;
+        }
+        e.vx = dir.x * speed;
+        e.vy = dir.y * speed;
+    }
+
+    const result = gridAdvanceTileMove(e, speed, dt);
+    if (result.arrived) {
+        e.vx = 0;
+        e.vy = 0;
         ai.stuckTimer = 0;
         ai.physicalBlockedTimer = 0;
         ai.physicalBlocked = false;
@@ -1078,56 +1095,7 @@ function moveEnemyV312(e, dt) {
         ai.blockedDirectionFrames = 0;
         ai.lastX = e.x;
         ai.lastY = e.y;
-        if (dir.x) e.vx = dir.x * speed, e.vy = 0;
-        else e.vx = 0, e.vy = dir.y * speed;
-        e.lastDirection = dir.dir;
-        enemyRememberNavigationTileV321(e);
-        return;
-    }
-
-    e.vx = 0;
-    e.vy = 0;
-    ai.stuckTimer += dt;
-    ai.physicalBlocked = true;
-    ai.physicalBlockedTimer += dt;
-
-    // v3.24.1: contar bloqueos consecutivos por dirección. La recuperación
-    // cambia de candidato cuando el mismo vector falla repetidamente.
-    if (ai.blockedDirection === dir.dir) ai.blockedDirectionFrames += 1;
-    else {
-        ai.blockedDirection = dir.dir;
-        ai.blockedDirectionFrames = 1;
-    }
-
-    // Primero corregimos la alineación lateral de forma gradual. No hace snap
-    // ni movimiento diagonal: solo desplaza el eje perpendicular del corredor.
-    if (ai.physicalBlockedTimer <= enemyAI_V312.physicalRecoveryMs) {
-        if (enemyCornerAssistV312(e, dir, dt, ai.alert === 'flee')) {
-            ai.cornerCorrectionMs += dt;
-            ai.lastRecoveryReason = 'asistencia-esquina';
-            return;
-        }
-    }
-
-    // Si el corredor sigue bloqueado, hacemos una decisión de recuperación
-    // basada en la posición física actual, no en la presencia del jugador.
-    if (ai.physicalBlockedTimer >= enemyAI_V312.recoveryTriggerMs || ai.stuckTimer >= enemyAI_V312.stuckMs || ai.blockedDirectionFrames >= enemyAI_V312.repeatedBlockTriggerFrames) {
-        ai.stuckTimer = 0;
-        ai.blockedTimer = 0;
-        const fallback = enemyChooseDirectionAtIntersectionV312(e);
-        if (fallback && enemyImmediateDirectionPassableV312(e, fallback, ai.alert === 'flee', 0.75)) {
-            ai.desiredDirection = fallback.dir;
-            ai.direction = fallback.dir;
-            e.lastDirection = fallback.dir;
-            ai.recoveryCount += 1;
-            ai.lastRecoveryReason = ai.lastRecoveryPathNodes > 0 ? 'replan-ruta' : 'replan-fisico';
-            ai.physicalBlockedTimer = 0;
-            ai.physicalBlocked = false;
-            ai.cornerCorrectionMs = 0;
-            ai.blockedDirection = null;
-            ai.blockedDirectionFrames = 0;
-            ai.recoveryCooldownTimer = enemyAI_V312.recoveryCooldownMs;
-        }
+        if (enemyIsNearCenterV312(e)) applyEnemyDirectionAtCenterV312(e);
     }
 }
 

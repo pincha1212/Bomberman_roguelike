@@ -44,6 +44,22 @@
                 maxStep: MOTION.maxStep
             });
             if (!result.moved) return false;
+
+            // Invierno: oso/estorbador ocupan espacio, pero no hacen daño de contacto.
+            // Si el jugador intenta atravesarlos, revertimos solo este paso físico.
+            if (gameState.biomeV49?.id === 'winter' && Array.isArray(gameState.enemies)) {
+                const hitbox = { left: player.x, right: player.x + player.width, top: player.y, bottom: player.y + player.height };
+                const blocked = gameState.enemies.some(e => {
+                    if (!e?.type?.winterRole) return false;
+                    const er = { left: e.x - e.width / 2, right: e.x + e.width / 2, top: e.y - e.height / 2, bottom: e.y + e.height / 2 };
+                    return hitbox.right > er.left && hitbox.left < er.right && hitbox.bottom > er.top && hitbox.top < er.bottom;
+                });
+                if (blocked) {
+                    player.x = beforeX;
+                    player.y = beforeY;
+                    return false;
+                }
+            }
             return true;
         }
 
@@ -110,191 +126,73 @@
 
         function updatePlayerMovement(dt) {
             const motionDt = getCombatMotionDt(dt);
-            const frameScale = Math.min(motionDt / 16.6667, 2);
-            player._frameScale = frameScale;
             const input = getCardinalInput();
-
-            if (input.axis) {
-                player.inputBuffer = input;
-                player.inputBufferTimer = MOTION.inputBufferMs + (Number(gameState.relicMods?.inputBufferBonus) || 0);
-            } else if (player.inputBufferTimer > 0) {
-                player.inputBufferTimer -= dt;
-                if (player.inputBufferTimer <= 0) player.inputBuffer = null;
-            }
-
-            const desired = input.axis ? input : player.inputBuffer;
-            const currentAxis = Math.abs(player.vx) > 0.01 ? 'x' : Math.abs(player.vy) > 0.01 ? 'y' : null;
             const movementMods = typeof getMovementModifiersV47 === 'function'
                 ? getMovementModifiersV47()
-                : { acceleration: 1, braking: 1, turnCarrySpeed: 1, speedMultiplier: 1 };
-            const effectMods = { accelerationMultiplier: 1, brakingMultiplier: 1, turnCarryMultiplier: 1, speedMultiplier: 1 };
+                : { speedMultiplier: 1 };
+            const effectMods = typeof getBombEffectMovementModifiersV64 === 'function'
+                ? getBombEffectMovementModifiersV64(player)
+                : { speedMultiplier: 1 };
             const materialMods = typeof getMaterialMovementModifiersV67 === 'function'
                 ? getMaterialMovementModifiersV67(player)
-                : { acceleration: 1, braking: 1, turnCarry: 1, speedMultiplier: 1, inputBufferMultiplier: 1 };
+                : { speedMultiplier: 1 };
             const gameplayMods = typeof getGameplayPowerupMovementModifiersV676 === 'function'
                 ? getGameplayPowerupMovementModifiersV676(player)
-                : { acceleration: 1, braking: 1, turnCarry: 1, speedMultiplier: 1, inputBufferMultiplier: 1 };
-            const acceleration = MOTION.acceleration * Number(movementMods.acceleration || 1) * Number(effectMods.accelerationMultiplier || 1) * Number(materialMods.acceleration || 1) * Number(gameplayMods.acceleration || 1);
-            const braking = MOTION.braking * Number(movementMods.braking || 1) * Number(effectMods.brakingMultiplier || 1) * Number(materialMods.braking || 1) * Number(gameplayMods.braking || 1);
-            const turnCarrySpeed = MOTION.turnCarrySpeed * Number(movementMods.turnCarrySpeed || 1) * Number(effectMods.turnCarryMultiplier || 1) * Number(materialMods.turnCarry || 1) * Number(gameplayMods.turnCarry || 1);
-            const effectiveSpeedBase = player.speed * Number(movementMods.speedMultiplier || 1) * Number(effectMods.speedMultiplier || 1) * Number(materialMods.speedMultiplier || 1) * Number(gameplayMods.speedMultiplier || 1);
-            const effectiveSpeed = typeof getHazardSpeedFactor === 'function'
-                ? effectiveSpeedBase * getHazardSpeedFactor()
-                : effectiveSpeedBase;
-            let axis = currentAxis;
-            let turnEntrySpeed = 0;
-            let turnCorrectionConsumed = false;
-            let movementDirection = desired?.dir || 0;
+                : { speedMultiplier: 1 };
+            const effectiveSpeed = player.speed
+                * Number(movementMods.speedMultiplier || 1)
+                * Number(effectMods.speedMultiplier || 1)
+                * Number(materialMods.speedMultiplier || 1)
+                * Number(gameplayMods.speedMultiplier || 1)
+                * (typeof getHazardSpeedFactor === 'function' ? getHazardSpeedFactor() : 1);
 
-            // Un snap de carril consume este frame. Guardamos la velocidad de
-            // entrada para arrancar el nuevo eje en el frame siguiente, evitando
-            // combinar la corrección lateral con el avance del giro.
-            if (desired && !currentAxis && player._turnEntryAxis === desired.axis && player._turnEntryDir === desired.dir && player._turnEntrySpeed > 0) {
-                axis = desired.axis;
-                movementDirection = desired.dir;
-                turnEntrySpeed = player._turnEntrySpeed;
-                player._turnEntrySpeed = 0;
-                player._turnEntryAxis = null;
-                player._turnEntryDir = 0;
+            const playerTile = gridCurrentTile(player, 'player');
+            const playerTilePos = gridGetEntityTileCenterPosition(player, playerTile.x, playerTile.y, 'player');
+            if (!player._tileMoveInitialized
+                || Math.abs(player.x - playerTilePos.x) > 0.01
+                || Math.abs(player.y - playerTilePos.y) > 0.01) {
+                gridSnapEntityToTile(player, playerTile.x, playerTile.y, 'player');
+                player._tileMoveInitialized = true;
             }
-            if (!desired) {
-                // Solo limpiamos el estado de giro aquí. El frenado físico se aplica
-                // una única vez en el bloque común del eje más abajo.
-                player._turnEntrySpeed = 0;
-                player._turnEntryAxis = null;
-                player._turnEntryDir = 0;
-            } else if (!currentAxis) {
-                axis = desired.axis;
-            } else if (currentAxis !== desired.axis) {
-                const currentVelocity = currentAxis === 'x' ? player.vx : player.vy;
-                const currentDirection = Math.sign(currentVelocity) || (gameState.lastMoveAxis === 'horizontal' ? 1 : 1);
-                const turnReady = isReadyForTurn(desired.axis);
 
-                if (turnReady) {
-                    // Primero intentamos el giro limpio en el centro del carril.
-                    if (trySnapToLane(desired.axis)) {
-                        turnEntrySpeed = Math.abs(currentVelocity) * turnCarrySpeed;
-                        player._turnEntrySpeed = turnEntrySpeed;
-                        player._turnEntryAxis = desired.axis;
-                        player._turnEntryDir = desired.dir;
-                        if (currentAxis === 'x') player.vx = 0;
-                        else player.vy = 0;
-                        turnCorrectionConsumed = true;
-                        axis = desired.axis;
-                        movementDirection = desired.dir;
-                    } else {
-                        // Asistencia mínima y estrictamente cardinal. Si todavía
-                        // faltan unos píxeles para entrar a la intersección,
-                        // corregimos SOLO el eje perpendicular y consumimos este
-                        // frame. Esto evita desplazamiento diagonal.
-                        const offset = getLaneOffset(desired.axis);
-                        const correction = Math.min(MOTION.turnCorrectionStep, Math.abs(offset));
-                        if (correction > MOVEMENT_EPSILON) {
-                            const correctionAxis = desired.axis === 'x' ? 'y' : 'x';
-                            const movedCorrection = correctionAxis === 'x'
-                                ? moveAxisWithCollision('x', Math.sign(offset) * correction)
-                                : moveAxisWithCollision('y', Math.sign(offset) * correction);
-                            if (movedCorrection) {
-                                turnCorrectionConsumed = true;
-                                axis = currentAxis;
-                                movementDirection = currentDirection;
-                            } else {
-                                // Si la corrección lateral es físicamente imposible,
-                                // no forzamos el giro. Mantenemos el carril actual.
-                                axis = currentAxis;
-                                movementDirection = currentDirection;
-                            }
-                        } else {
-                            axis = currentAxis;
-                            movementDirection = currentDirection;
-                        }
-                    }
+            // Una orden corresponde a UNA celda. El siguiente giro se evalúa
+            // únicamente cuando se alcanza el centro de la celda destino.
+            if (!player._tileMoveActive && input.axis) {
+                const current = gridCurrentTile(player, 'player');
+                const gx = current.x + (input.axis === 'x' ? input.dir : 0);
+                const gy = current.y + (input.axis === 'y' ? input.dir : 0);
+                const started = gridBeginTileMove(player, gx, gy, { kind: 'player' });
+                if (started) {
+                    player.dir = input.axis === 'x' ? (input.dir < 0 ? 'left' : 'right') : (input.dir < 0 ? 'up' : 'down');
+                    player.vx = input.axis === 'x' ? input.dir * effectiveSpeed : 0;
+                    player.vy = input.axis === 'y' ? input.dir * effectiveSpeed : 0;
                 } else {
-                    // El jugador puede anticipar el giro. Seguimos avanzando en
-                    // la dirección actual hasta llegar a la ventana de giro; el
-                    // input perpendicular queda bufferizado. Nunca invertimos el
-                    // eje por culpa del nuevo input.
-                    axis = currentAxis;
-                    movementDirection = currentDirection;
+                    player.vx = 0;
+                    player.vy = 0;
                 }
-            } else {
-                axis = desired.axis;
-                movementDirection = desired.dir;
-            }
-
-            if (turnCorrectionConsumed && turnEntrySpeed <= 0) {
-                // La corrección lateral ya movió al personaje este frame. No
-                // aplicamos después otro desplazamiento sobre el eje longitudinal.
-                player.isMoving = true;
-                player.walkCycle += motionDt * 0.015;
-                return;
-            }
-
-            if (turnCorrectionConsumed && turnEntrySpeed > 0) {
-                // Un snap de giro no avanza el nuevo eje en el mismo frame.
-                player.isMoving = true;
-                player.walkCycle += motionDt * 0.015;
-                return;
-            }
-
-            // Un solo componente de velocidad puede existir en todo momento.
-            if (axis === 'x') {
-                player.vy = 0;
-                const target = desired ? movementDirection * effectiveSpeed : 0;
-                if (turnEntrySpeed > 0) {
-                    player.vx = movementDirection * Math.min(
-                        effectiveSpeed,
-                        Math.max(turnEntrySpeed, effectiveSpeed * 0.68)
-                    );
-                } else {
-                    player.vx = approach(
-                        player.vx,
-                        target,
-                        (desired ? acceleration : braking) * frameScale
-                    );
-                }
-                if (Math.abs(player.vx) < MOTION.stopEpsilon) player.vx = 0;
-                if (player.vx !== 0) player.dir = player.vx < 0 ? 'left' : 'right';
-            } else if (axis === 'y') {
-                player.vx = 0;
-                const target = desired ? movementDirection * effectiveSpeed : 0;
-                if (turnEntrySpeed > 0) {
-                    player.vy = movementDirection * Math.min(
-                        effectiveSpeed,
-                        Math.max(turnEntrySpeed, effectiveSpeed * 0.68)
-                    );
-                } else {
-                    player.vy = approach(
-                        player.vy,
-                        target,
-                        (desired ? acceleration : braking) * frameScale
-                    );
-                }
-                if (Math.abs(player.vy) < MOTION.stopEpsilon) player.vy = 0;
-                if (player.vy !== 0) player.dir = player.vy < 0 ? 'up' : 'down';
             }
 
             const beforeMoveX = player.x;
             const beforeMoveY = player.y;
-            let moved = false;
-            if (player.vx) moved = moveAxisWithCollision('x', player.vx * frameScale);
-            else if (player.vy) moved = moveAxisWithCollision('y', player.vy * frameScale);
-            if (moved && typeof globalThis.gameplayPowerupAfterPlayerMovementV676 === 'function') {
-                globalThis.gameplayPowerupAfterPlayerMovementV676(player, beforeMoveX, beforeMoveY);
+            const result = gridAdvanceTileMove(player, effectiveSpeed, motionDt);
+            const moved = result.moved || result.active;
+
+            if (result.arrived) {
+                // La posición final es siempre exactamente el centro del tile.
+                player.vx = 0;
+                player.vy = 0;
+                if (typeof globalThis.gameplayPowerupAfterPlayerMovementV676 === 'function') {
+                    globalThis.gameplayPowerupAfterPlayerMovementV676(player, beforeMoveX, beforeMoveY);
+                }
             }
 
-            if (!moved && (player.vx || player.vy)) {
-                if (player.vx) player.vx = 0;
-                if (player.vy) player.vy = 0;
-            }
             player.isMoving = moved;
             if (moved) player.walkCycle += motionDt * 0.015;
 
-            // v5.7: sincroniza la FSM con el resultado físico real.
             if (typeof playerFSMSyncMovement === 'function') {
                 playerFSMSyncMovement({
                     moving: moved,
-                    inputActive: !!desired
+                    inputActive: !!input.axis
                 });
             }
         }

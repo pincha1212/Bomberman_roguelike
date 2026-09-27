@@ -129,6 +129,72 @@ function gridCanOccupy(entity, x, y, options = {}) {
     return true;
 }
 
+
+// v6.9.1 — Movimiento discreto por tiles.
+// Las entidades se desplazan de centro de celda a centro de celda. La animación
+// puede interpolar entre ambos centros, pero nunca cambia de carril ni termina
+// una orden en una posición intermedia.
+function gridGetEntityCenterPosition(entity, kind = null) {
+    const resolvedKind = kind || (entity && entity.__gridAnchor === 'center' ? 'enemy' : 'player');
+    if (resolvedKind === 'player') {
+        return { x: Number(entity.x) + Number(entity.width) / 2, y: Number(entity.y) + Number(entity.height) / 2 };
+    }
+    return { x: Number(entity.x), y: Number(entity.y) };
+}
+
+function gridGetEntityTileCenterPosition(entity, gx, gy, kind = null) {
+    const resolvedKind = kind || (entity && entity.__gridAnchor === 'center' ? 'enemy' : 'player');
+    const center = gridTileCenter(gx, gy);
+    if (resolvedKind === 'player') {
+        return { x: center.x - Number(entity.width) / 2, y: center.y - Number(entity.height) / 2 };
+    }
+    return center;
+}
+
+function gridSnapEntityToTile(entity, gx, gy, kind = null) {
+    if (!entity || !gridIsInside(gx, gy)) return false;
+    const resolvedKind = kind || (entity && entity.__gridAnchor === 'center' ? 'enemy' : 'player');
+    const pos = gridGetEntityTileCenterPosition(entity, gx, gy, resolvedKind);
+    entity.x = pos.x;
+    entity.y = pos.y;
+    return true;
+}
+
+function gridBeginTileMove(entity, gx, gy, options = {}) {
+    if (!entity || !gridIsInside(gx, gy)) return false;
+    const kind = options.kind || (entity && entity.__gridAnchor === 'center' ? 'enemy' : 'player');
+    if (!gridCanOccupy(entity, gridGetEntityTileCenterPosition(entity, gx, gy, kind).x, gridGetEntityTileCenterPosition(entity, gx, gy, kind).y, options)) return false;
+    const pos = gridGetEntityTileCenterPosition(entity, gx, gy, kind);
+    entity._tileMoveTargetX = pos.x;
+    entity._tileMoveTargetY = pos.y;
+    entity._tileMoveTargetGX = gx;
+    entity._tileMoveTargetGY = gy;
+    entity._tileMoveActive = true;
+    return true;
+}
+
+function gridAdvanceTileMove(entity, speedPxPerFrame, dt, options = {}) {
+    if (!entity?._tileMoveActive) return { active: false, arrived: false, moved: false };
+    const scale = Math.min(Math.max(Number(dt) || 0, 0) / 16.6667, 2);
+    let remaining = Math.max(0, Number(speedPxPerFrame) || 0) * scale;
+    const tx = Number(entity._tileMoveTargetX);
+    const ty = Number(entity._tileMoveTargetY);
+    const cx = Number(entity.x);
+    const cy = Number(entity.y);
+    const dx = tx - cx;
+    const dy = ty - cy;
+    const dist = Math.abs(dx) + Math.abs(dy);
+    if (dist <= 0.001 || remaining >= dist) {
+        entity.x = tx;
+        entity.y = ty;
+        entity._tileMoveActive = false;
+        return { active: false, arrived: true, moved: dist > 0.001 };
+    }
+    if (Math.abs(dx) > 0.001) entity.x += Math.sign(dx) * Math.min(remaining, Math.abs(dx));
+    else if (Math.abs(dy) > 0.001) entity.y += Math.sign(dy) * Math.min(remaining, Math.abs(dy));
+    return { active: true, arrived: false, moved: remaining > 0 };
+}
+
 function gridMoveCardinal(entity, dx, dy, options = {}) {
     if (!dx && !dy) return { moved: false, blocked: false, laneCorrected: false, movedPx: 0, laneCorrectionPx: 0, diagonalInputResolved: false };
 

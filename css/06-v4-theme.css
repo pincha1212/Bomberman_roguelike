@@ -142,15 +142,6 @@ body.v4-theme::before{
 
 .v4-boss-bomb-badge{border-color:rgba(229,57,53,.55);}
 
-/* Mobile controls become proper arcade controls instead of generic floating UI. */
-.v4-theme #mobile-controls{
-    background:#0c0f14;
-    border:2px solid #333946;
-    border-radius:6px;
-    box-shadow:0 8px 0 rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.04);
-}
-.v4-theme .bomb-btn{background:linear-gradient(180deg,#ff655d,#bd2724);border:2px solid #ffd85a;box-shadow:0 5px 0 #68100f,0 0 18px rgba(229,57,53,.3);}
-
 @media(max-width:1180px){
     .v4-theme .main-menu{grid-template-columns:minmax(420px,min(70vw,760px)) minmax(290px,360px);grid-template-areas:"game start" "rail start";}
     .v4-theme .menu-rail{grid-area:rail;height:auto;min-height:160px;}

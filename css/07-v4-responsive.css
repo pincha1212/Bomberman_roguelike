@@ -177,29 +177,6 @@
     overflow:visible;
 }
 
-/* Controles táctiles separados del canvas y respetando safe areas. */
-.v4-theme #mobile-controls{
-    left:max(6px,env(safe-area-inset-left));
-    right:max(6px,env(safe-area-inset-right));
-    bottom:max(6px,env(safe-area-inset-bottom));
-    width:auto;
-    margin:0;
-    min-height:74px;
-    padding:7px 9px;
-    gap:12px;
-}
-@media (pointer:coarse),(max-width:900px){
-    .v4-theme #mobile-controls{position:fixed;z-index:100;}
-}
-@media (max-width:480px){
-    .v4-theme #mobile-controls{min-height:70px;padding:6px 7px;}
-.v4-theme .bomb-btn{width:68px;height:68px;font-size:24px;}
-}
-@media (orientation:landscape) and (max-height:620px){
-    .v4-theme #mobile-controls{min-height:58px;padding:4px 7px;bottom:max(4px,env(safe-area-inset-bottom));}
-.v4-theme .bomb-btn{width:56px;height:56px;font-size:20px;}
-}
-
 /* Pantallas de resultado: el contenido se desplaza dentro del propio overlay. */
 .v4-theme .screen{
     overflow:auto;

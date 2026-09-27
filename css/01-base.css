@@ -131,18 +131,6 @@
             box-shadow: 0 1px 0 #1e40af, 0 3px 6px rgba(0,0,0,0.5);
         }
 
-        #mobile-controls {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 15px;
-            margin-top: 8px;
-            background: rgba(30, 41, 59, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            backdrop-filter: blur(4px);
-        }
 .bomb-btn {
             width: 80px;
             height: 80px;

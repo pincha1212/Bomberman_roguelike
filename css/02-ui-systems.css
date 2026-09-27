@@ -177,3 +177,90 @@ body { background: radial-gradient(circle at center, #111827 0%, #05070c 70%); }
  #game-container.ui-player-tr #ui-layer > .flex:last-child{bottom:5px;right:5px;}
 }
 
+
+/* V6.8.7 — HUD de capacidades: lectura directa sin convertir el HUD en un panel de trucos. */
+.ability-strip{
+    width:min(260px,42vw);
+    margin-top:2px;
+    padding:5px;
+    border:1px solid rgba(56,232,255,.28);
+    border-radius:5px;
+    background:rgba(2,6,23,.84);
+    box-shadow:0 3px 14px rgba(0,0,0,.34), inset 0 0 14px rgba(56,232,255,.025);
+}
+.ability-strip-title{
+    font:6px 'Press Start 2P',monospace;
+    color:#67e8f9;
+    letter-spacing:.12em;
+    margin:0 0 4px;
+}
+.ability-slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;}
+.ability-slot{
+    min-width:0;
+    display:flex;
+    align-items:center;
+    gap:4px;
+    padding:4px;
+    border:1px solid #334155;
+    border-radius:3px;
+    background:rgba(15,23,42,.78);
+    opacity:.52;
+    transition:opacity .15s ease,border-color .15s ease,box-shadow .15s ease;
+}
+.ability-slot[data-active="true"]{
+    opacity:1;
+    border-color:#67e8f9;
+    box-shadow:0 0 9px rgba(56,232,255,.16);
+}
+.ability-slot-experimental{border-style:dashed;}
+.ability-icon{font-size:15px;line-height:1;flex:0 0 auto;}
+.ability-copy{min-width:0;display:flex;flex-direction:column;align-items:flex-start;overflow:hidden;}
+.ability-copy strong{font:5px 'Press Start 2P',monospace;color:#f8fafc;white-space:nowrap;}
+.ability-copy small{font:6px Inter,sans-serif;color:#94a3b8;margin-top:2px;white-space:nowrap;}
+.ability-slot[data-active="true"] .ability-copy small{color:#67e8f9;}
+.ability-detail{
+    margin-top:4px;
+    padding:4px 5px;
+    border-top:1px solid rgba(148,163,184,.16);
+    color:#cbd5e1;
+    font:6px Inter,sans-serif;
+    line-height:1.35;
+    text-align:left;
+    min-height:16px;
+}
+@media(max-width:640px){
+    .ability-strip{width:min(215px,56vw);padding:4px;}
+    .ability-strip-title{font-size:5px;}
+    .ability-slot{padding:3px;gap:3px;}
+    .ability-icon{font-size:12px;}
+    .ability-copy strong{font-size:4px;}
+    .ability-copy small{font-size:5px;}
+    .ability-detail{font-size:5px;}
+}
+
+
+/* V6.8.8 — Feedback compacto de power-up. No bloquea el gameplay ni añade efectos de mapa. */
+.powerup-toast{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    width:min(260px,42vw);
+    margin-top:4px;
+    padding:5px 6px;
+    border:1px solid rgba(250,204,21,.34);
+    border-radius:5px;
+    background:rgba(2,6,23,.90);
+    box-shadow:0 3px 14px rgba(0,0,0,.30);
+    transition:opacity .12s ease,border-color .12s ease;
+}
+.powerup-toast[data-applied="false"]{border-color:rgba(249,115,22,.50);opacity:.92;}
+.powerup-toast-icon{font-size:17px;line-height:1;flex:0 0 auto;}
+.powerup-toast-copy{min-width:0;display:flex;flex-direction:column;gap:2px;}
+.powerup-toast-copy strong{font:6px 'Press Start 2P',monospace;color:#fef3c7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.powerup-toast-copy small{font:6px Inter,sans-serif;color:#cbd5e1;line-height:1.25;}
+@media(max-width:640px){
+    .powerup-toast{width:min(215px,56vw);padding:4px 5px;}
+    .powerup-toast-icon{font-size:13px;}
+    .powerup-toast-copy strong{font-size:5px;}
+    .powerup-toast-copy small{font-size:5px;}
+}

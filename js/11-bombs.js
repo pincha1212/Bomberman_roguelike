@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.7.1.2 — Bomb Handling + shared bomb states
+// Bomberman Roguelike v6.10.0 — Classic Bomberman bomb handling
 // Núcleo de colocación, retención segura, ocupación, mecha y cadenas.
 
 const BOMB_HANDLING = {
@@ -9,6 +9,10 @@ const BOMB_HANDLING = {
     holdInitialDelay: 300,
     holdRepeat: 180,
     movePlacementGrace: 90,
+    playerKickDistance: 4,
+    materialKickDistance: 1,
+    kickJumpDuration: 190,
+    kickJumpArc: TILE_SIZE * .30,
 };
 
 const bombInputState = {
@@ -25,12 +29,12 @@ const bombHandlingFx = { chainLinks: [] };
 // v4.0: todas las bombas comparten una pequeña máquina de estados.
 // Separamos lógica de detonación (tile x/y) de su posición visual (worldX/worldY)
 // para permitir bombas lanzadas, empujadas, atrapadas o desviadas en futuras habilidades.
-const BOMB_V4_STATES = Object.freeze({ MOVING: 'moving', ARMED: 'armed', EXPLODING: 'exploding', CARRIED: 'carried' });
+const BOMB_V4_STATES = Object.freeze({ MOVING: 'moving', ARMED: 'armed', CARRIED: 'carried', EXPLODING: 'exploding' });
 
 function ensureBombV4State(bomb){
     if (!bomb || typeof bomb !== 'object') return null;
     if (!bomb.state) bomb.state = bomb.owner === 'boss' ? BOMB_V4_STATES.MOVING : BOMB_V4_STATES.ARMED;
-    if (!bomb.motionState) bomb.motionState = bomb.state === BOMB_V4_STATES.MOVING ? BOMB_V4_STATES.MOVING : (bomb.state === BOMB_V4_STATES.CARRIED ? BOMB_V4_STATES.CARRIED : 'idle');
+    if (!bomb.motionState) bomb.motionState = bomb.state === BOMB_V4_STATES.MOVING ? BOMB_V4_STATES.MOVING : 'idle';
     if (!Number.isFinite(bomb.worldX)) bomb.worldX = (Number(bomb.x) + .5) * TILE_SIZE;
     if (!Number.isFinite(bomb.worldY)) bomb.worldY = (Number(bomb.y) + .5) * TILE_SIZE;
     if (!Number.isFinite(bomb.motionProgress)) bomb.motionProgress = bomb.state === BOMB_V4_STATES.MOVING ? 0 : 1;
@@ -49,6 +53,9 @@ function ensureBombV4State(bomb){
     if (!Number.isFinite(bomb.bobPhase)) bomb.bobPhase = 0;
     if (!Array.isArray(bomb.motionQueue)) bomb.motionQueue = []; // destinos en coordenadas de CASILLA {x,y}
     if (typeof bomb.preserveTimerOnArm !== 'boolean') bomb.preserveTimerOnArm = false;
+    if (!bomb.interactionState) bomb.interactionState = 'free';
+    if (typeof bomb.canKick !== 'boolean') bomb.canKick = bomb.owner !== 'boss';
+    if (typeof bomb.canPush !== 'boolean') bomb.canPush = bomb.owner !== 'boss';
     if (typeof bomb.canCarry !== 'boolean') bomb.canCarry = false;
     if (!Object.prototype.hasOwnProperty.call(bomb, 'carriedBy')) bomb.carriedBy = null;
     if (!Number.isFinite(bomb.timer)) bomb.timer = Number(bomb.fuseTotal || 0);
@@ -58,7 +65,6 @@ function ensureBombV4State(bomb){
 function startBombV4Motion(bomb, targetX, targetY, durationMs = 360, arc = 18){
     if (!bomb) return false;
     ensureBombV4State(bomb);
-    if (bomb.state === BOMB_V4_STATES.CARRIED) return false;
 
     const worldTargetX = Number(targetX);
     const worldTargetY = Number(targetY);
@@ -219,62 +225,10 @@ function bombV4StateSummary(bomb){
     return `${bomb.state}/${bomb.motionState}`;
 }
 
-function isBombMotionLandingTileFreeV67(gx, gy, bomb){
-    if(gx<0 || gy<0 || gx>=gameState.gridWidth || gy>=gameState.gridHeight) return false;
-    const tile=gameState.grid?.[gy]?.[gx];
-    if(tile===TYPES.WALL || tile===TYPES.BLOCK) return false;
-    return !gameState.bombs.some(other=>other && other!==bomb && other.x===gx && other.y===gy);
-}
-
-// Movimiento secuencial reutilizable para bombas no controladas por el jugador.
-// No contiene reglas de kick ni estado de interacción del jugador.
-function queueBombMotionSequenceV67(bomb, dx, dy, distance, durationMs = 190, arc = TILE_SIZE * .30){
-    if(!bomb) return false;
-    ensureBombV4State(bomb);
-    if(Math.abs(dx)+Math.abs(dy)!==1) return false;
-
-    const moveDistance = Math.max(1, Math.floor(Number(distance) || 1));
-    const sx = Math.floor(Number(bomb.x));
-    const sy = Math.floor(Number(bomb.y));
-    const tx = sx + dx * moveDistance;
-    const ty = sy + dy * moveDistance;
-
-    // La trayectoria puede atravesar obstáculos intermedios.
-    // La última casilla debe ser válida para aterrizar.
-    if(!isBombMotionLandingTileFreeV67(tx,ty,bomb)) return false;
-
-    bomb.motionQueue.length=0;
-    for(let step=1; step<=moveDistance; step++){
-        bomb.motionQueue.push({
-            x:sx + dx * step,
-            y:sy + dy * step,
-            durationMs,
-            arc
-        });
-    }
-
-    const first=bomb.motionQueue.shift();
-    if(!first){
-        bomb.motionQueue.length=0;
-        return false;
-    }
-
-    bomb.preserveTimerOnArm=true;
-    return startBombV4Motion(
-        bomb,
-        (first.x+.5)*TILE_SIZE,
-        (first.y+.5)*TILE_SIZE,
-        Number(first.durationMs)||durationMs,
-        Number(first.arc)||arc
-    );
-}
-
 function getBombAtTile(gx, gy){
     return gameState.bombs.find(b => {
-        if (!b) return false;
+        if (!b || b.x !== gx || b.y !== gy) return false;
         ensureBombV4State(b);
-        if (b.state === BOMB_V4_STATES.CARRIED) return false;
-        if (b.x !== gx || b.y !== gy) return false;
         return b.state !== BOMB_V4_STATES.MOVING;
     }) || null;
 }
@@ -282,7 +236,6 @@ function getBombAtTile(gx, gy){
 function isBombSolidForPlayer(gx, gy){
     const bomb = getBombAtTile(gx, gy);
     if (!bomb) return false;
-    if (bomb.state === BOMB_V4_STATES.CARRIED) return false;
     return !bomb.playerPassThrough;
 }
 
@@ -324,9 +277,6 @@ function markBombEscapeState(){
 
 function beginBombHold(source='input'){
     if (bombInputState.held) return false;
-    if (typeof globalThis.handleBombActionV682 === 'function' && globalThis.handleBombActionV682(source)) {
-        return true;
-    }
     bombInputState.held = true;
     bombInputState.source = source;
     bombInputState.startedAt = performance.now();
@@ -353,6 +303,15 @@ function isRecentMovementInput(){
 
 function requestBombPlacement(reason='press'){
     if (!gameState.isPlaying || gameState.paused) return false;
+
+    // GRAB es una acción explícita: con el powerup activo, una pulsación de
+    // bomba intenta primero recoger/dejar una bomba. Solo si no hay una acción
+    // de GRAB válida se comporta como el botón clásico de colocar bomba.
+    if (reason === 'press' && typeof window.tryGrabPlayerBombV610 === 'function' && player?.grabTimer > 0) {
+        const grabResult = window.tryGrabPlayerBombV610();
+        if (grabResult) return true;
+    }
+
     if (reason === 'press' && isRecentMovementInput()) return false;
     const before = player.bombsPlaced;
     const placed = placeBomb(reason);
@@ -362,21 +321,153 @@ function requestBombPlacement(reason='press'){
     return placed;
 }
 
+function getBombKickDirectionV67(){
+    const touch=gameState?.touchControls||{};
+    if(Math.abs(Number(touch.x))>=Math.abs(Number(touch.y)) && Math.abs(Number(touch.x))>=.25) return {dx:Math.sign(Number(touch.x)),dy:0};
+    if(Math.abs(Number(touch.y))>=.25) return {dx:0,dy:Math.sign(Number(touch.y))};
+    const keys=gameState?.keys||{};
+    if(keys.ArrowLeft||keys.KeyA) return {dx:-1,dy:0};
+    if(keys.ArrowRight||keys.KeyD) return {dx:1,dy:0};
+    if(keys.ArrowUp||keys.KeyW) return {dx:0,dy:-1};
+    if(keys.ArrowDown||keys.KeyS) return {dx:0,dy:1};
+    if (['up','down','left','right'].includes(player?.dir)) {
+        if (player.dir === 'left') return {dx:-1,dy:0};
+        if (player.dir === 'right') return {dx:1,dy:0};
+        if (player.dir === 'up') return {dx:0,dy:-1};
+        if (player.dir === 'down') return {dx:0,dy:1};
+    }
+    return {dx:0,dy:0};
+}
+
+function isBombKickTileFreeV67(gx,gy,bomb){
+    if(gx<0||gy<0||gx>=gameState.gridWidth||gy>=gameState.gridHeight) return false;
+    const tile=gameState.grid?.[gy]?.[gx];
+    if(tile===TYPES.WALL||tile===TYPES.BLOCK) return false;
+    if(typeof isMaterialBlockingTileV67==='function' && isMaterialBlockingTileV67(gx,gy)) return false;
+    return !gameState.bombs.some(other=>other&&other!==bomb&&other.x===gx&&other.y===gy);
+}
+
+function queueBombJumpSequenceV67(bomb, dx, dy, distance, durationMs = 190, arc = TILE_SIZE * .30){
+    if(!bomb) return false;
+    ensureBombV4State(bomb);
+    if(Math.abs(dx)+Math.abs(dy)!==1) return false;
+
+    const jumpDistance = Math.max(1, Math.floor(Number(distance) || 1));
+    const sx = Math.floor(Number(bomb.x));
+    const sy = Math.floor(Number(bomb.y));
+    const tx = sx + dx * jumpDistance;
+    const ty = sy + dy * jumpDistance;
+
+    // La trayectoria aérea puede atravesar paredes y bloques.
+    // La ÚLTIMA casilla debe ser suelo real para que la bomba pueda caer.
+    if(!isBombKickTileFreeV67(tx,ty,bomb)) return false;
+
+    bomb.motionQueue.length=0;
+    for(let step=1; step<=jumpDistance; step++){
+        bomb.motionQueue.push({
+            x:sx + dx * step,
+            y:sy + dy * step,
+            durationMs,
+            arc
+        });
+    }
+
+    const first=bomb.motionQueue.shift();
+    if(!first){
+        bomb.motionQueue.length=0;
+        return false;
+    }
+
+    bomb.preserveTimerOnArm=true;
+    bomb.interactionState='kicked';
+    bomb.kickCount=Number(bomb.kickCount||0)+1;
+    startBombV4Motion(
+        bomb,
+        (first.x+.5)*TILE_SIZE,
+        (first.y+.5)*TILE_SIZE,
+        Number(first.durationMs)||durationMs,
+        Number(first.arc)||arc
+    );
+    return true;
+}
+
+function kickBombV67(bomb,dx,dy){
+    if(!bomb||!player||player.kickTimer<=0) return false;
+    ensureBombV4State(bomb);
+    if(!bomb.canKick||bomb.owner!=='player'||bomb.state!==BOMB_V4_STATES.ARMED||player.kickCooldown>0) return false;
+    if(Math.abs(dx)+Math.abs(dy)!==1) return false;
+    const kickDistance = Math.max(1, Math.floor(Number(BOMB_HANDLING.playerKickDistance) || 4));
+    if(!queueBombJumpSequenceV67(bomb,dx,dy,kickDistance,BOMB_HANDLING.kickJumpDuration,BOMB_HANDLING.kickJumpArc)) return false;
+    player.kickCooldown=180;
+    return true;
+}
+
+function getAdjacentPlayerBombV67(){
+    if(!player||player.kickTimer<=0||player.kickCooldown>0) return null;
+    const px=Math.floor((player.x+player.width/2)/TILE_SIZE);
+    const py=Math.floor((player.y+player.height/2)/TILE_SIZE);
+    const candidates=[
+        {dx:-1,dy:0},
+        {dx:1,dy:0},
+        {dx:0,dy:-1},
+        {dx:0,dy:1}
+    ];
+    const inputDir=getBombKickDirectionV67();
+
+    const scoreCandidate=(candidate)=>{
+        let score=0;
+        if(candidate.dx===inputDir.dx&&candidate.dy===inputDir.dy) score+=100;
+        if(candidate.dx===0&&candidate.dy===-1&&player.dir==='up') score+=30;
+        if(candidate.dx===0&&candidate.dy===1&&player.dir==='down') score+=30;
+        if(candidate.dx===-1&&candidate.dy===0&&player.dir==='left') score+=30;
+        if(candidate.dx===1&&candidate.dy===0&&player.dir==='right') score+=30;
+        return score;
+    };
+
+    const found=[];
+    for(const candidate of candidates){
+        const bomb=gameState.bombs.find(b=>
+            b&&b.owner==='player'&&
+            b.x===px+candidate.dx&&
+            b.y===py+candidate.dy&&
+            b.state===BOMB_V4_STATES.ARMED
+        );
+        if(bomb) found.push({bomb,...candidate,score:scoreCandidate(candidate)});
+    }
+
+    // Una dirección explícita manda: evitamos que una bomba lateral sea
+    // confundida con otra por el orden de candidatos cuando el jugador está
+    // tocando dos bombas a la vez.
+    if(inputDir.dx || inputDir.dy){
+        const directed = found.find(item => item.dx === inputDir.dx && item.dy === inputDir.dy);
+        if(directed) return directed;
+        return null;
+    }
+
+    found.sort((a,b)=>b.score-a.score||a.dy-b.dy||a.dx-b.dx);
+    return found[0]||null;
+}
+
+function tryKickPlayerBombsV67(){
+    const candidate=getAdjacentPlayerBombV67();
+    if(!candidate) return false;
+    return kickBombV67(candidate.bomb,candidate.dx,candidate.dy);
+}
+
 function placeBomb(reason='manual'){
     if (!gameState.isPlaying || gameState.paused) return false;
     if ((player.bombCooldown || 0) > 0) return false;
-    if (typeof globalThis.getCarriedBombForEntityV682 === 'function' && globalThis.getCarriedBombForEntityV682(player)) return false;
     if (player.bombsPlaced >= player.maxBombs) return false;
 
     const gx = Math.floor((player.x + player.width / 2) / TILE_SIZE);
     const gy = Math.floor((player.y + player.height / 2) / TILE_SIZE);
     if (getBombAtTile(gx, gy)) return false;
     if (!gameState.grid[gy] || gameState.grid[gy][gx] === TYPES.WALL || gameState.grid[gy][gx] === TYPES.BLOCK) return false;
+    const materialMods = typeof getBombMaterialModifiersV67 === 'function' ? getBombMaterialModifiersV67(gx, gy) : { fuseMultiplier:1, canPlace:true, kickOnPlace:false };
+    if (!materialMods.canPlace) return false;
+
     const baseFuse = gameState.roomType.id === 'CURSED' ? BOMB_HANDLING.cursedFuse : BOMB_HANDLING.normalFuse;
-    const gameplayBombMods = typeof getGameplayPowerupBombModifiersV676 === 'function'
-        ? getGameplayPowerupBombModifiersV676({ owner: 'player' })
-        : { fuseMultiplier: 1 };
-    const fuseTotal = Math.max(700, Math.round(baseFuse * (typeof getBombFuseMultiplier === 'function' ? getBombFuseMultiplier() : 1) * Number(gameplayBombMods.fuseMultiplier || 1)));
+    const fuseTotal = Math.max(700, Math.round(baseFuse * (typeof getBombFuseMultiplier === 'function' ? getBombFuseMultiplier() : 1) * materialMods.fuseMultiplier));
     const bomb = {
         id: `bomb-${gameState.animFrame}-${Math.random().toString(36).slice(2,7)}`,
         owner: 'player',
@@ -412,7 +503,6 @@ function placeBomb(reason='manual'){
 
     gameState.bombs.push(bomb);
     player.bombsPlaced++;
-    if (typeof applyGameplayPowerupToBombV676 === 'function') applyGameplayPowerupToBombV676(bomb);
     if (typeof playerFSMStartBomb === 'function') playerFSMStartBomb();
     player.bombCooldown = BOMB_HANDLING.placementCooldown;
     if (typeof triggerBombPlacedFeedback === 'function') triggerBombPlacedFeedback(bomb);
@@ -484,11 +574,11 @@ function bombUpdate(dt){
     // ÚNICA FUENTE DE VERDAD DEL CICLO DE VIDA DE LAS BOMBAS.
     // Todo: cooldowns, movimiento, salto, mecha, límites y detonación pasa por aquí.
     player.bombCooldown=Math.max(0,(player.bombCooldown||0)-dt);
+    player.kickTimer=Math.max(0,(player.kickTimer||0)-dt);
+    player.kickCooldown=Math.max(0,(player.kickCooldown||0)-dt);
+    tryKickPlayerBombsV67();
     updateBombInput(dt);
     markBombEscapeState();
-    if (typeof globalThis.updateBombEntityInteractionsV682 === 'function') {
-        globalThis.updateBombEntityInteractionsV682(dt);
-    }
 
     for(let i=bombHandlingFx.chainLinks.length-1;i>=0;i--){
         bombHandlingFx.chainLinks[i].timer-=dt;
@@ -499,25 +589,13 @@ function bombUpdate(dt){
         const bomb=gameState.bombs[i];
         if(!bomb) continue;
         ensureBombV4State(bomb);
-        if (bomb.state === BOMB_V4_STATES.CARRIED) {
-            if (typeof globalThis.updateCarriedBombPositionV682 === 'function') {
-                globalThis.updateCarriedBombPositionV682(bomb);
-            }
-            continue;
-        }
 
         // La mecha corre también durante el vuelo. Si llega a cero, se marca
         // pendiente y se resuelve al aterrizar; nunca explota en mitad del aire.
         bomb.timer-=dt;
         if(bomb.timer<=0) bomb.pendingDetonation=true;
 
-        if (bomb.interactionMotionV682 === 'kick' && typeof globalThis.updateBombKickMotionV682 === 'function') {
-            globalThis.updateBombKickMotionV682(bomb, dt);
-        } else if (bomb.interactionMotionV682 === 'throw' && typeof globalThis.updateBombThrowMotionV685 === 'function') {
-            globalThis.updateBombThrowMotionV685(bomb, dt);
-        } else {
-            updateBombV4Motion(bomb, dt);
-        }
+        updateBombV4Motion(bomb, dt);
         ensureBombV4State(bomb);
 
         if(bomb.state !== BOMB_V4_STATES.ARMED) continue;
@@ -567,6 +645,10 @@ window.startBombV4Motion = startBombV4Motion;
 window.armBombV4 = armBombV4;
 window.getBombV4WorldPosition = getBombV4WorldPosition;
 window.bombV4StateSummary = bombV4StateSummary;
-window.queueBombMotionSequenceV67 = queueBombMotionSequenceV67;
+window.kickBombV67 = kickBombV67;
+window.queueBombJumpSequenceV67 = queueBombJumpSequenceV67;
 window.bombUpdate = bombUpdate;
 window.updateBombHandling = updateBombHandling;
+window.tryKickPlayerBombsV67 = tryKickPlayerBombsV67;
+window.getBombKickDirectionV67 = getBombKickDirectionV67;
+window.getAdjacentPlayerBombV67 = getAdjacentPlayerBombV67;

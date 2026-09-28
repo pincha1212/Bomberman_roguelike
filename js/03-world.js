@@ -253,9 +253,11 @@
                 let type = ENEMY_TYPES.RASTRERO;
                 if (gameState.level >= 3 && roll > .68) type = ENEMY_TYPES.ESPECIAL;
                 else if (gameState.level >= 2 && roll > .38) type = ENEMY_TYPES.VOLADOR;
-                const difficultySpeed = gameState.difficulty?.enemySpeedMult || 1;
                 const behavior = typeof pickEnemyBehaviorV324 === 'function' ? pickEnemyBehaviorV324(type, gameState.level, gameState.enemies.length + i, roll) : null;
-                const speed = type.speed * gameState.roomType.enemySpeedMult * difficultySpeed * (1 + gameState.threatLevel * .04);
+                // v6.10.2: threatLevel se aplica una sola vez en moveEnemyV312().
+                const speed = typeof getEnemyBaseSpeedV610 === 'function'
+                    ? getEnemyBaseSpeedV610(type)
+                    : type.speed * gameState.roomType.enemySpeedMult * (gameState.difficulty?.enemySpeedMult || 1);
                 gameState.enemies.push({ x:c.x*TILE_SIZE+TILE_SIZE/2, y:c.y*TILE_SIZE+TILE_SIZE/2, width:TILE_SIZE*.75, height:TILE_SIZE*.75, type, vx:speed*(Math.random()<.5?-1:1), vy:0, baseSpeed:speed, changeTimer:15+Math.random()*35, elite:false, reinforcement:true, aiBehavior:behavior?.id || null });
                 addFloatingText('REFUERZO', c.x*TILE_SIZE+TILE_SIZE/2, c.y*TILE_SIZE+TILE_SIZE/2, '#fb7185');
             }

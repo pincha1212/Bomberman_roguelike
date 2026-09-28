@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.11 — Enemy spawning and enemy setup
+// Bomberman Roguelike v6.10.2 — Enemy spawning and enemy setup
         function spawnEnemies() {
             const diff = gameState.difficulty || (typeof getDifficultyV323 === 'function' ? getDifficultyV323(gameState.level) : null);
             const maxEnemies = diff?.maxEnemies || largeSupport.maxEnemies;
@@ -58,7 +58,7 @@
                 if (gameState.level >= 2 && rand > 0.6) type = ENEMY_TYPES.VOLADOR;
                 if (gameState.level >= 3 && rand > 0.85) type = ENEMY_TYPES.ESPECIAL;
                 const behavior = typeof pickEnemyBehaviorV324 === 'function' ? pickEnemyBehaviorV324(type, gameState.level, i, rand) : null;
-                const speed = type.speed * gameState.roomType.enemySpeedMult * (diff?.enemySpeedMult || 1);
+                const speed = typeof getEnemyBaseSpeedV610 === 'function' ? getEnemyBaseSpeedV610(type) : type.speed * gameState.roomType.enemySpeedMult * (diff?.enemySpeedMult || 1);
 
                 gameState.enemies.push({
                     x: x * TILE_SIZE + TILE_SIZE / 2,

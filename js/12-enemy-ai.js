@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.24 — Enemy Behaviors Update
+// Bomberman Roguelike v6.10.2 — Enemy Behaviors Update
 // Navegación local tipo corredor/intersección: la IA decide una dirección
 // v3.21: decisiones locales + memoria corta + continuidad de ruta; BFS solo para recovery excepcional.
 // y 13-collision.js se ocupa del movimiento y las paredes.
@@ -1039,14 +1039,21 @@ function applyEnemyDirectionAtCenterV312(e) {
     return false;
 }
 
-function moveEnemyV312(e, dt) {
-    const ai = e.ai;
+function getEnemyMovementSpeedV610(e) {
     const profile = enemyBehaviorProfileV324(e);
     const gameplaySpeedMultiplier = typeof getGameplayPowerupEnemySpeedMultiplierV676 === 'function'
         ? Math.max(0.1, Number(getGameplayPowerupEnemySpeedMultiplierV676(e)) || 1)
         : 1;
-    const speed = e.baseSpeed * Number(profile.speedMultiplier || 1)
-        * (1 + gameState.threatLevel * 0.04) * gameplaySpeedMultiplier;
+    const threatMultiplier = 1 + Math.max(0, Number(gameState.threatLevel) || 0) * 0.04;
+    return Math.max(0.1, Number(e.baseSpeed) || 1)
+        * Number(profile.speedMultiplier || 1)
+        * threatMultiplier
+        * gameplaySpeedMultiplier;
+}
+
+function moveEnemyV312(e, dt) {
+    const ai = e.ai;
+    const speed = getEnemyMovementSpeedV610(e);
 
     if (!e._tileMoveInitialized) {
         const tile = enemyTileV312(e);

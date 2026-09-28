@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.7.6 — Gameplay Test Lab
+// Bomberman Roguelike v6.10.3 — Gameplay Test Lab power-up integration
 // ?test=1 convierte el runtime en un entorno neutral para verificar gameplay real.
 (function initTestLabV675(global) {
     'use strict';
@@ -704,7 +704,7 @@
     global.BOMBER_ENGINE.isTestLabNeutral = () => isActive();
     global.BOMBER_ENGINE.getTestLabConfig = () => ({
         active: isActive(),
-        version: '6.7.9',
+        version: '6.10.3',
         neutral: true,
         arena: { ...TEST_ARENA },
         powerupFilter: getState()?.testLabPowerupFilterV676 || DEFAULT_SHELF_FILTER,

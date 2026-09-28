@@ -392,10 +392,38 @@ const UI = {};
         });
 
         function applyPowerupV67(type){
-            const def=POWERUP_DEFS_V67[String(type)]; if(!def) return false;
+            const key = String(type || '');
+
+            // Capacidades permanentes: el pickup real pasa por la fuente declarativa
+            // de capacidades, no por un segundo sistema de estado.
+            if ((key === 'KICK' || key === 'GRAB' || key === 'THROW') && typeof activateCapabilityPowerupV681 === 'function') {
+                const applied = !!activateCapabilityPowerupV681(player, key);
+                if (typeof updateUI==='function') updateUI();
+                return applied;
+            }
+
+            // BOMB_UP/FIRE_UP siguen siendo reliquias en gameplay normal.
+            // En Test Lab se habilitan para que el estante pueda probar realmente
+            // todas las mejoras base que declara el laboratorio.
+            if (key === POWERUPS.BOMB_UP || key === POWERUPS.FIRE_UP) {
+                const testLab = !!window.BOMBER_TEST_MODE_V53 && !!window.BOMBER_ENGINE?.isTestLabNeutral?.();
+                if (!testLab) {
+                    if (typeof addFloatingText==='function') addFloatingText('SOLO RELIQUIA',player.x,player.y,'#c084fc');
+                    return false;
+                }
+                const capKey = key === POWERUPS.BOMB_UP ? 'maxBombs' : 'bombRange';
+                const hardCap = Number(PLAYER_LIMITS_V67.hard[capKey]) || 1;
+                const current = Number(player[capKey]) || 1;
+                if (current >= hardCap) return false;
+                player[capKey] = Math.min(current + 1, hardCap);
+                clampPlayerCapacitiesV67();
+                if (typeof updateUI==='function') updateUI();
+                return true;
+            }
+
+            const def=POWERUP_DEFS_V67[key]; if(!def) return false;
             const applied=!!def.apply();
             clampPlayerCapacitiesV67();
-            if((type===POWERUPS.BOMB_UP||type===POWERUPS.FIRE_UP)&&typeof addFloatingText==='function') addFloatingText('SOLO RELIQUIA',player.x,player.y,'#c084fc');
             if(typeof updateUI==='function') updateUI();
             return applied;
         }
@@ -410,23 +438,12 @@ const UI = {};
         window.getPowerupDropPoolV67=getPowerupDropPoolV67;
 
         const ENEMY_TYPES = {
-            RASTRERO: { name: 'Rastrero', color: '#ef4444', speed: 1.05, canFly: false },
-            VOLADOR: { name: 'Volador', color: '#3b82f6', speed: 0.90, canFly: true },
-            ESPECIAL: { name: 'Especial', color: '#22c55e', speed: 1.45, canFly: false },
+            RASTRERO: { name: 'Rastrero', color: '#ef4444', speed: 1.4, canFly: false },
+            VOLADOR: { name: 'Volador', color: '#3b82f6', speed: 1.1, canFly: true },
+            ESPECIAL: { name: 'Especial', color: '#22c55e', speed: 2.2, canFly: false },
             OSO_NIEVE: { name: 'Oso de nieve', color: '#e5e7eb', speed: 0.72, canFly: false, winterRole: 'bear', contactDamage: 0 },
             ESTORBADOR_HIELO: { name: 'Estorbador', color: '#93c5fd', speed: 0.52, canFly: false, winterRole: 'obstructor', contactDamage: 0 }
         };
-
-        // v6.10.2: velocidad base compartida por spawn inicial y refuerzos.
-        // El escalado dinámico de amenaza se aplica una sola vez en la IA.
-        function getEnemyBaseSpeedV610(type) {
-            const roomMult = Number(gameState.roomType?.enemySpeedMult);
-            const difficultyMult = Number(gameState.difficulty?.enemySpeedMult);
-            return Math.max(0.1, Number(type?.speed) || 1) * (Number.isFinite(roomMult) ? roomMult : 1)
-              * (Number.isFinite(difficultyMult) ? difficultyMult : 1);
-        }
-
-        window.getEnemyBaseSpeedV610 = getEnemyBaseSpeedV610;
 
         // v3.24: perfiles de comportamiento separados del tipo visual/fisico.
         // Cada enemigo conserva un solo arquetipo durante toda la vida de la entidad.
@@ -449,7 +466,7 @@ const UI = {};
             AGGRESSIVE: Object.freeze({
                 id: 'aggressive', label: 'Agresivo', distanceWeight: 3.35, distanceLookaheadWeight: 0.9,
                 sameDirectionBonus: 1.8, reversePenalty: 8, branchPreference: 0.15, recentPenalty: 0.9,
-                loopPenalty: 0.8, turnCommitMs: 145, speedMultiplier: 1.00
+                loopPenalty: 0.8, turnCommitMs: 145, speedMultiplier: 1.08
             }),
             FLYER: Object.freeze({
                 id: 'flyer', label: 'Volador', distanceWeight: 3.05, distanceLookaheadWeight: 0.78,

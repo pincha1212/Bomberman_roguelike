@@ -394,36 +394,18 @@ const UI = {};
         function applyPowerupV67(type){
             const key = String(type || '');
 
-            // Capacidades permanentes: el pickup real pasa por la fuente declarativa
-            // de capacidades, no por un segundo sistema de estado.
+            // Las capacidades de interacción tienen su propia fuente de verdad.
+            // El pickup pasa por acá, pero no se duplica la lógica en POWERUP_DEFS_V67.
             if ((key === 'KICK' || key === 'GRAB' || key === 'THROW') && typeof activateCapabilityPowerupV681 === 'function') {
                 const applied = !!activateCapabilityPowerupV681(player, key);
-                if (typeof updateUI==='function') updateUI();
+                if (applied && typeof updateUI === 'function') updateUI();
                 return applied;
-            }
-
-            // BOMB_UP/FIRE_UP siguen siendo reliquias en gameplay normal.
-            // En Test Lab se habilitan para que el estante pueda probar realmente
-            // todas las mejoras base que declara el laboratorio.
-            if (key === POWERUPS.BOMB_UP || key === POWERUPS.FIRE_UP) {
-                const testLab = !!window.BOMBER_TEST_MODE_V53 && !!window.BOMBER_ENGINE?.isTestLabNeutral?.();
-                if (!testLab) {
-                    if (typeof addFloatingText==='function') addFloatingText('SOLO RELIQUIA',player.x,player.y,'#c084fc');
-                    return false;
-                }
-                const capKey = key === POWERUPS.BOMB_UP ? 'maxBombs' : 'bombRange';
-                const hardCap = Number(PLAYER_LIMITS_V67.hard[capKey]) || 1;
-                const current = Number(player[capKey]) || 1;
-                if (current >= hardCap) return false;
-                player[capKey] = Math.min(current + 1, hardCap);
-                clampPlayerCapacitiesV67();
-                if (typeof updateUI==='function') updateUI();
-                return true;
             }
 
             const def=POWERUP_DEFS_V67[key]; if(!def) return false;
             const applied=!!def.apply();
             clampPlayerCapacitiesV67();
+            if((type===POWERUPS.BOMB_UP||type===POWERUPS.FIRE_UP)&&typeof addFloatingText==='function') addFloatingText('SOLO RELIQUIA',player.x,player.y,'#c084fc');
             if(typeof updateUI==='function') updateUI();
             return applied;
         }

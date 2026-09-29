@@ -418,10 +418,12 @@
 
     function handleBombActionV682() {
         const player = getPlayer();
-        if (!player) return false;
+        if (!player || !entityCanUse(player, 'grab')) return false;
         const carried = getCarriedBombForEntity(player);
-        if (!carried) return false;
-        return releaseCarriedBombV682(player, 'drop');
+        if (carried) return releaseCarriedBombV682(player, 'drop');
+        const bomb = getFacingAdjacentGrabBomb(player);
+        if (!bomb) return false;
+        return grabBombV682(player, bomb);
     }
 
     global.getCarriedBombForEntityV682 = getCarriedBombForEntity;

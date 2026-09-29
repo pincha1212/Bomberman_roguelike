@@ -307,7 +307,7 @@ function requestBombPlacement(reason='press'){
     // GRAB es una acción explícita: con el powerup activo, una pulsación de
     // bomba intenta primero recoger/dejar una bomba. Solo si no hay una acción
     // de GRAB válida se comporta como el botón clásico de colocar bomba.
-    if (reason === 'press' && typeof window.tryGrabPlayerBombV610 === 'function' && player?.grabTimer > 0) {
+    if (reason === 'press' && typeof window.tryGrabPlayerBombV610 === 'function' && typeof window.isGrabActiveV681 === 'function' && window.isGrabActiveV681(player)) {
         const grabResult = window.tryGrabPlayerBombV610();
         if (grabResult) return true;
     }
@@ -576,7 +576,15 @@ function bombUpdate(dt){
     player.bombCooldown=Math.max(0,(player.bombCooldown||0)-dt);
     player.kickTimer=Math.max(0,(player.kickTimer||0)-dt);
     player.kickCooldown=Math.max(0,(player.kickCooldown||0)-dt);
-    tryKickPlayerBombsV67();
+    // v6.11.1: KICK/GRAB tienen una única autoridad física en 55-bomb-interactions.js.
+    if (typeof window.updateBombEntityInteractionsV682 === 'function') {
+        window.updateBombEntityInteractionsV682();
+    }
+    if (typeof window.updateBombKickMotionV682 === 'function') {
+        for (const bomb of gameState.bombs || []) {
+            window.updateBombKickMotionV682(bomb, dt);
+        }
+    }
     updateBombInput(dt);
     markBombEscapeState();
 

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.7.1.1 — Eco de Muerte
+// Bomberman Roguelike v6.11.0 — Death Echo Rework
 // Un eco persistente por profundidad, inspirado en el concepto de fantasma
 // vengativo: conserva una copia inmutable del build que murió y la reutiliza
 // como enemigo autónomo en futuros intentos.
@@ -10,21 +10,21 @@
 // - Sus bombas entran al sistema de bombas/eventos existente con owner propio.
 // - La IA es determinista por decisión: persigue, busca alineación y huye de
 //   explosiones predecibles después de colocar una bomba.
-(function installDeathEchoV631(global) {
+(function installDeathEchoV611(global) {
     'use strict';
 
     const VERSION = '6.11.0';
-    const COMPATIBLE_VERSIONS = new Set(['6.3.0', '6.3.1', '6.5.1', '6.7.0', '6.7.1','6.7.1.1', '6.11.0']);
-    if (global.__DEATH_ECHO_V631_INSTALLED__) return;
-    global.__DEATH_ECHO_V631_INSTALLED__ = true;
+    const COMPATIBLE_VERSIONS = new Set(['6.3.0', '6.3.1', '6.5.1', '6.7.0', '6.7.1', '6.7.1.1', '6.11.0']);
+    if (global.__DEATH_ECHO_V611_INSTALLED__) return;
+    global.__DEATH_ECHO_V611_INSTALLED__ = true;
 
     const STORAGE_KEY = 'bombermanDeathEchoesV63';
     const MAX_ECHOES = 44;
     const GHOST_OWNER = 'death_echo';
-    const DECISION_MS = 200;
-    const BOMB_COOLDOWN_MS = 1400;
+    const DECISION_MS = 120;
+    const BOMB_COOLDOWN_MS = 1600;
     const GHOST_SPATIAL_RANGE = 2;
-    const GHOST_TILE_SPEED = 1.15; // px/frame equivalente; deliberadamente lento
+    const ECHO_SPEED = 1.15;
 
     const state = {
         checkedLevel: null,
@@ -314,96 +314,66 @@
         return 999;
     }
 
-    function chooseSafeStep(ghost) {
-        const start = tileFromGhost(ghost);
-        const target = tileFromPlayer();
-        const danger = collectDangerCells();
-        const dirs = [
-            { dx: 0, dy: 0, bias: 0 },
-            { dx: 1, dy: 0, bias: 1 },
-            { dx: -1, dy: 0, bias: 1 },
-            { dx: 0, dy: 1, bias: 1 },
-            { dx: 0, dy: -1, bias: 1 }
-        ];
-        const ranked = [];
-        for (const dir of dirs) {
-            const x = start.x + dir.dx;
-            const y = start.y + dir.dy;
-            if (!isPassableTile(x, y) || (bombAtTile(x, y) && !(x === start.x && y === start.y))) continue;
-            const key = cellKey(x, y);
-            const playerDistanceScore = Math.abs(x - target.x) + Math.abs(y - target.y);
-            ranked.push({ x, y, score: (danger.has(key) ? -1200 : 0) + playerDistanceScore * 8 + pathDistance({x, y}, target, danger) * 2 + dir.bias });
-        }
-        ranked.sort((a, b) => b.score - a.score || a.y - b.y || a.x - b.x);
-        return ranked[0] || start;
+    function playerDistance(a, b) {
+        return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
     }
 
-    function chooseStep(ghost) {
+    function chooseEscapeTile(ghost, bomb) {
         const start = tileFromGhost(ghost);
-        const playerTile = tileFromPlayer();
-        const danger = collectDangerCells();
-        if (danger.has(cellKey(start.x, start.y)) || ghost.aiMode === 'ESCAPE') return chooseSafeStep(ghost);
-
-        const attack = chooseTwoTileBombTarget(ghost);
-        if (attack) {
-            const moves = [[1,0],[-1,0],[0,1],[0,-1],[0,0]];
-            const ranked = moves.map(([dx,dy]) => {
-                const x=start.x+dx,y=start.y+dy;
-                if(!isPassableTile(x,y) || (bombAtTile(x,y)&&!(x===start.x&&y===start.y))) return null;
-                return {x,y,score:pathDistance({x,y},attack,danger)+(danger.has(cellKey(x,y))?1000:0)};
-            }).filter(Boolean);
-            ranked.sort((a,b)=>a.score-b.score||a.y-b.y||a.x-b.x);
-            return ranked[0] || start;
-        }
-
-        const moves = [[1,0],[-1,0],[0,1],[0,-1],[0,0]];
-        const ranked = moves.map(([dx,dy])=>{
-            const x=start.x+dx,y=start.y+dy;
-            if(!isPassableTile(x,y)||(bombAtTile(x,y)&&!(x===start.x&&y===start.y))) return null;
-            const d=Math.abs(x-playerTile.x)+Math.abs(y-playerTile.y);
-            return {x,y,score:pathDistance({x,y},playerTile,danger)*10+d*2+(danger.has(cellKey(x,y))?1000:0)};
-        }).filter(Boolean);
-        ranked.sort((a,b)=>a.score-b.score||a.y-b.y||a.x-b.x);
-        return ranked[0] || start;
-    }
-
-    function ghostBombCount(ghost) {
-        return (gameState.bombs || []).filter(b => b && b.owner === GHOST_OWNER && b.echoId === ghost.echoId).length;
-    }
-
-    function canGhostEscapeAfterBombAt(ghost, targetTile) {
-        const start = tileFromGhost(ghost);
-        const testBomb = { x: targetTile.x, y: targetTile.y, range: ghost.bombRange };
-        const blastCells = typeof calculateBombBlastCells === 'function' ? calculateBombBlastCells(testBomb) : [];
+        const blastCells = typeof calculateBombBlastCells === 'function'
+            ? calculateBombBlastCells(bomb)
+            : [];
         const blast = new Set(blastCells.map(cell => cellKey(Number(cell.x), Number(cell.y))));
-        const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        for (const key of collectDangerCells()) blast.add(key);
         const queue = [{ x: start.x, y: start.y, distance: 0 }];
         const visited = new Set([cellKey(start.x, start.y)]);
-        const MAX_ESCAPE_STEPS = Math.max(5, ghost.bombRange + 3);
-
-        // El fantasma lanza la bomba lejos de sí. Su supervivencia se calcula
-        // desde su posición actual hasta una celda fuera del blast del objetivo.
-        if (!blast.has(cellKey(start.x, start.y))) return true;
+        const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        let fallback = null;
 
         while (queue.length) {
             const current = queue.shift();
+            const currentKey = cellKey(current.x, current.y);
+            if (!blast.has(currentKey) && !(current.x === start.x && current.y === start.y)) {
+                return { x: current.x, y: current.y, distance: current.distance };
+            }
+            if (current.distance >= Math.max(4, ghost.bombRange + 2)) continue;
+
             for (const [dx, dy] of dirs) {
                 const x = current.x + dx;
                 const y = current.y + dy;
                 const key = cellKey(x, y);
                 if (visited.has(key) || !isPassableTile(x, y) || bombAtTile(x, y)) continue;
-                const distance = current.distance + 1;
                 visited.add(key);
-
-                if (!blast.has(key) && distance <= MAX_ESCAPE_STEPS) return true;
-                if (distance < MAX_ESCAPE_STEPS) queue.push({ x, y, distance });
+                const next = { x, y, distance: current.distance + 1 };
+                if (!blast.has(key) && !fallback) fallback = next;
+                queue.push(next);
             }
         }
-        return false;
+        return fallback;
     }
 
-    function playerDistance(a, b) {
-        return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    function chooseSafeStep(ghost, targetTile = null) {
+        const start = tileFromGhost(ghost);
+        const target = targetTile || tileFromPlayer();
+        const danger = collectDangerCells();
+        const dirs = [
+            { dx: 0, dy: 0 },
+            { dx: 1, dy: 0 }, { dx: -1, dy: 0 },
+            { dx: 0, dy: 1 }, { dx: 0, dy: -1 }
+        ];
+        const ranked = [];
+        for (const dir of dirs) {
+            const x = start.x + dir.dx;
+            const y = start.y + dir.dy;
+            if (!isPassableTile(x, y)) continue;
+            if (bombAtTile(x, y) && !(x === start.x && y === start.y)) continue;
+            const key = cellKey(x, y);
+            const dangerPenalty = danger.has(key) ? 100000 : 0;
+            const distance = pathDistance({ x, y }, target, danger);
+            ranked.push({ x, y, score: dangerPenalty + distance * 4 + Math.abs(x - target.x) + Math.abs(y - target.y) });
+        }
+        ranked.sort((a, b) => a.score - b.score || a.y - b.y || a.x - b.x);
+        return ranked[0] || start;
     }
 
     function canGhostTraceRouteToPlayer(ghost, danger = collectDangerCells()) {
@@ -411,86 +381,169 @@
         const start = tileFromGhost(ghost);
         const target = tileFromPlayer();
         if (!isInsideGrid(start.x, start.y) || !isInsideGrid(target.x, target.y)) return false;
-
-        // La ruta puede rodear bombas/explosiones, pero no puede atravesar
-        // paredes ni otras celdas físicamente bloqueadas. Si el jugador está
-        // separado por una barrera, el eco NO tiene ataque válido todavía.
         return pathDistance(start, target, danger) < 999;
     }
 
-    function chooseTwoTileBombTarget(ghost) {
-        const target = tileFromPlayer();
-        const start = tileFromGhost(ghost);
-        const danger = collectDangerCells();
-        if (!canGhostTraceRouteToPlayer(ghost, danger)) return null;
-        if (playerDistance(start, target) !== GHOST_SPATIAL_RANGE) return null;
-        const blastCells = typeof calculateBombBlastCells === 'function' ? calculateBombBlastCells({ x:start.x, y:start.y, range:ghost.bombRange }) : [];
-        const hitsPlayer = blastCells.some(cell=>Number(cell.x)===target.x&&Number(cell.y)===target.y);
-        if (!hitsPlayer || danger.has(cellKey(start.x,start.y)) || bombAtTile(start.x,start.y)) return null;
-        return {x:start.x,y:start.y};
+    function chooseAttackTile(ghost) {
+        const ghostTile = tileFromGhost(ghost);
+        const playerTile = tileFromPlayer();
+        const distance = playerDistance(ghostTile, playerTile);
+
+        // El Echo ataca desde su propia casilla. La posición debe estar
+        // exactamente a dos tiles del jugador y alineada cardinalmente.
+        if (distance !== GHOST_SPATIAL_RANGE) return null;
+        if (ghostTile.x !== playerTile.x && ghostTile.y !== playerTile.y) return null;
+        if (!isPassableTile(ghostTile.x, ghostTile.y) || bombAtTile(ghostTile.x, ghostTile.y)) return null;
+
+        const blast = typeof calculateBombBlastCells === 'function'
+            ? calculateBombBlastCells({ x: ghostTile.x, y: ghostTile.y, range: ghost.bombRange })
+            : [];
+        const hitsPlayer = blast.some(cell => Number(cell.x) === playerTile.x && Number(cell.y) === playerTile.y);
+        if (!hitsPlayer) return null;
+
+        const testBomb = { x: ghostTile.x, y: ghostTile.y, range: ghost.bombRange };
+        const escape = chooseEscapeTile(ghost, testBomb);
+        if (!escape) return null;
+        return { x: ghostTile.x, y: ghostTile.y, escape };
     }
 
-    function createGhostBomb(ghost) {
-        if (!ghost || !gameState.isPlaying || gameState.paused) return false;
+    function ghostBombCount(ghost) {
+        return (gameState.bombs || []).filter(b => b && b.owner === GHOST_OWNER && b.echoId === ghost.echoId).length;
+    }
+
+    function createGhostBomb(ghost, targetTile) {
+        if (!ghost || !targetTile || !gameState.isPlaying || gameState.paused) return false;
         if (ghostBombCount(ghost) >= ghost.maxBombs) return false;
         if (state.bombCooldown > 0) return false;
 
         const ghostTile = tileFromGhost(ghost);
-        const playerTile = tileFromPlayer();
-        if (playerDistance(ghostTile, playerTile) !== GHOST_SPATIAL_RANGE) return false;
+        if (ghostTile.x !== targetTile.x || ghostTile.y !== targetTile.y) return false;
         if (!isPassableTile(ghostTile.x, ghostTile.y) || bombAtTile(ghostTile.x, ghostTile.y)) return false;
-        if (!canGhostEscapeAfterBombAt(ghost, ghostTile)) return false;
 
-        const baseFuse = gameState.roomType?.id === 'CURSED' ? BOMB_HANDLING.cursedFuse : BOMB_HANDLING.normalFuse;
+        const baseFuse = gameState.roomType?.id === 'CURSED'
+            ? BOMB_HANDLING.cursedFuse
+            : BOMB_HANDLING.normalFuse;
         const fuseTotal = Math.max(700, Math.round(baseFuse * ghost.bombFuseMultiplier));
-        const startX = (ghostTile.x + 0.5) * TILE_SIZE;
-        const startY = (ghostTile.y + 0.5) * TILE_SIZE;
+        const gx = ghostTile.x;
+        const gy = ghostTile.y;
+        const worldX = (gx + 0.5) * TILE_SIZE;
+        const worldY = (gy + 0.5) * TILE_SIZE;
 
         const bomb = {
             id: `echo-bomb-${ghost.echoId}-${gameState.animFrame}-${Math.random().toString(36).slice(2, 6)}`,
-            owner: GHOST_OWNER, echoId: ghost.echoId,
-            x: ghostTile.x, y: ghostTile.y, range: ghost.bombRange,
-            timer: fuseTotal, fuseTotal, warnBucket: Math.ceil(fuseTotal / 300), scalePulse: 1,
-            state: typeof BOMB_V4_STATES !== 'undefined' ? BOMB_V4_STATES.ARMED : 'armed',
-            motionState: 'armed', worldX: startX, worldY: startY,
-            playerPassThrough: false, justArmed: false, placedAtFrame: gameState.animFrame,
-            placementReason: 'death-echo', spatialRange: GHOST_SPATIAL_RANGE,
-            countsTowardPlayerCapacity: false, canCarry: false, carriedBy: null,
-            motionQueue: [], preserveTimerOnArm: true
+            owner: GHOST_OWNER,
+            echoId: ghost.echoId,
+            x: gx,
+            y: gy,
+            range: ghost.bombRange,
+            timer: fuseTotal,
+            fuseTotal,
+            warnBucket: Math.ceil(fuseTotal / 300),
+            scalePulse: 1,
+            playerPassThrough: false,
+            justArmed: false,
+            placedAtFrame: gameState.animFrame,
+            placementReason: 'death-echo-placed',
+            state: BOMB_V4_STATES.ARMED,
+            motionState: 'idle',
+            worldX,
+            worldY,
+            motionProgress: 1,
+            motionTimer: 0,
+            motionDuration: 0,
+            motionStartX: worldX,
+            motionStartY: worldY,
+            motionTargetX: worldX,
+            motionTargetY: worldY,
+            motionArc: 0,
+            motionRotation: 0,
+            motionRotationSpeed: 0,
+            bobPhase: 0,
+            motionQueue: [],
+            preserveTimerOnArm: false,
+            countsTowardPlayerCapacity: false,
+            canKick: false,
+            canPush: false,
+            canCarry: false,
+            carriedBy: null
         };
 
         gameState.bombs.push(bomb);
         state.bombCooldown = BOMB_COOLDOWN_MS;
-        ghost.lastAttackTarget = { x: playerTile.x, y: playerTile.y };
-        ghost.attackFlash = 120;
-        ghost.aiMode = 'ESCAPE';
-        ghost.aiModeTimer = 0;
-        if (typeof addParticles === 'function') addParticles(startX, startY, 'particleDanger', 8);
+        ghost.mode = 'ESCAPE';
+        ghost.escapeTargetTile = targetTile.escape || null;
+        ghost.lastAttackTarget = { x: gx, y: gy };
+        ghost.attackFlash = 180;
+        if (typeof addParticles === 'function') addParticles(worldX, worldY, 'particleDanger', 8);
+        if (typeof sfx === 'function') sfx('bomb');
         return true;
+    }
+
+    function chooseChaseStep(ghost) {
+        const start = tileFromGhost(ghost);
+        const target = tileFromPlayer();
+        const danger = collectDangerCells();
+        const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        const candidates = [];
+
+        for (const [dx, dy] of dirs) {
+            const x = start.x + dx;
+            const y = start.y + dy;
+            if (!isPassableTile(x, y) || bombAtTile(x, y)) continue;
+            const key = cellKey(x, y);
+            if (danger.has(key)) continue;
+            const distance = pathDistance({ x, y }, target, danger);
+            if (distance >= 999) continue;
+            candidates.push({ x, y, score: distance * 4 + Math.abs(x - target.x) + Math.abs(y - target.y) });
+        }
+        candidates.push({ x: start.x, y: start.y, score: pathDistance(start, target, danger) * 4 });
+        candidates.sort((a, b) => a.score - b.score || a.y - b.y || a.x - b.x);
+        return candidates[0] || start;
     }
 
     function moveGhostToward(ghost, targetTile, dt) {
         if (!ghost || !targetTile) return false;
-        const current = tileFromGhost(ghost);
-        const targetX = targetTile.x * TILE_SIZE + TILE_SIZE / 2 - ghost.width / 2;
-        const targetY = targetTile.y * TILE_SIZE + TILE_SIZE / 2 - ghost.height / 2;
-        const dx = targetX - ghost.x;
-        const dy = targetY - ghost.y;
-        if (Math.abs(dx) > 0.5 && Math.abs(dy) > 0.5) return false;
-        const distance = Math.abs(dx) + Math.abs(dy);
-        if (distance <= 0.5) { ghost.x = targetX; ghost.y = targetY; ghost.moving = false; return true; }
-        const frameScale = Math.max(0.25, Math.min(2, number(dt, 16.6667) / 16.6667));
-        const step = Math.min(GHOST_TILE_SPEED * frameScale, distance);
-        if (Math.abs(dx) >= Math.abs(dy)) {
-            ghost.x += Math.sign(dx) * step;
-            ghost.dir = dx < 0 ? 'left' : 'right';
-        } else {
-            ghost.y += Math.sign(dy) * step;
-            ghost.dir = dy < 0 ? 'up' : 'down';
+        if (ghost._tileMoveActive) {
+            const result = gridAdvanceTileMove(ghost, ghost.speed, dt, { kind: 'enemy', allowCurrentBombTile: false });
+            if (result.arrived) {
+                ghost.moving = false;
+                ghost.moveDistance += TILE_SIZE;
+                return true;
+            }
+            ghost.moving = true;
+            return true;
         }
-        ghost.moving = step > 0.01;
-        ghost.moveDistance += step;
-        if (step >= distance - 0.01) { ghost.x = targetX; ghost.y = targetY; ghost.moving = false; return true; }
+
+        const current = tileFromGhost(ghost);
+        if (current.x === targetTile.x && current.y === targetTile.y) {
+            gridSnapEntityToTile(ghost, current.x, current.y, 'enemy');
+            ghost.moving = false;
+            return false;
+        }
+
+        const dx = targetTile.x - current.x;
+        const dy = targetTile.y - current.y;
+        let stepX = 0;
+        let stepY = 0;
+        if (Math.abs(dx) >= Math.abs(dy) && dx !== 0) stepX = Math.sign(dx);
+        else if (dy !== 0) stepY = Math.sign(dy);
+        else return false;
+
+        const gx = current.x + stepX;
+        const gy = current.y + stepY;
+        if (!gridBeginTileMove(ghost, gx, gy, { kind: 'enemy', allowCurrentBombTile: false })) {
+            ghost.moving = false;
+            return false;
+        }
+
+        ghost.dir = stepX < 0 ? 'left' : stepX > 0 ? 'right' : stepY < 0 ? 'up' : 'down';
+        ghost.lastDirection = ghost.dir;
+        ghost.moving = true;
+        const result = gridAdvanceTileMove(ghost, ghost.speed, dt, { kind: 'enemy', allowCurrentBombTile: false });
+        if (result.arrived) {
+            ghost.moving = false;
+            ghost.moveDistance += TILE_SIZE;
+        }
         return true;
     }
 
@@ -579,7 +632,7 @@
             y: spawn.y * TILE_SIZE + TILE_SIZE / 2 - TILE_SIZE * 0.68 / 2,
             width: TILE_SIZE * 0.68,
             height: TILE_SIZE * 0.68,
-            speed: clamp(number(build.speed, number(build.sourceSpeed, 3)), 1, 8),
+            speed: ECHO_SPEED,
             sourceSpeed: clamp(number(build.sourceSpeed, 3), 1, 8),
             maxBombs: clamp(Math.floor(number(build.maxBombs, 1)), 1, 8),
             bombRange: Math.max(GHOST_SPATIAL_RANGE, clamp(Math.floor(number(build.bombRange, 1)), 1, 12)),
@@ -596,8 +649,14 @@
             moveDistance: 0,
             moving: false,
             aiTargetTile: null,
-            aiMode: 'HUNT',
-            aiModeTimer: 0
+            mode: 'HUNT',
+            escapeTargetTile: null,
+            _tileMoveActive: false,
+            _tileMoveTargetX: 0,
+            _tileMoveTargetY: 0,
+            _tileMoveTargetGX: spawn.x,
+            _tileMoveTargetGY: spawn.y,
+            __gridAnchor: 'center'
         };
 
         ghost.echoStrength = Object.freeze({
@@ -613,14 +672,8 @@
         state.active = ghost;
         gameState.deathEchoV61 = ghost;
         state.decisionTimer = 0;
-        state.bombCooldown = 450;
+        state.bombCooldown = 0;
         return ghost;
-    }
-
-    function dangerCellForEcho(ghost) {
-        const danger = collectDangerCells();
-        const t = tileFromGhost(ghost);
-        return danger.has(cellKey(t.x, t.y));
     }
 
     function updateDeathEchoV61(dt) {
@@ -633,41 +686,74 @@
         ghost.hitFlash = Math.max(0, ghost.hitFlash - number(dt, 16));
         ghost.attackFlash = Math.max(0, ghost.attackFlash - number(dt, 16));
 
-        const target = tileFromPlayer();
         const ghostTile = tileFromGhost(ghost);
-        const distance = Math.abs(ghostTile.x - target.x) + Math.abs(ghostTile.y - target.y);
+        const activeEchoBombs = (gameState.bombs || []).filter(b =>
+            b && b.owner === GHOST_OWNER && b.echoId === ghost.echoId && b.state !== BOMB_V4_STATES.EXPLODING
+        );
+        const danger = collectDangerCells();
 
-        if (state.decisionTimer <= 0) {
+        // ESCAPE tiene prioridad absoluta: el Echo nunca sigue persiguiendo
+        // mientras una bomba propia puede matarlo.
+        if (ghost.mode === 'ESCAPE' && activeEchoBombs.length) {
+            const bomb = activeEchoBombs[0];
+            const escape = ghost.escapeTargetTile || chooseEscapeTile(ghost, bomb);
+            if (escape) {
+                ghost.aiTargetTile = escape;
+                moveGhostToward(ghost, escape, dt);
+            } else {
+                const safe = chooseSafeStep(ghost, tileFromPlayer());
+                moveGhostToward(ghost, safe, dt);
+            }
+            ghost.visualTime += Math.max(0, number(dt, 16));
+            return;
+        }
+
+        if (ghost.mode === 'ESCAPE') {
+            ghost.mode = 'HUNT';
+            ghost.escapeTargetTile = null;
+            ghost.aiTargetTile = null;
+        }
+
+        // Si quedó parado en una casilla peligrosa por una explosión externa,
+        // escapar tiene prioridad sobre cualquier ataque.
+        if (danger.has(cellKey(ghostTile.x, ghostTile.y))) {
+            const safe = chooseSafeStep(ghost, tileFromPlayer());
+            moveGhostToward(ghost, safe, dt);
+            ghost.visualTime += Math.max(0, number(dt, 16));
+            return;
+        }
+
+        if (state.decisionTimer <= 0 && !ghost._tileMoveActive) {
             state.decisionTimer = DECISION_MS;
             state.aiStep++;
 
-            // Prioridad 1: ataque espacial. Solo existe si el eco puede trazar
-            // una ruta físicamente válida hasta el jugador y, además, hasta la
-            // casilla concreta desde la que lanzará la bomba.
-            if (ghost.aiMode !== 'ESCAPE') {
-                const attackTarget = chooseTwoTileBombTarget(ghost);
-                if (attackTarget) createGhostBomb(ghost);
-            } else if (!dangerCellForEcho(ghost)) {
-                ghost.aiMode = 'HUNT';
+            const attackTarget = chooseAttackTile(ghost);
+            if (attackTarget && createGhostBomb(ghost, attackTarget)) {
+                ghost.aiTargetTile = null;
+                ghost.visualTime += Math.max(0, number(dt, 16));
+                return;
             }
 
-            // Solo elegimos el siguiente destino aquí. El desplazamiento ocurre
-            // cada frame abajo, con dt real.
-            state.smoothMoveTarget = chooseStep(ghost);
-            ghost.aiTargetTile = state.smoothMoveTarget;
+            // El Echo primero intenta acercarse. Si no existe ruta directa,
+            // pathDistance mantiene la navegación cardinal alrededor de paredes.
+            ghost.aiTargetTile = chooseChaseStep(ghost);
+        }
+
+        if (ghost.aiTargetTile && !ghost._tileMoveActive) {
+            const current = tileFromGhost(ghost);
+            if (current.x === ghost.aiTargetTile.x && current.y === ghost.aiTargetTile.y) {
+                ghost.aiTargetTile = null;
+            }
         }
 
         if (ghost.aiTargetTile) {
             const reached = moveGhostToward(ghost, ghost.aiTargetTile, dt);
-            const current = tileFromGhost(ghost);
-            if (!reached || (current.x === ghost.aiTargetTile.x && current.y === ghost.aiTargetTile.y)) {
+            if (!reached || (!ghost._tileMoveActive && tileFromGhost(ghost).x === ghost.aiTargetTile.x && tileFromGhost(ghost).y === ghost.aiTargetTile.y)) {
                 ghost.aiTargetTile = null;
-                state.smoothMoveTarget = null;
-                // El siguiente destino se decide enseguida: no dejamos una pausa
-                // artificial de hasta DECISION_MS en cada intersección.
                 state.decisionTimer = 0;
             }
         }
+
         ghost.visualTime += Math.max(0, number(dt, 16));
 
         const playerRect = {

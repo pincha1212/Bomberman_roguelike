@@ -304,12 +304,17 @@ function isRecentMovementInput(){
 function requestBombPlacement(reason='press'){
     if (!gameState.isPlaying || gameState.paused) return false;
 
-    // GRAB/THROW son acciones explícitas. Si existe una bomba transportada,
-    // la pulsación se consume para lanzarla o soltarla; si no existe, GRAB
-    // intenta recoger una bomba adyacente antes de colocar una nueva.
-    if (reason === 'press' && typeof window.handlePlayerBombActionV683 === 'function') {
-        const interactionResult = window.handlePlayerBombActionV683();
-        if (interactionResult) return true;
+    // GRAB es una acción explícita: con el powerup activo, una pulsación de
+    // bomba intenta primero recoger/dejar una bomba. Solo si no hay una acción
+    // de GRAB válida se comporta como el botón clásico de colocar bomba.
+    if (reason === 'press' && typeof window.tryGrabPlayerBombV610 === 'function') {
+        const grabActive = typeof window.isGrabActiveV681 === 'function'
+            ? !!window.isGrabActiveV681(player)
+            : !!(player?.grabTimer > 0);
+        if (grabActive) {
+            const grabResult = window.tryGrabPlayerBombV610();
+            if (grabResult) return true;
+        }
     }
 
     if (reason === 'press' && isRecentMovementInput()) return false;
@@ -576,7 +581,7 @@ function bombUpdate(dt){
     player.bombCooldown=Math.max(0,(player.bombCooldown||0)-dt);
     player.kickTimer=Math.max(0,(player.kickTimer||0)-dt);
     player.kickCooldown=Math.max(0,(player.kickCooldown||0)-dt);
-    if (typeof window.updateBombEntityInteractionsV682 === 'function') window.updateBombEntityInteractionsV682();
+    tryKickPlayerBombsV67();
     updateBombInput(dt);
     markBombEscapeState();
 
@@ -595,17 +600,8 @@ function bombUpdate(dt){
         bomb.timer-=dt;
         if(bomb.timer<=0) bomb.pendingDetonation=true;
 
-        if (bomb.interactionMotionV682 === 'kick' && typeof window.updateBombKickMotionV682 === 'function') {
-            window.updateBombKickMotionV682(bomb, dt);
-        } else {
-            updateBombV4Motion(bomb, dt);
-        }
+        updateBombV4Motion(bomb, dt);
         ensureBombV4State(bomb);
-        if (bomb.state === BOMB_V4_STATES.ARMED && bomb.interactionMotionV682 === 'throw') {
-            bomb.interactionMotionV682 = null;
-            bomb.interactionActorV682 = null;
-            bomb.motionDirection = null;
-        }
 
         if(bomb.state !== BOMB_V4_STATES.ARMED) continue;
         if(bomb.timer>0 && bomb.timer<=BOMB_HANDLING.warningStart){

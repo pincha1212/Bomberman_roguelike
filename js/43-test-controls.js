@@ -596,7 +596,10 @@
         };
         push('Capacidades KICK/GRAB declaradas', capabilityAudit.kickEligible && capabilityAudit.grabEligible);
         push('KICK/GRAB inactivos al reset', capabilityAudit.initiallyInactive);
+        const activeCaps = typeof global.getActiveCapabilityPowerupsV681 === 'function' ? global.getActiveCapabilityPowerupsV681(player) : [];
         push('KICK y GRAB pueden coexistir', !global.CAPABILITY_POWERUPS_V681?.KICK?.exclusiveGroup && !global.CAPABILITY_POWERUPS_V681?.GRAB?.exclusiveGroup);
+        push('Capacidades aplicables desde Test Lab', ['KICK','GRAB'].every(type => typeof global.activateCapabilityPowerupV681 === 'function' && !!global.CAPABILITY_POWERUPS_V681?.[type]));
+        if (activeCaps.includes('THROW')) push('THROW requiere GRAB activo', activeCaps.includes('GRAB'));
         push('THROW registrado', labTypes.includes('THROW') && !!global.CAPABILITY_POWERUPS_V681?.THROW);
         push('THROW requiere GRAB', Array.isArray(global.CAPABILITY_POWERUPS_V681?.THROW?.requires) && global.CAPABILITY_POWERUPS_V681.THROW.requires.includes('grab'));
 

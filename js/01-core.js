@@ -383,34 +383,62 @@ const UI = {};
         }
 
         const POWERUP_DEFS_V67 = Object.freeze({
-            [POWERUPS.BOMB_UP]: Object.freeze({ id:POWERUPS.BOMB_UP, label:'BOMBA', apply:()=>false }),
-            [POWERUPS.FIRE_UP]: Object.freeze({ id:POWERUPS.FIRE_UP, label:'RANGO', apply:()=>false }),
+            [POWERUPS.BOMB_UP]: Object.freeze({
+                id:POWERUPS.BOMB_UP, label:'BOMBA',
+                apply:()=>{
+                    const cap = getPlayerCapacityCapsV67();
+                    if (player.maxBombs >= cap.maxBombs) return false;
+                    player.maxBombs = Math.min(cap.maxBombs, player.maxBombs + 1);
+                    return true;
+                }
+            }),
+            [POWERUPS.FIRE_UP]: Object.freeze({
+                id:POWERUPS.FIRE_UP, label:'RANGO',
+                apply:()=>{
+                    const cap = getPlayerCapacityCapsV67();
+                    if (player.bombRange >= cap.bombRange) return false;
+                    player.bombRange = Math.min(cap.bombRange, player.bombRange + 1);
+                    return true;
+                }
+            }),
             [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'BOTAS', apply:()=>{ player.speed=Math.min(player.speed+0.4,6); return true; } }),
-            [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', apply:()=>{ player.health=Math.min(player.health+1,player.maxHealth); return true; } }),
-            [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', apply:()=>{ player.hasShield=true; return true; } }),
-            [POWERUPS.BOMB_KICK]: Object.freeze({ id:POWERUPS.BOMB_KICK, label:'PATADA', apply:()=>{ player.kickTimer=PLAYER_LIMITS_V67.kickDurationMs; return true; } })
+            [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', apply:()=>{ if(player.health>=player.maxHealth) return false; player.health=Math.min(player.health+1,player.maxHealth); return true; } }),
+            [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', apply:()=>{ if(player.hasShield) return false; player.hasShield=true; return true; } }),
+            [POWERUPS.BOMB_KICK]: Object.freeze({ id:POWERUPS.BOMB_KICK, label:'PATADA', apply:()=>{
+                if (typeof activateCapabilityPowerupV681 === 'function') return !!activateCapabilityPowerupV681(player, 'KICK');
+                return false;
+            } })
         });
 
         function applyPowerupV67(type){
             const key = String(type || '');
-
-            // Las capacidades de interacción tienen su propia fuente de verdad.
-            // El pickup pasa por acá, pero no se duplica la lógica en POWERUP_DEFS_V67.
-            if ((key === 'KICK' || key === 'GRAB' || key === 'THROW') && typeof activateCapabilityPowerupV681 === 'function') {
+            if (['KICK','GRAB','THROW'].includes(key) && typeof activateCapabilityPowerupV681 === 'function') {
                 const applied = !!activateCapabilityPowerupV681(player, key);
-                if (applied && typeof updateUI === 'function') updateUI();
+                if (applied && typeof addFloatingText==='function') {
+                    const labels = { KICK:'PATADA', GRAB:'AGARRE', THROW:'LANZAMIENTO' };
+                    addFloatingText(`✓ ${labels[key]}`, player.x, player.y, '#67e8f9');
+                }
+                if (typeof updateUI==='function') updateUI();
                 return applied;
             }
-
             const def=POWERUP_DEFS_V67[key]; if(!def) return false;
             const applied=!!def.apply();
             clampPlayerCapacitiesV67();
-            if((type===POWERUPS.BOMB_UP||type===POWERUPS.FIRE_UP)&&typeof addFloatingText==='function') addFloatingText('SOLO RELIQUIA',player.x,player.y,'#c084fc');
+            if(!applied && typeof addFloatingText==='function') addFloatingText('LÍMITE ALCANZADO',player.x,player.y,'#f97316');
             if(typeof updateUI==='function') updateUI();
             return applied;
         }
 
-        function getPowerupDropPoolV67(){ return Object.freeze([POWERUPS.SPEED_UP,POWERUPS.HEALTH_UP,POWERUPS.SHIELD_UP,POWERUPS.BOMB_KICK]); }
+        function getPowerupDropPoolV67(){
+            return Object.freeze([
+                POWERUPS.BOMB_UP,
+                POWERUPS.FIRE_UP,
+                POWERUPS.SPEED_UP,
+                POWERUPS.HEALTH_UP,
+                POWERUPS.SHIELD_UP,
+                POWERUPS.BOMB_KICK
+            ]);
+        }
 
         window.PLAYER_LIMITS_V67=PLAYER_LIMITS_V67;
         window.POWERUP_DEFS_V67=POWERUP_DEFS_V67;

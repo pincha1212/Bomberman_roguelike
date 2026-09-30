@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.10.3 — Gameplay Test Lab power-up integration
+// Bomberman Roguelike v6.7.6 — Gameplay Test Lab
 // ?test=1 convierte el runtime en un entorno neutral para verificar gameplay real.
 (function initTestLabV675(global) {
     'use strict';
@@ -19,14 +19,14 @@
     const BASE_POWERUP_TYPES = Object.freeze(['BOMB_UP', 'FIRE_UP', 'SPEED_UP', 'HEALTH_UP', 'SHIELD_UP']);
     const CAPABILITY_POWERUP_TYPES = Object.freeze(['KICK', 'GRAB', 'THROW']);
     const BASE_POWERUP_META = Object.freeze({
-        BOMB_UP: { id:'BOMB_UP', name:'BOMBA', icon:'💣', rarity:'BASE', category:'BASE', desc:'Aumenta maxBombs en 1 hasta el límite duro del jugador.', implemented:true },
-        FIRE_UP: { id:'FIRE_UP', name:'RANGO', icon:'🔥', rarity:'BASE', category:'BASE', desc:'Aumenta bombRange en 1 hasta el límite duro del jugador.', implemented:true },
+        BOMB_UP: { id:'BOMB_UP', name:'BOMBA', icon:'💣', rarity:'BASE', category:'BASE', desc:'Aumenta maxBombs en 1 hasta el límite actual; las reliquias pueden ampliar ese límite.', implemented:true },
+        FIRE_UP: { id:'FIRE_UP', name:'RANGO', icon:'🔥', rarity:'BASE', category:'BASE', desc:'Aumenta bombRange en 1 hasta el límite actual; las reliquias pueden ampliar ese límite.', implemented:true },
         SPEED_UP: { id:'SPEED_UP', name:'BOTAS', icon:'👟', rarity:'BASE', category:'BASE', desc:'Aumenta la velocidad del jugador mediante el pickup real.', implemented:true },
         HEALTH_UP: { id:'HEALTH_UP', name:'VIDA', icon:'❤️', rarity:'BASE', category:'BASE', desc:'Recupera 1 punto de vida, limitado por maxHealth.', implemented:true },
         SHIELD_UP: { id:'SHIELD_UP', name:'ESCUDO', icon:'🛡️', rarity:'BASE', category:'BASE', desc:'Activa el escudo mediante el sistema real de pickup.', implemented:true },
-        KICK: { id:'KICK', name:'PATADA', icon:'🥾', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: empujar bombas al caminar contra ellas. Exclusiva frente a GRAB.', implemented:true },
-        GRAB: { id:'GRAB', name:'AGARRE', icon:'🧤', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: levantar y transportar bombas; GRAB implica CARRY. Exclusiva frente a KICK.', implemented:true },
-        THROW: { id:'THROW', name:'LANZAMIENTO', icon:'🎯', rarity:'BASE', category:'INTERACCION', desc:'PRUEBA: lanzar la bomba transportada hasta 3 celdas. Requiere GRAB; todavía no entra al gameplay normal.', implemented:true, experimental:true },
+        KICK: { id:'KICK', name:'PATADA', icon:'🥾', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: empujar bombas al caminar contra ellas.', implemented:true },
+        GRAB: { id:'GRAB', name:'AGARRE', icon:'🧤', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: levantar y transportar bombas; GRAB implica CARRY.', implemented:true },
+        THROW: { id:'THROW', name:'LANZAMIENTO', icon:'🎯', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: lanzar la bomba transportada hasta 3 celdas. Requiere GRAB.', implemented:true, experimental:true },
     });
     const POWERUP_CATEGORY_LABELS = Object.freeze({
         ALL:'TODOS', BASE:'BASE', INTERACCION:'INTERACCION', MOVIMIENTO:'MOVIMIENTO', BOMBAS:'BOMBAS', ENEMIGOS:'ENEMIGOS'
@@ -596,7 +596,7 @@
         };
         push('Capacidades KICK/GRAB declaradas', capabilityAudit.kickEligible && capabilityAudit.grabEligible);
         push('KICK/GRAB inactivos al reset', capabilityAudit.initiallyInactive);
-        push('Grupo KICK/GRAB exclusivo', !!global.CAPABILITY_POWERUPS_V681?.KICK?.exclusiveGroup && global.CAPABILITY_POWERUPS_V681.KICK.exclusiveGroup === global.CAPABILITY_POWERUPS_V681.GRAB?.exclusiveGroup);
+        push('KICK y GRAB pueden coexistir', !global.CAPABILITY_POWERUPS_V681?.KICK?.exclusiveGroup && !global.CAPABILITY_POWERUPS_V681?.GRAB?.exclusiveGroup);
         push('THROW registrado', labTypes.includes('THROW') && !!global.CAPABILITY_POWERUPS_V681?.THROW);
         push('THROW requiere GRAB', Array.isArray(global.CAPABILITY_POWERUPS_V681?.THROW?.requires) && global.CAPABILITY_POWERUPS_V681.THROW.requires.includes('grab'));
 
@@ -704,7 +704,7 @@
     global.BOMBER_ENGINE.isTestLabNeutral = () => isActive();
     global.BOMBER_ENGINE.getTestLabConfig = () => ({
         active: isActive(),
-        version: '6.10.3',
+        version: '6.7.9',
         neutral: true,
         arena: { ...TEST_ARENA },
         powerupFilter: getState()?.testLabPowerupFilterV676 || DEFAULT_SHELF_FILTER,

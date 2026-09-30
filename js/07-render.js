@@ -206,10 +206,13 @@ function draw() {
                 ? globalThis.getCarriedBombForEntityV682(player)
                 : null;
             if (carriedPlayerBomb) {
-                const carriedPos = typeof globalThis.getBombV4WorldPosition === 'function'
-                    ? globalThis.getBombV4WorldPosition(carriedPlayerBomb)
-                    : { x: player.x + player.width / 2, y: player.y - TILE_SIZE * 0.38 };
-                drawBombSprite(carriedPos.x, carriedPos.y, carriedPlayerBomb);
+                const carriedPos = typeof globalThis.getCarriedBombWorldPositionV682 === 'function'
+                    ? globalThis.getCarriedBombWorldPositionV682(carriedPlayerBomb)
+                    : {
+                        x: player.x + player.width / 2,
+                        y: player.y + player.height / 2 - TILE_SIZE * 0.38
+                    };
+                if (carriedPos) drawBombSprite(carriedPos.x, carriedPos.y, carriedPlayerBomb);
             }
 
             // Draw Particles: el presupuesto visual es menor que el de simulación.

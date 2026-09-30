@@ -280,18 +280,31 @@
         return true;
     }
 
-    function updateCarriedBombPositionV682(bomb) {
-        if (!isBombCarried(bomb)) return false;
+    function getCarriedBombWorldPositionV682(bomb) {
+        if (!isBombCarried(bomb)) return null;
         const carrier = bomb.carriedBy;
-        if (!carrier || typeof carrier !== 'object') return false;
+        if (!carrier || typeof carrier !== 'object') return null;
         const tile = tileSize();
-        const cx = Number(carrier.x) + (Number(carrier.width) || tile * 0.7) / 2;
-        const cy = Number(carrier.y) - tile * CARRY_HEIGHT;
-        bomb.worldX = cx;
-        bomb.worldY = cy;
+        const width = Number(carrier.width) || tile * 0.7;
+        const height = Number(carrier.height) || tile * 0.7;
+        return {
+            x: Number(carrier.x) + width * 0.5,
+            y: Number(carrier.y) + height * 0.5 - tile * CARRY_HEIGHT
+        };
+    }
+
+    function updateCarriedBombPositionV682(bomb) {
+        const pos = getCarriedBombWorldPositionV682(bomb);
+        if (!pos) return false;
+        // CARRIED no tiene coordenadas de grid válidas. Su posición visual se
+        // deriva SIEMPRE del portador para evitar que quede congelada en el
+        // punto donde fue agarrada.
+        bomb.worldX = pos.x;
+        bomb.worldY = pos.y;
         bomb.x = -999;
         bomb.y = -999;
         bomb.motionState = global.BOMB_V4_STATES.CARRIED;
+        bomb.motionProgress = 1;
         return true;
     }
 
@@ -512,6 +525,7 @@
     global.releaseCarriedBombV682 = releaseCarriedBombV682;
     global.prepareCarriedBombForExplosionV682 = prepareCarriedBombForExplosionV682;
     global.updateCarriedBombPositionV682 = updateCarriedBombPositionV682;
+    global.getCarriedBombWorldPositionV682 = getCarriedBombWorldPositionV682;
     global.updateBombEntityInteractionsV682 = updateBombEntityInteractionsV682;
     global.handleBombActionV682 = handleBombActionV682;
     global.handlePlayerBombActionV683 = handlePlayerBombActionV683;

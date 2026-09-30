@@ -159,13 +159,32 @@
         return getEntityInputDirection(entity);
     }
 
-    // GRAB no intenta atravesar la bomba. La bomba ya es sólida cuando el
-    // jugador sale de su casilla; por eso se recoge desde la casilla contigua,
-    // siempre que el jugador esté mirando hacia ella.
-    function getFacingAdjacentGrabBomb(entity) {
-        const dir = getFacingDirection(entity);
-        if (!dir || !entityCanUse(entity, 'grab')) return null;
-        return getAdjacentArmedBomb(entity, dir);
+    // GRAB se activa desde CUALQUIERA de las cuatro casillas adyacentes.
+    // No exige que el jugador esté mirando hacia la bomba.
+    function getAdjacentGrabBombAnyDirection(entity) {
+        if (!entity || !entityCanUse(entity, 'grab')) return null;
+        const tile = getEntityTile(entity);
+        const state = getState();
+        if (!tile || !state) return null;
+
+        const facing = getFacingDirection(entity);
+        const dirs = [
+            facing,
+            { x: 0, y: -1 },
+            { x: 1, y: 0 },
+            { x: 0, y: 1 },
+            { x: -1, y: 0 }
+        ].filter(Boolean);
+
+        const seen = new Set();
+        for (const dir of dirs) {
+            const key = `${dir.x},${dir.y}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const bomb = getAdjacentArmedBomb(entity, dir);
+            if (bomb) return bomb;
+        }
+        return null;
     }
 
     function getSameTileGrabBomb(entity) {
@@ -463,7 +482,7 @@
         const carried = getCarriedBombForEntity(player);
         if (carried) return releaseCarriedBombV682(player, 'drop');
 
-        const bomb = getFacingAdjacentGrabBomb(player);
+        const bomb = getAdjacentGrabBombAnyDirection(player);
         if (!bomb) return false;
         return grabBombV682(player, bomb);
     }
@@ -519,6 +538,7 @@
 
     global.getCarriedBombForEntityV682 = getCarriedBombForEntity;
     global.tryGrabPlayerBombV610 = tryGrabPlayerBombV610;
+    global.getAdjacentGrabBombAnyDirectionV687 = getAdjacentGrabBombAnyDirection;
     global.startBombKickV682 = startBombKickV682;
     global.updateBombKickMotionV682 = updateBombKickMotionV682;
     global.grabBombV682 = grabBombV682;

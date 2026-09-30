@@ -307,14 +307,12 @@ function requestBombPlacement(reason='press'){
     // GRAB es una acción explícita: con el powerup activo, una pulsación de
     // bomba intenta primero recoger/dejar una bomba. Solo si no hay una acción
     // de GRAB válida se comporta como el botón clásico de colocar bomba.
-    if (reason === 'press' && typeof window.tryGrabPlayerBombV610 === 'function') {
-        const grabActive = typeof window.isGrabActiveV681 === 'function'
-            ? !!window.isGrabActiveV681(player)
-            : !!(player?.grabTimer > 0);
-        if (grabActive) {
-            const grabResult = window.tryGrabPlayerBombV610();
-            if (grabResult) return true;
-        }
+    if (reason === 'press' && typeof window.handlePlayerBombActionV683 === 'function') {
+        const interactionResult = window.handlePlayerBombActionV683();
+        if (interactionResult) return true;
+    } else if (reason === 'press' && typeof window.tryGrabPlayerBombV610 === 'function' && typeof window.isGrabActiveV681 === 'function' && window.isGrabActiveV681(player)) {
+        const grabResult = window.tryGrabPlayerBombV610();
+        if (grabResult) return true;
     }
 
     if (reason === 'press' && isRecentMovementInput()) return false;

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.4 — Bomb Effect Registry
+// Bomberman Roguelike v6.12.9 — Bomb Effect Registry
 // Base simple y extensible para rastros/efectos de bombas.
 //
 // PRINCIPIOS
@@ -13,7 +13,7 @@
 (function installBombEffectSystemV64(global) {
     'use strict';
 
-    const VERSION = '6.4.1';
+    const VERSION = '6.12.9';
     const EVENT = global.GAME_EVENTS_V60?.BOMBA_EXPLOTO || global.GAME_EVENTS_V59?.BOMBA_EXPLOTO;
     const LISTENER_KEY = 'bomb-explosion:effects';
     const MAX_FIELDS = 420;
@@ -23,7 +23,10 @@
         HEAT: 'heat',
         COLD: 'cold',
         FROST: 'frost',
-        SHOCK: 'shock'
+        SHOCK: 'shock',
+        STEAM: 'steam',
+        PLASMA: 'plasma',
+        ARC: 'arc'
     });
 
     const EFFECT_DEFS = Object.freeze({
@@ -58,7 +61,10 @@
             tags: Object.freeze(['hazard', 'winter', 'damage', 'status'])
         }),
         [EFFECTS.FROST]: Object.freeze({ id:EFFECTS.FROST, label:'Escarcha', color:'#7dd3fc', core:'#e0f2fe', defaultDurationMs:2800, tickMs:250, damage:0, movementMultiplier:0.62, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','ice','slow']) }),
-        [EFFECTS.SHOCK]: Object.freeze({ id:EFFECTS.SHOCK, label:'Descarga', color:'#facc15', core:'#fef9c3', defaultDurationMs:1800, tickMs:600, damage:1, movementMultiplier:0.86, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','electric','damage']) })
+        [EFFECTS.SHOCK]: Object.freeze({ id:EFFECTS.SHOCK, label:'Descarga', color:'#facc15', core:'#fef9c3', defaultDurationMs:1800, tickMs:600, damage:1, movementMultiplier:0.86, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','electric','damage']) }),
+        [EFFECTS.STEAM]: Object.freeze({ id:EFFECTS.STEAM, label:'Vapor', color:'#e2e8f0', core:'#ffffff', defaultDurationMs:2200, tickMs:300, damage:0, movementMultiplier:0.58, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','combo','steam','slow']), materialType: global.MATERIALS_V60?.STEAM || 'steam' }),
+        [EFFECTS.PLASMA]: Object.freeze({ id:EFFECTS.PLASMA, label:'Plasma', color:'#c084fc', core:'#f5d0fe', defaultDurationMs:1500, tickMs:300, damage:1, movementMultiplier:0.92, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','combo','plasma','damage']) }),
+        [EFFECTS.ARC]: Object.freeze({ id:EFFECTS.ARC, label:'Rayo extendido', color:'#fde047', core:'#ffffff', defaultDurationMs:900, tickMs:250, damage:1, movementMultiplier:0.90, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','combo','electric','extended','damage']) })
     });
 
     // Una tabla de combinaciones. Se puede ampliar con pares nuevos sin tocar
@@ -68,7 +74,28 @@
             result: EFFECTS.HEAT,
             consume: Object.freeze([EFFECTS.COLD, EFFECTS.HEAT]),
             message: 'DESCONGELADO'
+        }),
+        'frost|heat': Object.freeze({
+            result: EFFECTS.STEAM,
+            consume: Object.freeze([EFFECTS.FROST, EFFECTS.HEAT]),
+            message: 'VAPOR'
+        }),
+        'heat|shock': Object.freeze({
+            result: EFFECTS.PLASMA,
+            consume: Object.freeze([EFFECTS.HEAT, EFFECTS.SHOCK]),
+            message: 'PLASMA'
+        }),
+        'frost|shock': Object.freeze({
+            result: EFFECTS.ARC,
+            consume: Object.freeze([EFFECTS.FROST, EFFECTS.SHOCK]),
+            message: 'RAYO EXTENDIDO'
         })
+    });
+
+    const COMBO_RADIUS_V6129 = Object.freeze({
+        steam: 1,
+        plasmaChainTargets: 4,
+        arcLength: 2
     });
 
     const runtime = {
@@ -172,8 +199,10 @@
         if (heat) speedMultiplier *= getEffectConfigV64(EFFECTS.HEAT)?.movementMultiplier || 1;
         const frost = getEffectStatusV64(entity, EFFECTS.FROST);
         const shock = getEffectStatusV64(entity, EFFECTS.SHOCK);
+        const steam = getEffectStatusV64(entity, EFFECTS.STEAM);
         if (frost) speedMultiplier *= getBombEffectConfigSafe(EFFECTS.FROST)?.movementMultiplier || 0.62;
         if (shock) speedMultiplier *= getBombEffectConfigSafe(EFFECTS.SHOCK)?.movementMultiplier || 0.86;
+        if (steam) speedMultiplier *= getBombEffectConfigSafe(EFFECTS.STEAM)?.movementMultiplier || 0.58;
         if (cold) {
             const exposure = finite(cold.exposureMs, 0);
             if (exposure >= EFFECT_DEFS[EFFECTS.COLD].movementSlowAtMs) speedMultiplier *= 0.90;
@@ -292,12 +321,97 @@
         return fields.find(field => field?.key === key && field.effectId === effectId) || null;
     }
 
+    function comboCellOpenV6129(x, y) {
+        const state = getState();
+        if (!state || !isFiniteNumber(Number(x)) || !isFiniteNumber(Number(y))) return false;
+        const tx = Math.trunc(Number(x));
+        const ty = Math.trunc(Number(y));
+        if (tx < 0 || ty < 0 || tx >= Number(state.gridWidth) || ty >= Number(state.gridHeight)) return false;
+        const type = state.grid?.[ty]?.[tx];
+        const wall = global.TYPES?.WALL;
+        const locked = global.TYPES?.EXIT_LOCKED;
+        const block = global.TYPES?.BLOCK;
+        return type !== wall && type !== locked && type !== block;
+    }
+
+    function triggerPlasmaChainV6129(originX, originY, sourceBombId) {
+        const candidates = collectEntities().filter(target => target.kind === 'enemy' || target.kind === 'boss');
+        if (!candidates.length) return 0;
+        const hitToken = `plasma:${runtime.lastEventId}:${sourceBombId || 'none'}`;
+        let currentCell = { x: Math.trunc(originX), y: Math.trunc(originY) };
+        let totalHits = 0;
+
+        for (let hop = 0; hop <= COMBO_RADIUS_V6129.plasmaChainTargets; hop++) {
+            const available = candidates.filter(target => {
+                const entity = target.entity;
+                if (!entity || entity.__plasmaChainHitV6129 === hitToken) return false;
+                const cell = entityCell(entity);
+                if (!cell) return false;
+                return Math.abs(cell.x - currentCell.x) + Math.abs(cell.y - currentCell.y) === 0 ||
+                       Math.abs(cell.x - currentCell.x) + Math.abs(cell.y - currentCell.y) === 1;
+            });
+            if (!available.length) break;
+            available.sort((a, b) => {
+                const ac = entityCell(a.entity);
+                const bc = entityCell(b.entity);
+                return (Math.abs(ac.x - currentCell.x) + Math.abs(ac.y - currentCell.y)) -
+                       (Math.abs(bc.x - currentCell.x) + Math.abs(bc.y - currentCell.y));
+            });
+            const target = available[0];
+            const cell = entityCell(target.entity);
+            target.entity.__plasmaChainHitV6129 = hitToken;
+            if (damageTarget(target, 1, 'effect:plasma-chain')) totalHits++;
+            if (!cell) break;
+            currentCell = cell;
+        }
+        return totalHits;
+    }
+
+    function spawnSteamCloudV6129(fields, x, y, options = {}) {
+        const offsets = [
+            { x: 0, y: 0 },
+            { x: 1, y: 0 },
+            { x: -1, y: 0 },
+            { x: 0, y: 1 },
+            { x: 0, y: -1 }
+        ];
+        let created = 0;
+        for (const offset of offsets) {
+            const tx = Math.trunc(x) + offset.x;
+            const ty = Math.trunc(y) + offset.y;
+            if (!comboCellOpenV6129(tx, ty)) continue;
+            if (depositFieldInternal(EFFECTS.STEAM, tx, ty, {
+                durationMs: 2200, intensity: 1, source: 'combo:steam', owner: options.owner, sourceBombId: options.sourceBombId
+            })) created++;
+        }
+        return created;
+    }
+
+    function spawnExtendedLightningV6129(x, y, options = {}) {
+        const dirs = [
+            { x: 1, y: 0 }, { x: -1, y: 0 },
+            { x: 0, y: 1 }, { x: 0, y: -1 }
+        ];
+        let created = 0;
+        for (const dir of dirs) {
+            for (let step = 1; step <= COMBO_RADIUS_V6129.arcLength; step++) {
+                const tx = Math.trunc(x) + dir.x * step;
+                const ty = Math.trunc(y) + dir.y * step;
+                if (!comboCellOpenV6129(tx, ty)) break;
+                if (depositFieldInternal(EFFECTS.ARC, tx, ty, {
+                    durationMs: 900, intensity: 1, source: 'combo:arc', owner: options.owner, sourceBombId: options.sourceBombId
+                })) created++;
+            }
+        }
+        return created;
+    }
+
     function combinationFor(a, b) {
         const pair = [String(a), String(b)].sort().join('|');
         return COMBINATIONS[pair] || null;
     }
 
-    function depositField(effectId, x, y, options = {}) {
+    function depositFieldInternal(effectId, x, y, options = {}, resolveCombinations = true) {
         const fields = ensureFields();
         const config = getEffectConfigV64(effectId);
         const tx = Math.trunc(Number(x));
@@ -311,7 +425,7 @@
         // mismo efecto. Así, si una celda contiene HEAT + COLD y entra otro
         // HEAT, primero resolvemos COLD+HEAT y no dejamos efectos incompatibles.
         for (const existing of [...existingFields]) {
-            if (existing.effectId === effectId) continue;
+            if (!resolveCombinations || existing.effectId === effectId) continue;
             const combo = combinationFor(existing.effectId, effectId);
             if (!combo) continue;
 
@@ -320,10 +434,19 @@
                 if (consumed) removeField(fields, consumed);
             }
             if (combo.result) {
-                const created = depositField(combo.result, tx, ty, {
+                const created = depositFieldInternal(combo.result, tx, ty, {
                     source: 'combination',
-                    durationMs: options.durationMs
-                });
+                    durationMs: options.durationMs,
+                    owner: options.owner,
+                    sourceBombId: options.sourceBombId
+                }, false);
+                if (created && combo.result === EFFECTS.STEAM) {
+                    spawnSteamCloudV6129(fields, tx, ty, options);
+                } else if (created && combo.result === EFFECTS.PLASMA) {
+                    triggerPlasmaChainV6129(tx, ty, options.sourceBombId);
+                } else if (created && combo.result === EFFECTS.ARC) {
+                    spawnExtendedLightningV6129(tx, ty, options);
+                }
                 if (combo.message && typeof global.addFloatingText === 'function') {
                     global.addFloatingText(
                         combo.message,
@@ -360,6 +483,14 @@
             createdEventId: runtime.lastEventId
         });
         return true;
+    }
+
+    function depositField(effectId, x, y, options = {}) {
+        return depositFieldInternal(effectId, x, y, options, true);
+    }
+
+    function isFiniteNumber(value) {
+        return Number.isFinite(Number(value));
     }
 
     function clearEntityEffect(entity, effectId) {

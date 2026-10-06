@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.12.0 — Bombas elementales
+// Bomberman Roguelike v6.12.9 — Bombas elementales + combos
 // Vertical slice: FIRE / ICE / ELECTRIC. La bomba conserva su elemento
 // al ser colocada, agarrada, lanzada o encadenada.
 (function installElementalBombsV612(global) {

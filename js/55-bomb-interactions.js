@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.12.5 — Bomberman-style bomb interactions
+// Bomberman Roguelike v6.12.6 — Bomberman-style bomb interactions
 // KICK / GRAB son capacidades declarativas resueltas por 54-entity-capabilities.js.
 // Este módulo contiene exclusivamente la interacción física con bombas.
 (function installBombInteractionsV682(global) {
@@ -8,6 +8,7 @@
     // El jugador tiene un cap duro de 4 tiles por patada. Las entidades no-jugador
     // conservan el comportamiento previo: se detienen por obstáculo, sin cap nuevo.
     const PLAYER_KICK_DISTANCE_V682 = 4;
+    const PLAYER_KICK_COOLDOWN_MS_V682 = 180;
     const CARRY_HEIGHT = 0.38;
 
     function getState() { return global.BOMBER_ENGINE?.getState?.() || global.gameState || null; }
@@ -236,7 +237,7 @@
         bomb.playerPassThrough = true;
         bomb.justArmed = false;
         bomb.preserveTimerOnArm = true;
-        if (entity === getPlayer()) entity.kickCooldown = 180;
+        if (entity === getPlayer()) entity.kickCooldown = PLAYER_KICK_COOLDOWN_MS_V682;
         return true;
     }
 
@@ -591,4 +592,4 @@
     global.BOMBER_ENGINE.startBombKick = startBombKickV682;
     global.BOMBER_ENGINE.grabBomb = grabBombV682;
     global.BOMBER_ENGINE.dropCarriedBomb = releaseCarriedBombV682;
-})(window);
+})(globalThis);

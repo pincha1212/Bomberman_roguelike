@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.12.5 — Run Save
+// Bomberman Roguelike v6.12.6 — Run Save
 // Persistencia de una run en localStorage. Schema versionado. Sin dependencia de Theme/Mechanics/Hazards.
 (function initRunSaveV55(global) {
     'use strict';

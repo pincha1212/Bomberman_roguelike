@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.12.5 — Classic Bomberman bomb handling
+// Bomberman Roguelike v6.12.6 — Classic Bomberman bomb handling
 // Núcleo de colocación, retención segura, ocupación, mecha y cadenas.
 
 const BOMB_HANDLING = {
@@ -329,27 +329,36 @@ function getBombKickDirectionV67(){
     if(keys.ArrowRight||keys.KeyD) return {dx:1,dy:0};
     if(keys.ArrowUp||keys.KeyW) return {dx:0,dy:-1};
     if(keys.ArrowDown||keys.KeyS) return {dx:0,dy:1};
-    if (['up','down','left','right'].includes(player?.dir)) {
-        if (player.dir === 'left') return {dx:-1,dy:0};
-        if (player.dir === 'right') return {dx:1,dy:0};
-        if (player.dir === 'up') return {dx:0,dy:-1};
-        if (player.dir === 'down') return {dx:0,dy:1};
+    const currentPlayer = getRuntimePlayerV682();
+    if (['up','down','left','right'].includes(currentPlayer?.dir)) {
+        if (currentPlayer.dir === 'left') return {dx:-1,dy:0};
+        if (currentPlayer.dir === 'right') return {dx:1,dy:0};
+        if (currentPlayer.dir === 'up') return {dx:0,dy:-1};
+        if (currentPlayer.dir === 'down') return {dx:0,dy:1};
     }
     return {dx:0,dy:0};
 }
 
+function getRuntimePlayerV682(){
+    return globalThis.BOMBER_ENGINE?.getPlayer?.()
+        || globalThis.player
+        || (typeof player !== 'undefined' ? player : null);
+}
+
 function kickBombV67(bomb,dx,dy){
-    if(!bomb||!player||typeof window.startBombKickV682!=='function') return false;
-    return !!window.startBombKickV682(bomb,player,{x:Number(dx)||0,y:Number(dy)||0});
+    const currentPlayer = getRuntimePlayerV682();
+    if(!bomb||!currentPlayer||typeof globalThis.startBombKickV682!=='function') return false;
+    return !!globalThis.startBombKickV682(bomb,currentPlayer,{x:Number(dx)||0,y:Number(dy)||0});
 }
 
 function getAdjacentPlayerBombV67(){
-    if(!player||typeof window.getAdjacentPlayerBombV682!=='function') return null;
-    return window.getAdjacentPlayerBombV682(player);
+    const currentPlayer = getRuntimePlayerV682();
+    if(!currentPlayer||typeof globalThis.getAdjacentPlayerBombV682!=='function') return null;
+    return globalThis.getAdjacentPlayerBombV682(currentPlayer);
 }
 
 function tryKickPlayerBombsV67(){
-    if(typeof window.processPlayerBombInteractionV682==='function') return !!window.processPlayerBombInteractionV682();
+    if(typeof globalThis.processPlayerBombInteractionV682==='function') return !!globalThis.processPlayerBombInteractionV682();
     return false;
 }
 

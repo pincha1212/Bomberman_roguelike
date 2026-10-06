@@ -3,6 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
 const JS = rel => fs.readFileSync(path.join(ROOT, rel), 'utf8');
@@ -17,6 +18,87 @@ function has(rel, needle) {
 
 function match(rel, regex) {
     return regex.test(JS(rel));
+}
+
+let coreRuntimeLoaded = false;
+
+function makeDomElement() {
+    return {
+        classList: {
+            add() {},
+            remove() {},
+            toggle() {}
+        },
+        style: {},
+        dataset: {},
+        textContent: '',
+        innerHTML: '',
+        getBoundingClientRect: () => ({ width: 800, height: 600 }),
+        appendChild() {}
+    };
+}
+
+function makeCanvas() {
+    const ctx = {
+        save() {}, restore() {}, beginPath() {}, arc() {}, fill() {}, fillRect() {},
+        createRadialGradient: () => ({ addColorStop() {} })
+    };
+    return { width: 800, height: 600, getContext: () => ctx };
+}
+
+function loadCoreRuntime() {
+    if (coreRuntimeLoaded) return;
+
+    globalThis.window = globalThis.window || globalThis;
+    globalThis.window.addEventListener = globalThis.window.addEventListener || (() => {});
+    globalThis.window.removeEventListener = globalThis.window.removeEventListener || (() => {});
+    globalThis.document = globalThis.document || {};
+    const canvas = makeCanvas();
+    globalThis.document.getElementById = id => id === 'gameCanvas' ? canvas : makeDomElement();
+    globalThis.localStorage = globalThis.localStorage || {
+        getItem: () => null,
+        setItem: () => {},
+        removeItem: () => {}
+    };
+    globalThis.window.ROGUELIKE_V327 = { relics: [] };
+    globalThis.window.ROGUELIKE_RELICS_V327 = [];
+    globalThis.window.rogueV327GetActiveSynergies = () => [];
+    globalThis.ResizeObserver = undefined;
+
+    vm.runInThisContext(JS('js/01-core.js'), { filename: path.join(ROOT, 'js/01-core.js') });
+    coreRuntimeLoaded = true;
+}
+
+function coreRuntime() {
+    loadCoreRuntime();
+    const engine = globalThis.window.BOMBER_ENGINE;
+    assert(engine && typeof engine.getPlayer === 'function', '01-core runtime must expose BOMBER_ENGINE.getPlayer');
+    assert(typeof engine.getState === 'function', '01-core runtime must expose BOMBER_ENGINE.getState');
+    return { player: engine.getPlayer(), state: engine.getState(), window: globalThis.window };
+}
+
+function resetCoreSpecState() {
+    const runtime = coreRuntime();
+    Object.assign(runtime.player, {
+        maxBombs: 1,
+        bombRange: 1,
+        maxHealth: 5,
+        health: 3,
+        speed: 3.0,
+        hasShield: false
+    });
+    runtime.state.relics = [];
+    runtime.window.ROGUELIKE_V327.relics = [];
+    runtime.window.ROGUELIKE_RELICS_V327 = [];
+    runtime.window.rogueV327GetActiveSynergies = () => [];
+    return runtime;
+}
+
+function installRuntimeCapRelic(id, bonuses) {
+    const runtime = coreRuntime();
+    runtime.state.relics.push({ id });
+    runtime.window.ROGUELIKE_RELICS_V327.push({ id, bonuses });
+    return runtime;
 }
 
 function readCoreSections() {
@@ -38,22 +120,48 @@ function testBaseCurrentCapModel() {
 }
 
 function testBombUp() {
-    const core = JS('js/01-core.js');
-    assert(core.includes("[POWERUPS.BOMB_UP]"), 'BOMB_UP definition must exist');
-    assert(/if\s*\(player\.maxBombs\s*>=\s*cap\.maxBombs\)\s*return false/.test(core), 'BOMB_UP must no-op at CAP');
-    assert(/player\.maxBombs\s*=\s*Math\.min\(cap\.maxBombs,\s*player\.maxBombs\s*\+\s*1\)/.test(core), 'BOMB_UP must increment CURRENT only');
-    const body = core.slice(core.indexOf('[POWERUPS.BOMB_UP]'), core.indexOf('[POWERUPS.FIRE_UP]'));
-    assert(!/cap\.maxBombs\s*\+=|cap\.maxBombs\s*-=/i.test(body), 'BOMB_UP must never mutate CAP');
+    const runtime = resetCoreSpecState();
+    installRuntimeCapRelic('spec_bomb_cap_1', { bombs: 1 });
+    installRuntimeCapRelic('spec_bomb_cap_2', { bombs: 1 });
+
+    const { player, window } = runtime;
+    const capBefore = window.getPlayerCapacityCapsV67().maxBombs;
+    assert(capBefore === 3, `Expected simulated BOMB CAP 3, got ${capBefore}`);
+
+    const applied = window.applyPowerupV67('BOMB_UP');
+    const capAfter = window.getPlayerCapacityCapsV67().maxBombs;
+
+    assert(applied === true, 'BOMB_UP must apply when CURRENT is below CAP');
+    assert(player.maxBombs === 2, `BOMB_UP must produce CURRENT 2, got ${player.maxBombs}`);
+    assert(capAfter === 3, `BOMB_UP must not mutate CAP; got ${capAfter}`);
+
+    player.maxBombs = 3;
+    assert(window.applyPowerupV67('BOMB_UP') === false, 'BOMB_UP must no-op at CAP');
+    assert(player.maxBombs === 3, 'BOMB_UP at CAP must leave CURRENT unchanged');
 }
 
+
 function testFireUp() {
-    const core = JS('js/01-core.js');
-    assert(core.includes("[POWERUPS.FIRE_UP]"), 'FIRE_UP definition must exist');
-    assert(/if\s*\(player\.bombRange\s*>=\s*cap\.bombRange\)\s*return false/.test(core), 'FIRE_UP must no-op at CAP');
-    assert(/player\.bombRange\s*=\s*Math\.min\(cap\.bombRange,\s*player\.bombRange\s*\+\s*1\)/.test(core), 'FIRE_UP must increment CURRENT only');
-    const body = core.slice(core.indexOf('[POWERUPS.FIRE_UP]'), core.indexOf('[POWERUPS.SPEED_UP]'));
-    assert(!/cap\.bombRange\s*\+=|cap\.bombRange\s*-=/i.test(body), 'FIRE_UP must never mutate CAP');
+    const runtime = resetCoreSpecState();
+    installRuntimeCapRelic('spec_range_cap_1', { range: 1 });
+    installRuntimeCapRelic('spec_range_cap_2', { range: 1 });
+
+    const { player, window } = runtime;
+    const capBefore = window.getPlayerCapacityCapsV67().bombRange;
+    assert(capBefore === 3, `Expected simulated RANGE CAP 3, got ${capBefore}`);
+
+    const applied = window.applyPowerupV67('FIRE_UP');
+    const capAfter = window.getPlayerCapacityCapsV67().bombRange;
+
+    assert(applied === true, 'FIRE_UP must apply when CURRENT is below CAP');
+    assert(player.bombRange === 2, `FIRE_UP must produce CURRENT 2, got ${player.bombRange}`);
+    assert(capAfter === 3, `FIRE_UP must not mutate CAP; got ${capAfter}`);
+
+    player.bombRange = 3;
+    assert(window.applyPowerupV67('FIRE_UP') === false, 'FIRE_UP must no-op at CAP');
+    assert(player.bombRange === 3, 'FIRE_UP at CAP must leave CURRENT unchanged');
 }
+
 
 function testFirstRelicFlagsAndProgression() {
     const sources = [JS('js/01-core.js'), JS('js/16-relics.js'), JS('js/31-roguelike-update.js'), JS('js/44-run-save.js')];
@@ -103,14 +211,32 @@ function testIndependentClampOnRelicLoss() {
 }
 
 function testClampInvocationContract() {
-    const core = JS('js/01-core.js');
-    const relics = JS('js/31-roguelike-update.js');
-    const save = JS('js/44-run-save.js');
-    assert(core.includes('clampPlayerCapacitiesV67();'), 'Clamp must run after power-up/relic-cap changes');
-    assert(relics.includes('clampPlayerCapacitiesV67();'), 'Relic-derived CAP changes must invoke clamp');
-    assert(save.includes('clampPlayerCapacitiesV67();'), 'Restore must invoke clamp');
-    assert(/Math\.min\(7\.0|Math\.min\([^\n]*cap\.speed/.test(core), 'Speed must be clamped at the same lifecycle points');
+    const runtime = resetCoreSpecState();
+    installRuntimeCapRelic('spec_bomb_cap_1', { bombs: 1 });
+    installRuntimeCapRelic('spec_bomb_cap_2', { bombs: 1 });
+    const { player, window } = runtime;
+
+    player.maxBombs = 1;
+    player.bombRange = 1;
+    player.maxHealth = 4;
+    player.health = 3;
+    player.speed = 3.0;
+
+    const cap = window.clampPlayerCapacitiesV67();
+
+    assert(cap.maxBombs === 3, `Expected BOMB CAP 3, got ${cap.maxBombs}`);
+    assert(player.maxBombs === 1, `Clamp must preserve CURRENT below CAP; got ${player.maxBombs}`);
+    assert(player.bombRange === 1, 'Clamp must not modify unrelated RANGE CURRENT');
+    assert(player.maxHealth === 4, 'Clamp must preserve CURRENT-like maxHealth below CAP');
+    assert(player.health === 3, 'Clamp must preserve HEALTH below maxHealth CAP');
+    assert(player.speed === 3.0, 'Clamp must preserve valid speed CURRENT');
+
+    player.speed = 99;
+    const clampedAgain = window.clampPlayerCapacitiesV67();
+    assert(clampedAgain.speed === 7.0, 'Clamp must enforce fixed SPEED hard cap');
+    assert(player.speed === 7.0, `Speed must clamp to 7.0; got ${player.speed}`);
 }
+
 
 function testPersistenceCurrentRelicsFlagsAndDerived() {
     const save = JS('js/44-run-save.js');

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.12.9 — Bomb Effect Registry
+// Bomberman Roguelike v6.12.10 — Bomb Effect Registry
 // Base simple y extensible para rastros/efectos de bombas.
 //
 // PRINCIPIOS
@@ -13,7 +13,7 @@
 (function installBombEffectSystemV64(global) {
     'use strict';
 
-    const VERSION = '6.12.9';
+    const VERSION = '6.12.10';
     const EVENT = global.GAME_EVENTS_V60?.BOMBA_EXPLOTO || global.GAME_EVENTS_V59?.BOMBA_EXPLOTO;
     const LISTENER_KEY = 'bomb-explosion:effects';
     const MAX_FIELDS = 420;
@@ -131,6 +131,41 @@
 
     function clamp(value, min, max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    const ELEMENTAL_FEEDBACK_V61210 = Object.freeze({
+        heat: Object.freeze({ label: 'BRASA', color: '#fb923c', count: 12 }),
+        frost: Object.freeze({ label: 'ESCARCHA', color: '#7dd3fc', count: 12 }),
+        shock: Object.freeze({ label: 'CHISPA', color: '#facc15', count: 14 }),
+        steam: Object.freeze({ label: 'VAPOR', color: '#e2e8f0', count: 16 }),
+        plasma: Object.freeze({ label: 'PLASMA', color: '#c084fc', count: 18 }),
+        arc: Object.freeze({ label: 'RAYO', color: '#fde047', count: 16 })
+    });
+
+    function triggerElementalFeedbackV61210(effectId, x, y, options = {}) {
+        const meta = ELEMENTAL_FEEDBACK_V61210[effectId];
+        if (!meta) return false;
+        const worldX = (finite(x) + 0.5) * TILE_SIZE;
+        const worldY = (finite(y) + 0.5) * TILE_SIZE;
+        const intensity = clamp(finite(options.intensity, 1), 0.5, 1.5);
+        if (typeof global.addParticles === 'function') {
+            global.addParticles(worldX, worldY, meta.color, Math.max(4, Math.round(meta.count * intensity)));
+        }
+        if (typeof global.addFloatingText === 'function') {
+            global.addFloatingText(meta.label, worldX, worldY - TILE_SIZE * 0.24, meta.color);
+        }
+        return true;
+    }
+
+    function triggerBombFeedbackV61210(bomb) {
+        if (!bomb) return false;
+        const range = Math.max(1, finite(bomb.range, 1));
+        const intensity = clamp(5 + range * 0.9, 7, 12);
+        const duration = clamp(170 + range * 16, 190, 360);
+        if (typeof global.triggerScreenShake === 'function') {
+            global.triggerScreenShake(intensity, duration);
+        }
+        return true;
     }
 
     function definition(id) {
@@ -447,6 +482,7 @@
                 } else if (created && combo.result === EFFECTS.ARC) {
                     spawnExtendedLightningV6129(tx, ty, options);
                 }
+                if (created) triggerElementalFeedbackV61210(combo.result, tx, ty, { intensity: 1.15 });
                 if (combo.message && typeof global.addFloatingText === 'function') {
                     global.addFloatingText(
                         combo.message,
@@ -605,7 +641,11 @@
         }
         if (kind === 'enemy') return damageEnemy(target, amount, source);
         if (kind === 'boss' && typeof global.damageBoss === 'function') {
-            return !!global.damageBoss(amount);
+            const beforeHp = finite(entity.hp, finite(entity.health, 1));
+            const applied = !!global.damageBoss(amount);
+            const afterHp = finite(entity.hp, finite(entity.health, 0));
+            if (applied && beforeHp > 0 && afterHp <= 0 && typeof global.triggerHitStop === 'function') global.triggerHitStop(50);
+            return applied;
         }
         if (kind === 'death_echo' && typeof global.damageDeathEchoByEffectV63 === 'function') {
             return !!global.damageDeathEchoByEffectV63(amount, source);
@@ -731,10 +771,13 @@
         if (!cells.length) return;
         runtime.lastEventId = Number(payload?.eventId || payload?.blastId || runtime.lastEventId + 1);
         const bomb = payload?.bomb || {};
+        triggerBombFeedbackV61210(bomb);
         const effectIds = resolveBombEffectIds(bomb);
         if (!effectIds.length) return;
 
         for (const effectId of effectIds) {
+            const feedbackCell = cells[0];
+            if (feedbackCell) triggerElementalFeedbackV61210(effectId, feedbackCell.x, feedbackCell.y);
             const config = getEffectConfigV64(effectId);
             if (!config) continue;
             for (const cell of cells) {
@@ -882,6 +925,7 @@
     global.bombEffectSnapshotV64 = snapshot;
     global.bombEffectValidateV64 = validate;
     global.drawBombEffectsV64 = draw;
+    global.triggerElementalFeedbackV61210 = triggerElementalFeedbackV61210;
 
     global.BOMBER_ENGINE = global.BOMBER_ENGINE || {};
     global.BOMBER_ENGINE.getBombEffects = () => ({ effects: EFFECTS, definitions: EFFECT_DEFS, combinations: COMBINATIONS, snapshot });

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v3.9 — Combat & Feedback
+// Bomberman Roguelike v6.12.10 — Combat & Feedback
 // Feedback visual/audio aislado para facilitar futuras iteraciones.
 const combatFeedback = {
     hitStop: 0,
@@ -65,6 +65,7 @@ function triggerEnemyDefeatFeedback(e){
     addParticles(e.x, e.y, e.elite ? 'particleEnemyElite' : 'particleEnemy', e.elite ? 22 : 15);
     addFloatingText(e.elite ? '★ KO ELITE' : 'KO', e.x, e.y - e.height * .55, color);
     triggerCombatFlash('rgba(56,189,248,1)', e.elite ? .16 : .09, 75);
+    triggerHitStop(50);
     sfx('enemyKill');
 }
 

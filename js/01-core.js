@@ -339,6 +339,8 @@ const UI = {};
             heat_lens: Object.freeze({ bombRange: 1 })
         });
 
+        // SPEED_UP es un incremento finito: al alcanzar el hard cap central, devuelve false.
+        // No existe overflow ni cap paralelo. El no-op en 7.0 es intencional.
         function getPlayerCapacityCapsV67(){
             const cap = { ...PLAYER_LIMITS_V67.base };
             cap.speed = Number(PLAYER_LIMITS_V67.hard.speed) || 7;

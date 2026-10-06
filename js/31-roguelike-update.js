@@ -1,5 +1,5 @@
 /*
- * BOMBERMAN ROGUELIKE v6.12.4
+ * BOMBERMAN ROGUELIKE v6.12.5
  * Roguelike Update
  *
  * Adds a lightweight meta layer over the existing run:

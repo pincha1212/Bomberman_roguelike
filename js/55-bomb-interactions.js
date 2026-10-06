@@ -1,11 +1,13 @@
-// Bomberman Roguelike v6.12.4 — Bomberman-style bomb interactions
+// Bomberman Roguelike v6.12.5 — Bomberman-style bomb interactions
 // KICK / GRAB son capacidades declarativas resueltas por 54-entity-capabilities.js.
 // Este módulo contiene exclusivamente la interacción física con bombas.
 (function installBombInteractionsV682(global) {
     'use strict';
 
     const KICK_SPEED_TILES_PER_SECOND = 6;
-    const KICK_DISTANCE_V682 = Object.freeze({ player: 4, echo: 2, default: 4 });
+    // El jugador tiene un cap duro de 4 tiles por patada. Las entidades no-jugador
+    // conservan el comportamiento previo: se detienen por obstáculo, sin cap nuevo.
+    const PLAYER_KICK_DISTANCE_V682 = 4;
     const CARRY_HEIGHT = 0.38;
 
     function getState() { return global.BOMBER_ENGINE?.getState?.() || global.gameState || null; }
@@ -229,7 +231,8 @@
         bomb.motionRotation = 0;
         bomb.interactionMotionV682 = 'kick';
         bomb.interactionActorV682 = entity;
-        bomb.kickRemainingV682 = KICK_DISTANCE_V682[getArchetype(entity)] || KICK_DISTANCE_V682.default;
+        if (entity === getPlayer()) bomb.kickRemainingV682 = PLAYER_KICK_DISTANCE_V682;
+        else delete bomb.kickRemainingV682;
         bomb.playerPassThrough = true;
         bomb.justArmed = false;
         bomb.preserveTimerOnArm = true;
@@ -252,10 +255,11 @@
         if (!bomb || bomb.state !== global.BOMB_V4_STATES.MOVING || bomb.interactionMotionV682 !== 'kick') return false;
         const dir = bomb.motionDirection;
         if (!dir || Math.abs(dir.x) + Math.abs(dir.y) !== 1) return stopBombKickV682(bomb);
-        if (!Number.isFinite(Number(bomb.kickRemainingV682))) {
-            bomb.kickRemainingV682 = KICK_DISTANCE_V682[getArchetype(bomb.interactionActorV682)] || KICK_DISTANCE_V682.default;
+        const hasPlayerKickLimit = bomb.interactionActorV682 === getPlayer();
+        if (hasPlayerKickLimit && !Number.isFinite(Number(bomb.kickRemainingV682))) {
+            bomb.kickRemainingV682 = PLAYER_KICK_DISTANCE_V682;
         }
-        if (Number(bomb.kickRemainingV682) <= 0) return stopBombKickV682(bomb);
+        if (hasPlayerKickLimit && Number(bomb.kickRemainingV682) <= 0) return stopBombKickV682(bomb);
         const tile = tileSize();
         const speed = Math.max(tile * 6 / 1000, Number(bomb.motionSpeed) || 0);
         let remaining = speed * Math.max(0, Number(dt) || 0);
@@ -272,8 +276,10 @@
                 bomb.y = Number(bomb.motionTargetTileY);
                 bomb.worldX = (bomb.x + 0.5) * tile;
                 bomb.worldY = (bomb.y + 0.5) * tile;
-                bomb.kickRemainingV682 = Math.max(0, (Number(bomb.kickRemainingV682) || 0) - 1);
-                if (bomb.kickRemainingV682 <= 0) return stopBombKickV682(bomb);
+                if (hasPlayerKickLimit) {
+                    bomb.kickRemainingV682 = Math.max(0, (Number(bomb.kickRemainingV682) || 0) - 1);
+                    if (bomb.kickRemainingV682 <= 0) return stopBombKickV682(bomb);
+                }
                 const nextX = bomb.x + dir.x;
                 const nextY = bomb.y + dir.y;
                 if (!cellFreeForKick(nextX, nextY, bomb, bomb.interactionActorV682)) return stopBombKickV682(bomb);
@@ -498,7 +504,7 @@
 
     function processPlayerBombInteractionV682() {
         const player = getPlayer();
-        if (!player || !entityCanUse(player, 'kick')) return false;
+        if (!player) return false;
         const dir = getEntityInputDirection(player);
         if (!dir) return false;
         const adjacent = getAdjacentArmedBomb(player, dir);
@@ -508,7 +514,7 @@
 
     function getAdjacentPlayerBombV682(entity) {
         const player = entity || getPlayer();
-        if (!player || !entityCanUse(player, 'kick')) return null;
+        if (!player) return null;
         const dir = getEntityInputDirection(player);
         if (!dir) return null;
         return getAdjacentArmedBomb(player, dir);

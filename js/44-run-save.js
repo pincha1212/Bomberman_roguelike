@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.12.4 — Run Save
+// Bomberman Roguelike v6.12.5 — Run Save
 // Persistencia de una run en localStorage. Schema versionado. Sin dependencia de Theme/Mechanics/Hazards.
 (function initRunSaveV55(global) {
     'use strict';
@@ -75,6 +75,73 @@
     function restoreCanonicalRelics(ids) {
         if (!Array.isArray(ids) || typeof RELICS === 'undefined') return [];
         return ids.map(item => RELICS.find(relic => relic.id === item?.id)).filter(Boolean);
+    }
+
+    function deriveLegacyRelicModsV55(ids) {
+        const mods = {
+            bombFuseMultiplier: 1,
+            turnAssistBonus: 0,
+            turnSnapBonus: 0,
+            inputBufferBonus: 0,
+            unstablePowder: false,
+            economyBonus: 0
+        };
+        if (!Array.isArray(ids)) return mods;
+        for (const item of ids) {
+            const id = String(item?.id || '');
+            if (id === 'short_fuse') mods.bombFuseMultiplier *= 0.72;
+            if (id === 'unstable_powder') mods.unstablePowder = true;
+            if (id === 'magnetic_boots') {
+                mods.turnAssistBonus += 4;
+                mods.turnSnapBonus += 1.25;
+                mods.inputBufferBonus += 75;
+            }
+            if (id === 'salvage_core') mods.economyBonus += 0.20;
+        }
+        return mods;
+    }
+
+    function migrateSaveSchemaV55(save) {
+        if (!save || typeof save !== 'object') return null;
+        if (save.schemaVersion === SCHEMA_VERSION) return save;
+        if (save.schemaVersion !== 1) return null;
+        if (!save.run || !save.world?.grid?.length) return null;
+
+        const migrated = clone(save);
+        if (!migrated) return null;
+        migrated.schemaVersion = SCHEMA_VERSION;
+        migrated.migratedFromSchemaVersion = 1;
+        migrated.run.relicMods = migrated.run.relicMods || deriveLegacyRelicModsV55(migrated.run.relics);
+
+        migrated.player = migrated.player || {};
+        migrated.player.bombElementV612 = migrated.player.bombElementV612 || 'normal';
+        migrated.player.capabilityProfileV681 = migrated.player.capabilityProfileV681 || { permanent: [], byGroup: {} };
+
+        if (Array.isArray(migrated.world.bombs)) {
+            for (const bomb of migrated.world.bombs) {
+                if (!bomb || typeof bomb !== 'object') continue;
+                // Schema 1 no guardaba referencias de portador. Un estado CARRIED
+                // sin referencia no puede reconstruirse de forma segura; se normaliza
+                // a ARMADA en la casilla guardada de la bomba o del jugador.
+                if (bomb.state === global.BOMB_V4_STATES?.CARRIED && !bomb.carriedByRefV6124) {
+                    const px = Number(migrated.player.x);
+                    const py = Number(migrated.player.y);
+                    const tw = 48;
+                    const gx = Number.isFinite(Number(bomb.x)) && Number(bomb.x) >= 0 ? Number(bomb.x) : Math.floor((px + Number(migrated.player.width || tw) / 2) / tw);
+                    const gy = Number.isFinite(Number(bomb.y)) && Number(bomb.y) >= 0 ? Number(bomb.y) : Math.floor((py + Number(migrated.player.height || tw) / 2) / tw);
+                    bomb.x = gx;
+                    bomb.y = gy;
+                    bomb.worldX = (gx + 0.5) * tw;
+                    bomb.worldY = (gy + 0.5) * tw;
+                    bomb.timer = Math.max(0, Number(bomb.carriedTimer) || Number(bomb.timer) || 0);
+                    bomb.carriedTimer = 0;
+                    bomb.carriedBy = null;
+                    bomb.state = global.BOMB_V4_STATES?.ARMED || 'armed';
+                    bomb.motionState = 'idle';
+                }
+            }
+        }
+        return migrated;
     }
 
     function serializeEntityRef(entity, player, state) {
@@ -231,8 +298,12 @@
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
             if (!raw) return null;
-            const save = JSON.parse(raw);
-            if (!save || save.schemaVersion !== SCHEMA_VERSION || !save.run || !save.world?.grid?.length) return null;
+            const parsed = JSON.parse(raw);
+            const save = migrateSaveSchemaV55(parsed);
+            if (!save || !save.run || !save.world?.grid?.length) return null;
+            if (parsed.schemaVersion !== save.schemaVersion) {
+                try { localStorage.setItem(STORAGE_KEY, JSON.stringify(save)); } catch (_) {}
+            }
             return save;
         } catch (_) { return null; }
     }
@@ -387,6 +458,7 @@
     global.readRunSaveV55 = readSaveV55;
     global.clearRunSaveV55 = clearRunSaveV55;
     global.restoreRunV55 = restoreRunV55;
+    global.migrateRunSaveV55 = migrateSaveSchemaV55;
     global.updateResumeButtonV55 = updateResumeButton;
     global.BOMBER_ENGINE = global.BOMBER_ENGINE || {};
     global.BOMBER_ENGINE.saveRun = saveRunV55;

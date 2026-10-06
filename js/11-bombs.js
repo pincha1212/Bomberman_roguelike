@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.12.4 — Classic Bomberman bomb handling
+// Bomberman Roguelike v6.12.5 — Classic Bomberman bomb handling
 // Núcleo de colocación, retención segura, ocupación, mecha y cadenas.
 
 const BOMB_HANDLING = {
@@ -339,15 +339,13 @@ function getBombKickDirectionV67(){
 }
 
 function kickBombV67(bomb,dx,dy){
-    if(!bomb||!player||typeof window.isKickActiveV681!=='function'||!window.isKickActiveV681(player)) return false;
-    if(typeof window.startBombKickV682!=='function') return false;
+    if(!bomb||!player||typeof window.startBombKickV682!=='function') return false;
     return !!window.startBombKickV682(bomb,player,{x:Number(dx)||0,y:Number(dy)||0});
 }
 
 function getAdjacentPlayerBombV67(){
-    if(!player||typeof window.isKickActiveV681!=='function'||!window.isKickActiveV681(player)) return null;
-    if(typeof window.getAdjacentPlayerBombV682==='function') return window.getAdjacentPlayerBombV682(player);
-    return null;
+    if(!player||typeof window.getAdjacentPlayerBombV682!=='function') return null;
+    return window.getAdjacentPlayerBombV682(player);
 }
 
 function tryKickPlayerBombsV67(){

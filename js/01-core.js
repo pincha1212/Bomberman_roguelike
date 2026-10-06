@@ -327,9 +327,8 @@ const UI = {};
         };
 
         const PLAYER_LIMITS_V67 = Object.freeze({
-            base: Object.freeze({ maxHealth: 5, maxBombs: 1, bombRange: 1 }),
-            hard: Object.freeze({ maxHealth: 10, maxBombs: 8, bombRange: 12 }),
-            kickDurationMs: 12000
+            base: Object.freeze({ maxHealth: 5, maxBombs: 1, bombRange: 1, speed: 3.0 }),
+            hard: Object.freeze({ maxHealth: 10, maxBombs: 8, bombRange: 12, speed: 7.0 }),
         });
 
         const LEGACY_RELIC_CAP_BONUSES_V67 = Object.freeze({
@@ -342,6 +341,7 @@ const UI = {};
 
         function getPlayerCapacityCapsV67(){
             const cap = { ...PLAYER_LIMITS_V67.base };
+            cap.speed = Number(PLAYER_LIMITS_V67.hard.speed) || 7;
             const owned = new Set();
             for (const relic of (Array.isArray(gameState?.relics) ? gameState.relics : [])) {
                 const id = String(relic?.id || ''); if (id) owned.add(id);
@@ -380,6 +380,7 @@ const UI = {};
             player.maxHealth = cap.maxHealth;
             player.maxBombs = cap.maxBombs;
             player.bombRange = cap.bombRange;
+            player.speed = Math.max(PLAYER_LIMITS_V67.base.speed, Math.min(cap.speed, Number(player.speed) || PLAYER_LIMITS_V67.base.speed));
             player.health = Math.max(1, Math.min(player.maxHealth, Number(player.health) || player.maxHealth));
             if (options.healNewMax && cap.maxHealth > oldMaxHealth) player.health = Math.min(player.maxHealth, player.health + (cap.maxHealth - oldMaxHealth));
             return cap;
@@ -404,7 +405,7 @@ const UI = {};
                     return true;
                 }
             }),
-            [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'BOTAS', apply:()=>{ player.speed=Math.min(player.speed+0.4,6); return true; } }),
+            [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'BOTAS', apply:()=>{ const cap=getPlayerCapacityCapsV67(); const current=Number(player.speed); if(!Number.isFinite(current)) player.speed=PLAYER_LIMITS_V67.base.speed; if(player.speed>=cap.speed) return false; player.speed=Math.min(player.speed+0.4,cap.speed); return true; } }),
             [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', apply:()=>{ if(player.health>=player.maxHealth) return false; player.health=Math.min(player.health+1,player.maxHealth); return true; } }),
             [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', apply:()=>{ if(player.hasShield) return false; player.hasShield=true; return true; } }),
             [POWERUPS.BOMB_KICK]: Object.freeze({ id:POWERUPS.BOMB_KICK, label:'PATADA', apply:()=>{
@@ -555,7 +556,7 @@ const UI = {};
             { id: 'twin_fuse', icon: '💣', name: 'MECHA GEMELA', rarity: 'UNCOMMON', desc: '+1 bomba máxima.',
               apply: () => { clampPlayerCapacitiesV67(); } },
             { id: 'iron_boots', icon: '👟', name: 'BOTAS DE HIERRO', rarity: 'UNCOMMON', desc: '+0.6 velocidad permanente.',
-              apply: () => { player.speed = Math.min(player.speed + 0.6, 6); } },
+              apply: () => { const cap = getPlayerCapacityCapsV67(); player.speed = Math.min(player.speed + 0.6, cap.speed); } },
             { id: 'heart_engine', icon: '♥', name: 'MOTOR VITAL', rarity: 'RARE', desc: '+1 vida máxima y recuperas 1 vida ahora.',
               apply: () => { clampPlayerCapacitiesV67({ healNewMax: true }); } },
             { id: 'ward_plate', icon: '🛡', name: 'PLACA DE GUARDA', rarity: 'RARE', desc: 'Obtienes un escudo. Un golpe no destruye la run.',
@@ -569,7 +570,7 @@ const UI = {};
         ];
 
         const REWARDS = [
-            { id: 'speed', kind: 'UPGRADE', rarity: 'COMMON', name: 'BOTAS', desc: '+0.4 velocidad.', action: () => { player.speed = Math.min(player.speed + 0.4, 6); } },
+            { id: 'speed', kind: 'UPGRADE', rarity: 'COMMON', name: 'BOTAS', desc: '+0.4 velocidad.', action: () => { const cap = getPlayerCapacityCapsV67(); player.speed = Math.min(player.speed + 0.4, cap.speed); } },
             { id: 'shield', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'ESCUDO', desc: 'Protección contra un golpe.', action: () => player.hasShield = true },
             { id: 'coin', kind: 'UPGRADE', rarity: 'COMMON', name: 'BOTÍN', desc: '+35 monedas.', action: () => gameState.coins += 35 },
             { id: 'heal', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'KIT MÉDICO', desc: 'Recupera 2 vidas sin superar el máximo.', action: () => player.health = Math.min(player.health + 2, player.maxHealth) },
@@ -664,9 +665,7 @@ const UI = {};
             maxBombs: 1,
             bombsPlaced: 0,
             bombCooldown: 0,
-            kickTimer: 0,
             kickCooldown: 0,
-            lastKickInputAt: 0,
             bombRange: 1,
             health: 3,
             maxHealth: 5,

@@ -1,10 +1,10 @@
-// Bomberman Roguelike v5.5 — Run Save
+// Bomberman Roguelike v6.12.4 — Run Save
 // Persistencia de una run en localStorage. Schema versionado. Sin dependencia de Theme/Mechanics/Hazards.
 (function initRunSaveV55(global) {
     'use strict';
 
     const STORAGE_KEY = 'bombermanRoguelikeRunSaveV55';
-    const SCHEMA_VERSION = 1;
+    const SCHEMA_VERSION = 2;
     const AUTOSAVE_MS = 8000;
     let autosaveTimer = 0;
 
@@ -77,8 +77,67 @@
         return ids.map(item => RELICS.find(relic => relic.id === item?.id)).filter(Boolean);
     }
 
+    function serializeEntityRef(entity, player, state) {
+        if (!entity) return null;
+        if (entity === player) return { kind: 'player' };
+        if (state?.boss && entity === state.boss) return { kind: 'boss' };
+        const enemies = Array.isArray(state?.enemies) ? state.enemies : [];
+        const enemyIndex = enemies.indexOf(entity);
+        if (enemyIndex >= 0) return { kind: 'enemy', index: enemyIndex };
+        return null;
+    }
+
+    function serializeBombs(bombs, player, state) {
+        if (!Array.isArray(bombs)) return [];
+        return bombs.map(bomb => {
+            if (!bomb || typeof bomb !== 'object') return null;
+            const copy = { ...bomb };
+            copy.carriedByRefV6124 = serializeEntityRef(bomb.carriedBy, player, state);
+            copy.interactionActorRefV6124 = serializeEntityRef(bomb.interactionActorV682, player, state);
+            delete copy.carriedBy;
+            delete copy.interactionActorV682;
+            return clone(copy);
+        }).filter(Boolean);
+    }
+
+    function restoreEntityRef(ref, player, state) {
+        if (!ref || typeof ref !== 'object') return null;
+        if (ref.kind === 'player') return player || null;
+        if (ref.kind === 'boss') return state?.boss || null;
+        if (ref.kind === 'enemy') return Array.isArray(state?.enemies) ? (state.enemies[Number(ref.index)] || null) : null;
+        return null;
+    }
+
+    function restoreBombLinks(state, player) {
+        const bombs = Array.isArray(state?.bombs) ? state.bombs : [];
+        let carried = null;
+        for (const bomb of bombs) {
+            if (!bomb || typeof bomb !== 'object') continue;
+            bomb.carriedBy = restoreEntityRef(bomb.carriedByRefV6124, player, state);
+            bomb.interactionActorV682 = restoreEntityRef(bomb.interactionActorRefV6124, player, state);
+            delete bomb.carriedByRefV6124;
+            delete bomb.interactionActorRefV6124;
+            if (bomb.state === global.BOMB_V4_STATES?.CARRIED && bomb.carriedBy === player && !carried) carried = bomb;
+        }
+        player.carriedBombV682 = carried;
+        return carried;
+    }
+
+    function syncPlayerBombCountFromState(state, player) {
+        if (!player || !Array.isArray(state?.bombs)) return;
+        player.bombsPlaced = state.bombs.filter(bomb =>
+            bomb && bomb.owner === 'player' && bomb.countsTowardPlayerCapacity !== false && bomb.state !== global.BOMB_V4_STATES?.EXPLODING
+        ).length;
+    }
+
     function serializePlayer(player) {
         if (!player) return null;
+        const capabilityProfile = player.capabilityProfileV681 && typeof player.capabilityProfileV681 === 'object'
+            ? {
+                permanent: Array.isArray(player.capabilityProfileV681.permanent) ? player.capabilityProfileV681.permanent.slice() : [],
+                byGroup: { ...(player.capabilityProfileV681.byGroup || {}) }
+            }
+            : null;
         return clone({
             x: player.x, y: player.y, width: player.width, height: player.height,
             speed: player.speed, maxBombs: player.maxBombs, bombsPlaced: player.bombsPlaced,
@@ -90,7 +149,9 @@
             vx: player.vx, vy: player.vy, inputDir: player.inputDir,
             inputAxis: player.inputAxis, inputBuffer: player.inputBuffer,
             inputBufferTimer: player.inputBufferTimer, hazardSlowTimer: player.hazardSlowTimer,
-            hazardSlowFactor: player.hazardSlowFactor, hazardSlowType: player.hazardSlowType
+            hazardSlowFactor: player.hazardSlowFactor, hazardSlowType: player.hazardSlowType,
+            bombElementV612: player.bombElementV612 || 'normal',
+            capabilityProfileV681: capabilityProfile
         });
     }
 
@@ -116,6 +177,7 @@
                 rerollDiscount: Number(state.rerollDiscount) || 0,
                 rerolls: Number(state.rerolls) || 0,
                 relics: clone((state.relics || []).map(r => ({ id:r.id, icon:r.icon, name:r.name, rarity:r.rarity, desc:r.desc, category:r.category || 'BOMB' }))),
+                relicMods: clone(state.relicMods),
                 runElapsedMs: Number(state.runElapsedMs) || 0,
                 roomTime: Number(state.roomTime) || 0,
                 threatLevel: Number(state.threatLevel) || 0,
@@ -138,7 +200,7 @@
                 exitPos: clone(state.exitPos),
                 roomDesign: serializeRoomDesign(state.roomDesign),
                 dungeonV44: serializeDungeon(state.dungeonV44),
-                bombs: clone(state.bombs || []),
+                bombs: serializeBombs(state.bombs || [], player, state),
                 explosions: [],
                 enemies: clone(state.enemies || []),
                 items: clone(state.items || []),
@@ -209,6 +271,7 @@
                 rerollDiscount: save.run.rerollDiscount,
                 rerolls: save.run.rerolls,
                 relics: restoreCanonicalRelics(save.run.relics),
+                relicMods: clone(save.run.relicMods) || clone(state.relicMods),
                 runElapsedMs: save.run.runElapsedMs,
                 roomTime: save.run.roomTime,
                 threatLevel: save.run.threatLevel,
@@ -248,11 +311,20 @@
                 global.ROGUELIKE_V327.relics = save.run.roguelikeV327Relics.slice();
                 global.ROGUELIKE_V327.selectedRelic = null;
                 global.ROGUELIKE_V327.relicOffers = [];
-                global.ROGUELIKE_V327.appliedBonus = { bombs: 0, range: 0, speed: 0, maxHealth: 0 };
+                global.ROGUELIKE_V327.appliedBonus = typeof rogueV327GetRelicBonuses === 'function'
+                    ? rogueV327GetRelicBonuses()
+                    : { bombs: 0, range: 0, speed: 0, maxHealth: 0 };
                 if (state.roguelikeV327) state.roguelikeV327.relics = save.run.roguelikeV327Relics.slice();
             }
 
             Object.assign(player, clone(save.player) || {});
+            if (!player.bombElementV612) player.bombElementV612 = 'normal';
+            if (player.capabilityProfileV681 && typeof player.capabilityProfileV681 === 'object') {
+                player.capabilityProfileV681.permanent = Array.isArray(player.capabilityProfileV681.permanent) ? player.capabilityProfileV681.permanent : [];
+                player.capabilityProfileV681.byGroup = player.capabilityProfileV681.byGroup && typeof player.capabilityProfileV681.byGroup === 'object' ? player.capabilityProfileV681.byGroup : {};
+            }
+            restoreBombLinks(state, player);
+            syncPlayerBombCountFromState(state, player);
             if (typeof clampPlayerCapacitiesV67 === 'function') clampPlayerCapacitiesV67();
             if (typeof playerFSMReset === 'function') playerFSMReset('save-restore');
             state.keys = {};

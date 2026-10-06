@@ -1,5 +1,5 @@
 /*
- * BOMBERMAN ROGUELIKE v3.27.0
+ * BOMBERMAN ROGUELIKE v6.12.4
  * Roguelike Update
  *
  * Adds a lightweight meta layer over the existing run:
@@ -413,7 +413,11 @@ function rogueV327ApplyDerivedBonuses() {
     if (!player) return;
     const target = rogueV327GetRelicBonuses();
     const delta = { speed: target.speed - ROGUELIKE_V327.appliedBonus.speed };
-    if ('speed' in player) player.speed = rogueV327Clamp(rogueV327Num(player.speed, 3) + delta.speed, 1, 7);
+    if ('speed' in player) {
+        const cap = typeof getPlayerCapacityCapsV67 === 'function' ? getPlayerCapacityCapsV67() : { speed: 7 };
+        const minSpeed = Number(PLAYER_LIMITS_V67?.base?.speed) || 3;
+        player.speed = rogueV327Clamp(rogueV327Num(player.speed, minSpeed) + delta.speed, minSpeed, Number(cap.speed) || 7);
+    }
     if (typeof clampPlayerCapacitiesV67 === 'function') clampPlayerCapacitiesV67();
     ROGUELIKE_V327.appliedBonus = target;
 }

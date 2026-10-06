@@ -1,10 +1,11 @@
-// Bomberman Roguelike v6.10.0 — Bomberman-style bomb interactions
+// Bomberman Roguelike v6.12.4 — Bomberman-style bomb interactions
 // KICK / GRAB son capacidades declarativas resueltas por 54-entity-capabilities.js.
 // Este módulo contiene exclusivamente la interacción física con bombas.
 (function installBombInteractionsV682(global) {
     'use strict';
 
     const KICK_SPEED_TILES_PER_SECOND = 6;
+    const KICK_DISTANCE_V682 = Object.freeze({ player: 4, echo: 2, default: 4 });
     const CARRY_HEIGHT = 0.38;
 
     function getState() { return global.BOMBER_ENGINE?.getState?.() || global.gameState || null; }
@@ -199,6 +200,8 @@
     function startBombKickV682(bomb, entity, dir) {
         const state = getState();
         if (!bomb || !entity || !dir || !state) return false;
+        if (!entityCanUse(entity, 'kick')) return false;
+        if (entity === getPlayer() && Number(entity.kickCooldown) > 0) return false;
         if (bomb.state !== global.BOMB_V4_STATES.ARMED || bomb.carriedBy) return false;
         const entityTile = getEntityTile(entity);
         if (entityTile && entityTile.x === bomb.x && entityTile.y === bomb.y) return false;
@@ -226,9 +229,11 @@
         bomb.motionRotation = 0;
         bomb.interactionMotionV682 = 'kick';
         bomb.interactionActorV682 = entity;
+        bomb.kickRemainingV682 = KICK_DISTANCE_V682[getArchetype(entity)] || KICK_DISTANCE_V682.default;
         bomb.playerPassThrough = true;
         bomb.justArmed = false;
         bomb.preserveTimerOnArm = true;
+        if (entity === getPlayer()) entity.kickCooldown = 180;
         return true;
     }
 
@@ -247,6 +252,10 @@
         if (!bomb || bomb.state !== global.BOMB_V4_STATES.MOVING || bomb.interactionMotionV682 !== 'kick') return false;
         const dir = bomb.motionDirection;
         if (!dir || Math.abs(dir.x) + Math.abs(dir.y) !== 1) return stopBombKickV682(bomb);
+        if (!Number.isFinite(Number(bomb.kickRemainingV682))) {
+            bomb.kickRemainingV682 = KICK_DISTANCE_V682[getArchetype(bomb.interactionActorV682)] || KICK_DISTANCE_V682.default;
+        }
+        if (Number(bomb.kickRemainingV682) <= 0) return stopBombKickV682(bomb);
         const tile = tileSize();
         const speed = Math.max(tile * 6 / 1000, Number(bomb.motionSpeed) || 0);
         let remaining = speed * Math.max(0, Number(dt) || 0);
@@ -263,6 +272,8 @@
                 bomb.y = Number(bomb.motionTargetTileY);
                 bomb.worldX = (bomb.x + 0.5) * tile;
                 bomb.worldY = (bomb.y + 0.5) * tile;
+                bomb.kickRemainingV682 = Math.max(0, (Number(bomb.kickRemainingV682) || 0) - 1);
+                if (bomb.kickRemainingV682 <= 0) return stopBombKickV682(bomb);
                 const nextX = bomb.x + dir.x;
                 const nextY = bomb.y + dir.y;
                 if (!cellFreeForKick(nextX, nextY, bomb, bomb.interactionActorV682)) return stopBombKickV682(bomb);
@@ -408,9 +419,7 @@
         const adjacent = getAdjacentArmedBomb(entity, dir);
         if (!adjacent) return;
 
-        if (entityCanUse(entity, 'kick')) {
-            startBombKickV682(adjacent, entity, dir);
-        }
+        startBombKickV682(adjacent, entity, dir);
     }
 
     function getThrowPathV683(entity, maxDistance = 3) {
@@ -487,6 +496,24 @@
         return grabBombV682(player, bomb);
     }
 
+    function processPlayerBombInteractionV682() {
+        const player = getPlayer();
+        if (!player || !entityCanUse(player, 'kick')) return false;
+        const dir = getEntityInputDirection(player);
+        if (!dir) return false;
+        const adjacent = getAdjacentArmedBomb(player, dir);
+        if (!adjacent) return false;
+        return startBombKickV682(adjacent, player, dir);
+    }
+
+    function getAdjacentPlayerBombV682(entity) {
+        const player = entity || getPlayer();
+        if (!player || !entityCanUse(player, 'kick')) return null;
+        const dir = getEntityInputDirection(player);
+        if (!dir) return null;
+        return getAdjacentArmedBomb(player, dir);
+    }
+
     function handlePlayerBombActionV683() {
         const player = getPlayer();
         if (!player) return false;
@@ -539,6 +566,8 @@
     global.getCarriedBombForEntityV682 = getCarriedBombForEntity;
     global.tryGrabPlayerBombV610 = tryGrabPlayerBombV610;
     global.getAdjacentGrabBombAnyDirectionV687 = getAdjacentGrabBombAnyDirection;
+    global.getAdjacentPlayerBombV682 = getAdjacentPlayerBombV682;
+    global.processPlayerBombInteractionV682 = processPlayerBombInteractionV682;
     global.startBombKickV682 = startBombKickV682;
     global.updateBombKickMotionV682 = updateBombKickMotionV682;
     global.grabBombV682 = grabBombV682;

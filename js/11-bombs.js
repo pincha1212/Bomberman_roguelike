@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.10.0 — Classic Bomberman bomb handling
+// Bomberman Roguelike v6.12.4 — Classic Bomberman bomb handling
 // Núcleo de colocación, retención segura, ocupación, mecha y cadenas.
 
 const BOMB_HANDLING = {
@@ -9,10 +9,6 @@ const BOMB_HANDLING = {
     holdInitialDelay: 300,
     holdRepeat: 180,
     movePlacementGrace: 90,
-    playerKickDistance: 4,
-    materialKickDistance: 1,
-    kickJumpDuration: 190,
-    kickJumpArc: TILE_SIZE * .30,
 };
 
 const bombInputState = {
@@ -342,119 +338,21 @@ function getBombKickDirectionV67(){
     return {dx:0,dy:0};
 }
 
-function isBombKickTileFreeV67(gx,gy,bomb){
-    if(gx<0||gy<0||gx>=gameState.gridWidth||gy>=gameState.gridHeight) return false;
-    const tile=gameState.grid?.[gy]?.[gx];
-    if(tile===TYPES.WALL||tile===TYPES.BLOCK) return false;
-    if(typeof isMaterialBlockingTileV67==='function' && isMaterialBlockingTileV67(gx,gy)) return false;
-    return !gameState.bombs.some(other=>other&&other!==bomb&&other.x===gx&&other.y===gy);
-}
-
-function queueBombJumpSequenceV67(bomb, dx, dy, distance, durationMs = 190, arc = TILE_SIZE * .30){
-    if(!bomb) return false;
-    ensureBombV4State(bomb);
-    if(Math.abs(dx)+Math.abs(dy)!==1) return false;
-
-    const jumpDistance = Math.max(1, Math.floor(Number(distance) || 1));
-    const sx = Math.floor(Number(bomb.x));
-    const sy = Math.floor(Number(bomb.y));
-    const tx = sx + dx * jumpDistance;
-    const ty = sy + dy * jumpDistance;
-
-    // La trayectoria aérea puede atravesar paredes y bloques.
-    // La ÚLTIMA casilla debe ser suelo real para que la bomba pueda caer.
-    if(!isBombKickTileFreeV67(tx,ty,bomb)) return false;
-
-    bomb.motionQueue.length=0;
-    for(let step=1; step<=jumpDistance; step++){
-        bomb.motionQueue.push({
-            x:sx + dx * step,
-            y:sy + dy * step,
-            durationMs,
-            arc
-        });
-    }
-
-    const first=bomb.motionQueue.shift();
-    if(!first){
-        bomb.motionQueue.length=0;
-        return false;
-    }
-
-    bomb.preserveTimerOnArm=true;
-    bomb.interactionState='kicked';
-    bomb.kickCount=Number(bomb.kickCount||0)+1;
-    startBombV4Motion(
-        bomb,
-        (first.x+.5)*TILE_SIZE,
-        (first.y+.5)*TILE_SIZE,
-        Number(first.durationMs)||durationMs,
-        Number(first.arc)||arc
-    );
-    return true;
-}
-
 function kickBombV67(bomb,dx,dy){
-    if(!bomb||!player||player.kickTimer<=0) return false;
-    ensureBombV4State(bomb);
-    if(!bomb.canKick||bomb.owner!=='player'||bomb.state!==BOMB_V4_STATES.ARMED||player.kickCooldown>0) return false;
-    if(Math.abs(dx)+Math.abs(dy)!==1) return false;
-    const kickDistance = Math.max(1, Math.floor(Number(BOMB_HANDLING.playerKickDistance) || 4));
-    if(!queueBombJumpSequenceV67(bomb,dx,dy,kickDistance,BOMB_HANDLING.kickJumpDuration,BOMB_HANDLING.kickJumpArc)) return false;
-    player.kickCooldown=180;
-    return true;
+    if(!bomb||!player||typeof window.isKickActiveV681!=='function'||!window.isKickActiveV681(player)) return false;
+    if(typeof window.startBombKickV682!=='function') return false;
+    return !!window.startBombKickV682(bomb,player,{x:Number(dx)||0,y:Number(dy)||0});
 }
 
 function getAdjacentPlayerBombV67(){
-    if(!player||player.kickTimer<=0||player.kickCooldown>0) return null;
-    const px=Math.floor((player.x+player.width/2)/TILE_SIZE);
-    const py=Math.floor((player.y+player.height/2)/TILE_SIZE);
-    const candidates=[
-        {dx:-1,dy:0},
-        {dx:1,dy:0},
-        {dx:0,dy:-1},
-        {dx:0,dy:1}
-    ];
-    const inputDir=getBombKickDirectionV67();
-
-    const scoreCandidate=(candidate)=>{
-        let score=0;
-        if(candidate.dx===inputDir.dx&&candidate.dy===inputDir.dy) score+=100;
-        if(candidate.dx===0&&candidate.dy===-1&&player.dir==='up') score+=30;
-        if(candidate.dx===0&&candidate.dy===1&&player.dir==='down') score+=30;
-        if(candidate.dx===-1&&candidate.dy===0&&player.dir==='left') score+=30;
-        if(candidate.dx===1&&candidate.dy===0&&player.dir==='right') score+=30;
-        return score;
-    };
-
-    const found=[];
-    for(const candidate of candidates){
-        const bomb=gameState.bombs.find(b=>
-            b&&b.owner==='player'&&
-            b.x===px+candidate.dx&&
-            b.y===py+candidate.dy&&
-            b.state===BOMB_V4_STATES.ARMED
-        );
-        if(bomb) found.push({bomb,...candidate,score:scoreCandidate(candidate)});
-    }
-
-    // Una dirección explícita manda: evitamos que una bomba lateral sea
-    // confundida con otra por el orden de candidatos cuando el jugador está
-    // tocando dos bombas a la vez.
-    if(inputDir.dx || inputDir.dy){
-        const directed = found.find(item => item.dx === inputDir.dx && item.dy === inputDir.dy);
-        if(directed) return directed;
-        return null;
-    }
-
-    found.sort((a,b)=>b.score-a.score||a.dy-b.dy||a.dx-b.dx);
-    return found[0]||null;
+    if(!player||typeof window.isKickActiveV681!=='function'||!window.isKickActiveV681(player)) return null;
+    if(typeof window.getAdjacentPlayerBombV682==='function') return window.getAdjacentPlayerBombV682(player);
+    return null;
 }
 
 function tryKickPlayerBombsV67(){
-    const candidate=getAdjacentPlayerBombV67();
-    if(!candidate) return false;
-    return kickBombV67(candidate.bomb,candidate.dx,candidate.dy);
+    if(typeof window.processPlayerBombInteractionV682==='function') return !!window.processPlayerBombInteractionV682();
+    return false;
 }
 
 function placeBomb(reason='manual'){
@@ -579,9 +477,8 @@ function bombUpdate(dt){
     // ÚNICA FUENTE DE VERDAD DEL CICLO DE VIDA DE LAS BOMBAS.
     // Todo: cooldowns, movimiento, salto, mecha, límites y detonación pasa por aquí.
     player.bombCooldown=Math.max(0,(player.bombCooldown||0)-dt);
-    player.kickTimer=Math.max(0,(player.kickTimer||0)-dt);
     player.kickCooldown=Math.max(0,(player.kickCooldown||0)-dt);
-    tryKickPlayerBombsV67();
+    if(typeof window.updateBombEntityInteractionsV682==='function') window.updateBombEntityInteractionsV682();
     updateBombInput(dt);
     markBombEscapeState();
 
@@ -595,10 +492,11 @@ function bombUpdate(dt){
         if(!bomb) continue;
         ensureBombV4State(bomb);
 
-        // La mecha corre también durante el vuelo. Si llega a cero, se marca
-        // pendiente y se resuelve al aterrizar; nunca explota en mitad del aire.
-        bomb.timer-=dt;
-        if(bomb.timer<=0) bomb.pendingDetonation=true;
+        // La mecha corre durante ARMADO y VUELO, pero queda pausada en CARRIED.
+        if(bomb.state !== BOMB_V4_STATES.CARRIED){
+            bomb.timer-=dt;
+            if(bomb.timer<=0) bomb.pendingDetonation=true;
+        }
 
         updateBombV4Motion(bomb, dt);
         ensureBombV4State(bomb);
@@ -651,7 +549,6 @@ window.armBombV4 = armBombV4;
 window.getBombV4WorldPosition = getBombV4WorldPosition;
 window.bombV4StateSummary = bombV4StateSummary;
 window.kickBombV67 = kickBombV67;
-window.queueBombJumpSequenceV67 = queueBombJumpSequenceV67;
 window.bombUpdate = bombUpdate;
 window.updateBombHandling = updateBombHandling;
 window.tryKickPlayerBombsV67 = tryKickPlayerBombsV67;

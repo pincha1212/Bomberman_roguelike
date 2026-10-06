@@ -657,3 +657,4 @@ window.updateBombHandling = updateBombHandling;
 window.tryKickPlayerBombsV67 = tryKickPlayerBombsV67;
 window.getBombKickDirectionV67 = getBombKickDirectionV67;
 window.getAdjacentPlayerBombV67 = getAdjacentPlayerBombV67;
+window.placeBomb = placeBomb;

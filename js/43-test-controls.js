@@ -37,6 +37,12 @@
     });
     const POWERUP_RESPAWN_MS = 500;
     const DEFAULT_SHELF_FILTER = 'BASE';
+    const ELEMENTAL_TEST_CASES = Object.freeze([
+        { id:'NORMAL', label:'NORMAL', element:'normal', powerup:null },
+        { id:'FIRE', label:'FUEGO', element:'fire', powerup:'BOMB_FIRE' },
+        { id:'ICE', label:'HIELO', element:'ice', powerup:'BOMB_ICE' },
+        { id:'ELECTRIC', label:'ELÉCTRICA', element:'electric', powerup:'BOMB_ELECTRIC' }
+    ]);
 
     function getLabPowerupTypes() {
         const gameplay = typeof global.BOMBER_ENGINE?.getGameplayPowerupIds === 'function' ? global.BOMBER_ENGINE.getGameplayPowerupIds() : [];
@@ -508,6 +514,101 @@
         return !(tile.right <= rect.left || tile.left >= rect.right || tile.bottom <= rect.top || tile.top >= rect.bottom);
     }
 
+    function getElementalTestStatus() {
+        const state = getState();
+        const bombs = Array.isArray(state?.bombs) ? state.bombs : [];
+        const activeElements = new Set(bombs.map(b => String(b?.elementV612 || 'normal')));
+        return {
+            bombs: bombs.length,
+            elements: [...activeElements],
+            cases: ELEMENTAL_TEST_CASES.map(test => ({
+                id: test.id,
+                element: test.element,
+                placed: bombs.some(b => String(b?.elementV612 || 'normal') === test.element),
+                carried: bombs.some(b => String(b?.elementV612 || 'normal') === test.element && b?.state === 'carried'),
+                moving: bombs.some(b => String(b?.elementV612 || 'normal') === test.element && b?.state === 'moving')
+            }))
+        };
+    }
+
+    function setPlayerElementForTest(element) {
+        if (!isActive()) return false;
+        if (typeof global.setPlayerBombElementV612 !== 'function') return false;
+        return !!global.setPlayerBombElementV612(element);
+    }
+
+    function spawnElementalTestKit() {
+        if (!isActive()) return false;
+        const state = getState();
+        const player = getPlayer();
+        if (!state || !player || typeof global.placeBomb !== 'function') return false;
+
+        // Kit físico real: usa placeBomb() para que mecha, rango, elemento,
+        // FSM y lifecycle sean exactamente los del gameplay.
+        const original = {
+            x: player.x, y: player.y, dir: player.dir,
+            maxBombs: player.maxBombs, bombsPlaced: player.bombsPlaced,
+            cooldown: player.bombCooldown, element: player.bombElementV612
+        };
+        const targets = [[4,6,'normal'],[6,4,'fire'],[8,6,'ice'],[6,8,'electric']];
+        const occupied = new Set((state.bombs || []).map(b => `${b.x},${b.y}`));
+        player.maxBombs = Math.max(8, Number(player.maxBombs) || 1);
+        player.bombsPlaced = (state.bombs || []).filter(b => b?.countsTowardPlayerCapacity !== false).length;
+
+        for (const [gx, gy, element] of targets) {
+            if (state.grid?.[gy]?.[gx] !== TYPES.EMPTY || occupied.has(`${gx},${gy}`)) continue;
+            player.x = gx * TILE_SIZE + (TILE_SIZE - player.width) / 2;
+            player.y = gy * TILE_SIZE + (TILE_SIZE - player.height) / 2;
+            player.bombCooldown = 0;
+            if (typeof global.setPlayerBombElementV612 === 'function') global.setPlayerBombElementV612(element);
+            if (global.placeBomb('test-lab-elemental-kit')) {
+                occupied.add(`${gx},${gy}`);
+            }
+        }
+
+        player.x = original.x; player.y = original.y; player.dir = original.dir;
+        player.maxBombs = original.maxBombs;
+        player.bombsPlaced = (state.bombs || []).filter(b => b?.countsTowardPlayerCapacity !== false).length;
+        player.bombCooldown = original.cooldown;
+        if (typeof global.setPlayerBombElementV612 === 'function') global.setPlayerBombElementV612(original.element || 'normal');
+        setStatus('TEST LAB · KIT ELEMENTAL creado con bombas reales: NORMAL / FUEGO / HIELO / ELÉCTRICA');
+        if (typeof global.updateUI === 'function') global.updateUI(true);
+        if (typeof global.draw === 'function') global.draw();
+        return true;
+    }
+
+    function spawnElementalInteractionTest() {
+        if (!isActive()) return false;
+        const state = getState();
+        const player = getPlayer();
+        if (!state || !player || typeof global.placeBomb !== 'function') return false;
+        const target = [Math.floor((player.x + player.width / 2) / TILE_SIZE) + 1, Math.floor((player.y + player.height / 2) / TILE_SIZE)];
+        const [gx, gy] = target;
+        if (state.grid?.[gy]?.[gx] !== TYPES.EMPTY || state.bombs?.some(b => b.x === gx && b.y === gy)) return false;
+        const original = { x:player.x, y:player.y, maxBombs:player.maxBombs, bombsPlaced:player.bombsPlaced, cooldown:player.bombCooldown };
+        player.maxBombs = Math.max(8, Number(player.maxBombs) || 1);
+        player.bombsPlaced = (state.bombs || []).filter(b => b?.countsTowardPlayerCapacity !== false).length;
+        player.x = (gx - 1) * TILE_SIZE + (TILE_SIZE - player.width) / 2;
+        player.y = gy * TILE_SIZE + (TILE_SIZE - player.height) / 2;
+        player.bombCooldown = 0;
+        const ok = global.placeBomb('test-lab-elemental-grab-throw');
+        player.x = original.x; player.y = original.y; player.maxBombs = original.maxBombs;
+        player.bombsPlaced = (state.bombs || []).filter(b => b?.countsTowardPlayerCapacity !== false).length;
+        player.bombCooldown = original.cooldown;
+        setStatus(ok ? 'TEST LAB · bomba real adyacente lista para GRAB / THROW' : 'TEST LAB · no se pudo crear la bomba de interacción');
+        return ok;
+    }
+
+    function clearTestBombs() {
+        if (!isActive()) return false;
+        const state = getState();
+        state.bombs = [];
+        if (getPlayer()) getPlayer().bombsPlaced = 0;
+        setStatus('TEST LAB · bombas de prueba eliminadas');
+        if (typeof global.draw === 'function') global.draw();
+        return true;
+    }
+
     function tickPowerupShelfRespawn() {
         if (!isActive()) return;
         const state = getState();
@@ -610,6 +711,11 @@
 
         push('Catálogo Lab = base + elementales + capacidades', labTypes.length === BASE_POWERUP_TYPES.length + ELEMENTAL_POWERUP_TYPES.length + CAPABILITY_POWERUP_TYPES.length);
         push('Todos los power-ups con metadatos', labTypes.every(type => !!getPowerupMeta(type)?.desc && getPowerupMeta(type)?.implemented !== false));
+        push('Elementales registradas', ELEMENTAL_POWERUP_TYPES.every(type => labTypes.includes(type)));
+        push('Definiciones elementales completas', ELEMENTAL_TEST_CASES.every(test => test.element === 'normal' || !!global.ELEMENTAL_BOMB_DEFS_V612?.[test.element]));
+        push('Aplicación elemental disponible', ELEMENTAL_POWERUP_TYPES.every(type => typeof global.applyElementalPowerupV612 === 'function'));
+        push('Bomba conserva elemento', (state?.bombs || []).filter(b => b?.elementV612).every(b => !!global.ELEMENTAL_BOMB_DEFS_V612?.[b.elementV612]));
+        push('Efectos elementales conectados', ['heat','frost','shock'].every(id => Object.values(global.ELEMENTAL_BOMB_DEFS_V612 || {}).some(def => Array.isArray(def.effectIds) && def.effectIds.includes(id))));
         const valid = checks.every(check => check.ok);
         const audit = getNode('test-lab-audit');
         if (audit) {
@@ -656,6 +762,9 @@
         getNode('test-lab-audit-btn')?.addEventListener('click', runGameplayAuditV676);
         getNode('test-powerup-filter')?.addEventListener('change', event => setPowerupFilter(event.currentTarget.value));
         getNode('test-powerup-shelf-toggle')?.addEventListener('click', togglePowerupShelf);
+        getNode('test-elemental-kit')?.addEventListener('click', spawnElementalTestKit);
+        getNode('test-elemental-interaction')?.addEventListener('click', spawnElementalInteractionTest);
+        getNode('test-elemental-clear')?.addEventListener('click', clearTestBombs);
 
         global.document.addEventListener('keydown', event => {
             if (!TEST_MODE) return;
@@ -725,6 +834,10 @@
     global.BOMBER_ENGINE.toggleTestLabPanel = toggleTestPanel;
     global.BOMBER_ENGINE.skipToDepth = jump;
     global.BOMBER_ENGINE.auditTestLabGameplay = runGameplayAuditV676;
+    global.BOMBER_ENGINE.spawnElementalTestKitV612 = spawnElementalTestKit;
+    global.BOMBER_ENGINE.spawnElementalInteractionTestV612 = spawnElementalInteractionTest;
+    global.BOMBER_ENGINE.clearTestBombsV612 = clearTestBombs;
+    global.BOMBER_ENGINE.getElementalTestStatusV612 = getElementalTestStatus;
     global.BOMBER_ENGINE.spawnTestPowerup = (type) => {
         // Compatibilidad API: devuelve/restituye un power-up real en la estantería;
         // nunca altera capacidades directamente.

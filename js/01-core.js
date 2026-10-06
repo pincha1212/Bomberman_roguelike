@@ -442,7 +442,10 @@ const UI = {};
                 POWERUPS.SPEED_UP,
                 POWERUPS.HEALTH_UP,
                 POWERUPS.SHIELD_UP,
-                POWERUPS.BOMB_KICK
+                POWERUPS.BOMB_KICK,
+                'BOMB_FIRE',
+                'BOMB_ICE',
+                'BOMB_ELECTRIC'
             ]);
         }
 

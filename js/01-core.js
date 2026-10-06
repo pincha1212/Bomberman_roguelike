@@ -378,13 +378,17 @@ const UI = {};
         function clampPlayerCapacitiesV67(options = {}){
             if (typeof player === 'undefined' || !player) return getPlayerCapacityCapsV67();
             const cap = getPlayerCapacityCapsV67();
-            const oldMaxHealth = Number(player.maxHealth) || cap.maxHealth;
+            const oldMaxHealth = Number(player.maxHealth);
+            const currentMaxBombs = Number(player.maxBombs);
+            const currentBombRange = Number(player.bombRange);
+            const currentHealth = Number(player.health);
+            const currentSpeed = Number(player.speed);
             player.maxHealth = cap.maxHealth;
-            player.maxBombs = cap.maxBombs;
-            player.bombRange = cap.bombRange;
-            player.speed = Math.max(PLAYER_LIMITS_V67.base.speed, Math.min(cap.speed, Number(player.speed) || PLAYER_LIMITS_V67.base.speed));
-            player.health = Math.max(1, Math.min(player.maxHealth, Number(player.health) || player.maxHealth));
-            if (options.healNewMax && cap.maxHealth > oldMaxHealth) player.health = Math.min(player.maxHealth, player.health + (cap.maxHealth - oldMaxHealth));
+            player.maxBombs = Math.min(Number.isFinite(currentMaxBombs) ? currentMaxBombs : PLAYER_LIMITS_V67.base.maxBombs, cap.maxBombs);
+            player.bombRange = Math.min(Number.isFinite(currentBombRange) ? currentBombRange : PLAYER_LIMITS_V67.base.bombRange, cap.bombRange);
+            player.health = Math.min(Number.isFinite(currentHealth) ? currentHealth : 1, cap.maxHealth);
+            player.speed = Math.min(Number.isFinite(currentSpeed) ? currentSpeed : PLAYER_LIMITS_V67.base.speed, 7.0);
+            if (options.healNewMax && Number.isFinite(oldMaxHealth) && cap.maxHealth > oldMaxHealth) player.health = Math.min(player.maxHealth, player.health + (cap.maxHealth - oldMaxHealth));
             return cap;
         }
 
@@ -407,7 +411,7 @@ const UI = {};
                     return true;
                 }
             }),
-            [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'BOTAS', apply:()=>{ const cap=getPlayerCapacityCapsV67(); const current=Number(player.speed); if(!Number.isFinite(current)) player.speed=PLAYER_LIMITS_V67.base.speed; if(player.speed>=cap.speed) return false; player.speed=Math.min(player.speed+0.4,cap.speed); return true; } }),
+            [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'BOTAS', apply:()=>{ const current=Number(player.speed); if(!Number.isFinite(current)) player.speed=PLAYER_LIMITS_V67.base.speed; if(player.speed>=7.0) return false; player.speed=Math.min(player.speed+0.4,7.0); return true; } }),
             [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', apply:()=>{ if(player.health>=player.maxHealth) return false; player.health=Math.min(player.health+1,player.maxHealth); return true; } }),
             [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', apply:()=>{ if(player.hasShield) return false; player.hasShield=true; return true; } }),
             [POWERUPS.BOMB_KICK]: Object.freeze({ id:POWERUPS.BOMB_KICK, label:'PATADA', apply:()=>{
@@ -671,6 +675,7 @@ const UI = {};
             bombRange: 1,
             health: 3,
             maxHealth: 5,
+            firstRelicFlags: { bomb: false, range: false, health: false },
             hasShield: false,
             isInvincible: false,
             invincibleTimer: 0,

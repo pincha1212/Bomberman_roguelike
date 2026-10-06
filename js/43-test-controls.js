@@ -35,8 +35,8 @@
     const POWERUP_CATEGORY_LABELS = Object.freeze({
         ALL:'TODOS', BASE:'BASE', INTERACCION:'INTERACCION', MOVIMIENTO:'MOVIMIENTO', BOMBAS:'BOMBAS', ENEMIGOS:'ENEMIGOS'
     });
-    const POWERUP_RESPAWN_MS = 500;
-    const DEFAULT_SHELF_FILTER = 'BASE';
+    const DEFAULT_SELECTOR_FILTER = 'BASE';
+    const SELECTOR_NORMAL = 'BOMB_NORMAL';
     const ELEMENTAL_TEST_CASES = Object.freeze([
         { id:'NORMAL', label:'NORMAL', element:'normal', powerup:null },
         { id:'FIRE', label:'FUEGO', element:'fire', powerup:'BOMB_FIRE' },
@@ -44,14 +44,16 @@
         { id:'ELECTRIC', label:'ELÉCTRICA', element:'electric', powerup:'BOMB_ELECTRIC' }
     ]);
 
-    function getLabPowerupTypes() {
+    function getLabSelectorTypes() {
         const gameplay = typeof global.BOMBER_ENGINE?.getGameplayPowerupIds === 'function' ? global.BOMBER_ENGINE.getGameplayPowerupIds() : [];
         const capability = typeof global.getCapabilityPowerupIdsV681 === 'function' ? global.getCapabilityPowerupIdsV681() : CAPABILITY_POWERUP_TYPES;
-        return Object.freeze([...BASE_POWERUP_TYPES, ...ELEMENTAL_POWERUP_TYPES, ...gameplay, ...capability.filter(id => !BASE_POWERUP_TYPES.includes(id) && !gameplay.includes(id))]);
+        const all = [SELECTOR_NORMAL, ...BASE_POWERUP_TYPES, ...ELEMENTAL_POWERUP_TYPES, ...gameplay, ...capability];
+        return Object.freeze([...new Set(all)]);
     }
 
     function getPowerupMeta(type) {
         const key = String(type || '');
+        if (key === SELECTOR_NORMAL) return { id:key, name:'BOMBA NORMAL', icon:'○', rarity:'BASE', category:'BOMBAS', desc:'Restablece el elemento de las próximas bombas a NORMAL.', implemented:true };
         return global.getPowerupDefinitionV69?.(key)
             || BASE_POWERUP_META[key]
             || global.getPowerupDefinitionV612?.(key)
@@ -65,27 +67,18 @@
         return BASE_POWERUP_META[type] ? 'BASE' : String(meta.category || 'BASE');
     }
 
-    function getAvailableShelfCategories() {
+    function getAvailableSelectorCategories() {
         const categories = new Set(['ALL', 'BASE']);
-        for (const type of getLabPowerupTypes()) categories.add(getPowerupCategory(type));
+        for (const type of getLabSelectorTypes()) categories.add(getPowerupCategory(type));
         return [...categories];
     }
 
-    function getVisiblePowerupTypes(state = getState()) {
-        const all = getLabPowerupTypes();
-        if (!state?.testLabV673?.active || state.testLabShelfVisibleV676 === false) return [];
-        const filter = String(state.testLabPowerupFilterV676 || DEFAULT_SHELF_FILTER);
+    function getVisibleSelectorTypes(state = getState()) {
+        const all = getLabSelectorTypes();
+        if (!state?.testLabV673?.active) return [];
+        const filter = String(state.testLabPowerupFilterV676 || DEFAULT_SELECTOR_FILTER);
         if (filter === 'ALL') return all;
         return all.filter(type => getPowerupCategory(type) === filter);
-    }
-
-    function getPowerupSlots(types = getVisiblePowerupTypes()) {
-        const slots = {};
-        const columns = [8, 9, 10, 11];
-        types.forEach((type, index) => {
-            slots[type] = [columns[index % columns.length], 1 + Math.floor(index / columns.length)];
-        });
-        return slots;
     }
 
     const runtime = {
@@ -94,10 +87,7 @@
         originalInitLevel: null,
         originalUpdateRoguePresentation: null,
         wrappedPresentation: false,
-        originalApplyPowerup: null,
-        wrappedApplyPowerup: false,
-        arenaActive: false,
-        respawnDue: new Map()
+        arenaActive: false
     };
 
     function getNode(id) { return global.document?.getElementById(id) || null; }
@@ -193,11 +183,6 @@
         if (bossHud) bossHud.classList.add('hidden');
     }
 
-    function resetPowerupRespawnTracking() {
-        runtime.respawnDue.clear();
-        const state = getState();
-        if (state) state.testLabPowerupRespawnsV673 = [];
-    }
 
     function resetPlayerToBase(player) {
         if (!player) return;
@@ -306,44 +291,6 @@
         }));
     }
 
-    function spawnShelfPowerups(state) {
-        const types = getVisiblePowerupTypes(state);
-        const slots = getPowerupSlots(types);
-        state.items = types.map(type => {
-            const [x, y] = slots[type];
-            return {
-                x, y, type,
-                testLabShelfSlotV676: type,
-                testLabShelfSlotV673: type,
-                testLabRespawnableV676: true,
-                testLabRespawnableV673: true
-            };
-        });
-        resetPowerupRespawnTracking();
-    }
-
-    function refreshPowerupShelf() {
-        if (!isActive()) return false;
-        const state = getState();
-        if (!state) return false;
-        state.items = Array.isArray(state.items) ? state.items.filter(item => !item?.testLabShelfSlotV676 && !item?.testLabShelfSlotV673) : [];
-        spawnShelfPowerups(state);
-        updatePowerupShelfControls();
-        if (typeof global.updateUI === 'function') global.updateUI(true);
-        if (typeof global.draw === 'function') global.draw();
-        return true;
-    }
-
-    function updatePowerupShelfControls() {
-        const state = getState();
-        const select = getNode('test-powerup-filter');
-        const toggle = getNode('test-powerup-shelf-toggle');
-        if (select) {
-            const filter = String(state?.testLabPowerupFilterV676 || DEFAULT_SHELF_FILTER);
-            select.value = getAvailableShelfCategories().includes(filter) ? filter : DEFAULT_SHELF_FILTER;
-        }
-        if (toggle) toggle.textContent = state?.testLabShelfVisibleV676 === false ? 'MOSTRAR ESTANTERÍA' : 'OCULTAR ESTANTERÍA';
-    }
 
     function applyNeutralTestLabEnvironment(reason = 'neutralize') {
         const state = getState();
@@ -361,9 +308,8 @@
             powerupRespawn: true,
             reason: String(reason)
         };
-        state.testLabPowerupFilterV676 = String(state.testLabPowerupFilterV676 || DEFAULT_SHELF_FILTER);
-        state.testLabShelfVisibleV676 = state.testLabShelfVisibleV676 !== false;
-        state.testLabPowerupPickupsV676 = Object.create(null);
+        state.testLabPowerupFilterV676 = String(state.testLabPowerupFilterV676 || DEFAULT_SELECTOR_FILTER);
+        state.testLabPowerupSelectionV676 = state.testLabPowerupSelectionV676 || SELECTOR_NORMAL;
 
         if (typeof global.setActiveThemeV46 === 'function') global.setActiveThemeV46('classic', false);
         state.biomeV49 = null;
@@ -387,7 +333,7 @@
         state.bombs = [];
         if (typeof global.resetGameplayPowerupsV676 === 'function') global.resetGameplayPowerupsV676();
         clearPowerupInfo();
-        spawnShelfPowerups(state);
+        updatePowerupSelectorUI();
         state.isPlaying = true;
         state.paused = false;
         state.lastTime = global.performance.now();
@@ -397,7 +343,7 @@
         setTestUiState();
         syncDepthInput();
         getNode('test-controls')?.classList.add('test-arena-active');
-        setStatus(`TEST LAB · neutral · ${getLabPowerupTypes().length} power-ups · bombas manuales · ${reason}`);
+        setStatus(`TEST LAB · neutral · ${getLabSelectorTypes().length - 1} opciones · aplicación directa · ${reason}`);
         if (typeof global.updateUI === 'function') global.updateUI(true);
         setTestUiState();
         if (typeof global.draw === 'function') global.draw();
@@ -464,35 +410,71 @@
         return true;
     }
 
-    function refillPowerups() {
+    function updatePowerupSelectorUI() {
+        const state = getState();
+        const select = getNode('test-powerup-filter');
+        const powerup = getNode('test-powerup-select');
+        if (select) {
+            const filter = String(state?.testLabPowerupFilterV676 || DEFAULT_SELECTOR_FILTER);
+            select.value = getAvailableSelectorCategories().includes(filter) ? filter : DEFAULT_SELECTOR_FILTER;
+        }
+        if (powerup) {
+            const selected = String(state?.testLabPowerupSelectionV676 || SELECTOR_NORMAL);
+            const types = getVisibleSelectorTypes(state);
+            powerup.innerHTML = '';
+            for (const type of types) {
+                const meta = getPowerupMeta(type);
+                const option = global.document.createElement('option');
+                option.value = type;
+                option.textContent = `${meta.icon || ''} ${meta.name || type}`.trim();
+                powerup.appendChild(option);
+            }
+            powerup.value = types.includes(selected) ? selected : (types[0] || SELECTOR_NORMAL);
+        }
+    }
+
+    function selectTestPowerup(type) {
+        if (!isActive()) return false;
+        const key = String(type || '');
+        if (!getLabSelectorTypes().includes(key)) return false;
+        const state = getState();
+        state.testLabPowerupSelectionV676 = key;
+        updatePowerupSelectorUI();
+        updatePowerupInfo(key, null);
+        return true;
+    }
+
+    function applyTestPowerup(type = null) {
         if (!isActive()) return false;
         const state = getState();
-        if (state.testLabShelfVisibleV676 === false) state.testLabShelfVisibleV676 = true;
-        refreshPowerupShelf();
-        setStatus(`TEST LAB · ${POWERUP_CATEGORY_LABELS[String(state.testLabPowerupFilterV676 || DEFAULT_SHELF_FILTER)] || 'filtro'} repuesto`);
-        return true;
+        const key = String(type || state?.testLabPowerupSelectionV676 || SELECTOR_NORMAL);
+        let result = false;
+        if (key === SELECTOR_NORMAL) {
+            result = typeof global.setPlayerBombElementV612 === 'function' && !!global.setPlayerBombElementV612('normal');
+        } else if (ELEMENTAL_POWERUP_TYPES.includes(key)) {
+            result = typeof global.applyElementalPowerupV612 === 'function' && !!global.applyElementalPowerupV612(key);
+        } else if (typeof global.applyPowerupV67 === 'function') {
+            result = !!global.applyPowerupV67(key);
+        }
+        updatePowerupInfo(key, result);
+        const meta = getPowerupMeta(key);
+        setStatus(result ? `TEST LAB · APLICADO · ${meta.name || key}` : `TEST LAB · SIN CAMBIO · ${meta.name || key}`);
+        if (typeof global.updateUI === 'function') global.updateUI(true);
+        return result;
     }
 
     function setPowerupFilter(filter) {
         if (!isActive()) return false;
         const state = getState();
-        const value = String(filter || DEFAULT_SHELF_FILTER);
-        if (!getAvailableShelfCategories().includes(value)) return false;
+        const value = String(filter || DEFAULT_SELECTOR_FILTER);
+        if (!getAvailableSelectorCategories().includes(value)) return false;
         state.testLabPowerupFilterV676 = value;
-        state.testLabShelfVisibleV676 = true;
-        refreshPowerupShelf();
+        updatePowerupSelectorUI();
+        const types = getVisibleSelectorTypes(state);
+        if (types.length) state.testLabPowerupSelectionV676 = types[0];
+        updatePowerupSelectorUI();
         clearPowerupInfo();
-        setStatus(`TEST LAB · estantería: ${POWERUP_CATEGORY_LABELS[value] || value}`);
-        return true;
-    }
-
-    function togglePowerupShelf() {
-        if (!isActive()) return false;
-        const state = getState();
-        state.testLabShelfVisibleV676 = state.testLabShelfVisibleV676 === false;
-        refreshPowerupShelf();
-        clearPowerupInfo();
-        setStatus(state.testLabShelfVisibleV676 ? 'TEST LAB · estantería visible' : 'TEST LAB · estantería oculta');
+        setStatus(`TEST LAB · selector: ${POWERUP_CATEGORY_LABELS[value] || value}`);
         return true;
     }
 
@@ -609,59 +591,6 @@
         return true;
     }
 
-    function tickPowerupShelfRespawn() {
-        if (!isActive()) return;
-        const state = getState();
-        const now = global.performance.now();
-        if (!Array.isArray(state.items)) state.items = [];
-        const types = getVisiblePowerupTypes(state);
-        const slots = getPowerupSlots(types);
-        for (const type of types) {
-            const present = state.items.some(item => item?.testLabShelfSlotV676 === type || item?.testLabShelfSlotV673 === type);
-            if (present) {
-                runtime.respawnDue.delete(type);
-                continue;
-            }
-            const due = runtime.respawnDue.get(type);
-            if (!Number.isFinite(due)) {
-                runtime.respawnDue.set(type, now + POWERUP_RESPAWN_MS);
-                continue;
-            }
-            if (now < due) continue;
-            const [x, y] = slots[type];
-            if (playerOverTile(x, y)) {
-                runtime.respawnDue.set(type, now + 150);
-                continue;
-            }
-            state.items.push({ x, y, type, testLabShelfSlotV676: type, testLabShelfSlotV673: type, testLabRespawnableV676: true, testLabRespawnableV673: true });
-            runtime.respawnDue.delete(type);
-        }
-    }
-
-    function handleTestPowerupPickup(type, result) {
-        if (!isActive()) return;
-        const key = String(type || '');
-        if (!getLabPowerupTypes().includes(key)) return;
-        const state = getState();
-        state.testLabPowerupPickupsV676 = state.testLabPowerupPickupsV676 || Object.create(null);
-        state.testLabPowerupPickupsV676[key] = Number(state.testLabPowerupPickupsV676[key] || 0) + 1;
-        updatePowerupInfo(key, result);
-        const meta = getPowerupMeta(key);
-        setStatus(`${meta.name || key} · ${meta.implemented === false ? 'registrado' : 'pickup real aplicado'}`);
-    }
-
-    function wrapPowerupApplication() {
-        if (runtime.wrappedApplyPowerup) return true;
-        if (typeof global.applyPowerupV67 !== 'function') return false;
-        runtime.originalApplyPowerup = global.applyPowerupV67;
-        global.applyPowerupV67 = function applyPowerupV67TestLab(type) {
-            const result = runtime.originalApplyPowerup(type);
-            if (TEST_MODE) handleTestPowerupPickup(type, result);
-            return result;
-        };
-        runtime.wrappedApplyPowerup = true;
-        return true;
-    }
 
     function runGameplayAuditV676() {
         if (!isActive()) return false;
@@ -689,7 +618,7 @@
         push('Bombas sin duplicados/fuera de grid', bombBounds);
         const gameplayAudit = typeof global.auditGameplayPowerupsV676 === 'function' ? global.auditGameplayPowerupsV676() : null;
         push('Power-ups universales auditables', !!gameplayAudit?.valid, gameplayAudit?.errors?.join('; ') || '');
-        const labTypes = getLabPowerupTypes();
+        const labTypes = getLabSelectorTypes();
         const baseDefs = global.POWERUP_DEFS_V67 || {};
         push('5 power-ups base con aplicación real', BASE_POWERUP_TYPES.every(type => typeof baseDefs[type]?.apply === 'function'));
         const dropPool = typeof global.getPowerupDropPoolV67 === 'function' ? global.getPowerupDropPoolV67() : [];
@@ -709,7 +638,7 @@
         push('THROW registrado', labTypes.includes('THROW') && !!global.CAPABILITY_POWERUPS_V681?.THROW);
         push('THROW requiere GRAB', Array.isArray(global.CAPABILITY_POWERUPS_V681?.THROW?.requires) && global.CAPABILITY_POWERUPS_V681.THROW.requires.includes('grab'));
 
-        push('Catálogo Lab = base + elementales + capacidades', labTypes.length === BASE_POWERUP_TYPES.length + ELEMENTAL_POWERUP_TYPES.length + CAPABILITY_POWERUP_TYPES.length);
+        push('Catálogo Lab = base + elementales + capacidades', labTypes.length === 1 + BASE_POWERUP_TYPES.length + ELEMENTAL_POWERUP_TYPES.length + CAPABILITY_POWERUP_TYPES.length);
         push('Todos los power-ups con metadatos', labTypes.every(type => !!getPowerupMeta(type)?.desc && getPowerupMeta(type)?.implemented !== false));
         push('Elementales registradas', ELEMENTAL_POWERUP_TYPES.every(type => labTypes.includes(type)));
         push('Definiciones elementales completas', ELEMENTAL_TEST_CASES.every(test => test.element === 'normal' || !!global.ELEMENTAL_BOMB_DEFS_V612?.[test.element]));
@@ -758,10 +687,10 @@
         });
         getNode('test-arena-reset')?.addEventListener('click', resetMap);
         getNode('test-player-reset')?.addEventListener('click', resetPlayerOnly);
-        getNode('test-powerups-refill')?.addEventListener('click', refillPowerups);
+        getNode('test-powerup-apply')?.addEventListener('click', () => applyTestPowerup());
+        getNode('test-powerup-select')?.addEventListener('change', event => selectTestPowerup(event.currentTarget.value));
         getNode('test-lab-audit-btn')?.addEventListener('click', runGameplayAuditV676);
         getNode('test-powerup-filter')?.addEventListener('change', event => setPowerupFilter(event.currentTarget.value));
-        getNode('test-powerup-shelf-toggle')?.addEventListener('click', togglePowerupShelf);
         getNode('test-elemental-kit')?.addEventListener('click', spawnElementalTestKit);
         getNode('test-elemental-interaction')?.addEventListener('click', spawnElementalInteractionTest);
         getNode('test-elemental-clear')?.addEventListener('click', clearTestBombs);
@@ -794,21 +723,16 @@
             global.setTimeout(bootstrap, 40);
             return;
         }
-        if (!wrapPresentation() || !wrapInitLevel() || !wrapPowerupApplication()) {
+        if (!wrapPresentation() || !wrapInitLevel()) {
             global.setTimeout(bootstrap, 40);
             return;
         }
         const root = getNode('test-controls');
         setTestPanelVisible(false);
-        updatePowerupShelfControls();
+        updatePowerupSelectorUI();
         if (!runtime.installed) {
             runtime.installed = true;
             jump(Number(getState()?.level) || 1);
-            const loop = () => {
-                if (TEST_MODE) tickPowerupShelfRespawn();
-                if (TEST_MODE) global.requestAnimationFrame(loop);
-            };
-            global.requestAnimationFrame(loop);
         }
     }
 
@@ -824,13 +748,14 @@
         version: '6.7.9',
         neutral: true,
         arena: { ...TEST_ARENA },
-        powerupFilter: getState()?.testLabPowerupFilterV676 || DEFAULT_SHELF_FILTER,
-        shelfVisible: getState()?.testLabShelfVisibleV676 !== false,
-        powerups: [...getLabPowerupTypes()]
+        powerupFilter: getState()?.testLabPowerupFilterV676 || DEFAULT_SELECTOR_FILTER,
+        selectedPowerup: getState()?.testLabPowerupSelectionV676 || SELECTOR_NORMAL,
+        powerups: [...getLabSelectorTypes()]
     });
-    global.BOMBER_ENGINE.getTestLabPowerupCatalog = () => Object.freeze(Object.fromEntries(getLabPowerupTypes().map(type => [type, getPowerupMeta(type)])));
+    global.BOMBER_ENGINE.getTestLabPowerupCatalog = () => Object.freeze(Object.fromEntries(getLabSelectorTypes().map(type => [type, getPowerupMeta(type)])));
     global.BOMBER_ENGINE.setTestLabPowerupFilter = setPowerupFilter;
-    global.BOMBER_ENGINE.toggleTestLabPowerupShelf = togglePowerupShelf;
+    global.BOMBER_ENGINE.selectTestLabPowerup = selectTestPowerup;
+    global.BOMBER_ENGINE.applyTestLabPowerup = applyTestPowerup;
     global.BOMBER_ENGINE.toggleTestLabPanel = toggleTestPanel;
     global.BOMBER_ENGINE.skipToDepth = jump;
     global.BOMBER_ENGINE.auditTestLabGameplay = runGameplayAuditV676;
@@ -838,18 +763,7 @@
     global.BOMBER_ENGINE.spawnElementalInteractionTestV612 = spawnElementalInteractionTest;
     global.BOMBER_ENGINE.clearTestBombsV612 = clearTestBombs;
     global.BOMBER_ENGINE.getElementalTestStatusV612 = getElementalTestStatus;
-    global.BOMBER_ENGINE.spawnTestPowerup = (type) => {
-        // Compatibilidad API: devuelve/restituye un power-up real en la estantería;
-        // nunca altera capacidades directamente.
-        if (!getLabPowerupTypes().includes(type)) return false;
-        const state = getState();
-        if (!isActive() || !state) return false;
-        const [x, y] = getPowerupSlots()[type];
-        if (!state.items.some(item => item?.testLabShelfSlotV676 === type || item?.testLabShelfSlotV673 === type)) {
-            state.items.push({ x, y, type, testLabShelfSlotV676: type, testLabShelfSlotV673: type, testLabRespawnableV676: true, testLabRespawnableV673: true });
-        }
-        return true;
-    };
+    global.BOMBER_ENGINE.spawnTestPowerup = selectTestPowerup;
 
     bootstrap();
 })(window);

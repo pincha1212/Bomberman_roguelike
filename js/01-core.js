@@ -415,6 +415,9 @@ const UI = {};
 
         function applyPowerupV67(type){
             const key = String(type || '');
+            if (['BOMB_FIRE','BOMB_ICE','BOMB_ELECTRIC'].includes(key) && typeof applyElementalPowerupV612 === 'function') {
+                return !!applyElementalPowerupV612(key);
+            }
             if (['KICK','GRAB','THROW'].includes(key) && typeof activateCapabilityPowerupV681 === 'function') {
                 const applied = !!activateCapabilityPowerupV681(player, key);
                 if (applied && typeof addFloatingText==='function') {

@@ -21,7 +21,9 @@
 
     const EFFECTS = Object.freeze({
         HEAT: 'heat',
-        COLD: 'cold'
+        COLD: 'cold',
+        FROST: 'frost',
+        SHOCK: 'shock'
     });
 
     const EFFECT_DEFS = Object.freeze({
@@ -54,7 +56,9 @@
             inputBufferHalfAtMs: 15000,
             extraSlipAtMs: 20000,
             tags: Object.freeze(['hazard', 'winter', 'damage', 'status'])
-        })
+        }),
+        [EFFECTS.FROST]: Object.freeze({ id:EFFECTS.FROST, label:'Escarcha', color:'#7dd3fc', core:'#e0f2fe', defaultDurationMs:2800, tickMs:250, damage:0, movementMultiplier:0.62, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','ice','slow']) }),
+        [EFFECTS.SHOCK]: Object.freeze({ id:EFFECTS.SHOCK, label:'Descarga', color:'#facc15', core:'#fef9c3', defaultDurationMs:1800, tickMs:600, damage:1, movementMultiplier:0.86, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','electric','damage']) })
     });
 
     // Una tabla de combinaciones. Se puede ampliar con pares nuevos sin tocar
@@ -155,6 +159,8 @@
         return statuses && typeof statuses === 'object' ? (statuses[effectId] || null) : null;
     }
 
+    function getBombEffectConfigSafe(id){ return getEffectConfigV64(id) || {}; }
+
     function getBombEffectMovementModifiersV64(entity) {
         const cold = getEffectStatusV64(entity, EFFECTS.COLD);
         const heat = getEffectStatusV64(entity, EFFECTS.HEAT);
@@ -164,6 +170,10 @@
         let turnCarryMultiplier = 1;
 
         if (heat) speedMultiplier *= getEffectConfigV64(EFFECTS.HEAT)?.movementMultiplier || 1;
+        const frost = getEffectStatusV64(entity, EFFECTS.FROST);
+        const shock = getEffectStatusV64(entity, EFFECTS.SHOCK);
+        if (frost) speedMultiplier *= getBombEffectConfigSafe(EFFECTS.FROST)?.movementMultiplier || 0.62;
+        if (shock) speedMultiplier *= getBombEffectConfigSafe(EFFECTS.SHOCK)?.movementMultiplier || 0.86;
         if (cold) {
             const exposure = finite(cold.exposureMs, 0);
             if (exposure >= EFFECT_DEFS[EFFECTS.COLD].movementSlowAtMs) speedMultiplier *= 0.90;
@@ -735,6 +745,7 @@
     global.getBombEffectVisualStateV64 = getBombEffectVisualStateV64;
     global.forcePlayerColdDeathV64 = forcePlayerColdDeathV64;
     global.applyBombEffectToAllEntitiesV64 = applyEffectToAllEntitiesV64;
+    global.depositBombEffectFieldV64 = depositField;
     global.bombEffectUpdateV64 = update;
     global.bombEffectResetV64 = reset;
     global.bombEffectSnapshotV64 = snapshot;

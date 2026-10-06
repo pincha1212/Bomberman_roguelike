@@ -64,7 +64,8 @@
                         y: cell.y,
                         timer: 100,
                         blastId,
-                        owner: bomb.owner || 'player'
+                        owner: bomb.owner || 'player',
+                        elementV612: bomb.elementV612 || 'normal'
                     });
                 }
             }
@@ -116,6 +117,7 @@
             // vida de las bombas. updateBombHandling() queda solo como wrapper
             // de compatibilidad para llamadas heredadas.
             bombUpdate(dt);
+            if (typeof updateElementalBombsV612 === 'function') updateElementalBombsV612(dt);
 
             // Hitbox estándar para recoger objetos (ocupa casi todo el sprite)
             let pRect = { left: player.x, right: player.x + player.width, top: player.y, bottom: player.y + player.height };

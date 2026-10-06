@@ -321,6 +321,9 @@ const UI = {};
             HEALTH_UP: 'HEALTH_UP',
             SHIELD_UP: 'SHIELD_UP',
             BOMB_KICK: 'BOMB_KICK'
+            ,BOMB_FIRE: 'BOMB_FIRE'
+            ,BOMB_ICE: 'BOMB_ICE'
+            ,BOMB_ELECTRIC: 'BOMB_ELECTRIC'
         };
 
         const PLAYER_LIMITS_V67 = Object.freeze({

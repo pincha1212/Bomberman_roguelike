@@ -175,6 +175,7 @@ function draw() {
                 drawBombSprite(bombPos.x, bombPos.y, b);
             }
             drawBombChainLinks();
+            if (typeof drawElementalBombFieldsV612 === 'function') drawElementalBombFieldsV612(ctx);
 
             // Draw Explosions
             for(let i=0;i<gameState.explosions.length;i++){
@@ -546,6 +547,7 @@ function draw() {
             let scale = 1.0 + pulse + (moving ? 0.04 * Math.sin((b.motionProgress || 0) * Math.PI * 2) : 0);
             ctx.save();
             ctx.translate(cx, cy);
+            if (typeof getBombElementDefV612 === 'function' && b?.elementV612 && b.elementV612 !== 'normal') { const ed=getBombElementDefV612(b); ctx.strokeStyle=ed.color; ctx.lineWidth=3; ctx.globalAlpha=.9; ctx.beginPath(); ctx.arc(0,0,TILE_SIZE*.48,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
             if (moving) ctx.rotate((b.motionRotation || 0) * 0.35);
             else if (Number.isFinite(b.windTilt)) ctx.rotate(Number(b.windTilt));
             ctx.scale(scale, scale);

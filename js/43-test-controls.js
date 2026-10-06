@@ -18,6 +18,7 @@
     });
     const BASE_POWERUP_TYPES = Object.freeze(['BOMB_UP', 'FIRE_UP', 'SPEED_UP', 'HEALTH_UP', 'SHIELD_UP']);
     const CAPABILITY_POWERUP_TYPES = Object.freeze(['KICK', 'GRAB', 'THROW']);
+    const ELEMENTAL_POWERUP_TYPES = Object.freeze(['BOMB_FIRE','BOMB_ICE','BOMB_ELECTRIC']);
     const BASE_POWERUP_META = Object.freeze({
         BOMB_UP: { id:'BOMB_UP', name:'BOMBA', icon:'💣', rarity:'BASE', category:'BASE', desc:'Aumenta maxBombs en 1 hasta el límite actual; las reliquias pueden ampliar ese límite.', implemented:true },
         FIRE_UP: { id:'FIRE_UP', name:'RANGO', icon:'🔥', rarity:'BASE', category:'BASE', desc:'Aumenta bombRange en 1 hasta el límite actual; las reliquias pueden ampliar ese límite.', implemented:true },
@@ -27,6 +28,9 @@
         KICK: { id:'KICK', name:'PATADA', icon:'🥾', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: empujar bombas al caminar contra ellas.', implemented:true },
         GRAB: { id:'GRAB', name:'AGARRE', icon:'🧤', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: levantar y transportar bombas; GRAB implica CARRY.', implemented:true },
         THROW: { id:'THROW', name:'LANZAMIENTO', icon:'🎯', rarity:'BASE', category:'INTERACCION', desc:'Capacidad permanente: lanzar la bomba transportada hasta 3 celdas. Requiere GRAB.', implemented:true, experimental:true },
+        BOMB_FIRE: { id:'BOMB_FIRE', name:'BOMBA FUEGO', icon:'🔥', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Selecciona FUEGO para las próximas bombas.', implemented:true },
+        BOMB_ICE: { id:'BOMB_ICE', name:'BOMBA HIELO', icon:'❄️', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Selecciona HIELO para las próximas bombas.', implemented:true },
+        BOMB_ELECTRIC: { id:'BOMB_ELECTRIC', name:'BOMBA ELÉCTRICA', icon:'⚡', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Selecciona ELÉCTRICA para las próximas bombas.', implemented:true },
     });
     const POWERUP_CATEGORY_LABELS = Object.freeze({
         ALL:'TODOS', BASE:'BASE', INTERACCION:'INTERACCION', MOVIMIENTO:'MOVIMIENTO', BOMBAS:'BOMBAS', ENEMIGOS:'ENEMIGOS'
@@ -37,13 +41,14 @@
     function getLabPowerupTypes() {
         const gameplay = typeof global.BOMBER_ENGINE?.getGameplayPowerupIds === 'function' ? global.BOMBER_ENGINE.getGameplayPowerupIds() : [];
         const capability = typeof global.getCapabilityPowerupIdsV681 === 'function' ? global.getCapabilityPowerupIdsV681() : CAPABILITY_POWERUP_TYPES;
-        return Object.freeze([...BASE_POWERUP_TYPES, ...gameplay, ...capability.filter(id => !BASE_POWERUP_TYPES.includes(id) && !gameplay.includes(id))]);
+        return Object.freeze([...BASE_POWERUP_TYPES, ...ELEMENTAL_POWERUP_TYPES, ...gameplay, ...capability.filter(id => !BASE_POWERUP_TYPES.includes(id) && !gameplay.includes(id))]);
     }
 
     function getPowerupMeta(type) {
         const key = String(type || '');
         return global.getPowerupDefinitionV69?.(key)
             || BASE_POWERUP_META[key]
+            || global.getPowerupDefinitionV612?.(key)
             || global.GAMEPLAY_POWERUP_DEFS_V676?.[key]
             || global.CAPABILITY_POWERUPS_V681?.[key]
             || { id:key, name:key, icon:'?', rarity:'UNKNOWN', category:'BASE', desc:'Sin descripción registrada todavía.', implemented:false };
@@ -603,7 +608,7 @@
         push('THROW registrado', labTypes.includes('THROW') && !!global.CAPABILITY_POWERUPS_V681?.THROW);
         push('THROW requiere GRAB', Array.isArray(global.CAPABILITY_POWERUPS_V681?.THROW?.requires) && global.CAPABILITY_POWERUPS_V681.THROW.requires.includes('grab'));
 
-        push('Catálogo Lab = base + capacidades', labTypes.length === BASE_POWERUP_TYPES.length + CAPABILITY_POWERUP_TYPES.length);
+        push('Catálogo Lab = base + elementales + capacidades', labTypes.length === BASE_POWERUP_TYPES.length + ELEMENTAL_POWERUP_TYPES.length + CAPABILITY_POWERUP_TYPES.length);
         push('Todos los power-ups con metadatos', labTypes.every(type => !!getPowerupMeta(type)?.desc && getPowerupMeta(type)?.implemented !== false));
         const valid = checks.every(check => check.ok);
         const audit = getNode('test-lab-audit');

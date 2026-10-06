@@ -501,9 +501,11 @@ function placeBomb(reason='manual'){
         bobPhase: 0,
         motionQueue: [],
         preserveTimerOnArm: false,
-        countsTowardPlayerCapacity: true
+        countsTowardPlayerCapacity: true,
+        elementV612: typeof getPlayerBombElementV612 === 'function' ? getPlayerBombElementV612() : 'normal'
     };
 
+    if (typeof applyElementToBombV612 === 'function') applyElementToBombV612(bomb);
     gameState.bombs.push(bomb);
     player.bombsPlaced++;
     if (typeof playerFSMStartBomb === 'function') playerFSMStartBomb();

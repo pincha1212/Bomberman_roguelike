@@ -6,3 +6,7 @@
 
 /* v6.7.6 — auditoría de gameplay */
 .test-lab-audit{flex:1 1 100%;font-size:7px;letter-spacing:.05em;color:#94a3b8;padding:2px 3px}.test-lab-audit.is-fail{color:#fca5a5}
+
+/* v6.12.1 — elemental test fixtures */
+.test-elemental-group { border-top: 1px solid rgba(148,163,184,.18); padding-top: 8px; }
+.test-elemental-group button { font-size: 10px; }

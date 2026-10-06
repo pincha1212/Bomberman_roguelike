@@ -10,3 +10,9 @@
 /* v6.12.1 — elemental test fixtures */
 .test-elemental-group { border-top: 1px solid rgba(148,163,184,.18); padding-top: 8px; }
 .test-elemental-group button { font-size: 10px; }
+
+/* v6.12.2 — selector directo F2: sin estantería física */
+.test-powerup-group select { min-width: 135px; }
+.test-powerup-group #test-powerup-select { min-width: 210px; }
+.test-powerup-group #test-powerup-apply { min-width: 76px; }
+@media(max-width:760px){.test-powerup-group #test-powerup-select{min-width:180px;max-width:100%}}

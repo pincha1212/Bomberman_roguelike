@@ -97,29 +97,27 @@
             if (UI['ui-shield-badge']) UI['ui-shield-badge'].classList.toggle('hidden', !player.hasShield);
 
             // V6.9: las capacidades se leen desde la fuente de verdad declarativa.
-            // THROW sigue siendo experimental y solo se presenta como activo dentro del Test Lab.
             const capabilityDefs = globalThis.CAPABILITY_POWERUPS_V681 || {};
-            const testLabActive = !!globalThis.BOMBER_ENGINE?.isTestLabNeutral?.();
             const activeCapabilities = typeof globalThis.getActiveCapabilityPowerupsV681 === 'function'
                 ? globalThis.getActiveCapabilityPowerupsV681(player) : [];
-            const capabilityUI = testLabActive
-                ? [['KICK','ui-ability-kick','ui-ability-kick-status'],['GRAB','ui-ability-grab','ui-ability-grab-status'],['THROW','ui-ability-throw','ui-ability-throw-status']]
-                : [['KICK','ui-ability-kick','ui-ability-kick-status'],['GRAB','ui-ability-grab','ui-ability-grab-status']];
+            const capabilityUI = [
+                ['KICK','ui-ability-kick','ui-ability-kick-status'],
+                ['GRAB','ui-ability-grab','ui-ability-grab-status'],
+                ['THROW','ui-ability-throw','ui-ability-throw-status']
+            ];
             for (const [id,nodeId,statusId] of capabilityUI) {
                 const node = UI[nodeId];
                 const status = UI[statusId];
                 const active = activeCapabilities.includes(id);
                 if (node) {
                     node.dataset.active = active ? 'true' : 'false';
-                    node.classList.toggle('hidden', id === 'THROW' && !testLabActive);
                 }
                 if (status) {
-                    if (id === 'THROW' && !testLabActive) status.textContent = 'LAB';
-                    else status.textContent = active ? 'ACTIVA' : '—';
+                    status.textContent = active ? 'ACTIVA' : '—';
                 }
             }
             if (UI['ui-ability-detail']) {
-                const activeId = activeCapabilities.find(id => id !== 'THROW' || testLabActive) || null;
+                const activeId = activeCapabilities[0] || null;
                 const meta = activeId ? capabilityDefs[activeId] : null;
                 UI['ui-ability-detail'].textContent = meta
                     ? `${meta.icon || ''} ${meta.label}: ${meta.desc}`

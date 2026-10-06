@@ -138,8 +138,8 @@
             pool: Object.freeze(['RASTRERO', 'VOLADOR', 'ESPECIAL']),
             colors: Object.freeze({ RASTRERO: 'enemyRastrero', VOLADOR: 'enemyVolador', ESPECIAL: 'enemyEspecial' })
         }),
-        // Pool universal: genéricos + KICK/GRAB ya validados en Test Lab.
-        // THROW permanece fuera del loot normal hasta completar su auditoría.
+        // Pool universal: genéricos + capacidades de interacción.
+        // THROW forma parte de las capacidades de interacción.
         powerups: Object.freeze({ pool: Object.freeze(['BOMB_UP','FIRE_UP','SPEED_UP','HEALTH_UP','SHIELD_UP','KICK','GRAB']) })
     });
 

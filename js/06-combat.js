@@ -82,7 +82,6 @@
             if (!gameState.isPlaying || gameState.paused) return;
 
             // Fuente única de actualización para power-ups universales.
-            // Se ejecuta tanto en gameplay normal como en ?test=1.
             if (typeof gameplayPowerupUpdateV676 === 'function') gameplayPowerupUpdateV676(dt);
             if (typeof tickRunClock === 'function') tickRunClock(dt);
             gameState.animFrame++;
@@ -312,9 +311,7 @@
             p.health--;
             p.isInvincible = true;
             p.invincibleTimer = 1500 + (Number(gs.hitInvulnerabilityBonus) || 0);
-            const testLabImmortal = gs?.testLabV673?.active === true && gs?.testLabV673?.immortal === true;
-            if (testLabImmortal) p.health = Math.max(1, Number(p.health) || 1);
-            const lethal = !testLabImmortal && p.health <= 0;
+            const lethal = p.health <= 0;
             addParticles(p.x, p.y, 'particleDanger', lethal ? 26 : 15);
             triggerPlayerDamageFeedback(source, sx, sy, lethal, false);
             triggerScreenShake(lethal ? 14 : 10, lethal ? 520 : 400);

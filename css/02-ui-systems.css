@@ -212,7 +212,6 @@ body { background: radial-gradient(circle at center, #111827 0%, #05070c 70%); }
     border-color:#67e8f9;
     box-shadow:0 0 9px rgba(56,232,255,.16);
 }
-.ability-slot-experimental{border-style:dashed;}
 .ability-icon{font-size:15px;line-height:1;flex:0 0 auto;}
 .ability-copy{min-width:0;display:flex;flex-direction:column;align-items:flex-start;overflow:hidden;}
 .ability-copy strong{font:5px 'Press Start 2P',monospace;color:#f8fafc;white-space:nowrap;}

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.11.0 — Death Echo Rework
+// Bomberman Roguelike v6.12.12 — Death Echo Rework
 // Un eco persistente por profundidad, inspirado en el concepto de fantasma
 // vengativo: conserva una copia inmutable del build que murió y la reutiliza
 // como enemigo autónomo en futuros intentos.
@@ -13,8 +13,8 @@
 (function installDeathEchoV611(global) {
     'use strict';
 
-    const VERSION = '6.11.0';
-    const COMPATIBLE_VERSIONS = new Set(['6.3.0', '6.3.1', '6.5.1', '6.7.0', '6.7.1', '6.7.1.1', '6.11.0']);
+    const VERSION = '6.12.12';
+    const COMPATIBLE_VERSIONS = new Set(['6.3.0', '6.3.1', '6.5.1', '6.7.0', '6.7.1', '6.7.1.1', '6.11.0', '6.12.12']);
     if (global.__DEATH_ECHO_V611_INSTALLED__) return;
     global.__DEATH_ECHO_V611_INSTALLED__ = true;
 
@@ -24,7 +24,7 @@
     const DECISION_MS = 120;
     const BOMB_COOLDOWN_MS = 1600;
     const GHOST_SPATIAL_RANGE = 2;
-    const ECHO_SPEED = 1.15;
+    const ECHO_SPEED_FALLBACK = 1.15;
 
     const state = {
         checkedLevel: null,
@@ -140,14 +140,22 @@
             })
             : {};
 
+        const capabilities = typeof global.getActiveCapabilityPowerupsV681 === 'function'
+            ? clone(global.getActiveCapabilityPowerupsV681(player))
+            : [];
+
         return {
             sourceSpeed: clamp(number(player?.speed, 3), 1, 8),
             speed: clamp(number(player?.speed, 3), 1, 8),
             maxBombs: clamp(Math.floor(number(player?.maxBombs, 1)), 1, 8),
             bombRange: clamp(Math.floor(number(player?.bombRange, 1)), 1, 12),
             maxHealth: clamp(Math.floor(number(player?.maxHealth, 5)), 1, 10),
+            // El escudo sigue siendo propio de la run y no convierte al Echo
+            // en un miniboss de dos golpes. Las capacidades permanentes sí.
             hasShield: false,
+            bombElementV612: ['normal', 'fire', 'ice', 'electric'].includes(String(player?.bombElementV612)) ? String(player.bombElementV612) : 'normal',
             dir: ['up', 'down', 'left', 'right'].includes(player?.dir) ? player.dir : 'down',
+            capabilities: Array.isArray(capabilities) ? capabilities.filter(id => ['KICK', 'GRAB', 'THROW'].includes(String(id))) : [],
             relicMods
         };
     }
@@ -465,7 +473,11 @@
             canKick: false,
             canPush: false,
             canCarry: false,
-            carriedBy: null
+            carriedBy: null,
+            elementV612: ghost.bombElementV612,
+            effectIds: Array.isArray(global.ELEMENTAL_BOMB_DEFS_V612?.[ghost.bombElementV612]?.effectIds)
+                ? [...global.ELEMENTAL_BOMB_DEFS_V612[ghost.bombElementV612].effectIds]
+                : []
         };
 
         gameState.bombs.push(bomb);
@@ -595,6 +607,10 @@
         if (!overlap) return false;
 
         ghost.lastHitBlastId = explosion.blastId;
+        if (typeof global.getCarriedBombForEntityV682 === 'function' && typeof global.releaseCarriedBombV682 === 'function') {
+            const carried = global.getCarriedBombForEntityV682(ghost);
+            if (carried) global.releaseCarriedBombV682(ghost, 'death');
+        }
         ghost.health = 0;
         ghost.maxHealth = 1;
         ghost.hasShield = false;
@@ -626,21 +642,43 @@
         const spawn = nearestSpawnTile(saved.position, playerTile);
         const build = saved.build || {};
         const relicMods = build.relicMods || {};
+        const capabilityIds = Array.isArray(build.capabilities)
+            ? build.capabilities.map(id => String(id)).filter(id => ['KICK', 'GRAB', 'THROW'].includes(id))
+            : [];
+        const permanentCapabilities = capabilityIds
+            .map(id => typeof global.getCapabilityPowerupDefV681 === 'function' ? global.getCapabilityPowerupDefV681(id)?.capability : null)
+            .filter(Boolean);
+        const capabilityByGroup = {};
+        for (const capability of permanentCapabilities) {
+            const def = typeof global.getCapabilityPowerupDefV681 === 'function'
+                ? Object.values({ KICK: global.getCapabilityPowerupDefV681('KICK'), GRAB: global.getCapabilityPowerupDefV681('GRAB'), THROW: global.getCapabilityPowerupDefV681('THROW') }).find(item => item?.capability === capability)
+                : null;
+            if (def?.exclusiveGroup) capabilityByGroup[def.exclusiveGroup] = capability;
+        }
+        const capabilityProfile = {
+            permanent: permanentCapabilities,
+            byGroup: capabilityByGroup
+        };
+        const inheritedSpeed = clamp(number(build.speed, number(build.sourceSpeed, ECHO_SPEED_FALLBACK)), 1, 8);
         const ghost = {
             ...clone(saved),
+            archetype: 'echo',
             x: spawn.x * TILE_SIZE + TILE_SIZE / 2 - TILE_SIZE * 0.68 / 2,
             y: spawn.y * TILE_SIZE + TILE_SIZE / 2 - TILE_SIZE * 0.68 / 2,
             width: TILE_SIZE * 0.68,
             height: TILE_SIZE * 0.68,
-            speed: ECHO_SPEED,
-            sourceSpeed: clamp(number(build.sourceSpeed, 3), 1, 8),
+            speed: inheritedSpeed,
+            sourceSpeed: inheritedSpeed,
             maxBombs: clamp(Math.floor(number(build.maxBombs, 1)), 1, 8),
             bombRange: Math.max(GHOST_SPATIAL_RANGE, clamp(Math.floor(number(build.bombRange, 1)), 1, 12)),
             bombFuseMultiplier: Math.max(0.5, number(build.bombFuseMultiplier, number(relicMods.bombFuseMultiplier, 1))),
+            bombElementV612: ['normal', 'fire', 'ice', 'electric'].includes(String(build.bombElementV612)) ? String(build.bombElementV612) : 'normal',
             maxHealth: 1,
             health: 1,
             hasShield: false,
             dir: ['up', 'down', 'left', 'right'].includes(build.dir) ? build.dir : 'down',
+            capabilities: capabilityIds,
+            capabilityProfileV681: capabilityProfile,
             hitFlash: 0,
             attackFlash: 0,
             lastHitBlastId: -1,
@@ -651,6 +689,7 @@
             aiTargetTile: null,
             mode: 'HUNT',
             escapeTargetTile: null,
+            echoInteractionTimer: 0,
             _tileMoveActive: false,
             _tileMoveTargetX: 0,
             _tileMoveTargetY: 0,
@@ -676,6 +715,66 @@
         return ghost;
     }
 
+    function echoHasCapability(ghost, capability) {
+        if (!ghost) return false;
+        if (typeof global.isCapabilityActiveV681 === 'function') {
+            return !!global.isCapabilityActiveV681(ghost, capability);
+        }
+        const profile = ghost.capabilityProfileV681;
+        return !!profile?.permanent?.includes(String(capability));
+    }
+
+    function setEchoFacingTowardPlayer(ghost) {
+        const gt = tileFromGhost(ghost);
+        const pt = tileFromPlayer();
+        const dx = pt.x - gt.x;
+        const dy = pt.y - gt.y;
+        if (Math.abs(dx) >= Math.abs(dy) && dx !== 0) ghost.dir = dx < 0 ? 'left' : 'right';
+        else if (dy !== 0) ghost.dir = dy < 0 ? 'up' : 'down';
+        ghost.lastDirection = ghost.dir;
+    }
+
+    function updateEchoInteractionAbility(dt, ghost) {
+        if (!ghost || ghost.mode === 'ESCAPE' || ghost.defeated) return false;
+        const carried = typeof global.getCarriedBombForEntityV682 === 'function'
+            ? global.getCarriedBombForEntityV682(ghost)
+            : null;
+
+        if (carried) {
+            ghost.echoInteractionTimer = Math.max(0, number(ghost.echoInteractionTimer, 0) - number(dt, 16));
+            if (ghost.echoInteractionTimer > 0) return true;
+
+            if (echoHasCapability(ghost, 'throw') && typeof global.throwCarriedBombV683 === 'function') {
+                setEchoFacingTowardPlayer(ghost);
+                if (global.throwCarriedBombV683(ghost)) {
+                    ghost.mode = 'ESCAPE';
+                    ghost.escapeTargetTile = null;
+                    ghost.echoInteractionTimer = 900;
+                    ghost.attackFlash = 180;
+                    return true;
+                }
+            }
+
+            if (typeof global.releaseCarriedBombV682 === 'function') {
+                global.releaseCarriedBombV682(ghost, 'drop');
+            }
+            ghost.echoInteractionTimer = 700;
+            return true;
+        }
+
+        if (!echoHasCapability(ghost, 'grab') || typeof global.getAdjacentGrabBombAnyDirectionV687 !== 'function' || typeof global.grabBombV682 !== 'function') {
+            return false;
+        }
+
+        const bomb = global.getAdjacentGrabBombAnyDirectionV687(ghost);
+        if (!bomb) return false;
+        if (!global.grabBombV682(ghost, bomb)) return false;
+        ghost.mode = 'CARRY';
+        ghost.echoInteractionTimer = echoHasCapability(ghost, 'throw') ? 260 : 620;
+        ghost.aiTargetTile = null;
+        return true;
+    }
+
     function updateDeathEchoV61(dt) {
         if (typeof gameState === 'undefined' || !gameState.isPlaying || gameState.paused) return;
         const ghost = syncDeathEchoV61();
@@ -691,6 +790,23 @@
             b && b.owner === GHOST_OWNER && b.echoId === ghost.echoId && b.state !== BOMB_V4_STATES.EXPLODING
         );
         const danger = collectDangerCells();
+
+        if (ghost.mode === 'CARRY') {
+            if (updateEchoInteractionAbility(dt, ghost)) {
+                const carriedNow = typeof global.getCarriedBombForEntityV682 === 'function'
+                    ? global.getCarriedBombForEntityV682(ghost)
+                    : null;
+                if (carriedNow) {
+                    const target = chooseChaseStep(ghost);
+                    if (target) moveGhostToward(ghost, target, dt);
+                } else if (ghost.mode === 'CARRY') {
+                    ghost.mode = 'HUNT';
+                }
+                ghost.visualTime += Math.max(0, number(dt, 16));
+                return;
+            }
+            ghost.mode = 'HUNT';
+        }
 
         // ESCAPE tiene prioridad absoluta: el Echo nunca sigue persiguiendo
         // mientras una bomba propia puede matarlo.
@@ -724,6 +840,10 @@
         }
 
         if (state.decisionTimer <= 0 && !ghost._tileMoveActive) {
+            if (updateEchoInteractionAbility(dt, ghost)) {
+                ghost.visualTime += Math.max(0, number(dt, 16));
+                return;
+            }
             state.decisionTimer = DECISION_MS;
             state.aiStep++;
 

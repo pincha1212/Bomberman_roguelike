@@ -8,7 +8,7 @@
         chaser:  Object.freeze({ kick:false, grab:false, carry:false, throw:false }),
         flyer:   Object.freeze({ kick:false, grab:false, carry:false, throw:false }),
         boss:    Object.freeze({ kick:true,  grab:true,  carry:true,  throw:true  }),
-        echo:    Object.freeze({ kick:true,  grab:false, carry:false, throw:false }),
+        echo:    Object.freeze({ kick:true,  grab:true,  carry:true,  throw:true  }),
         generic: Object.freeze({ kick:false, grab:false, carry:false, throw:false })
     });
 

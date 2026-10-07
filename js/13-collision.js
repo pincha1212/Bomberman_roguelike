@@ -108,16 +108,16 @@ function gridCanOccupy(entity, x, y, options = {}) {
     for (const tile of tiles) {
         if (gridTileIsBlocked(tile.x, tile.y, options)) return false;
 
-        if (kind === 'player') {
-            if (typeof isBombSolidForPlayer === 'function' && isBombSolidForPlayer(tile.x, tile.y)) return false;
-        } else if (!options.ignoreBombs) {
+        // Bombas = pared para TODAS las entidades que usan la colisión de rejilla.
+        // La única excepción controlada es la casilla en la que la entidad ya está
+        // parada mientras termina de salir de una bomba recién colocada.
+        if (!options.ignoreBombs) {
             const currentTile = tile.x === current.x && tile.y === current.y;
-            if (!(allowCurrentBombTile && currentTile)) {
-                const bomb = typeof getBombAtTile === 'function'
-                    ? getBombAtTile(tile.x, tile.y)
-                    : gameState.bombs?.find(b => b.x === tile.x && b.y === tile.y);
-                if (bomb) return false;
-            }
+            const bomb = typeof getBombAtTile === 'function'
+                ? getBombAtTile(tile.x, tile.y)
+                : gameState.bombs?.find(b => b && b.x === tile.x && b.y === tile.y && b.state !== 'moving');
+            const playerPassThrough = kind === 'player' && bomb && bomb.playerPassThrough === true;
+            if (bomb && !playerPassThrough && !(allowCurrentBombTile && currentTile)) return false;
         }
 
         if (options.avoidDanger && typeof isEnemyBombDanger === 'function' && isEnemyBombDanger(tile.x, tile.y)) {

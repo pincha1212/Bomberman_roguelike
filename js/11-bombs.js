@@ -279,9 +279,10 @@ function beginBombHold(source='input'){
     bombInputState.lastRepeatAt = 0;
     bombInputState.blockedByMovement = false;
     const placed = requestBombPlacement('press');
-    if (!placed && isRecentMovementInput()) {
-        bombInputState.blockedByMovement = true;
-    }
+    // Si la colocación inicial falla porque todavía te estás moviendo, no se
+    // cancela la retención: el siguiente intento debe volver a probar cuando
+    // haya pasado el retardo inicial.
+    bombInputState.blockedByMovement = false;
     return placed;
 }
 
@@ -471,7 +472,8 @@ function registerBombChainLink(from,to,index,total){
 
 function updateBombInput(dt){
     if(!bombInputState.held || !gameState.isPlaying || gameState.paused) return;
-    if(bombInputState.blockedByMovement) return;
+    // Una retención nunca queda bloqueada de forma permanente por un intento
+    // fallido durante el movimiento; cada repetición vuelve a intentar colocar.
     const now=performance.now();
     const heldFor=now-bombInputState.startedAt;
     if(heldFor < BOMB_HANDLING.holdInitialDelay) return;

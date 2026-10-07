@@ -324,6 +324,8 @@ const UI = {};
             ,BOMB_FIRE: 'BOMB_FIRE'
             ,BOMB_ICE: 'BOMB_ICE'
             ,BOMB_ELECTRIC: 'BOMB_ELECTRIC'
+            ,GRAB: 'GRAB'
+            ,THROW: 'THROW'
         };
 
         const PLAYER_LIMITS_V67 = Object.freeze({
@@ -447,17 +449,26 @@ const UI = {};
         }
 
         function getPowerupDropPoolV67(){
-            return Object.freeze([
-                POWERUPS.BOMB_UP,
-                POWERUPS.FIRE_UP,
-                POWERUPS.SPEED_UP,
-                POWERUPS.HEALTH_UP,
-                POWERUPS.SHIELD_UP,
-                POWERUPS.BOMB_KICK,
-                'BOMB_FIRE',
-                'BOMB_ICE',
-                'BOMB_ELECTRIC'
-            ]);
+            const pool = [];
+            const cap = getPlayerCapacityCapsV67();
+            const capabilityActive = (id) => typeof isCapabilityActiveV681 === 'function' && !!isCapabilityActiveV681(player, id);
+
+            if (Number(player.maxBombs) < Number(cap.maxBombs)) pool.push(POWERUPS.BOMB_UP);
+            if (Number(player.bombRange) < Number(cap.bombRange)) pool.push(POWERUPS.FIRE_UP);
+            if (Number(player.speed) < Number(PLAYER_LIMITS_V67.hard.speed)) pool.push(POWERUPS.SPEED_UP);
+            if (Number(player.health) < Number(player.maxHealth)) pool.push(POWERUPS.HEALTH_UP);
+            if (!player.hasShield) pool.push(POWERUPS.SHIELD_UP);
+            if (!capabilityActive('KICK')) pool.push(POWERUPS.BOMB_KICK);
+            if (!capabilityActive('GRAB')) pool.push(POWERUPS.GRAB);
+            if (capabilityActive('GRAB') && !capabilityActive('THROW')) pool.push(POWERUPS.THROW);
+
+            // Las bombas elementales siguen siendo siempre obtenibles: repetir
+            // el mismo elemento simplemente vuelve a seleccionarlo.
+            pool.push(POWERUPS.BOMB_FIRE, POWERUPS.BOMB_ICE, POWERUPS.BOMB_ELECTRIC);
+
+            // Nunca devolvemos un pool vacío: al alcanzar todas las mejoras
+            // permanentes, queda disponible el sistema elemental.
+            return Object.freeze(pool.length ? pool : [POWERUPS.BOMB_FIRE, POWERUPS.BOMB_ICE, POWERUPS.BOMB_ELECTRIC]);
         }
 
         window.PLAYER_LIMITS_V67=PLAYER_LIMITS_V67;
@@ -584,7 +595,7 @@ const UI = {};
             { id: 'shield', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'ESCUDO', desc: 'Protección contra un golpe.', action: () => player.hasShield = true },
             { id: 'coin', kind: 'UPGRADE', rarity: 'COMMON', name: 'BOTÍN', desc: '+35 monedas.', action: () => gameState.coins += 35 },
             { id: 'heal', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'KIT MÉDICO', desc: 'Recupera 2 vidas sin superar el máximo.', action: () => player.health = Math.min(player.health + 2, player.maxHealth) },
-            { id: 'bomb_kick', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'PATADA TEMPORAL', desc: 'Podés patear bombas durante 12 segundos.', action: () => typeof applyPowerupV67 === 'function' ? applyPowerupV67(POWERUPS.BOMB_KICK) : null }
+            { id: 'bomb_kick', kind: 'UPGRADE', rarity: 'UNCOMMON', name: 'PATADA', desc: 'Capacidad permanente para patear bombas.', action: () => typeof applyPowerupV67 === 'function' ? applyPowerupV67(POWERUPS.BOMB_KICK) : null }
         ];
 
         const RARITY_COLORS = {

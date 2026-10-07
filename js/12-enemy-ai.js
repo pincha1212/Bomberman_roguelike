@@ -21,6 +21,8 @@ const enemyAI_V312 = {
     lookaheadTiles: 3,
     stuckMs: 180,
     physicalRecoveryMs: 220,
+    wallPauseMs: 2000,
+    blockedRetryMs: 180,
     cornerAssistSpeed: 1.15,
     recoveryPathNodes: 240,
     cursor: 0,
@@ -155,7 +157,6 @@ function ensureEnemyMotionStateV312(e, index) {
             lastSeenX: -1,
             lastSeenY: -1,
             memoryTimer: 0,
-            blockPauseTimer: 0,
             patrolX: -1,
             patrolY: -1,
             surroundX: -1,
@@ -179,6 +180,10 @@ function ensureEnemyMotionStateV312(e, index) {
             lastTurnDirection: null,
             recoveryCooldownTimer: 0,
             recoveryPathCalls: 0,
+            wallPauseMs: 0,
+            blockedRetryMs: 0,
+            blockedDirection: null,
+            wallPauseExpired: false,
             blockedDirection: null,
             blockedDirectionFrames: 0,
             // v3.21: memoria corta de tiles visitados para evitar ciclos locales.
@@ -276,7 +281,7 @@ function enemyCanSeePlayerV312(e) {
         y: Math.floor(py / TILE_SIZE)
     };
     const tileDistance = Math.abs(pxTile.x - exTile.x) + Math.abs(pxTile.y - exTile.y);
-    if (tileDistance > 5) return false;
+    if (tileDistance > 9) return false;
 
     // En proximidad inmediata, el enemigo detecta al jugador aunque haya girado
     // apenas dentro de la misma zona del corredor.
@@ -871,74 +876,163 @@ function enemyChooseDirectionAtIntersectionV312(e) {
 
 function updateEnemyIntentV312(e, index, dt) {
     const ai = ensureEnemyMotionStateV312(e, index);
-    const safeDt = Math.max(0, Number(dt) || 0);
-    ai.blockPauseTimer = Math.max(0, Number(ai.blockPauseTimer || 0) - safeDt);
-    ai.visionTimer -= safeDt;
+    ai.decisionTimer -= dt;
+    ai.visionTimer -= dt;
+    ai.turnLockTimer = Math.max(0, Number(ai.turnLockTimer || 0) - dt);
+    ai.recoveryCooldownTimer = Math.max(0, Number(ai.recoveryCooldownTimer || 0) - dt);
+
+    const wasWallPaused = Number(ai.wallPauseMs || 0) > 0;
+    ai.wallPauseMs = Math.max(0, Number(ai.wallPauseMs || 0) - Number(dt || 0));
+    ai.blockedRetryMs = Math.max(0, Number(ai.blockedRetryMs || 0) - Number(dt || 0));
+    if (ai.wallPauseMs > 0 || ai.wallPauseExpired) {
+        // Al chocar contra una pared/bloque/bomba, el enemigo conserva su
+        // dirección y queda inmóvil. La decisión de giro se hace recién después
+        // de los 2 s; moveEnemyV312 ejecuta ese giro de forma tile-to-tile.
+        return;
+    }
+    if (wasWallPaused && !ai.wallPauseExpired && ai.blockedDirection) {
+        ai.wallPauseExpired = true;
+    }
+    ai.navigationMemoryTimer = Math.max(0, Number(ai.navigationMemoryTimer || 0) - dt);
+    if (ai.navigationMemoryTimer <= 0 && Array.isArray(ai.recentTileKeys)) {
+        const currentTile = enemyTileV312(e);
+        ai.recentTileKeys = [enemyTileKeyV312(currentTile.x, currentTile.y)];
+        ai.lastNavigationTileKey = ai.recentTileKeys[0];
+        ai.navigationMemoryTimer = enemyAI_V312.navigationMemoryMs;
+    }
+    ai.memoryTimer = Math.max(0, ai.memoryTimer - dt);
+    ai.surroundTimer = Math.max(0, ai.surroundTimer - dt);
 
     if (ai.visionTimer <= 0) {
         ai.visionTimer = enemyAI_V312.visionInterval + (index % 3) * 9;
-        ai.seesPlayer = enemyCanSeePlayerV312(e);
-        if (ai.seesPlayer) {
+        const sees = enemyCanSeePlayerV312(e);
+        ai.seesPlayer = sees;
+        if (sees) {
             const pt = enemyPlayerTileV312();
             ai.lastSeenX = pt.x;
             ai.lastSeenY = pt.y;
-        } else {
-            // Sin visión no existe memoria de persecución: vuelve a su recorrido.
-            ai.memoryTimer = 0;
-            ai.lastSeenX = -1;
-            ai.lastSeenY = -1;
+            ai.memoryTimer = enemyAI_V312.memoryMs;
+            if (e.type === ENEMY_TYPES.ESPECIAL) ai.surroundTimer = 0;
         }
     }
-
-    if (ai.blockPauseTimer > 0) return;
 
     const tile = enemyTileV312(e);
+    const dangerHere = enemyDangerV312(tile.x, tile.y);
+    if (!Number.isFinite(ai.dangerCheckTimer)) ai.dangerCheckTimer = 0;
+    ai.dangerCheckTimer -= dt;
+    let imminentDanger = false;
+    if (enemyAI_V312.danger.size > 0 && ai.dangerCheckTimer <= 0) {
+        ai.dangerCheckTimer = 75 + (index % 3) * 12;
+        imminentDanger = enemyAvailableDirectionsV312(e, false).some(dir => {
+            const next = enemyProjectedTileV312(e, dir, 1);
+            return enemyDangerV312(next.x, next.y);
+        });
+        ai.imminentDanger = imminentDanger;
+    } else {
+        imminentDanger = !!ai.imminentDanger;
+    }
+
+    const profile = enemyBehaviorProfileV324(e, index);
     const playerTile = enemyPlayerTileV312();
-    const nearAndVisible = ai.seesPlayer && enemyDistanceToV312(tile.x, tile.y, playerTile.x, playerTile.y) <= 5;
-    ai.alert = nearAndVisible ? 'chase' : 'patrol';
-    ai.behavior = nearAndVisible ? 'chase' : 'patrol';
+    const playerDistance = enemyDistanceToV312(tile.x, tile.y, playerTile.x, playerTile.y);
+    const evasiveEngaged = profile.id === 'evasive' && (ai.seesPlayer || playerDistance <= Number(profile.fleeRadius || 5));
+    const patrollerEngaged = profile.id === 'patroller' && playerDistance <= 4 && (ai.seesPlayer || ai.memoryTimer > 0);
+    const winterPassive = !!e.type?.winterRole;
+
+    if (dangerHere || imminentDanger || evasiveEngaged) {
+        ai.alert = 'flee';
+        ai.behavior = profile.id;
+    } else if (winterPassive) {
+        // Enemigos de Invierno: patrullan y ocupan espacio; no persiguen al jugador.
+        ai.alert = 'patrol';
+        ai.behavior = profile.id;
+    } else if ((ai.seesPlayer || ai.memoryTimer > 0) && profile.id !== 'patroller') {
+        ai.alert = profile.id === 'aggressive' ? 'aggressive' : 'chase';
+        ai.behavior = profile.id;
+    } else if (patrollerEngaged) {
+        ai.alert = 'chase';
+        ai.behavior = profile.id;
+    } else {
+        ai.alert = 'patrol';
+        ai.behavior = profile.id;
+    }
 
     const currentDir = enemyDirectionV312(ai.direction);
-    const currentPassable = enemyDirectionPassableV312(e, currentDir, false);
-    const atCenter = enemyIsNearCenterV312(e);
-    const shouldDecide = atCenter || !currentPassable || ai.decisionTimer <= 0;
-    ai.decisionTimer -= safeDt;
+    const physicalPassable = enemyDirectionPassableV312(e, currentDir, false);
+    const currentPassable = enemyDirectionPassableV312(e, currentDir, ai.alert === 'flee');
+
+    // Una pared/bloque/bomba no produce un giro instantáneo. El choque físico
+    // abre una pausa de 2 s; solo el peligro real puede saltarse esta espera.
+    if (!physicalPassable && !ai.wallPauseExpired && Number(ai.wallPauseMs || 0) <= 0) {
+        ai.wallPauseMs = enemyAI_V312.wallPauseMs;
+        ai.blockedRetryMs = enemyAI_V312.blockedRetryMs;
+        ai.blockedDirection = currentDir.dir;
+        ai.wallPauseExpired = false;
+        e.vx = 0;
+        e.vy = 0;
+        return;
+    }
+
+    const atCenterRaw = enemyIsNearCenterV312(e);
+    // Durante una recuperación física no tratamos la cercanía al centro como
+    // una intersección normal: primero dejamos terminar la corrección lateral.
+    const atCenter = atCenterRaw && !(ai.physicalBlocked && ai.physicalBlockedTimer < enemyAI_V312.physicalRecoveryMs);
+
+    // La rejilla sirve para anticipar paredes. El bloqueo físico se confirma
+    // solamente después de que gridMoveCardinal() falle con el hitbox real.
+    // Así la IA puede corregir la alineación lateral antes de abandonar la ruta.
+    if (!currentPassable) ai.blockedTimer += dt;
+    else ai.blockedTimer = 0;
+
+    const repeatedBlock = Number(ai.blockedDirectionFrames || 0) >= enemyAI_V312.repeatedBlockTriggerFrames;
+    const shouldDecide = atCenter || !currentPassable || repeatedBlock || ai.physicalBlockedTimer >= enemyAI_V312.physicalRecoveryMs || ai.decisionTimer <= 0 || ai.alert === 'flee';
     if (!shouldDecide) return;
 
-    if (ai.patrolX < 0 || ai.patrolY < 0 || (ai.alert === 'chase' && !ai.seesPlayer)) {
-        if (ai.alert === 'patrol') {
-            const patrol = enemyChoosePatrolTargetV312(e);
-            ai.patrolX = patrol.x;
-            ai.patrolY = patrol.y;
-        }
+    if (ai.patrolX >= 0 && tile.x === ai.patrolX && tile.y === ai.patrolY && ai.alert === 'patrol') {
+        ai.patrolX = -1;
+        ai.patrolY = -1;
     }
 
-    let chosen = null;
-    const physicalChoices = enemyPhysicalDirectionChoicesV312(e, false);
-    if (ai.blockedDirection) {
-        const alternatives = physicalChoices.filter(dir =>
-            dir.dir !== ai.blockedDirection &&
-            dir.dir !== ENEMY_OPPOSITE_V312[ai.blockedDirection]
-        );
-        chosen = alternatives[0] || physicalChoices.find(dir => dir.dir !== ai.blockedDirection) || null;
-        if (!chosen) {
-            // No existe otro tile accesible: no avanzar ni girar artificialmente.
-            ai.blockPauseTimer = 1000;
-            return;
-        }
-        ai.blockedDirection = null;
-    } else {
-        chosen = enemyChooseDirectionAtIntersectionV312(e);
-        if (!chosen) return;
-    }
+    let chosen = enemyChooseDirectionAtIntersectionV312(e);
     if (!chosen) return;
+
+    if (repeatedBlock && ai.blockedDirection === currentDir.dir && chosen.dir === currentDir.dir) {
+        const recovery = enemyChooseLocalRecoveryDirectionV319(e);
+        if (recovery) chosen = recovery;
+    }
 
     ai.desiredDirection = chosen.dir;
     ai.decisionTimer = enemyAI_V312.decisionInterval + (index % 3) * 10;
-    if (chosen.dir !== currentDir.dir && enemyImmediateDirectionPassableV312(e, chosen, false, 0.75)) {
+    if (chosen.dir !== currentDir.dir && enemyImmediateDirectionPassableV312(e, chosen, ai.alert === 'flee', 0.75)) {
+        const wasRecovery = Number(ai.physicalBlockedTimer || 0) > 0 || Number(ai.stuckTimer || 0) > 0;
         ai.direction = chosen.dir;
         e.lastDirection = chosen.dir;
+        if (wasRecovery) {
+            ai.recoveryCount += 1;
+            ai.lastRecoveryReason = ai.lastRecoveryPathNodes > 0 ? 'replan-ruta' : 'replan-fisico';
+            ai.blockedTimer = 0;
+            ai.physicalBlockedTimer = 0;
+            ai.physicalBlocked = false;
+            ai.recoveryCooldownTimer = Math.max(Number(ai.recoveryCooldownTimer || 0), enemyAI_V312.recoveryCooldownMs);
+        } else {
+            ai.turnLockTimer = Number(profile.turnCommitMs || enemyAI_V312.navigationTurnCommitMs);
+            ai.lastTurnTileKey = enemyTileKeyV312(tile.x, tile.y);
+            ai.lastTurnDirection = chosen.dir;
+            ai.lastTurnFromDirection = currentDir.dir;
+            ai.lastTurnAtTileKey = enemyTileKeyV312(tile.x, tile.y);
+            ai.navigationTurnCount = Number(ai.navigationTurnCount || 0) + 1;
+        }
     }
+    ai.lastDecisionTileX = tile.x;
+    ai.lastDecisionTileY = tile.y;
+
+    if (!currentPassable || ai.alert === 'flee') {
+        ai.direction = chosen.dir;
+        e.lastDirection = chosen.dir;
+        ai.blockedTimer = 0;
+    }
+
+
 }
 
 function applyEnemyDirectionAtCenterV312(e) {
@@ -993,6 +1087,7 @@ function getEnemyMovementSpeedV610(e) {
 function moveEnemyV312(e, dt) {
     const ai = e.ai;
     const speed = getEnemyMovementSpeedV610(e);
+    const safeDt = Math.max(0, Number(dt) || 0);
 
     if (!e._tileMoveInitialized) {
         const tile = enemyTileV312(e);
@@ -1000,55 +1095,101 @@ function moveEnemyV312(e, dt) {
         e._tileMoveInitialized = true;
     }
 
-    if (Number(ai.blockPauseTimer || 0) > 0) {
+    if (e._tileMoveActive) {
+        const result = gridAdvanceTileMove(e, speed, dt, { kind:'enemy', canFly:!!e.type.canFly, allowCurrentBombTile:false });
+        if (result.arrived) {
+            e.vx = 0;
+            e.vy = 0;
+            ai.stuckTimer = 0;
+            ai.physicalBlockedTimer = 0;
+            ai.physicalBlocked = false;
+            ai.cornerCorrectionMs = 0;
+            ai.blockedDirection = null;
+            ai.blockedDirectionFrames = 0;
+            e.lastX = e.x;
+            e.lastY = e.y;
+        }
+        return;
+    }
+
+    // Si una pared/bloque/bomba desaparece mientras el enemigo está esperando,
+    // reintenta primero la dirección que quería seguir. No queda congelado en
+    // un bloqueo antiguo.
+    if (Number(ai.wallPauseMs || 0) > 0) {
+        ai.wallPauseMs = Math.max(0, Number(ai.wallPauseMs || 0) - safeDt);
+        ai.blockedRetryMs = Math.max(0, Number(ai.blockedRetryMs || 0) - safeDt);
+        if (ai.blockedDirection && ai.blockedRetryMs <= 0) {
+            const blockedDir = enemyDirectionV312(ai.blockedDirection);
+            if (enemyImmediateDirectionPassableV312(e, blockedDir, false, 1.0)) {
+                ai.wallPauseMs = 0;
+                ai.wallPauseExpired = false;
+                ai.blockedRetryMs = 0;
+                ai.direction = blockedDir.dir;
+                ai.desiredDirection = blockedDir.dir;
+            } else {
+                ai.blockedRetryMs = enemyAI_V312.blockedRetryMs;
+            }
+        }
         e.vx = 0;
         e.vy = 0;
         return;
     }
 
-    if (!e._tileMoveActive) {
-        const dir = enemyDirectionV312(ai.direction);
-        const tile = enemyTileV312(e);
-        const gx = tile.x + dir.x;
-        const gy = tile.y + dir.y;
-        const started = gridBeginTileMove(e, gx, gy, {
-            kind: 'enemy',
-            canFly: !!e.type.canFly,
-            allowCurrentBombTile: false
-        });
-        if (!started) {
-            // Toda pared, bloque destructible o bomba impone una pausa real de 1 s.
-            ai.blockPauseTimer = 1000;
-            ai.blockedDirection = dir.dir;
-            ai.direction = null;
-            ai.desiredDirection = null;
-            e.lastDirection = null;
-            e.vx = 0;
-            e.vy = 0;
+    if (ai.wallPauseExpired && ai.blockedDirection) {
+        const current = enemyDirectionV312(ai.direction);
+        let next = enemyChooseLocalRecoveryDirectionV319(e);
+        if (!next) {
+            const options = enemyAvailableDirectionsV312(e, false);
+            next = options.find(dir => dir.dir !== ai.blockedDirection && dir.dir !== current.dir)
+                || options.find(dir => dir.dir === ENEMY_OPPOSITE_V312[ai.blockedDirection])
+                || options[0]
+                || null;
+        }
+        if (next) {
+            ai.direction = next.dir;
+            ai.desiredDirection = next.dir;
+            e.lastDirection = next.dir;
+            ai.blockedDirection = null;
+            ai.wallPauseExpired = false;
+            ai.blockedTimer = 0;
+            ai.physicalBlocked = false;
+            ai.physicalBlockedTimer = 0;
+        } else {
+            ai.blockedRetryMs = enemyAI_V312.blockedRetryMs;
             return;
         }
-        e.vx = dir.x * speed;
-        e.vy = dir.y * speed;
     }
 
-    const result = gridAdvanceTileMove(e, speed, dt);
-    if (result.arrived) {
+    const dir = enemyDirectionV312(ai.direction);
+    const tile = enemyTileV312(e);
+    const gx = tile.x + dir.x;
+    const gy = tile.y + dir.y;
+    const started = gridBeginTileMove(e, gx, gy, {
+        kind:'enemy',
+        canFly:!!e.type.canFly,
+        allowCurrentBombTile:false
+    });
+    if (!started) {
+        // El giro no es instantáneo: 2 s de pausa visible antes de cambiar de
+        // corredor. Si durante la espera aparece espacio, puede continuar recto.
+        ai.wallPauseMs = enemyAI_V312.wallPauseMs;
+        ai.blockedRetryMs = enemyAI_V312.blockedRetryMs;
+        ai.blockedDirection = dir.dir;
+        ai.wallPauseExpired = false;
         e.vx = 0;
         e.vy = 0;
-        ai.stuckTimer = 0;
-        ai.physicalBlockedTimer = 0;
-        ai.physicalBlocked = false;
-        ai.blockedDirection = null;
-        ai.blockedDirectionFrames = 0;
-        e.lastX = e.x;
-        e.lastY = e.y;
+        ai.blockedTimer = (ai.blockedTimer || 0) + safeDt;
+        return;
     }
+
+    e.vx = dir.x * speed;
+    e.vy = dir.y * speed;
 }
 
 function updateEnemyAI(dt) {
     if (!gameState.isPlaying || gameState.paused) return;
 
-    const roomKey = `${gameState.level}:${gameState.gridWidth}x${gameState.gridHeight}`;
+    const roomKey = `${gameState.level}:${gameState.roomType.id}`;
     if (enemyAI_V312.roomKey !== roomKey) {
         enemyAI_V312.roomKey = roomKey;
         enemyAI_V312.dangerCooldown = 0;
@@ -1063,6 +1204,8 @@ function updateEnemyAI(dt) {
             ensureEnemyMotionStateV312(gameState.enemies[i], i);
         }
     }
+
+    updateEnemyDangerV312(dt);
 
     const count = gameState.enemies.length;
     if (!count) return;

@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOMBERMAN ROGUELIKE — v6.12.7</title>
+    <title>BOMBERMAN ROGUELIKE — v6.9.6</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/11-test-controls.css">
     <link rel="stylesheet" href="css/12-run-save.css">
     <link rel="stylesheet" href="css/06-mobile-performance.css">
     <link rel="stylesheet" href="css/12-mobile-controls.css?v=6.9.9">
@@ -69,11 +70,11 @@
                                 <div id="ui-ability-grab" class="ability-slot" data-active="false" title="AGARRE: levanta y transporta una bomba" aria-label="Agarre: levantar y transportar bombas">
                                     <span class="ability-icon" aria-hidden="true">🧤</span><span class="ability-copy"><strong>AGARRE</strong><small id="ui-ability-grab-status">—</small></span>
                                 </div>
-                                <div id="ui-ability-throw" class="ability-slot" data-active="false" title="LANZAMIENTO: lanza la bomba sostenida" aria-label="Lanzamiento: lanzar bombas sostenidas">
-                                    <span class="ability-icon" aria-hidden="true">🎯</span><span class="ability-copy"><strong>LANZAMIENTO</strong><small id="ui-ability-throw-status">—</small></span>
+                                <div id="ui-ability-throw" class="ability-slot ability-slot-experimental" data-active="false" title="LANZAMIENTO: experimental; requiere AGARRE" aria-label="Lanzamiento: experimental">
+                                    <span class="ability-icon" aria-hidden="true">🎯</span><span class="ability-copy"><strong>LANZAMIENTO</strong><small id="ui-ability-throw-status">LAB</small></span>
                                 </div>
                             </div>
-                            <div id="ui-ability-detail" class="ability-detail" aria-live="polite">Elegí PATADA, AGARRE o LANZAMIENTO según las capacidades activas</div>
+                            <div id="ui-ability-detail" class="ability-detail" aria-live="polite">Elegí PATADA o AGARRE recogiendo el power-up correspondiente</div>
                             <div id="ui-powerup-toast" class="powerup-toast hidden" aria-live="polite" aria-atomic="true">
                                 <span id="ui-powerup-toast-icon" class="powerup-toast-icon" aria-hidden="true">◆</span>
                                 <span class="powerup-toast-copy"><strong id="ui-powerup-toast-name">POWER-UP</strong><small id="ui-powerup-toast-desc">—</small></span>
@@ -82,7 +83,56 @@
                     </div>
                 </div>
 
-
+                <div id="test-controls" class="test-controls hidden" aria-label="Laboratorio de pruebas">
+                    <div class="test-controls-title">PRUEBAS</div>
+                    <div class="test-controls-level">
+                        <span>NIVEL</span>
+                        <button type="button" data-test-step="-1" aria-label="Nivel anterior">−</button>
+                        <input id="test-depth-input" type="number" min="1" max="44" value="1" inputmode="numeric" aria-label="Profundidad de prueba">
+                        <button type="button" data-test-step="1" aria-label="Siguiente nivel">+</button>
+                        <button type="button" id="test-depth-go">IR</button>
+                    </div>
+                    <div class="test-tools-divider" aria-hidden="true"></div>
+                    <div class="test-tools-group">
+                        <span class="test-tools-label">LAB</span>
+                        <button type="button" id="test-arena-reset">RESET MAPA</button>
+                        <button type="button" id="test-player-reset">RESET JUGADOR</button>
+                        <button type="button" id="test-lab-audit-btn">AUDITAR APP</button>
+                    </div>
+                    <div class="test-tools-group test-powerup-group" aria-label="Selector directo de pruebas">
+                        <span class="test-tools-label">SELECTOR</span>
+                        <select id="test-powerup-filter" aria-label="Filtrar pruebas por categoría">
+                            <option value="BASE">BASE</option>
+                            <option value="INTERACCION">INTERACCION</option>
+                            <option value="MOVIMIENTO">MOVIMIENTO</option>
+                            <option value="BOMBAS">BOMBAS</option>
+                            <option value="ENEMIGOS">ENEMIGOS</option>
+                            <option value="ALL">TODOS</option>
+                        </select>
+                        <select id="test-powerup-select" aria-label="Seleccionar prueba o power-up"></select>
+                        <button type="button" id="test-powerup-apply">APLICAR</button>
+                    </div>
+                    <div id="test-powerup-info" class="test-powerup-info is-empty" aria-label="Información de la prueba seleccionada">
+                        <div class="test-powerup-info-main">
+                            <div id="test-powerup-info-icon" class="test-powerup-info-icon" aria-hidden="true">·</div>
+                            <div class="test-powerup-info-copy">
+                                <div class="test-powerup-info-kicker">PRUEBA SELECCIONADA</div>
+                                <div id="test-powerup-info-name" class="test-powerup-info-name">Ninguna</div>
+                                <div class="test-powerup-info-tags"><span id="test-powerup-info-category">—</span><span id="test-powerup-info-rarity">—</span></div>
+                            </div>
+                        </div>
+                        <div id="test-powerup-info-desc" class="test-powerup-info-desc">Seleccioná una prueba y pulsá APLICAR. El selector ejecuta el sistema real del gameplay.</div>
+                        <div id="test-powerup-info-status" class="test-powerup-info-status">ESPERANDO APLICACIÓN</div>
+                    </div>
+                    <div class="test-tools-group test-elemental-group" aria-label="Kit de pruebas de bombas elementales">
+                        <span class="test-tools-label">BOMBAS ELEMENTALES</span>
+                        <button type="button" id="test-elemental-kit">KIT 4 ELEMENTOS</button>
+                        <button type="button" id="test-elemental-interaction">BOMBA GRAB/THROW</button>
+                        <button type="button" id="test-elemental-clear">LIMPIAR BOMBAS</button>
+                    </div>
+                    <div id="test-lab-audit" class="test-lab-audit" aria-live="polite">AUDITORÍA · sin ejecutar</div>
+                    <div id="test-lab-status" class="test-lab-status" role="status" aria-live="polite">TEST LAB · ENTORNO NEUTRO</div>
+                </div>
 
                 <!-- Death / Run Summary -->
                 <div id="game-over-screen" class="screen hidden death-screen">
@@ -213,7 +263,7 @@
         </div>
     </div>
 <!-- v3.28 modular JavaScript. Feedback is layered over the existing combat/runtime systems. -->
-    <script src="js/01-core.js?v=6.12.11"></script>
+    <script src="js/01-core.js?v=6.9.6"></script>
     <script src="js/54-entity-capabilities.js?v=6.11.3"></script>
     <script src="js/35-device-quality.js?v=4.5.0"></script>
     <script src="js/37-theme.js?v=6.8.7"></script>
@@ -221,36 +271,38 @@
     <script src="js/16-relics.js?v=6.7.0"></script>
     <script src="js/02-input.js?v=6.9.7"></script>
     <script src="js/15-room-design.js?v=6.10.1"></script>
+    <script src="js/57-dungeon-generator.js?v=6.12.14"></script>
     <script src="js/24-difficulty.js?v=3.27.0"></script>
-    <script src="js/03-world.js?v=6.12.11"></script>
+    <script src="js/03-world.js?v=6.4.0"></script>
     <script src="js/04-enemies.js?v=6.10.1"></script>
-    <script src="js/11-bombs.js?v=6.12.6"></script>
+    <script src="js/11-bombs.js?v=6.11.3"></script>
     <script src="js/13-collision.js?v=6.9.6"></script>
-    <script src="js/55-bomb-interactions.js?v=6.12.6"></script>
+    <script src="js/55-bomb-interactions.js?v=6.11.3"></script>
     <script src="js/14-traps.js?v=4.6.2"></script>
     <script src="js/05-player.js?v=6.9.6"></script>
     <script src="js/45-player-fsm.js?v=5.7.0"></script>
-    <script src="js/12-enemy-ai.js?v=6.12.11"></script>
+    <script src="js/12-enemy-ai.js?v=6.9.6"></script>
     <script src="js/06-combat.js?v=6.8.8"></script>
     <script src="js/53-mobile-performance.js?v=6.9.9"></script>
     <script src="js/07-render.js?v=6.8.7"></script>
     <script src="js/09-camera.js?v=3.27.0"></script>
-    <script src="js/10-feedback.js?v=6.12.10"></script>
-    <script src="js/17-run-lifecycle.js?v=6.12.11"></script>
+    <script src="js/10-feedback.js?v=4.6.2"></script>
+    <script src="js/17-run-lifecycle.js?v=6.7.0"></script>
     <script src="js/08-loop-ui.js?v=6.9.6"></script>
     <script src="js/27-boss-system.js?v=6.7.9"></script>
     <script src="js/29-feedback-system.js?v=4.6.2"></script>
-    <script src="js/31-roguelike-update.js?v=6.12.6"></script>
+    <script src="js/31-roguelike-update.js?v=6.7.0"></script>
     <script src="js/40-biome-progression.js?v=6.10.1"></script>
     <script src="js/41-biome-journey.js?v=6.3.0"></script>
     <script src="js/42-run-history.js?v=5.6.0"></script>
-    <script src="js/44-run-save.js?v=6.12.6"></script>
+    <script src="js/44-run-save.js?v=6.7.9"></script>
+    <script src="js/43-test-controls.js?v=6.12.3"></script>
     <script src="js/46-ecs.js?v=6.0.0"></script>
     <script src="js/47-event-bus.js?v=6.0.0"></script>
     <script src="js/48-bomb-events.js?v=6.7.0"></script>
     <script src="js/49-material-field.js?v=6.10.1"></script>
     <script src="js/50-death-echo.js?v=6.10.1"></script>
-    <script src="js/51-bomb-effects.js?v=6.12.10"></script>
-    <script src="js/56-elemental-bombs.js?v=6.12.9"></script>
+    <script src="js/51-bomb-effects.js?v=6.12.3"></script>
+    <script src="js/56-elemental-bombs.js?v=6.12.3"></script>
 </body>
 </html>

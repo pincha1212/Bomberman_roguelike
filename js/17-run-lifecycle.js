@@ -132,11 +132,6 @@ function resetWorldRuntimeState() {
     }
     resetPlayerRuntimeState();
 
-    if (typeof UI !== 'undefined') {
-        UI['danger-indicator']?.classList.add('hidden');
-        UI['boss-hud']?.classList.add('hidden');
-        UI['room-intro']?.classList.add('hidden');
-    }
 }
 
 function beginNewRun() {

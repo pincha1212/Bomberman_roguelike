@@ -118,42 +118,6 @@
 
             if (UI['ui-shield-badge']) UI['ui-shield-badge'].classList.toggle('hidden', !player.hasShield);
 
-            // V6.9: las capacidades se leen desde la fuente de verdad declarativa.
-            const capabilityDefs = globalThis.CAPABILITY_POWERUPS_V681 || {};
-            const activeCapabilities = typeof globalThis.getActiveCapabilityPowerupsV681 === 'function'
-                ? globalThis.getActiveCapabilityPowerupsV681(player) : [];
-            const capabilityUI = [
-                ['KICK','ui-ability-kick','ui-ability-kick-status'],
-                ['GRAB','ui-ability-grab','ui-ability-grab-status'],
-                ['THROW','ui-ability-throw','ui-ability-throw-status']
-            ];
-            for (const [id,nodeId,statusId] of capabilityUI) {
-                const node = UI[nodeId];
-                const status = UI[statusId];
-                const active = activeCapabilities.includes(id);
-                if (node) {
-                    node.dataset.active = active ? 'true' : 'false';
-                }
-                if (status) {
-                    status.textContent = active ? 'ACTIVA' : '—';
-                }
-            }
-            if (UI['ui-ability-detail']) {
-                const activeId = activeCapabilities[0] || null;
-                const meta = activeId ? capabilityDefs[activeId] : null;
-                UI['ui-ability-detail'].textContent = meta
-                    ? `${meta.icon || ''} ${meta.label}: ${meta.desc}`
-                    : 'Sin habilidad de interacción activa';
-            }
-
-            const b = gameState.boss;
-            const visible = !!b && !b.defeated;
-            if (UI['boss-hud']) UI['boss-hud'].classList.toggle('hidden', !visible);
-            if (visible) {
-                if (UI['boss-bar']) UI['boss-bar'].style.width = `${Math.max(0, b.hp / b.maxHp * 100)}%`;
-                if (UI['boss-phase']) UI['boss-phase'].textContent = `FASE ${b.phase}`;
-            }
-
             if (UI['room-banner']) {
                 UI['room-banner'].textContent = `${gameState.roomType.icon} ${gameState.roomType.name} · ${gameState.roomType.subtitle}`;
                 UI['room-banner'].style.setProperty('--room-accent', gameState.roomType.color);

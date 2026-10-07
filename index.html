@@ -6,7 +6,8 @@
     <title>BOMBERMAN ROGUELIKE — v6.9.6</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/13-game-information.css?v=6.12.21">
+    <link rel="stylesheet" href="css/13-game-information.css?v=6.12.23">
+    <link rel="stylesheet" href="css/14-viewport-layout.css?v=6.12.23">
     <link rel="stylesheet" href="css/12-run-save.css">
     <link rel="stylesheet" href="css/06-mobile-performance.css">
     <link rel="stylesheet" href="css/12-mobile-controls.css?v=6.9.9">
@@ -34,6 +35,7 @@
             </aside>
 
             <div id="game-layout" class="game-layout" aria-label="Partida e información">
+                <div id="game-stage" class="game-stage" aria-label="Área de juego">
                 <section id="game-container" aria-label="Área de juego">
                     <canvas id="gameCanvas" width="600" height="600"></canvas>
                     <div id="immersion-vignette"></div>
@@ -85,8 +87,8 @@
                     <div class="reward-kicker">RUN PAUSADA</div>
                     <h1 class="text-xl mb-3 text-cyan-300 pixel-font">PAUSA</h1>
                     <button id="btn-resume" class="btn-pixel">CONTINUAR</button>
+                </section>
                 </div>
-            </section>
 
                 <aside id="game-info-panel" class="game-info-panel" aria-label="Información de la partida">
                     <div class="game-info-header">
@@ -126,41 +128,14 @@
                         </div>
                     </div>
 
-                    <section class="info-card" aria-label="Habilidades de interacción">
-                        <div class="info-card-title">HABILIDADES</div>
-                        <div id="ui-abilities" class="ability-strip">
-                            <div class="ability-slots">
-                                <div id="ui-ability-kick" class="ability-slot" data-active="false" title="PATADA: empuja bombas al caminar contra ellas" aria-label="Patada: empujar bombas">
-                                    <span class="ability-icon" aria-hidden="true">🥾</span><span class="ability-copy"><strong>PATADA</strong><small id="ui-ability-kick-status">—</small></span>
-                                </div>
-                                <div id="ui-ability-grab" class="ability-slot" data-active="false" title="AGARRE: levanta y transporta una bomba" aria-label="Agarre: levantar y transportar bombas">
-                                    <span class="ability-icon" aria-hidden="true">🧤</span><span class="ability-copy"><strong>AGARRE</strong><small id="ui-ability-grab-status">—</small></span>
-                                </div>
-                                <div id="ui-ability-throw" class="ability-slot" data-active="false" title="LANZAMIENTO: requiere AGARRE" aria-label="Lanzamiento: lanzar bombas">
-                                    <span class="ability-icon" aria-hidden="true">🎯</span><span class="ability-copy"><strong>LANZAMIENTO</strong><small id="ui-ability-throw-status">—</small></span>
-                                </div>
-                            </div>
-                            <div id="ui-ability-detail" class="ability-detail" aria-live="polite">Sin habilidad de interacción activa</div>
-                            <div id="ui-powerup-toast" class="powerup-toast hidden" aria-live="polite" aria-atomic="true">
-                                <span id="ui-powerup-toast-icon" class="powerup-toast-icon" aria-hidden="true">◆</span>
-                                <span class="powerup-toast-copy"><strong id="ui-powerup-toast-name">POWER-UP</strong><small id="ui-powerup-toast-desc">—</small></span>
-                            </div>
-                        </div>
-                    </section>
+                    <div id="ui-powerup-toast" class="powerup-toast hidden" aria-live="polite" aria-atomic="true">
+                        <span id="ui-powerup-toast-icon" class="powerup-toast-icon" aria-hidden="true">◆</span>
+                        <span class="powerup-toast-copy"><strong id="ui-powerup-toast-name">POWER-UP</strong><small id="ui-powerup-toast-desc">—</small></span>
+                    </div>
 
                     <section class="info-card" aria-label="Reliquias activas">
                         <div class="info-card-title">RELIQUIAS ACTIVAS <span id="ui-relic-count-label">0</span></div>
                         <div id="ui-relic-list" class="info-relic-list"><div class="info-empty">Sin reliquias activas</div></div>
-                    </section>
-
-                    <section class="info-card" aria-label="Situación de la sala">
-                        <div class="info-card-title">SITUACIÓN</div>
-                        <div id="danger-indicator" class="info-danger hidden">PELIGRO</div>
-                        <div id="room-intro" class="info-room-intro hidden"></div>
-                        <div id="boss-hud" class="boss-hud hidden">
-                            <div class="boss-hud-top"><span>☠ COLOSO</span><span id="boss-phase">FASE 1</span></div>
-                            <div class="boss-bar-track"><div id="boss-bar" class="boss-bar"></div></div>
-                        </div>
                     </section>
 
                     <section class="info-card info-feed-card" aria-label="Información reciente">

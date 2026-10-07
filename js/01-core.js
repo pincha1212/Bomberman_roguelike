@@ -21,33 +21,13 @@ function sfx(type){
     g.gain.setValueAtTime(.0001,now); g.gain.exponentialRampToValueAtTime(.06,now+.008); g.gain.exponentialRampToValueAtTime(.0001,now+dur);
     o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now+dur+.02);
 }
-function showRoomIntro(){
-    const el=document.getElementById('room-intro'); if(!el) return;
-    const r=gameState.roomType;
-    el.innerHTML=`<div class="room-number">DEPTH ${String(gameState.level).padStart(2,'0')} · RUN ${String(gameState.runNumber).padStart(2,'0')}</div><div class="room-name" style="color:${r.color}">${r.icon} ${r.name}</div><div class="room-sub">${r.subtitle}</div>`;
-    el.classList.remove('hidden');
-    clearTimeout(ambient.introTimer); ambient.introTimer=setTimeout(()=>el.classList.add('hidden'),1800);
-    sfx('click');
-}
 function renderImmersion(){
-    const danger=UI['danger-indicator'];
-    if(!danger) return;
-    const ptx=Math.floor((player.x+player.width/2)/TILE_SIZE);
-    const pty=Math.floor((player.y+player.height/2)/TILE_SIZE);
-    let nearestBomb=false;
-    for(let i=0;i<gameState.bombs.length;i++){
-        const b=gameState.bombs[i];
-        if(b && b.timer<900 && Math.abs(b.x-ptx)+Math.abs(b.y-pty)<=2){ nearestBomb=true; break; }
-    }
-    const pressureDanger = gameState.roomTime < 15000 || gameState.threatLevel >= 2;
-    danger.textContent = pressureDanger ? `⚠ PRESIÓN ${gameState.threatLevel}` : 'PELIGRO';
-    danger.classList.toggle('hidden', (!nearestBomb && !pressureDanger) || gameState.paused);
     const vignette=UI['immersion-vignette'];
-    if(vignette){
-        const low=player.health<=1, pulse=low ? (0.28+Math.sin(gameState.animFrame*.08)*.12) : .08;
-        vignette.style.background=`radial-gradient(circle at 50% 48%, transparent 25%, rgba(2,6,23,${pulse}) 62%, rgba(2,6,23,${low?.62:.38}) 100%)`;
-    }
+    if(!vignette) return;
+    const low=player.health<=1, pulse=low ? (0.28+Math.sin(gameState.animFrame*.08)*.12) : .08;
+    vignette.style.background=`radial-gradient(circle at 50% 48%, transparent 25%, rgba(2,6,23,${pulse}) 62%, rgba(2,6,23,${low?.62:.38}) 100%)`;
 }
+
 function updatePerfSceneV329(){
     const frame=Number(gameState.animFrame||0);
     if(perf.heavySceneFrame===frame) return perf.heavyScene;
@@ -298,10 +278,8 @@ if (typeof ResizeObserver === 'function') {
 const UI = {};
 [
     'ui-health','ui-score','ui-level','ui-bombs','ui-range','ui-speed','ui-coins','ui-relics',
-    'ui-timer','ui-threat','ui-shield-badge','boss-hud','boss-bar','boss-phase','room-banner',
-    'run-banner','relic-strip','danger-indicator','immersion-vignette',
-    'ui-ability-kick','ui-ability-kick-status','ui-ability-grab','ui-ability-grab-status',
-    'ui-ability-throw','ui-ability-throw-status','ui-ability-detail','ui-powerup-toast',
+    'ui-timer','ui-threat','ui-shield-badge','room-banner',
+    'run-banner','relic-strip','immersion-vignette','ui-powerup-toast',
     'ui-powerup-toast-icon','ui-powerup-toast-name','ui-powerup-toast-desc','ui-bomb-element',
     'ui-relic-list','ui-relic-count-label'
 ].forEach(id => UI[id] = document.getElementById(id));

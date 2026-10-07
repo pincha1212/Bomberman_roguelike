@@ -44,17 +44,7 @@
 .info-element-card strong{font:7px 'Press Start 2P',monospace;color:var(--element-color,#94a3b8);}
 .info-card{margin-top:9px;padding-top:9px;border-top:1px solid rgba(148,163,184,.12);}
 .info-card-title{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;color:#94a3b8;}
-.ability-strip{width:100%!important;margin:0!important;padding:0!important;border:0!important;background:none!important;box-shadow:none!important;}
-.ability-slots{grid-template-columns:1fr!important;gap:4px!important;}
-.ability-slot{padding:5px!important;}
-.ability-detail{margin-top:5px!important;padding:5px 6px!important;background:rgba(15,23,42,.55);border:1px solid rgba(148,163,184,.10);border-radius:3px;}
 #ui-powerup-toast{width:100%!important;margin-top:5px!important;}
-#danger-indicator.info-danger{position:static!important;transform:none!important;bottom:auto!important;left:auto!important;margin:0 0 6px!important;font:7px 'Press Start 2P',monospace;text-align:left;letter-spacing:.10em;}
-#room-intro.info-room-intro{position:static!important;transform:none!important;min-width:0!important;padding:7px!important;margin:0 0 6px!important;border:1px solid rgba(148,163,184,.14);border-radius:4px;background:rgba(2,6,23,.55);text-align:left;animation:none;}
-.info-room-intro .room-number{font-size:5px!important;margin-bottom:5px!important;}
-.info-room-intro .room-name{font-size:8px!important;}
-.info-room-intro .room-sub{margin-top:5px!important;font-size:.62rem!important;}
-.boss-hud{position:static!important;transform:none!important;left:auto!important;top:auto!important;width:100%!important;max-width:none!important;margin:0!important;padding:7px!important;box-sizing:border-box;}
 .info-relic-list{display:grid;gap:4px;}
 .info-relic-row{display:grid;grid-template-columns:22px 1fr;gap:6px;align-items:start;padding:5px 6px;border:1px solid rgba(148,163,184,.10);border-radius:3px;background:rgba(15,23,42,.52);}
 .info-relic-row > span{font-size:14px;line-height:1;}
@@ -82,11 +72,6 @@
 @media(max-width:560px){
     .game-info-panel{max-height:27dvh;width:min(94vw,620px);}
     #ui-layer{grid-template-columns:1fr!important;}
-    .info-column-right{align-items:flex-start!important;}
-    .ability-slots{grid-template-columns:repeat(3,minmax(0,1fr))!important;}
-    .ability-copy strong{font-size:4px!important;}
-    .ability-copy small{font-size:5px!important;}
-    .ability-icon{font-size:11px!important;}
-    .info-section-title,.game-info-kicker,.info-card-title{font-size:5px;}
+    .info-column-right{align-items:flex-start!important;}    .info-section-title,.game-info-kicker,.info-card-title{font-size:5px;}
     .info-element-card strong{font-size:6px;}
 }

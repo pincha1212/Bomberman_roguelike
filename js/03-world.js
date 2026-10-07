@@ -140,7 +140,6 @@
             if (typeof resetCameraToPlayer === 'function') resetCameraToPlayer();
 
             spawnEnemies();
-            showRoomIntro();
             updateRoguePresentation();
             updateUI();
         }

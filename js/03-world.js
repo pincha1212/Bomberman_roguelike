@@ -1,12 +1,10 @@
 // Bomberman Roguelike v4.1 — Level generation, bombs, boss arena, threats and traps
         function initLevel() {
             // Expand map grid size with higher levels
-            gameState.roomType = getRoomForDepth(gameState.level);
+            gameState.roomType = ROOM_TYPES.STANDARD;
             if (typeof applyDifficultyV323 === 'function') applyDifficultyV323();
-            gameState.gridWidth = 15 + Math.floor((gameState.level - 1) / 2) * 2;
-            gameState.gridHeight = 15 + Math.floor((gameState.level - 1) / 2) * 2;
-            gameState.gridWidth = Math.min(gameState.gridWidth, 25);
-            gameState.gridHeight = Math.min(gameState.gridHeight, 25);
+            gameState.gridWidth = 15;
+            gameState.gridHeight = 15;
 
             gameState.grid = Array(gameState.gridHeight).fill().map(() => Array(gameState.gridWidth).fill(TYPES.EMPTY));
             gameState.gridRevision = (gameState.gridRevision || 0) + 1;
@@ -54,19 +52,15 @@
             // v4.4: los niveles normales se generan completamente desde el nuevo
             // generador Bomberman (figura estructural + bloques destructibles aleatorios).
             // El boss conserva su arena especializada y utiliza la base clásica.
-            if (gameState.roomType.id === 'BOSS') {
-                const blockDensity = Math.max(0.25, Math.min(0.72, 0.35 + (gameState.level * 0.03) + gameState.roomType.blockBonus + (gameState.difficulty?.blockDensityBonus || 0)));
-                for (let y = 1; y < gameState.gridHeight - 1; y++) {
-                    for (let x = 1; x < gameState.gridWidth - 1; x++) {
-                        if (gameState.grid[y][x] === TYPES.EMPTY) {
-                            if ((x <= 2 && y <= 2) || (x === 1 && y === 3) || (x === 3 && y === 1)) continue;
-                            if (Math.random() < blockDensity) gameState.grid[y][x] = TYPES.BLOCK;
-                        }
-                    }
+            // Mapa clásico Bomberman: paredes fijas + bloques destructibles aleatorios.
+            const blockDensity = 0.42;
+            for (let y = 1; y < gameState.gridHeight - 1; y++) {
+                for (let x = 1; x < gameState.gridWidth - 1; x++) {
+                    if (gameState.grid[y][x] !== TYPES.EMPTY) continue;
+                    if ((x <= 2 && y <= 2) || (x === 1 && y === 3) || (x === 3 && y === 1)) continue;
+                    if (Math.random() < blockDensity) gameState.grid[y][x] = TYPES.BLOCK;
                 }
             }
-
-            applyRoomDesignV313();
 
             // V3.13: el layout diseñado elige una puerta de salida dentro de la sala final.
             let blocks = [];
@@ -89,18 +83,7 @@
                 gameState.grid[gameState.exitPos.y][gameState.exitPos.x] = TYPES.EXIT_OPEN;
             }
 
-            if (gameState.roomType.id === 'BOSS') {
-                setupBossArena();
-            }
 
-            if (gameState.roomType.id === 'SHRINE') {
-                player.health = Math.min(player.health + 1, player.maxHealth);
-                player.hasShield = true;
-                addFloatingText('SANTUARIO: +1 VIDA + ESCUDO', player.x, player.y, '#67e8f9');
-            }
-
-            generateHazards();
-            placeRoomDesignItemsV313();
             spawnEnemies();
             showRoomIntro();
             updateRoguePresentation();

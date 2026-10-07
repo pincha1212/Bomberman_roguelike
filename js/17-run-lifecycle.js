@@ -190,8 +190,14 @@ function finishRun(source = 'unknown') {
 
     // v6.1: capturamos el build ANTES de cerrar la run. El eco se guarda
     // separado del save de la run para sobrevivir al siguiente intento.
+    let deathRelicsSnapshot = null;
     if (String(source || '') !== 'completed' && typeof recordDeathEchoV61 === 'function') {
+        deathRelicsSnapshot = Array.isArray(gameState.relics) ? gameState.relics.map(relic => ({ ...relic })) : [];
         recordDeathEchoV61(source);
+        if (Array.isArray(gameState.relics)) gameState.relics = [];
+        if (window.ROGUELIKE_V327 && Array.isArray(window.ROGUELIKE_V327.relics)) window.ROGUELIKE_V327.relics = [];
+        if (window.ROGUELIKE_V327?.appliedBonus) window.ROGUELIKE_V327.appliedBonus = { bombs: 0, range: 0, speed: 0, maxHealth: 0 };
+        if (typeof resetRelicModifiers === 'function') resetRelicModifiers();
     }
 
     gameState.isPlaying = false;
@@ -226,7 +232,7 @@ function finishRun(source = 'unknown') {
         score: finalScore,
         coins: finalCoins,
         kills: finalKills,
-        relics: gameState.relics.map(relic => ({
+        relics: (deathRelicsSnapshot || gameState.relics).map(relic => ({
             id: relic.id,
             name: relic.name,
             icon: relic.icon,

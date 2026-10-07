@@ -328,7 +328,7 @@ const UI = {};
 
         const PLAYER_LIMITS_V67 = Object.freeze({
             base: Object.freeze({ maxHealth: 5, maxBombs: 1, bombRange: 1, speed: 3.0 }),
-            hard: Object.freeze({ maxHealth: 10, maxBombs: 8, bombRange: 12, speed: 7.0 }),
+            hard: Object.freeze({ maxHealth: 10, maxBombs: 10, bombRange: 16, speed: 7.0 }),
         });
 
         const LEGACY_RELIC_CAP_BONUSES_V67 = Object.freeze({
@@ -342,7 +342,11 @@ const UI = {};
         // SPEED_UP es un incremento finito: al alcanzar el hard cap central, devuelve false.
         // No existe overflow ni cap paralelo. El no-op en 7.0 es intencional.
         function getPlayerCapacityCapsV67(){
-            const cap = { ...PLAYER_LIMITS_V67.base };
+            const cap = {
+                ...PLAYER_LIMITS_V67.base,
+                maxBombs: 8,
+                bombRange: 12
+            };
             cap.speed = Number(PLAYER_LIMITS_V67.hard.speed) || 7;
             const owned = new Set();
             for (const relic of (Array.isArray(gameState?.relics) ? gameState.relics : [])) {

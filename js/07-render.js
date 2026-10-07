@@ -261,7 +261,7 @@ function draw() {
             // El eco utiliza EXACTAMENTE el mismo diseño geométrico del jugador.
             // La diferencia es monocromática + alpha 0.50. No hay aura, ojos,
             // partículas ni una segunda animación superpuesta.
-            drawBombermanSprite(ghost.x, ghost.y, ghost, { ghost: true });
+            drawBombermanSprite(ghost.x - ghost.width / 2, ghost.y - ghost.height / 2, ghost, { ghost: true });
         }
 
         function drawSteelWall(x, y, targetCtx = ctx) {

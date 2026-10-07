@@ -1,19 +1,116 @@
-// Bomberman Roguelike v4.1 — Level generation, bombs, boss arena, threats and traps
+// Bomberman Roguelike v6.12.20 — Level generation with controlled procedural layout + classic fallback.
+        function applyProceduralMapV61220() {
+            const generator = (typeof window !== 'undefined') ? window.DungeonGenerator : null;
+            if (!generator || typeof generator.getRunRequest !== 'function') return false;
+
+            const request = generator.getRunRequest(gameState.level);
+            if (!request || request.enabled !== true) return false;
+
+            const profile = {
+                ...(request.profile || {}),
+                width: gameState.gridWidth,
+                height: gameState.gridHeight,
+                targetRooms: gameState.gridWidth >= 21 ? 5 : (gameState.gridWidth >= 17 ? 4 : 3)
+            };
+            const result = generator.generate(request.seed, profile);
+            const validation = typeof generator.validateResult === 'function'
+                ? generator.validateResult(result)
+                : { valid: false, errors: ['generator_validator_missing'] };
+
+            if (!result || result.generated !== true || !result.mapData || validation.valid !== true) {
+                return false;
+            }
+
+            const tileMap = {
+                EMPTY: TYPES.EMPTY,
+                WALL: TYPES.WALL,
+                BLOCK: TYPES.BLOCK,
+                EXIT_LOCKED: TYPES.EXIT_LOCKED,
+                EXIT_OPEN: TYPES.EXIT_OPEN
+            };
+            const mapData = result.mapData;
+            const nextGrid = mapData.tiles.map(row => row.map(tile => tileMap[tile]));
+            if (nextGrid.some(row => row.some(tile => !Number.isInteger(tile)))) return false;
+
+            gameState.grid = nextGrid;
+            gameState.gridWidth = mapData.width;
+            gameState.gridHeight = mapData.height;
+            gameState.exitPos = mapData.exit ? { x: mapData.exit.x, y: mapData.exit.y } : null;
+            if (mapData.playerSpawn) {
+                player.x = mapData.playerSpawn.x * TILE_SIZE + (TILE_SIZE - player.width) / 2;
+                player.y = mapData.playerSpawn.y * TILE_SIZE + (TILE_SIZE - player.height) / 2;
+            }
+            gameState.proceduralMapActive = true;
+            gameState.proceduralMapSeed = request.seed;
+
+            // Mantener el flujo visual existente: la salida procedural queda oculta bajo un bloque.
+            if (gameState.exitPos && gameState.grid[gameState.exitPos.y]?.[gameState.exitPos.x] === TYPES.EMPTY) {
+                gameState.grid[gameState.exitPos.y][gameState.exitPos.x] = TYPES.BLOCK;
+            }
+
+            gameState.gridRevision = (gameState.gridRevision || 0) + 1;
+            if (typeof invalidateRenderCacheV317 === 'function') invalidateRenderCacheV317();
+            return true;
+        }
+
+        function buildClassicMapV61220() {
+            gameState.proceduralMapActive = false;
+            gameState.proceduralMapSeed = null;
+            gameState.grid = Array(gameState.gridHeight).fill().map(() => Array(gameState.gridWidth).fill(TYPES.EMPTY));
+
+            // Outer walls & pillar walls
+            for (let y = 0; y < gameState.gridHeight; y++) {
+                for (let x = 0; x < gameState.gridWidth; x++) {
+                    if (x === 0 || x === gameState.gridWidth - 1 || y === 0 || y === gameState.gridHeight - 1) {
+                        gameState.grid[y][x] = TYPES.WALL;
+                    } else if (x % 2 === 0 && y % 2 === 0) {
+                        gameState.grid[y][x] = TYPES.WALL;
+                    }
+                }
+            }
+
+            const blockDensity = 0.42;
+            for (let y = 1; y < gameState.gridHeight - 1; y++) {
+                for (let x = 1; x < gameState.gridWidth - 1; x++) {
+                    if (gameState.grid[y][x] !== TYPES.EMPTY) continue;
+                    if ((x <= 2 && y <= 2) || (x === 1 && y === 3) || (x === 3 && y === 1)) continue;
+                    if (Math.random() < blockDensity) gameState.grid[y][x] = TYPES.BLOCK;
+                }
+            }
+
+            let blocks = [];
+            for (let y = 1; y < gameState.gridHeight - 1; y++) {
+                for (let x = 1; x < gameState.gridWidth - 1; x++) {
+                    if (gameState.grid[y][x] === TYPES.BLOCK) blocks.push({ x, y });
+                }
+            }
+
+            const designedExit = gameState.roomDesign?.exitGate;
+            if (designedExit && designedExit.x > 0 && designedExit.x < gameState.gridWidth - 1 && designedExit.y > 0 && designedExit.y < gameState.gridHeight - 1) {
+                gameState.exitPos = { x: designedExit.x, y: designedExit.y };
+                if (gameState.grid[designedExit.y][designedExit.x] === TYPES.WALL) gameState.grid[designedExit.y][designedExit.x] = TYPES.EMPTY;
+                gameState.grid[designedExit.y][designedExit.x] = TYPES.BLOCK;
+            } else if (blocks.length > 0) {
+                const exitBlock = blocks[Math.floor(Math.random() * blocks.length)];
+                gameState.exitPos = { x: exitBlock.x, y: exitBlock.y };
+            } else {
+                gameState.exitPos = { x: gameState.gridWidth - 2, y: gameState.gridHeight - 2 };
+                gameState.grid[gameState.exitPos.y][gameState.exitPos.x] = TYPES.EXIT_OPEN;
+            }
+
+            gameState.gridRevision = (gameState.gridRevision || 0) + 1;
+            if (typeof invalidateRenderCacheV317 === 'function') invalidateRenderCacheV317();
+        }
+
         function initLevel() {
-            // Expand map grid size with higher levels
             gameState.roomType = ROOM_TYPES.STANDARD;
             if (typeof applyDifficultyV323 === 'function') applyDifficultyV323();
             gameState.gridWidth = 15;
             gameState.gridHeight = 15;
 
-            gameState.grid = Array(gameState.gridHeight).fill().map(() => Array(gameState.gridWidth).fill(TYPES.EMPTY));
             gameState.gridRevision = (gameState.gridRevision || 0) + 1;
-            if (typeof invalidateRenderCacheV317 === 'function') invalidateRenderCacheV317();
             gameState.bombs = [];
-            // v6.0: los residuos pertenecen al campo de batalla actual.
             if (typeof materialResetV60 === 'function') materialResetV60();
-            // V3.8: una nueva sala/run empieza sin bombas ocupando el cupo del jugador.
-            // initLevel() limpia el array de bombas, por lo que el contador debe sincronizarse también.
             player.bombsPlaced = 0;
             gameState.explosions = [];
             gameState.enemies = [];
@@ -33,56 +130,14 @@
                 ? getDifficultyReinforcementIntervalV323(firstReinforcementBase)
                 : firstReinforcementBase;
 
-            // Spawn player top-left corner
-            player.x = TILE_SIZE + (TILE_SIZE - player.width)/2;
-            player.y = TILE_SIZE + (TILE_SIZE - player.height)/2;
+            // El mapa nunca se publica parcialmente: el generador trabaja sobre MapData aislado.
+            player.x = TILE_SIZE + (TILE_SIZE - player.width) / 2;
+            player.y = TILE_SIZE + (TILE_SIZE - player.height) / 2;
+
+            const proceduralApplied = applyProceduralMapV61220();
+            if (!proceduralApplied) buildClassicMapV61220();
+
             if (typeof resetCameraToPlayer === 'function') resetCameraToPlayer();
-
-            // Outer walls & pillar walls
-            for (let y = 0; y < gameState.gridHeight; y++) {
-                for (let x = 0; x < gameState.gridWidth; x++) {
-                    if (x === 0 || x === gameState.gridWidth - 1 || y === 0 || y === gameState.gridHeight - 1) {
-                        gameState.grid[y][x] = TYPES.WALL;
-                    } else if (x % 2 === 0 && y % 2 === 0) {
-                        gameState.grid[y][x] = TYPES.WALL;
-                    }
-                }
-            }
-
-            // v4.4: los niveles normales se generan completamente desde el nuevo
-            // generador Bomberman (figura estructural + bloques destructibles aleatorios).
-            // El boss conserva su arena especializada y utiliza la base clásica.
-            // Mapa clásico Bomberman: paredes fijas + bloques destructibles aleatorios.
-            const blockDensity = 0.42;
-            for (let y = 1; y < gameState.gridHeight - 1; y++) {
-                for (let x = 1; x < gameState.gridWidth - 1; x++) {
-                    if (gameState.grid[y][x] !== TYPES.EMPTY) continue;
-                    if ((x <= 2 && y <= 2) || (x === 1 && y === 3) || (x === 3 && y === 1)) continue;
-                    if (Math.random() < blockDensity) gameState.grid[y][x] = TYPES.BLOCK;
-                }
-            }
-
-            // V3.13: el layout diseñado elige una puerta de salida dentro de la sala final.
-            let blocks = [];
-            for (let y = 1; y < gameState.gridHeight - 1; y++) {
-                for (let x = 1; x < gameState.gridWidth - 1; x++) {
-                    if (gameState.grid[y][x] === TYPES.BLOCK) blocks.push({x, y});
-                }
-            }
-            
-            const designedExit = gameState.roomDesign?.exitGate;
-            if (designedExit && designedExit.x > 0 && designedExit.x < gameState.gridWidth - 1 && designedExit.y > 0 && designedExit.y < gameState.gridHeight - 1) {
-                gameState.exitPos = { x: designedExit.x, y: designedExit.y };
-                if (gameState.grid[designedExit.y][designedExit.x] === TYPES.WALL) gameState.grid[designedExit.y][designedExit.x] = TYPES.EMPTY;
-                gameState.grid[designedExit.y][designedExit.x] = TYPES.BLOCK;
-            } else if (blocks.length > 0) {
-                let exitBlock = blocks[Math.floor(Math.random() * blocks.length)];
-                gameState.exitPos = {x: exitBlock.x, y: exitBlock.y};
-            } else {
-                gameState.exitPos = {x: gameState.gridWidth - 2, y: gameState.gridHeight - 2};
-                gameState.grid[gameState.exitPos.y][gameState.exitPos.x] = TYPES.EXIT_OPEN;
-            }
-
 
             spawnEnemies();
             showRoomIntro();

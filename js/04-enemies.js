@@ -88,6 +88,9 @@
             gameState.floaters.push({
                 text, x, y, color, opacity: 1.0, life: 60
             });
+            if (typeof pushInformationFeedV61221 === 'function') {
+                pushInformationFeedV61221(text, color);
+            }
         }
 
         function addParticles(x, y, colorOrThemeKey, count = 8) {

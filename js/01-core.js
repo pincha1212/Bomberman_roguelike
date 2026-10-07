@@ -299,7 +299,11 @@ const UI = {};
 [
     'ui-health','ui-score','ui-level','ui-bombs','ui-range','ui-speed','ui-coins','ui-relics',
     'ui-timer','ui-threat','ui-shield-badge','boss-hud','boss-bar','boss-phase','room-banner',
-    'run-banner','relic-strip','danger-indicator','immersion-vignette'
+    'run-banner','relic-strip','danger-indicator','immersion-vignette',
+    'ui-ability-kick','ui-ability-kick-status','ui-ability-grab','ui-ability-grab-status',
+    'ui-ability-throw','ui-ability-throw-status','ui-ability-detail','ui-powerup-toast',
+    'ui-powerup-toast-icon','ui-powerup-toast-name','ui-powerup-toast-desc','ui-bomb-element',
+    'ui-relic-list','ui-relic-count-label'
 ].forEach(id => UI[id] = document.getElementById(id));
 
         // World and Zoom settings

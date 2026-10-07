@@ -226,17 +226,8 @@ function draw() {
                 ctx.fillRect(p.x, p.y, p.size, p.size);
             }
 
-            // Draw Floater Texts
-            if (gameState.floaters.length) ctx.font = '10px "Press Start 2P"';
-            for(let i=Math.max(0, gameState.floaters.length-(Number(profileV65.floaterBudget) || 8)); i<gameState.floaters.length; i++){
-                const f=gameState.floaters[i];
-                if(!f || !isWorldRectVisibleV329(f.x, f.y-16, 80, 20, TILE_SIZE)) continue;
-                renderStatsV329.floaters++;
-                ctx.fillStyle = f.color;
-                ctx.globalAlpha = Math.max(0, f.opacity);
-                ctx.fillText(f.text, f.x, f.y);
-                ctx.globalAlpha = 1.0;
-            }
+            // Los mensajes informativos se muestran en el panel DOM externo.
+            renderStatsV329.floaters = 0;
 
             ctx.restore();
 

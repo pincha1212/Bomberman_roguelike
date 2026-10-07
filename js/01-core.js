@@ -400,7 +400,8 @@ const UI = {};
 
         const POWERUP_DEFS_V67 = Object.freeze({
             [POWERUPS.BOMB_UP]: Object.freeze({
-                id:POWERUPS.BOMB_UP, label:'BOMBA',
+                id:POWERUPS.BOMB_UP, label:'BOMBA', icon:'💣', rarity:'COMMON', category:'MEJORA',
+                desc:'Aumenta en 1 la cantidad máxima de bombas simultáneas.',
                 apply:()=>{
                     const cap = getPlayerCapacityCapsV67();
                     if (player.maxBombs >= cap.maxBombs) return false;
@@ -409,7 +410,8 @@ const UI = {};
                 }
             }),
             [POWERUPS.FIRE_UP]: Object.freeze({
-                id:POWERUPS.FIRE_UP, label:'RANGO',
+                id:POWERUPS.FIRE_UP, label:'RANGO', icon:'🔥', rarity:'COMMON', category:'MEJORA',
+                desc:'Aumenta en 1 el alcance de las explosiones.',
                 apply:()=>{
                     const cap = getPlayerCapacityCapsV67();
                     if (player.bombRange >= cap.bombRange) return false;
@@ -417,13 +419,16 @@ const UI = {};
                     return true;
                 }
             }),
-            [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'BOTAS', apply:()=>{ const current=Number(player.speed); if(!Number.isFinite(current)) player.speed=PLAYER_LIMITS_V67.base.speed; if(player.speed>=7.0) return false; player.speed=Math.min(player.speed+0.4,7.0); return true; } }),
-            [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', apply:()=>{ if(player.health>=player.maxHealth) return false; player.health=Math.min(player.health+1,player.maxHealth); return true; } }),
-            [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', apply:()=>{ if(player.hasShield) return false; player.hasShield=true; return true; } }),
-            [POWERUPS.BOMB_KICK]: Object.freeze({ id:POWERUPS.BOMB_KICK, label:'PATADA', apply:()=>{
+            [POWERUPS.SPEED_UP]: Object.freeze({ id:POWERUPS.SPEED_UP, label:'BOTAS', icon:'👟', rarity:'COMMON', category:'MEJORA', desc:'Aumenta la velocidad en 0,4.', apply:()=>{ const current=Number(player.speed); if(!Number.isFinite(current)) player.speed=PLAYER_LIMITS_V67.base.speed; if(player.speed>=7.0) return false; player.speed=Math.min(player.speed+0.4,7.0); return true; } }),
+            [POWERUPS.HEALTH_UP]: Object.freeze({ id:POWERUPS.HEALTH_UP, label:'VIDA', icon:'❤️', rarity:'COMMON', category:'MEJORA', desc:'Recupera 1 punto de vida actual.', apply:()=>{ if(player.health>=player.maxHealth) return false; player.health=Math.min(player.health+1,player.maxHealth); return true; } }),
+            [POWERUPS.SHIELD_UP]: Object.freeze({ id:POWERUPS.SHIELD_UP, label:'ESCUDO', icon:'🛡️', rarity:'UNCOMMON', category:'DEFENSA', desc:'Otorga un escudo que absorbe un impacto.', apply:()=>{ if(player.hasShield) return false; player.hasShield=true; return true; } }),
+            [POWERUPS.BOMB_KICK]: Object.freeze({ id:POWERUPS.BOMB_KICK, label:'PATADA', icon:'🥾', rarity:'UNCOMMON', category:'INTERACCION', desc:'Activa permanentemente la capacidad de patear bombas.', apply:()=>{
                 if (typeof activateCapabilityPowerupV681 === 'function') return !!activateCapabilityPowerupV681(player, 'KICK');
                 return false;
-            } })
+            } }),
+            [POWERUPS.BOMB_FIRE]: Object.freeze({ id:POWERUPS.BOMB_FIRE, label:'BOMBA FUEGO', icon:'🔥', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Hace que las próximas bombas sean de fuego.' }),
+            [POWERUPS.BOMB_ICE]: Object.freeze({ id:POWERUPS.BOMB_ICE, label:'BOMBA HIELO', icon:'❄️', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Hace que las próximas bombas sean de hielo.' }),
+            [POWERUPS.BOMB_ELECTRIC]: Object.freeze({ id:POWERUPS.BOMB_ELECTRIC, label:'BOMBA ELÉCTRICA', icon:'⚡', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Hace que las próximas bombas sean eléctricas.' })
         });
 
         function applyPowerupV67(type){

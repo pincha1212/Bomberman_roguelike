@@ -216,6 +216,253 @@ function drawBiomeWallV622(targetCtx, x, y, size, seed = 0) {
         default: return drawStructuredWallFamilyV622(targetCtx, x, y, size, spec, seed);
     }
 }
+const BIOME_BLOCK_SPECS_V623 = Object.freeze({
+    classic: Object.freeze({ family: 'crate', base: '#8f4f2b', light: '#d38a4b', shadow: '#5a2e1b', deep: '#2f180d', accent: '#f0b35c', secondary: '#6f3a24', detail: 'wood' }),
+    winter: Object.freeze({ family: 'ice', base: '#d9f4ff', light: '#ffffff', shadow: '#7fb2c5', deep: '#5a91a8', accent: '#8ee8ff', secondary: '#b7e9fa', detail: 'crack' }),
+    autumn: Object.freeze({ family: 'leafcrate', base: '#7b421f', light: '#c7792d', shadow: '#4a2413', deep: '#26130a', accent: '#e8752f', secondary: '#a52e26', detail: 'leaves' }),
+    spring: Object.freeze({ family: 'shrub', base: '#3f6d38', light: '#78a85f', shadow: '#274124', deep: '#192719', accent: '#f48fb1', secondary: '#fff4f8', detail: 'flowers' }),
+    summer: Object.freeze({ family: 'cactus', base: '#2d7f4f', light: '#73bf77', shadow: '#1b4e2f', deep: '#12351f', accent: '#8fd17b', secondary: '#b89a68', detail: 'rocks' }),
+    underground: Object.freeze({ family: 'ore', base: '#4b4650', light: '#7f7784', shadow: '#2b2730', deep: '#17151a', accent: '#d7aa43', secondary: '#a98b62', detail: 'gold' }),
+    clouds: Object.freeze({ family: 'cloud', base: '#eef6ff', light: '#ffffff', shadow: '#9fb3c7', deep: '#d0deea', accent: '#ffffff', secondary: '#c4d7e8', detail: 'soft' }),
+    mountains: Object.freeze({ family: 'stones', base: '#8f979f', light: '#c7cdd2', shadow: '#5b6269', deep: '#353a3f', accent: '#e3e8eb', secondary: '#737b83', detail: 'pile' }),
+    beach: Object.freeze({ family: 'barrelcrate', base: '#8a5a34', light: '#d39a5f', shadow: '#4f2d19', deep: '#2a180e', accent: '#c97a48', secondary: '#e2c07c', detail: 'coastal' }),
+    space: Object.freeze({ family: 'tech', base: '#d98a26', light: '#ffd36a', shadow: '#8a4c12', deep: '#3e240c', accent: '#56d9ff', secondary: '#6e7f8d', detail: 'core' }),
+    sky: Object.freeze({ family: 'altar', base: '#d8d4ca', light: '#ffffff', shadow: '#9c978d', deep: '#625e57', accent: '#eee6d1', secondary: '#b8b2a7', detail: 'sacred' }),
+    inferno: Object.freeze({ family: 'emberrock', base: '#37211d', light: '#704137', shadow: '#1d100e', deep: '#0e0706', accent: '#ff8a24', secondary: '#c33d1c', detail: 'embers' })
+});
+
+function getBiomeBlockSpecV623() {
+    const themeId = typeof getThemeV46 === 'function' ? (getThemeV46()?.id || 'classic') : 'classic';
+    return BIOME_BLOCK_SPECS_V623[themeId] || BIOME_BLOCK_SPECS_V623.classic;
+}
+
+function drawBiomeBlockFrameV623(targetCtx, x, y, size, spec) {
+    const inset = Math.max(3, Math.floor(size * 0.08));
+    drawTileShadowV621(targetCtx, x, y, size, spec.shadow);
+    targetCtx.fillStyle = spec.base;
+    targetCtx.fillRect(x + 1, y + 1, size - 2, size - 3);
+    drawTileBorderV621(targetCtx, x, y, size, {
+        highlight: spec.light,
+        shadow: spec.shadow
+    });
+    targetCtx.fillStyle = spec.deep;
+    targetCtx.globalAlpha = 0.20;
+    targetCtx.fillRect(x + inset, y + inset, size - inset * 2, size - inset * 2);
+    targetCtx.globalAlpha = 1;
+    drawTileHighlightV621(targetCtx, x, y, size, spec.light, 0.24);
+}
+
+function drawIceBlockV623(targetCtx, x, y, size, spec, seed = 0) {
+    drawBiomeBlockFrameV623(targetCtx, x, y, size, spec);
+    const inset = size * 0.16;
+    targetCtx.fillStyle = spec.secondary;
+    targetCtx.fillRect(x + inset, y + inset, size - inset * 2, size * 0.62);
+    drawTilePolygonV621(targetCtx, [[x+size*.14,y+size*.18],[x+size*.30,y+size*.10],[x+size*.44,y+size*.18],[x+size*.56,y+size*.11],[x+size*.78,y+size*.18],[x+size*.70,y+size*.30],[x+size*.28,y+size*.28]], spec.light);
+    drawTileCrackV621(targetCtx, x, y, size, spec.accent, seed + 3, 3);
+    drawTileCrackV621(targetCtx, x + size*.18, y + size*.20, size*.64, '#5fa8c5', seed + 11, 2);
+}
+
+function drawLeafCrateV623(targetCtx, x, y, size, spec, seed = 0) {
+    drawBiomeBlockFrameV623(targetCtx, x, y, size, spec);
+    targetCtx.fillStyle = spec.secondary;
+    targetCtx.fillRect(x+size*.13, y+size*.18, size*.74, size*.62);
+    targetCtx.fillStyle = spec.shadow;
+    targetCtx.fillRect(x+size*.17, y+size*.27, size*.66, Math.max(2,size*.045));
+    targetCtx.fillRect(x+size*.17, y+size*.55, size*.66, Math.max(2,size*.045));
+    drawTilePolygonV621(targetCtx, [[x+size*.08,y+size*.28],[x+size*.22,y+size*.12],[x+size*.31,y+size*.26],[x+size*.19,y+size*.37]], spec.accent);
+    drawTilePolygonV621(targetCtx, [[x+size*.69,y+size*.18],[x+size*.82,y+size*.06],[x+size*.92,y+size*.22],[x+size*.79,y+size*.30]], spec.secondary);
+    drawTilePolygonV621(targetCtx, [[x+size*.43,y+size*.10],[x+size*.55,y+size*.04],[x+size*.61,y+size*.21],[x+size*.49,y+size*.27]], spec.accent);
+    drawTileNoiseV621(targetCtx, x+size*.10, y+size*.10, size*.80, spec.light, seed + 4, 7, 0.12);
+}
+
+function drawFlowerShrubV623(targetCtx, x, y, size, spec, seed = 0) {
+    drawBiomeBlockFrameV623(targetCtx, x, y, size, spec);
+    targetCtx.fillStyle = spec.base;
+    [[.28,.58,.23],[.50,.47,.29],[.72,.58,.23],[.39,.70,.22],[.61,.70,.22]].forEach(([cx,cy,r]) => {
+        targetCtx.beginPath();
+        targetCtx.arc(x+size*cx, y+size*cy, size*r, 0, Math.PI*2);
+        targetCtx.fill();
+    });
+    const flowers = [
+        [.27,.39,spec.accent],[.48,.31,spec.secondary],[.69,.42,'#ef5350'],[.42,.56,'#ffffff'],[.62,.57,spec.accent]
+    ];
+    flowers.forEach(([fx,fy,color], i) => {
+        targetCtx.fillStyle = color;
+        for(let p=0;p<4;p++){
+            const a=(Math.PI/2)*p;
+            targetCtx.beginPath();
+            targetCtx.arc(x+size*fx+Math.cos(a)*size*.055, y+size*fy+Math.sin(a)*size*.055, Math.max(2,size*.035), 0, Math.PI*2);
+            targetCtx.fill();
+        }
+        targetCtx.fillStyle = '#ffd54f';
+        targetCtx.fillRect(x+size*fx-1, y+size*fy-1, 2, 2);
+    });
+    drawTileNoiseV621(targetCtx, x+size*.12, y+size*.26, size*.76, spec.light, seed+2, 9, .10);
+}
+
+function drawCactusV623(targetCtx, x, y, size, spec) {
+    drawBiomeBlockFrameV623(targetCtx, x, y, size, spec);
+    targetCtx.fillStyle = spec.secondary;
+    targetCtx.fillRect(x+size*.18, y+size*.78, size*.64, size*.10);
+    targetCtx.fillStyle = spec.shadow;
+    targetCtx.fillRect(x+size*.26, y+size*.81, size*.15, size*.07);
+    targetCtx.fillStyle = spec.base;
+    targetCtx.fillRect(x+size*.42, y+size*.22, size*.17, size*.58);
+    targetCtx.fillRect(x+size*.28, y+size*.42, size*.15, size*.25);
+    targetCtx.fillRect(x+size*.63, y+size*.34, size*.15, size*.28);
+    targetCtx.fillStyle = spec.light;
+    targetCtx.fillRect(x+size*.45, y+size*.26, Math.max(2,size*.045), size*.48);
+    targetCtx.fillStyle = spec.shadow;
+    targetCtx.fillRect(x+size*.53, y+size*.22, Math.max(2,size*.04), size*.58);
+    targetCtx.fillStyle = spec.secondary;
+    [[.25,.78,.10],[.55,.82,.13],[.77,.78,.09]].forEach(([cx,cy,r])=>{
+        targetCtx.beginPath(); targetCtx.arc(x+size*cx,y+size*cy,size*r,0,Math.PI*2); targetCtx.fill();
+    });
+}
+
+function drawOreBlockV623(targetCtx, x, y, size, spec, seed = 0) {
+    drawBiomeBlockFrameV623(targetCtx, x, y, size, spec);
+    const pts = [[.14,.69],[.22,.32],[.48,.18],[.76,.30],[.86,.65],[.62,.84],[.36,.82]];
+    drawTilePolygonV621(targetCtx, pts.map(([px,py])=>[x+size*px,y+size*py]), spec.base, spec.shadow, Math.max(1,size*.025));
+    drawTilePolygonV621(targetCtx, [[x+size*.23,y+size*.58],[x+size*.39,y+size*.27],[x+size*.54,y+size*.42],[x+size*.46,y+size*.70]], spec.light);
+    targetCtx.strokeStyle = spec.accent;
+    targetCtx.lineWidth = Math.max(2,size*.035);
+    targetCtx.beginPath();
+    targetCtx.moveTo(x+size*.30,y+size*.62); targetCtx.lineTo(x+size*.49,y+size*.52); targetCtx.lineTo(x+size*.66,y+size*.62);
+    targetCtx.moveTo(x+size*.56,y+size*.38); targetCtx.lineTo(x+size*.72,y+size*.31);
+    targetCtx.stroke();
+    targetCtx.fillStyle = spec.accent;
+    [[.35,.48],[.63,.55],[.73,.36]].forEach(([px,py])=>{
+        targetCtx.fillRect(x+size*px, y+size*py, Math.max(2,size*.05), Math.max(2,size*.05));
+    });
+    drawTileNoiseV621(targetCtx, x+size*.15, y+size*.20, size*.70, spec.secondary, seed+5, 8, .14);
+}
+
+function drawCloudBlockV623(targetCtx, x, y, size, spec, seed = 0) {
+    drawBiomeBlockFrameV623(targetCtx, x, y, size, spec);
+    const puffs = [[.25,.60,.22],[.43,.46,.28],[.66,.56,.27],[.81,.66,.18],[.53,.68,.29]];
+    puffs.forEach(([cx,cy,r],i)=>{
+        targetCtx.fillStyle = i===1 || i===4 ? spec.light : spec.base;
+        targetCtx.beginPath();
+        targetCtx.arc(x+size*cx,y+size*cy,size*r,0,Math.PI*2);
+        targetCtx.fill();
+    });
+    targetCtx.fillStyle = spec.shadow;
+    targetCtx.globalAlpha = .20;
+    targetCtx.fillRect(x+size*.19,y+size*.66,size*.60,size*.10);
+    targetCtx.globalAlpha = 1;
+    drawTileNoiseV621(targetCtx, x+size*.18, y+size*.30, size*.62, spec.light, seed+3, 8, .16);
+}
+
+function drawStonePileV623(targetCtx, x, y, size, spec, seed = 0) {
+    drawBiomeBlockFrameV623(targetCtx, x, y, size, spec);
+    const stones = [
+        [[.14,.74],[.25,.38],[.43,.46],[.39,.76]],
+        [[.35,.78],[.46,.28],[.62,.34],[.68,.74]],
+        [[.58,.75],[.69,.42],[.86,.49],[.82,.79]]
+    ];
+    stones.forEach((shape,i)=>{
+        drawTilePolygonV621(targetCtx, shape.map(([px,py])=>[x+size*px,y+size*py]), i===1 ? spec.light : spec.base, spec.shadow, Math.max(1,size*.025));
+    });
+    drawTileHighlightV621(targetCtx, x, y, size, spec.accent, .18);
+    drawTileNoiseV621(targetCtx, x+size*.13, y+size*.24, size*.74, spec.accent, seed+6, 7, .10);
+}
+
+function drawBeachBarrelCrateV623(targetCtx, x, y, size, spec, seed = 0) {
+    drawBiomeBlockFrameV623(targetCtx, x, y, size, spec);
+    targetCtx.fillStyle = spec.shadow;
+    targetCtx.fillRect(x+size*.50,y+size*.30,size*.32,size*.48);
+    targetCtx.fillStyle = spec.base;
+    targetCtx.fillRect(x+size*.54,y+size*.26,size*.28,size*.48);
+    targetCtx.fillStyle = spec.light;
+    targetCtx.fillRect(x+size*.58,y+size*.30,Math.max(2,size*.05),size*.40);
+    targetCtx.fillStyle = spec.shadow;
+    targetCtx.fillRect(x+size*.14,y+size*.32,size*.30,size*.34);
+    targetCtx.fillStyle = spec.secondary;
+    targetCtx.fillRect(x+size*.17,y+size*.35,size*.24,size*.28);
+    targetCtx.fillStyle = spec.accent;
+    targetCtx.fillRect(x+size*.19,y+size*.45,size*.20,Math.max(2,size*.04));
+    targetCtx.fillRect(x+size*.14,y+size*.70,size*.32,Math.max(2,size*.05));
+    drawTilePolygonV621(targetCtx, [[x+size*.70,y+size*.18],[x+size*.76,y+size*.11],[x+size*.82,y+size*.18],[x+size*.76,y+size*.23]], spec.secondary);
+    drawTileNoiseV621(targetCtx, x+size*.12, y+size*.24, size*.72, spec.light, seed+4, 7, .10);
+}
+
+function drawTechBlockV623(targetCtx, x, y, size, spec, seed = 0) {
+    drawBiomeBlockFrameV623(targetCtx, x, y, size, spec);
+    targetCtx.fillStyle = spec.deep;
+    targetCtx.fillRect(x+size*.14,y+size*.16,size*.72,size*.68);
+    targetCtx.fillStyle = spec.base;
+    targetCtx.fillRect(x+size*.18,y+size*.20,size*.64,size*.60);
+    targetCtx.fillStyle = spec.secondary;
+    [[.20,.23],[.76,.23],[.20,.72],[.76,.72]].forEach(([px,py])=>targetCtx.fillRect(x+size*px,y+size*py,size*.08,size*.08));
+    targetCtx.fillStyle = '#123b52';
+    targetCtx.fillRect(x+size*.38,y+size*.36,size*.24,size*.24);
+    targetCtx.fillStyle = spec.accent;
+    targetCtx.beginPath(); targetCtx.arc(x+size*.50,y+size*.48,size*.095,0,Math.PI*2); targetCtx.fill();
+    targetCtx.fillStyle = spec.light;
+    targetCtx.fillRect(x+size*.22,y+size*.26,size*.14,Math.max(2,size*.04));
+    drawTileNoiseV621(targetCtx, x+size*.16, y+size*.20, size*.68, spec.secondary, seed+7, 6, .08);
+}
+
+function drawAltarV623(targetCtx, x, y, size, spec) {
+    drawBiomeBlockFrameV623(targetCtx, x, y, size, spec);
+    targetCtx.fillStyle = spec.shadow;
+    targetCtx.fillRect(x+size*.14,y+size*.72,size*.72,size*.12);
+    targetCtx.fillStyle = spec.base;
+    targetCtx.fillRect(x+size*.21,y+size*.58,size*.58,size*.16);
+    targetCtx.fillRect(x+size*.28,y+size*.36,size*.44,size*.24);
+    targetCtx.fillStyle = spec.light;
+    targetCtx.fillRect(x+size*.31,y+size*.39,size*.12,size*.16);
+    targetCtx.fillRect(x+size*.28,y+size*.58,size*.08,size*.11);
+    targetCtx.fillStyle = spec.accent;
+    targetCtx.globalAlpha=.40;
+    targetCtx.fillRect(x+size*.36,y+size*.15,size*.28,size*.12);
+    targetCtx.globalAlpha=1;
+    drawTileCrackV621(targetCtx, x+size*.20, y+size*.34, size*.56, spec.secondary, 9, 2);
+}
+
+function drawEmberRockV623(targetCtx, x, y, size, spec, seed = 0) {
+    drawBiomeBlockFrameV623(targetCtx, x, y, size, spec);
+    drawTilePolygonV621(targetCtx, [[x+size*.12,y+size*.76],[x+size*.20,y+size*.40],[x+size*.40,y+size*.22],[x+size*.58,y+size*.36],[x+size*.54,y+size*.66],[x+size*.76,y+size*.42],[x+size*.89,y+size*.74],[x+size*.72,y+size*.86],[x+size*.40,y+size*.82]], spec.base);
+    targetCtx.strokeStyle = spec.secondary;
+    targetCtx.lineWidth = Math.max(2,size*.035);
+    targetCtx.beginPath();
+    targetCtx.moveTo(x+size*.25,y+size*.62); targetCtx.lineTo(x+size*.36,y+size*.46); targetCtx.lineTo(x+size*.50,y+size*.52);
+    targetCtx.moveTo(x+size*.63,y+size*.65); targetCtx.lineTo(x+size*.72,y+size*.48);
+    targetCtx.stroke();
+    targetCtx.fillStyle = spec.accent;
+    [[.31,.56,.045],[.58,.42,.038],[.71,.60,.032]].forEach(([px,py,r])=>{
+        targetCtx.beginPath(); targetCtx.arc(x+size*px,y+size*py,size*r,0,Math.PI*2); targetCtx.fill();
+    });
+    targetCtx.fillStyle = spec.secondary;
+    drawTilePolygonV621(targetCtx, [[x+size*.35,y+size*.36],[x+size*.42,y+size*.20],[x+size*.47,y+size*.38]], spec.secondary);
+    drawTileNoiseV621(targetCtx, x+size*.12, y+size*.20, size*.76, spec.secondary, seed+8, 8, .12);
+}
+
+function drawAutumnBlockV623(targetCtx, x, y, size, spec, seed) { drawLeafCrateV623(targetCtx, x, y, size, spec, seed); }
+function drawSpringBlockV623(targetCtx, x, y, size, spec, seed) { drawFlowerShrubV623(targetCtx, x, y, size, spec, seed); }
+function drawSummerBlockV623(targetCtx, x, y, size, spec, seed) { drawCactusV623(targetCtx, x, y, size, spec, seed); }
+function drawBeachBlockEntryV623(targetCtx, x, y, size, spec, seed) { drawBeachBarrelCrateV623(targetCtx, x, y, size, spec, seed); }
+
+function drawBiomeBlockV623(targetCtx, x, y, size, seed = 0) {
+    const themeId = typeof getThemeV46 === 'function' ? (getThemeV46()?.id || 'classic') : 'classic';
+    const spec = BIOME_BLOCK_SPECS_V623[themeId] || BIOME_BLOCK_SPECS_V623.classic;
+    switch (themeId) {
+        case 'winter': return drawIceBlockV623(targetCtx, x, y, size, spec, seed);
+        case 'autumn': return drawAutumnBlockV623(targetCtx, x, y, size, spec, seed);
+        case 'spring': return drawSpringBlockV623(targetCtx, x, y, size, spec, seed);
+        case 'summer': return drawSummerBlockV623(targetCtx, x, y, size, spec, seed);
+        case 'underground': return drawOreBlockV623(targetCtx, x, y, size, spec, seed);
+        case 'clouds': return drawCloudBlockV623(targetCtx, x, y, size, spec, seed);
+        case 'mountains': return drawStonePileV623(targetCtx, x, y, size, spec, seed);
+        case 'beach': return drawBeachBlockEntryV623(targetCtx, x, y, size, spec, seed);
+        case 'space': return drawTechBlockV623(targetCtx, x, y, size, spec, seed);
+        case 'sky': return drawAltarV623(targetCtx, x, y, size, spec, seed);
+        case 'inferno': return drawEmberRockV623(targetCtx, x, y, size, spec, seed);
+        default: return drawBiomeTileBaseV621(targetCtx, x, y, 'block', size, seed);
+    }
+}
+
 const renderTileCacheV621 = new Map();
 
 const BIOME_TILE_PROFILES_V621 = Object.freeze({
@@ -402,9 +649,13 @@ function buildBiomeTileCacheV621(type, variant = 0) {
 
     const profile = getBiomeTileProfileV621(type);
     if (type === 'wall' && typeof drawBiomeWallV622 === 'function') {
-        // V6.22: WALL pasa por el nuevo dibujo procedural, siempre dentro del caché V6.21.
+        // V6.22: WALL pasa por el dibujo procedural cacheado.
         // drawSteelWall() se conserva por ahora como código legado hasta una limpieza posterior.
         drawBiomeWallV622(tileCtx, 0, 0, TILE_SIZE, variant);
+    } else if (type === 'block' && typeof drawBiomeBlockV623 === 'function') {
+        // V6.23: BLOCK pasa por el dibujo destructible procedural cacheado.
+        // La identidad visual cambia por bioma; la celda sigue siendo TYPES.BLOCK.
+        drawBiomeBlockV623(tileCtx, 0, 0, TILE_SIZE, variant);
     } else {
         drawBiomeTileBaseV621(tileCtx, 0, 0, type, TILE_SIZE, variant);
     }

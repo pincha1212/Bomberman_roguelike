@@ -1,5 +1,5 @@
 /*
- * BOMBERMAN ROGUELIKE v6.12.6
+ * BOMBERMAN ROGUELIKE v6.25.0
  * Roguelike Update
  *
  * Adds a lightweight meta layer over the existing run:
@@ -462,14 +462,20 @@ function rogueV327SpawnExtraEnemy() {
         }
 
         if (!spot) return;
-        const clone = { ...template };
         const tileSize = rogueV327Num(window.TILE_SIZE, 48);
-        clone.x = spot.gx * tileSize + tileSize / 2;
-        clone.y = spot.gy * tileSize + tileSize / 2;
-        clone.vx = rogueV327Num(template.vx, 1);
-        clone.vy = 0;
-        clone.changeTimer = 20;
-        gameState.enemies.push(clone);
+        const spec = typeof resolveEnemySpawnSpecV625 === 'function'
+            ? resolveEnemySpawnSpecV625({ index: gameState.enemies.length, count: gameState.enemies.length + 1 })
+            : null;
+        const extra = typeof makeEnemyEntityV625 === 'function'
+            ? makeEnemyEntityV625({ x:spot.gx, y:spot.gy }, spec, { source: 'roguelike-extra', elite: Boolean(template?.elite), changeTimer: 20 })
+            : null;
+        if (!extra) return;
+        extra.x = spot.gx * tileSize + tileSize / 2;
+        extra.y = spot.gy * tileSize + tileSize / 2;
+        extra.vx = rogueV327Num(extra.vx, 1);
+        extra.vy = 0;
+        extra.changeTimer = 20;
+        gameState.enemies.push(extra);
     } catch (_) {}
 }
 

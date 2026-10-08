@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.10.2 — Enemy spawning and enemy setup
+// Bomberman Roguelike v6.25.0 — Enemy spawning delegated to biome authority
         function spawnEnemies() {
             const diff = gameState.difficulty || (typeof getDifficultyV323 === 'function' ? getDifficultyV323(gameState.level) : null);
             const maxEnemies = diff?.maxEnemies || largeSupport.maxEnemies;
@@ -32,34 +32,17 @@
                 [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
             }
 
-            for (let i = 0; i < Math.min(count, candidates.length); i++) {
+            const spawnTotal = Math.min(count, candidates.length);
+            const spawnPlan = typeof buildEnemySpawnPlanV625 === 'function'
+                ? buildEnemySpawnPlanV625(spawnTotal)
+                : [];
+            for (let i = 0; i < spawnTotal; i++) {
                 const {x, y} = candidates[i];
-                let rand = Math.random();
-                let type;
-
-                // Todos los biomas comparten el pool de enemigos base mientras no exista una mecánica específica validada.
-                type = ENEMY_TYPES.RASTRERO;
-                if (gameState.level >= 2 && rand > 0.6) type = ENEMY_TYPES.VOLADOR;
-                if (gameState.level >= 3 && rand > 0.85) type = ENEMY_TYPES.ESPECIAL;
-                const behavior = typeof pickEnemyBehaviorV324 === 'function' ? pickEnemyBehaviorV324(type, gameState.level, i, rand) : null;
-                const speed = typeof getEnemyBaseSpeedV610 === 'function' ? getEnemyBaseSpeedV610(type) : type.speed * gameState.roomType.enemySpeedMult * (diff?.enemySpeedMult || 1);
-
-                gameState.enemies.push({
-                    x: x * TILE_SIZE + TILE_SIZE / 2,
-                    y: y * TILE_SIZE + TILE_SIZE / 2,
-                    width: TILE_SIZE * 0.75,
-                    height: TILE_SIZE * 0.75,
-                    type: type,
-                    vx: speed * (Math.random() < 0.5 ? 1 : -1),
-                    vy: 0,
-                    baseSpeed: speed,
-                    changeTimer: Math.random() * 100,
-                    elite: gameState.roomType.id === 'ELITE' || gameState.roomType.id === 'CURSED' || (diff?.eliteBonus || 0) > 0 && Math.random() < diff.eliteBonus,
-                    lastDirection: 'down',
-                    __gridAnchor: 'center',
-                    desiredDirection: 'down',
-                    aiBehavior: behavior?.id || null
-                });
+                const spec = spawnPlan[i] || (typeof resolveEnemySpawnSpecV625 === 'function' ? resolveEnemySpawnSpecV625({ index: i, count: spawnTotal }) : null);
+                const entity = typeof makeEnemyEntityV625 === 'function'
+                    ? makeEnemyEntityV625({ x, y }, spec, { source: 'initial' })
+                    : null;
+                if (entity) gameState.enemies.push(entity);
             }
         }
 

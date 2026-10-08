@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.15.0 — Especies por bioma.
+// Bomberman Roguelike v6.25.0 — Especies por bioma.
 // Cada variante combina la skin existente con un único override pequeño.
 // No crea tipos de enemigo ni cambia el arquetipo de IA.
 (function installBiomeEnemySpeciesV615(global) {
@@ -21,24 +21,38 @@
     const BIOMES = Object.freeze([
         'winter','autumn','spring','summer','underground','clouds','mountains','beach','space','sky','inferno'
     ]);
-    const TYPE_KEYS = Object.freeze(['RASTRERO','VOLADOR','ESPECIAL']);
+    const TYPE_KEYS = Object.freeze(['RASTRERO','VOLADOR','ESPECIAL','OSO_NIEVE','ESTORBADOR_HIELO']);
+
+    function stateObject() {
+        return (typeof gameState !== 'undefined' && gameState) ? gameState : (global.BOMBER_ENGINE?.getState?.() || {});
+    }
 
     function currentBiomeId() {
-        return String(global.gameState?.biomeOverrideV49 || global.gameState?.biomeV49?.id || global.getThemeV46?.()?.id || 'classic');
+        const state = stateObject();
+        return String(state.biomeOverrideV49 || state.biomeV49?.id || global.getThemeV46?.()?.id || 'classic');
     }
 
     function getTypeKey(enemyOrType) {
         const type = enemyOrType?.type || enemyOrType;
+        if ((typeof ENEMY_TYPES !== 'undefined' && type === ENEMY_TYPES.OSO_NIEVE)) return 'OSO_NIEVE';
+        if ((typeof ENEMY_TYPES !== 'undefined' && type === ENEMY_TYPES.ESTORBADOR_HIELO)) return 'ESTORBADOR_HIELO';
         if ((typeof ENEMY_TYPES !== 'undefined' && type === ENEMY_TYPES.VOLADOR) || type?.name === 'Volador') return 'VOLADOR';
         if ((typeof ENEMY_TYPES !== 'undefined' && type === ENEMY_TYPES.ESPECIAL) || type?.name === 'Especial') return 'ESPECIAL';
         return 'RASTRERO';
     }
 
     function getProfile(enemyOrType) {
+        const biomeId = currentBiomeId();
+        const rawType = enemyOrType?.type || enemyOrType;
+        if (biomeId === 'winter' && rawType === ENEMY_TYPES?.OSO_NIEVE) {
+            return Object.freeze({ biomeId, typeKey:'OSO_NIEVE', name:'Oso de nieve', ruleId:'ice_resistance', body:'#b9e6ef', shade:'#527d8d', accent:'#ffffff', motif:'ice', rule:RULES.ice_resistance });
+        }
+        if (biomeId === 'winter' && rawType === ENEMY_TYPES?.ESTORBADOR_HIELO) {
+            return Object.freeze({ biomeId, typeKey:'ESTORBADOR_HIELO', name:'Estorbador de hielo', ruleId:'ice_resistance', body:'#77b8dc', shade:'#355c7a', accent:'#dff7ff', motif:'ice', rule:RULES.ice_resistance });
+        }
         const profile = typeof global.getEnemySkinV614 === 'function'
             ? global.getEnemySkinV614(enemyOrType)
             : null;
-        const biomeId = currentBiomeId();
         const typeKey = getTypeKey(enemyOrType);
         if (profile) return Object.freeze({ ...profile, biomeId, typeKey, rule: RULES[profile.ruleId] || null });
         return Object.freeze({
@@ -56,14 +70,17 @@
     function isLeafCover(enemy) {
         if (!enemy || currentBiomeId() !== 'autumn') return false;
         const cell = typeof global.gridCurrentTile === 'function' ? global.gridCurrentTile(enemy, 'enemy') : null;
-        if (!cell || !global.gameState?.grid) return false;
+        const state = stateObject();
+        if (!cell || !state.grid) return false;
         const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-        return dirs.some(([dx,dy]) => global.gameState.grid[cell.y + dy]?.[cell.x + dx] === global.TYPES?.BLOCK);
+        const state = stateObject();
+        return dirs.some(([dx,dy]) => state.grid[cell.y + dy]?.[cell.x + dx] === global.TYPES?.BLOCK);
     }
 
     function isHighAltitude(enemy) {
         if (!enemy || currentBiomeId() !== 'sky') return false;
-        const h = Math.max(1, Number(global.gameState?.gridHeight) || 1);
+        const state = stateObject();
+        const h = Math.max(1, Number(state.gridHeight) || 1);
         const cy = (Number(enemy.y) + Number(enemy.height || 0) / 2) / Number(global.TILE_SIZE || 48);
         return cy <= Math.max(1, h * 0.34);
     }
@@ -114,9 +131,11 @@
     function isInVegetation(enemy) {
         if (!enemy || currentBiomeId() !== 'spring') return false;
         const cell = typeof global.gridCurrentTile === 'function' ? global.gridCurrentTile(enemy, 'enemy') : null;
-        if (!cell || !global.gameState?.grid) return false;
+        const state = stateObject();
+        if (!cell || !state.grid) return false;
         const dirs = [[0,0],[1,0],[-1,0],[0,1],[0,-1]];
-        return dirs.some(([dx,dy]) => global.gameState.grid[cell.y + dy]?.[cell.x + dx] === global.TYPES?.BLOCK);
+        const state = stateObject();
+        return dirs.some(([dx,dy]) => state.grid[cell.y + dy]?.[cell.x + dx] === global.TYPES?.BLOCK);
     }
 
     function updateVegetationRegen(enemy, dt) {

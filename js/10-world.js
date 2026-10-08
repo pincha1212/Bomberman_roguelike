@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.12.20 — Level generation with controlled procedural layout + classic fallback.
+// Bomberman Roguelike v6.25.0 — Level generation + delegated enemy reinforcement spawn.
         function applyProceduralMapV61220() {
             const generator = (typeof window !== 'undefined') ? window.DungeonGenerator : null;
             if (!generator || typeof generator.getRunRequest !== 'function') return false;
@@ -278,18 +278,21 @@
                 }
             }
             candidates.sort((a,b) => b.distance - a.distance);
-            for (let i = 0; i < Math.min(count, candidates.length); i++) {
+            const spawnTotal = Math.min(count, candidates.length, typeof canSpawnEnemyV625 === 'function' ? canSpawnEnemyV625(count) : count);
+            const spawnPlan = typeof buildEnemySpawnPlanV625 === 'function'
+                ? buildEnemySpawnPlanV625(spawnTotal)
+                : [];
+            for (let i = 0; i < spawnTotal; i++) {
                 const c = candidates[i];
-                const roll = Math.random();
-                let type = ENEMY_TYPES.RASTRERO;
-                if (gameState.level >= 3 && roll > .68) type = ENEMY_TYPES.ESPECIAL;
-                else if (gameState.level >= 2 && roll > .38) type = ENEMY_TYPES.VOLADOR;
-                const behavior = typeof pickEnemyBehaviorV324 === 'function' ? pickEnemyBehaviorV324(type, gameState.level, gameState.enemies.length + i, roll) : null;
-                // v6.10.2: threatLevel se aplica una sola vez en moveEnemyV312().
-                const speed = typeof getEnemyBaseSpeedV610 === 'function'
-                    ? getEnemyBaseSpeedV610(type)
-                    : type.speed * gameState.roomType.enemySpeedMult * (gameState.difficulty?.enemySpeedMult || 1);
-                gameState.enemies.push({ x:c.x*TILE_SIZE+TILE_SIZE/2, y:c.y*TILE_SIZE+TILE_SIZE/2, width:TILE_SIZE*.75, height:TILE_SIZE*.75, type, vx:speed*(Math.random()<.5?-1:1), vy:0, baseSpeed:speed, changeTimer:15+Math.random()*35, elite:false, reinforcement:true, aiBehavior:behavior?.id || null });
+                const spec = spawnPlan[i] || (typeof resolveEnemySpawnSpecV625 === 'function' ? resolveEnemySpawnSpecV625({ index: i, count: spawnTotal }) : null);
+                const entity = typeof makeEnemyEntityV625 === 'function'
+                    ? makeEnemyEntityV625({ x:c.x, y:c.y }, spec, { source: 'reinforcement', reinforcement: true, changeTimer: 15 + Math.random() * 35 })
+                    : null;
+                if (entity) {
+                    entity.elite = false;
+                    entity.reinforcement = true;
+                    gameState.enemies.push(entity);
+                }
                 addFloatingText('REFUERZO', c.x*TILE_SIZE+TILE_SIZE/2, c.y*TILE_SIZE+TILE_SIZE/2, '#fb7185');
             }
             if (count > 0) sfx('alarm');

@@ -1,12 +1,12 @@
 // Bomberman Roguelike v4.6 — Canvas rendering and theme-backed sprite drawing
-// V6.22: 11 paredes de bioma procedurales integradas al caché V6.21
+// V6.25.0: Canvas conserva skins/especies de enemigos por bioma. Cache procedural preservado.
 // V3.17: cache de terreno estático para evitar reconstruir la cuadrícula completa
 // en cada frame. El mapa se regenera solo cuando cambia la referencia/revisión.
 
 // V6.21: infraestructura común para tiles procedurales en Canvas 2D.
 // El caché por tile complementa al caché de terreno existente; no crea un segundo renderer.
 
-// V6.22: paredes procedurales por bioma. Solo visual; reutiliza el caché V6.21.
+// V6.22/V6.23/V6.24: paredes y objetos procedurales; una sola ruta visual Canvas 2D.
 const BIOME_WALL_SPECS_V622 = Object.freeze({
     classic: Object.freeze({ family: 'structured', base: '#475569', light: '#94a3b8', shadow: '#334155', deep: '#0f172a', accent: '#38bdf8', inset: '#1e293b' }),
     winter: Object.freeze({ family: 'rock', base: '#526f7e', light: '#d9f4ff', shadow: '#314956', deep: '#1b2c35', accent: '#8ee8ff', secondary: '#6ea7bb', detail: 'ice' }),
@@ -485,11 +485,6 @@ const BIOME_TILE_FALLBACK_PALETTE_V621 = Object.freeze({
     block: Object.freeze({ base: '#b45309', highlight: '#f59e0b', shadow: '#78350f', deep: '#451a03', accent: '#92400e' })
 });
 
-function getBiomeTileProfileV621(type) {
-    const themeId = typeof getThemeV46 === 'function' ? (getThemeV46()?.id || 'classic') : 'classic';
-    const bucket = BIOME_TILE_PROFILES_V621[themeId] || BIOME_TILE_PROFILES_V621.classic;
-    return bucket[type] || null;
-}
 
 function getBiomeTilePaletteV621(type) {
     const base = BIOME_TILE_FALLBACK_PALETTE_V621[type] || BIOME_TILE_FALLBACK_PALETTE_V621.wall;
@@ -616,12 +611,28 @@ function drawBiomeTileBaseV621(targetCtx, x, y, type, size, seed = 0) {
 }
 
 function createTileSurfaceV621(width, height) {
-    if (typeof OffscreenCanvas === 'function') return new OffscreenCanvas(width, height);
+    // V6.24.1: OffscreenCanvas es una optimizacion, no un requisito del render.
+    // Solo se acepta si realmente podemos obtener un contexto 2D. Si falla,
+    // se cae al canvas normal sin interrumpir el render del juego.
+    if (typeof OffscreenCanvas === 'function') {
+        try {
+            const offscreen = new OffscreenCanvas(width, height);
+            if (offscreen && typeof offscreen.getContext === 'function' && offscreen.getContext('2d')) {
+                return offscreen;
+            }
+        } catch (_) {
+            // Fallback inmediato al canvas DOM.
+        }
+    }
     if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
-        const surface = document.createElement('canvas');
-        surface.width = width;
-        surface.height = height;
-        return surface;
+        try {
+            const surface = document.createElement('canvas');
+            surface.width = width;
+            surface.height = height;
+            if (typeof surface.getContext === 'function' && surface.getContext('2d')) return surface;
+        } catch (_) {
+            // Sin superficie disponible, el llamador usara el fallback visual.
+        }
     }
     return null;
 }
@@ -644,19 +655,28 @@ function buildBiomeTileCacheV621(type, variant = 0) {
 
     const surface = createTileSurfaceV621(TILE_SIZE, TILE_SIZE);
     if (!surface) return null;
-    const tileCtx = surface.getContext('2d', { alpha: true });
+    let tileCtx = null;
+    try {
+        tileCtx = surface.getContext('2d', { alpha: true });
+    } catch (_) {
+        tileCtx = null;
+    }
     if (!tileCtx) return null;
 
-    const profile = getBiomeTileProfileV621(type);
-    if (type === 'wall' && typeof drawBiomeWallV622 === 'function') {
-        // V6.22: WALL pasa por el dibujo procedural cacheado.
-        // drawSteelWall() se conserva por ahora como código legado hasta una limpieza posterior.
-        drawBiomeWallV622(tileCtx, 0, 0, TILE_SIZE, variant);
-    } else if (type === 'block' && typeof drawBiomeBlockV623 === 'function') {
-        // V6.23: BLOCK pasa por el dibujo destructible procedural cacheado.
-        // La identidad visual cambia por bioma; la celda sigue siendo TYPES.BLOCK.
-        drawBiomeBlockV623(tileCtx, 0, 0, TILE_SIZE, variant);
-    } else {
+    try {
+        if (type === 'wall' && typeof drawBiomeWallV622 === 'function') {
+            // V6.22: WALL pasa por el dibujo procedural cacheado.
+            drawBiomeWallV622(tileCtx, 0, 0, TILE_SIZE, variant);
+        } else if (type === 'block' && typeof drawBiomeBlockV623 === 'function') {
+            // V6.23: BLOCK pasa por el dibujo destructible procedural cacheado.
+            // La celda sigue siendo TYPES.BLOCK; solo cambia su representacion.
+            drawBiomeBlockV623(tileCtx, 0, 0, TILE_SIZE, variant);
+        } else {
+            drawBiomeTileBaseV621(tileCtx, 0, 0, type, TILE_SIZE, variant);
+        }
+    } catch (_) {
+        // Un fallo visual de un tile no puede abortar la construccion de todo el mapa.
+        tileCtx.clearRect(0, 0, TILE_SIZE, TILE_SIZE);
         drawBiomeTileBaseV621(tileCtx, 0, 0, type, TILE_SIZE, variant);
     }
 
@@ -989,344 +1009,8 @@ function draw() {
             }
         }
 
-        function drawSteelWall(x, y, targetCtx = ctx) {
-            // Pilar 3D Reforzado
-            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('wallBase') : '#475569'; // Top Base
-            targetCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('wallHighlight') : '#94a3b8'; // Top Highlight
-            targetCtx.fillRect(x, y, TILE_SIZE, 3);
-            targetCtx.fillRect(x, y, 3, TILE_SIZE);
-            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('wallShadow') : '#334155'; // Sombra inferior/derecha
-            targetCtx.fillRect(x, y + TILE_SIZE - 4, TILE_SIZE, 4);
-            targetCtx.fillRect(x + TILE_SIZE - 4, y, 4, TILE_SIZE);
-            
-            // Bisel interior
-            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('wallInset') : '#1e293b';
-            targetCtx.fillRect(x + 6, y + 6, TILE_SIZE - 12, TILE_SIZE - 12);
-            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('wallDeep') : '#0f172a';
-            targetCtx.fillRect(x + 8, y + 8, TILE_SIZE - 16, TILE_SIZE - 16);
-            
-            // Remaches
-            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('wallAccent') : '#38bdf8';
-            targetCtx.fillRect(x + 10, y + 10, 2, 2);
-            targetCtx.fillRect(x + TILE_SIZE - 12, y + TILE_SIZE - 12, 2, 2);
-        }
 
-        function drawBrickBlock(x, y, targetCtx = ctx) {
-            // Los dos objetos destructibles siguen usando TYPES.BLOCK para no crear
-            // una segunda capa de colisiones. Visualmente, algunos se presentan como
-            // barriles/urnas: misma resistencia y mismo drop, pero silueta distinta.
-            const style = typeof themeSpriteV46 === 'function' ? themeSpriteV46('blockStyle', 'wood-crate') : 'wood-crate';
-            const barrelStyle = typeof themeSpriteV46 === 'function' ? themeSpriteV46('barrelStyle', 'wood-barrel') : 'wood-barrel';
-            const levelSeed = Math.max(1, Number(gameState.level) || 1);
-            const barrelVariant = Math.abs((x * 17 + y * 31 + levelSeed * 13) % 7) === 0;
-            const base = typeof themeColorV46 === 'function' ? themeColorV46('blockBase') : '#b45309';
-            const hi = typeof themeColorV46 === 'function' ? themeColorV46('blockHighlight') : '#f59e0b';
-            const shadow = typeof themeColorV46 === 'function' ? themeColorV46('blockShadow') : '#78350f';
-            const pattern = typeof themeColorV46 === 'function' ? themeColorV46('blockPattern') : '#92400e';
-            const core = typeof themeColorV46 === 'function' ? themeColorV46('blockCore') : '#451a03';
 
-            if (barrelVariant) {
-                drawBiomeBarrelV61229(x, y, targetCtx, barrelStyle, { base, hi, shadow, pattern, core });
-                return;
-            }
-
-            const inset = Math.max(4, TILE_SIZE * 0.12);
-            const inner = TILE_SIZE - inset * 2;
-
-            targetCtx.fillStyle = shadow;
-            targetCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-            targetCtx.fillStyle = base;
-            targetCtx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 5);
-            targetCtx.fillStyle = hi;
-            targetCtx.fillRect(x + 2, y + 2, TILE_SIZE - 4, Math.max(2, TILE_SIZE * 0.08));
-            targetCtx.fillRect(x + 2, y + 2, Math.max(2, TILE_SIZE * 0.08), TILE_SIZE - 7);
-
-            if (style === 'ice-crate') {
-                // Caja de hielo: panel translúcido + grietas.
-                targetCtx.fillStyle = base;
-                targetCtx.fillRect(x + inset, y + inset, inner, inner);
-                targetCtx.strokeStyle = hi;
-                targetCtx.lineWidth = 2;
-                targetCtx.beginPath();
-                targetCtx.moveTo(x + inset + inner * .18, y + inset + inner * .08);
-                targetCtx.lineTo(x + inset + inner * .45, y + inset + inner * .44);
-                targetCtx.lineTo(x + inset + inner * .30, y + inset + inner * .86);
-                targetCtx.moveTo(x + inset + inner * .70, y + inset + inner * .10);
-                targetCtx.lineTo(x + inset + inner * .54, y + inset + inner * .40);
-                targetCtx.lineTo(x + inset + inner * .78, y + inset + inner * .82);
-                targetCtx.stroke();
-                targetCtx.fillStyle = hi;
-                targetCtx.fillRect(x + TILE_SIZE/2 - 3, y + TILE_SIZE/2 - 3, 6, 6);
-            } else if (style === 'leaf-crate') {
-                // Caja de hojas: marco verde y cuatro hojas/placas diagonales.
-                targetCtx.fillStyle = base;
-                targetCtx.fillRect(x + inset, y + inset, inner, inner);
-                targetCtx.fillStyle = pattern;
-                targetCtx.beginPath();
-                targetCtx.moveTo(x + inset, y + inset + inner * .28);
-                targetCtx.lineTo(x + inset + inner * .28, y + inset);
-                targetCtx.lineTo(x + inset + inner * .16, y + inset + inner * .18);
-                targetCtx.closePath(); targetCtx.fill();
-                targetCtx.beginPath();
-                targetCtx.moveTo(x + inset + inner, y + inset + inner * .28);
-                targetCtx.lineTo(x + inset + inner * .72, y + inset);
-                targetCtx.lineTo(x + inset + inner * .84, y + inset + inner * .18);
-                targetCtx.closePath(); targetCtx.fill();
-                targetCtx.beginPath();
-                targetCtx.moveTo(x + inset + inner * .50, y + inset + inner * .50);
-                targetCtx.lineTo(x + inset + inner * .23, y + inset + inner * .84);
-                targetCtx.lineTo(x + inset + inner * .77, y + inset + inner * .84);
-                targetCtx.closePath(); targetCtx.fill();
-                targetCtx.fillStyle = core;
-                targetCtx.fillRect(x + TILE_SIZE/2 - 3, y + TILE_SIZE/2 - 3, 6, 6);
-            } else if (style === 'garden-crate') {
-                // Caja de jardín: listones horizontales + brote central.
-                targetCtx.fillStyle = base;
-                targetCtx.fillRect(x + inset, y + inset, inner, inner);
-                targetCtx.fillStyle = pattern;
-                for (let i = 1; i < 4; i++) targetCtx.fillRect(x + inset, y + inset + inner * (i/4), inner, 2);
-                targetCtx.fillStyle = hi;
-                targetCtx.fillRect(x + inset + inner * .46, y + inset + inner * .22, 2, inner * .55);
-                targetCtx.beginPath();
-                targetCtx.arc(x + inset + inner * .36, y + inset + inner * .28, Math.max(2, inner*.10), 0, Math.PI*2); targetCtx.fill();
-                targetCtx.beginPath();
-                targetCtx.arc(x + inset + inner * .60, y + inset + inner * .34, Math.max(2, inner*.10), 0, Math.PI*2); targetCtx.fill();
-            } else if (style === 'sun-crate') {
-                // Caja solar: amarillo intenso, rayos y centro.
-                targetCtx.fillStyle = base;
-                targetCtx.fillRect(x + inset, y + inset, inner, inner);
-                targetCtx.strokeStyle = pattern; targetCtx.lineWidth = 2;
-                targetCtx.beginPath();
-                targetCtx.moveTo(x + inset + inner*.18, y + inset + inner*.18); targetCtx.lineTo(x + inset + inner*.82, y + inset + inner*.82);
-                targetCtx.moveTo(x + inset + inner*.82, y + inset + inner*.18); targetCtx.lineTo(x + inset + inner*.18, y + inset + inner*.82);
-                targetCtx.stroke();
-                targetCtx.fillStyle = hi;
-                targetCtx.beginPath(); targetCtx.arc(x + TILE_SIZE/2, y + TILE_SIZE/2, Math.max(3, TILE_SIZE*.16), 0, Math.PI*2); targetCtx.fill();
-            } else if (style === 'ore-crate') {
-                // Caja de mineral: placas rocosas con gema central.
-                targetCtx.fillStyle = base;
-                targetCtx.fillRect(x + inset, y + inset, inner, inner);
-                targetCtx.fillStyle = pattern;
-                const pts = [
-                    [x+inset+inner*.10,y+inset+inner*.20],[x+inset+inner*.38,y+inset+inner*.10],[x+inset+inner*.25,y+inset+inner*.42],
-                    [x+inset+inner*.72,y+inset+inner*.12],[x+inset+inner*.88,y+inset+inner*.35],[x+inset+inner*.58,y+inset+inner*.30]
-                ];
-                targetCtx.beginPath(); targetCtx.moveTo(...pts[0]); for(const p of pts.slice(1)) targetCtx.lineTo(...p); targetCtx.closePath(); targetCtx.fill();
-                targetCtx.fillStyle = hi; targetCtx.beginPath(); targetCtx.moveTo(x+TILE_SIZE/2,y+inset+4); targetCtx.lineTo(x+TILE_SIZE/2+5,y+TILE_SIZE/2); targetCtx.lineTo(x+TILE_SIZE/2,y+TILE_SIZE/2+6); targetCtx.lineTo(x+TILE_SIZE/2-5,y+TILE_SIZE/2); targetCtx.closePath(); targetCtx.fill();
-            } else if (style === 'cloud-crate') {
-                // Caja de nube: caja clara con abombamientos suaves en las caras.
-                targetCtx.fillStyle = base;
-                targetCtx.fillRect(x + inset, y + inset, inner, inner);
-                targetCtx.fillStyle = hi;
-                for (const p of [[.24,.34,.13],[.48,.28,.16],[.72,.38,.13]]) {
-                    targetCtx.beginPath(); targetCtx.arc(x+inset+inner*p[0], y+inset+inner*p[1], inner*p[2], 0, Math.PI*2); targetCtx.fill();
-                }
-                targetCtx.fillStyle = pattern;
-                targetCtx.fillRect(x + inset + inner*.16, y + inset + inner*.62, inner*.68, 2);
-            } else if (style === 'rock-crate') {
-                // Caja de piedra: panel con quiebres angulares.
-                targetCtx.fillStyle = base;
-                targetCtx.fillRect(x + inset, y + inset, inner, inner);
-                targetCtx.fillStyle = pattern;
-                targetCtx.beginPath();
-                targetCtx.moveTo(x+inset+inner*.08,y+inset+inner*.20); targetCtx.lineTo(x+inset+inner*.36,y+inset+inner*.08); targetCtx.lineTo(x+inset+inner*.30,y+inset+inner*.40); targetCtx.lineTo(x+inset+inner*.08,y+inset+inner*.54); targetCtx.closePath(); targetCtx.fill();
-                targetCtx.beginPath();
-                targetCtx.moveTo(x+inset+inner*.58,y+inset+inner*.10); targetCtx.lineTo(x+inset+inner*.90,y+inset+inner*.25); targetCtx.lineTo(x+inset+inner*.78,y+inset+inner*.50); targetCtx.lineTo(x+inset+inner*.52,y+inset+inner*.38); targetCtx.closePath(); targetCtx.fill();
-                targetCtx.strokeStyle = hi; targetCtx.lineWidth = 2;
-                targetCtx.beginPath(); targetCtx.moveTo(x+inset+inner*.40,y+inset+inner*.18); targetCtx.lineTo(x+inset+inner*.52,y+inset+inner*.78); targetCtx.stroke();
-            } else if (style === 'sand-crate') {
-                // Caja de arena: marco, cuerda cruzada y nudos.
-                targetCtx.fillStyle = base;
-                targetCtx.fillRect(x + inset, y + inset, inner, inner);
-                targetCtx.strokeStyle = pattern; targetCtx.lineWidth = 2;
-                targetCtx.beginPath();
-                targetCtx.moveTo(x+inset,y+inset); targetCtx.lineTo(x+inset+inner,y+inset+inner);
-                targetCtx.moveTo(x+inset+inner,y+inset); targetCtx.lineTo(x+inset,y+inset+inner);
-                targetCtx.stroke();
-                targetCtx.fillStyle = hi;
-                for (const [dx,dy] of [[.10,.10],[.90,.10],[.10,.90],[.90,.90]]) { targetCtx.fillRect(x+inset+inner*dx-2,y+inset+inner*dy-2,4,4); }
-            } else if (style === 'tech-crate') {
-                // Caja tecnológica: panel, tornillos y bandas de seguridad.
-                targetCtx.fillStyle = base;
-                targetCtx.fillRect(x + inset, y + inset, inner, inner);
-                targetCtx.fillStyle = hi;
-                targetCtx.fillRect(x+inset+inner*.12,y+inset+inner*.12,inner*.76,3);
-                targetCtx.fillStyle = pattern;
-                for (let i=0;i<4;i++) targetCtx.fillRect(x+inset+inner*.18+i*inner*.17,y+inset+inner*.52,inner*.11,3);
-                targetCtx.fillStyle = core;
-                for (const [dx,dy] of [[.12,.12],[.88,.12],[.12,.88],[.88,.88]]) { targetCtx.beginPath(); targetCtx.arc(x+inset+inner*dx,y+inset+inner*dy,2,0,Math.PI*2); targetCtx.fill(); }
-            } else if (style === 'aurora-crate') {
-                // Caja aurora: panel oscuro con bandas diagonales brillantes.
-                targetCtx.fillStyle = base; targetCtx.fillRect(x+inset,y+inset,inner,inner);
-                targetCtx.strokeStyle = hi; targetCtx.lineWidth = 3;
-                targetCtx.beginPath(); targetCtx.moveTo(x+inset,y+inset+inner*.72); targetCtx.lineTo(x+inset+inner*.34,y+inset+inner*.10); targetCtx.lineTo(x+inset+inner*.68,y+inset+inner*.90); targetCtx.lineTo(x+inset+inner,y+inset+inner*.28); targetCtx.stroke();
-                targetCtx.fillStyle = pattern; targetCtx.fillRect(x+inset+inner*.10,y+inset+inner*.44,inner*.80,3);
-            } else if (style === 'lava-crate') {
-                // Caja de lava: bloque de roca roja con grietas incandescentes.
-                targetCtx.fillStyle = base; targetCtx.fillRect(x+inset,y+inset,inner,inner);
-                targetCtx.strokeStyle = hi; targetCtx.lineWidth = 2.5;
-                targetCtx.beginPath();
-                targetCtx.moveTo(x+inset+inner*.12,y+inset+inner*.18); targetCtx.lineTo(x+inset+inner*.44,y+inset+inner*.44); targetCtx.lineTo(x+inset+inner*.28,y+inset+inner*.82);
-                targetCtx.moveTo(x+inset+inner*.62,y+inset+inner*.16); targetCtx.lineTo(x+inset+inner*.52,y+inset+inner*.58); targetCtx.lineTo(x+inset+inner*.84,y+inset+inner*.82);
-                targetCtx.stroke();
-                targetCtx.fillStyle = core; targetCtx.fillRect(x+TILE_SIZE/2-4,y+TILE_SIZE/2-4,8,8);
-            } else {
-                // Caja de madera clásica: listones cruzados.
-                targetCtx.strokeStyle = pattern;
-                targetCtx.lineWidth = 4;
-                targetCtx.beginPath();
-                targetCtx.moveTo(x + 6, y + 6);
-                targetCtx.lineTo(x + TILE_SIZE - 6, y + TILE_SIZE - 6);
-                targetCtx.moveTo(x + TILE_SIZE - 6, y + 6);
-                targetCtx.lineTo(x + 6, y + TILE_SIZE - 6);
-                targetCtx.stroke();
-                targetCtx.fillStyle = core;
-                targetCtx.fillRect(x + TILE_SIZE/2 - 4, y + TILE_SIZE/2 - 4, 8, 8);
-            }
-        }
-
-        function drawBiomeBarrelV61229(x, y, targetCtx, style, colors) {
-            const { base, hi, shadow, pattern, core } = colors;
-            const pad = Math.max(4, TILE_SIZE * 0.13);
-            const left = x + pad;
-            const right = x + TILE_SIZE - pad;
-            const top = y + pad + 2;
-            const bottom = y + TILE_SIZE - pad;
-            const width = right - left;
-            const centerX = x + TILE_SIZE / 2;
-
-            // Sombra inferior y cuerpo cilíndrico.
-            targetCtx.fillStyle = shadow;
-            targetCtx.fillRect(left + 1, top + 3, width - 2, bottom - top - 1);
-            targetCtx.fillStyle = base;
-            targetCtx.beginPath();
-            targetCtx.moveTo(left + 3, top);
-            targetCtx.quadraticCurveTo(centerX, top - 2, right - 3, top);
-            targetCtx.lineTo(right - 3, bottom);
-            targetCtx.quadraticCurveTo(centerX, bottom + 2, left + 3, bottom);
-            targetCtx.closePath();
-            targetCtx.fill();
-
-            // Tapa superior.
-            targetCtx.fillStyle = hi;
-            targetCtx.beginPath();
-            targetCtx.ellipse(centerX, top + 1, width * .43, Math.max(3, TILE_SIZE * .10), 0, 0, Math.PI * 2);
-            targetCtx.fill();
-            targetCtx.fillStyle = core;
-            targetCtx.beginPath();
-            targetCtx.ellipse(centerX, top + 1, width * .22, Math.max(1.5, TILE_SIZE * .045), 0, 0, Math.PI * 2);
-            targetCtx.fill();
-
-            // Aros del barril: hacen visible la silueta incluso en temas oscuros.
-            targetCtx.fillStyle = pattern;
-            targetCtx.fillRect(left + 1, y + TILE_SIZE * .31, width - 2, Math.max(2, TILE_SIZE * .055));
-            targetCtx.fillRect(left + 1, y + TILE_SIZE * .67, width - 2, Math.max(2, TILE_SIZE * .055));
-            targetCtx.fillStyle = hi;
-            targetCtx.fillRect(left + 2, y + TILE_SIZE * .30, width * .16, 2);
-            targetCtx.fillRect(left + 2, y + TILE_SIZE * .66, width * .16, 2);
-
-            if (style === 'ice-drum') {
-                targetCtx.strokeStyle = '#ffffff';
-                targetCtx.lineWidth = 1.5;
-                targetCtx.beginPath();
-                targetCtx.moveTo(centerX - 4, y + TILE_SIZE * .43);
-                targetCtx.lineTo(centerX + 2, y + TILE_SIZE * .54);
-                targetCtx.lineTo(centerX - 1, y + TILE_SIZE * .64);
-                targetCtx.stroke();
-            } else if (style === 'leaf-barrel') {
-                targetCtx.fillStyle = hi;
-                targetCtx.beginPath();
-                targetCtx.ellipse(centerX - 4, y + TILE_SIZE * .53, 4, 2.5, -.45, 0, Math.PI * 2);
-                targetCtx.ellipse(centerX + 4, y + TILE_SIZE * .57, 4, 2.5, .45, 0, Math.PI * 2);
-                targetCtx.fill();
-            } else if (style === 'garden-pot') {
-                targetCtx.fillStyle = hi;
-                targetCtx.fillRect(centerX - 3, y + TILE_SIZE * .43, 6, TILE_SIZE * .20);
-                targetCtx.fillStyle = pattern;
-                targetCtx.beginPath();
-                targetCtx.arc(centerX - 4, y + TILE_SIZE * .44, 4, Math.PI * .95, Math.PI * 1.85);
-                targetCtx.arc(centerX + 4, y + TILE_SIZE * .42, 4, Math.PI * 1.15, Math.PI * .05);
-                targetCtx.fill();
-            } else if (style === 'sun-drum') {
-                targetCtx.fillStyle = hi;
-                targetCtx.beginPath();
-                targetCtx.arc(centerX, y + TILE_SIZE * .53, 4, 0, Math.PI * 2);
-                targetCtx.fill();
-                targetCtx.strokeStyle = hi; targetCtx.lineWidth = 1.5;
-                for (let i = 0; i < 4; i++) {
-                    const a = i * Math.PI / 2;
-                    targetCtx.beginPath();
-                    targetCtx.moveTo(centerX + Math.cos(a) * 6, y + TILE_SIZE * .53 + Math.sin(a) * 6);
-                    targetCtx.lineTo(centerX + Math.cos(a) * 9, y + TILE_SIZE * .53 + Math.sin(a) * 9);
-                    targetCtx.stroke();
-                }
-            } else if (style === 'ore-barrel') {
-                targetCtx.fillStyle = hi;
-                targetCtx.beginPath();
-                targetCtx.moveTo(centerX, y + TILE_SIZE * .42);
-                targetCtx.lineTo(centerX + 4, y + TILE_SIZE * .53);
-                targetCtx.lineTo(centerX, y + TILE_SIZE * .66);
-                targetCtx.lineTo(centerX - 4, y + TILE_SIZE * .53);
-                targetCtx.closePath(); targetCtx.fill();
-            } else if (style === 'cloud-canister') {
-                targetCtx.fillStyle = hi;
-                for (const [dx,dy,r] of [[-5,.52,3],[0,.47,4],[5,.52,3]]) {
-                    targetCtx.beginPath(); targetCtx.arc(centerX + dx, y + TILE_SIZE * dy, r, 0, Math.PI*2); targetCtx.fill();
-                }
-            } else if (style === 'rock-barrel') {
-                targetCtx.fillStyle = pattern;
-                targetCtx.beginPath();
-                targetCtx.moveTo(centerX - 5, y + TILE_SIZE * .48);
-                targetCtx.lineTo(centerX - 1, y + TILE_SIZE * .40);
-                targetCtx.lineTo(centerX + 5, y + TILE_SIZE * .49);
-                targetCtx.lineTo(centerX + 2, y + TILE_SIZE * .62);
-                targetCtx.lineTo(centerX - 4, y + TILE_SIZE * .60);
-                targetCtx.closePath(); targetCtx.fill();
-            } else if (style === 'sand-barrel') {
-                targetCtx.strokeStyle = hi; targetCtx.lineWidth = 2;
-                targetCtx.beginPath();
-                targetCtx.arc(centerX, y + TILE_SIZE * .54, 5, 0, Math.PI * 2);
-                targetCtx.stroke();
-            } else if (style === 'tech-drum') {
-                targetCtx.fillStyle = hi;
-                targetCtx.fillRect(centerX - 5, y + TILE_SIZE * .48, 10, 2);
-                targetCtx.fillStyle = pattern;
-                targetCtx.fillRect(centerX - 5, y + TILE_SIZE * .57, 3, 3);
-                targetCtx.fillRect(centerX + 2, y + TILE_SIZE * .57, 3, 3);
-            } else if (style === 'aurora-barrel') {
-                targetCtx.strokeStyle = hi; targetCtx.lineWidth = 2;
-                targetCtx.beginPath();
-                targetCtx.moveTo(left + 5, y + TILE_SIZE * .58);
-                targetCtx.quadraticCurveTo(centerX, y + TILE_SIZE * .42, right - 5, y + TILE_SIZE * .58);
-                targetCtx.stroke();
-            } else if (style === 'lava-drum') {
-                targetCtx.strokeStyle = hi; targetCtx.lineWidth = 2;
-                targetCtx.beginPath();
-                targetCtx.moveTo(centerX - 5, y + TILE_SIZE * .41);
-                targetCtx.lineTo(centerX + 2, y + TILE_SIZE * .53);
-                targetCtx.lineTo(centerX - 2, y + TILE_SIZE * .66);
-                targetCtx.stroke();
-                targetCtx.fillStyle = hi;
-                targetCtx.fillRect(centerX - 2, y + TILE_SIZE * .51, 4, 4);
-            } else {
-                // Barril de madera clásico: símbolo en X.
-                targetCtx.strokeStyle = hi;
-                targetCtx.lineWidth = 2;
-                targetCtx.beginPath();
-                targetCtx.moveTo(centerX - 5, y + TILE_SIZE * .46);
-                targetCtx.lineTo(centerX + 5, y + TILE_SIZE * .61);
-                targetCtx.moveTo(centerX + 5, y + TILE_SIZE * .46);
-                targetCtx.lineTo(centerX - 5, y + TILE_SIZE * .61);
-                targetCtx.stroke();
-            }
-
-            // Base elíptica que termina de separar el barril de una caja.
-            targetCtx.fillStyle = shadow;
-            targetCtx.beginPath();
-            targetCtx.ellipse(centerX, bottom, width * .39, Math.max(2, TILE_SIZE * .085), 0, 0, Math.PI);
-            targetCtx.fill();
-        }
 
         function drawExitPortal(x, y) {
             let pulse = Math.sin(gameState.animFrame * 0.1) * 3;
@@ -1475,6 +1159,12 @@ function draw() {
 
         function drawEnemySprite(e) {
             ctx.save();
+            const enemySpecies = typeof getEnemyBiomeSpeciesProfileV615 === 'function' ? getEnemyBiomeSpeciesProfileV615(e) : null;
+            const enemySkin = enemySpecies || (typeof getEnemySkinV614 === 'function' ? getEnemySkinV614(e) : null);
+            const skinBody = enemySkin?.body || e.type.color;
+            const skinShade = enemySkin?.shade || e.type.color;
+            const skinAccent = enemySkin?.accent || themeColorV46('enemyEye', '#ffffff');
+            const skinMotif = enemySkin?.motif || 'classic';
             if (e.elite) {
                 ctx.strokeStyle = gameState.roomType.color;
                 ctx.globalAlpha = 0.45 + Math.sin(gameState.animFrame * 0.15) * 0.1;
@@ -1492,9 +1182,8 @@ function draw() {
             ctx.ellipse(e.x, e.y + e.height/2, e.width/2, 4, 0, 0, Math.PI*2);
             ctx.fill();
 
-            // Cuerpo
-            const enemyThemeKey = e?.type?.name === 'Rastrero' ? 'enemyRastrero' : e?.type?.name === 'Volador' ? 'enemyVolador' : e?.type?.name === 'Especial' ? 'enemyEspecial' : null;
-            ctx.fillStyle = enemyThemeKey && typeof themeColorV46 === 'function' ? themeColorV46(enemyThemeKey, e.type.color) : e.type.color;
+            // Cuerpo base; la skin solo cambia la representación visual.
+            ctx.fillStyle = skinBody;
             ctx.beginPath();
             if (e.type.canFly) {
                 // Cola de fantasma
@@ -1510,7 +1199,56 @@ function draw() {
                 ctx.fill();
             }
 
-
+            // Motivo de bioma: accesorio ligero, procedural y barato.
+            const motifY = e.y + floaty;
+            ctx.fillStyle = skinAccent;
+            ctx.strokeStyle = skinShade;
+            ctx.lineWidth = 2;
+            if (skinMotif === 'snow' || skinMotif === 'ice') {
+                ctx.beginPath();
+                ctx.moveTo(e.x - 7, motifY - e.height * 0.34); ctx.lineTo(e.x, motifY - e.height * 0.52); ctx.lineTo(e.x + 7, motifY - e.height * 0.34);
+                ctx.stroke();
+                if (skinMotif === 'ice') { ctx.beginPath(); ctx.moveTo(e.x, motifY - 2); ctx.lineTo(e.x, motifY - 12); ctx.stroke(); }
+            } else if (skinMotif === 'leaf') {
+                ctx.beginPath(); ctx.ellipse(e.x - 8, motifY - 10, 4, 7, -0.65, 0, Math.PI * 2); ctx.ellipse(e.x + 8, motifY - 10, 4, 7, 0.65, 0, Math.PI * 2); ctx.fill();
+            } else if (skinMotif === 'acorn') {
+                ctx.beginPath(); ctx.arc(e.x, motifY - 8, 6, Math.PI, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = skinShade; ctx.beginPath(); ctx.moveTo(e.x - 6, motifY - 8); ctx.lineTo(e.x + 6, motifY - 8); ctx.stroke();
+                ctx.fillStyle = skinAccent; ctx.fillRect(e.x - 2, motifY - 15, 4, 4);
+            } else if (skinMotif === 'flower') {
+                for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; ctx.beginPath(); ctx.arc(e.x + Math.cos(a) * 8, motifY - 10 + Math.sin(a) * 3, 3, 0, Math.PI * 2); ctx.fill(); }
+            } else if (skinMotif === 'vine') {
+                ctx.beginPath(); ctx.arc(e.x, motifY - 12, 7, 0, Math.PI * 2); ctx.stroke();
+            } else if (skinMotif === 'sun') {
+                for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; ctx.beginPath(); ctx.moveTo(e.x + Math.cos(a) * 9, motifY - 10 + Math.sin(a) * 5); ctx.lineTo(e.x + Math.cos(a) * 13, motifY - 10 + Math.sin(a) * 7); ctx.stroke(); }
+            } else if (skinMotif === 'crystal' || skinMotif === 'ore') {
+                ctx.beginPath(); ctx.moveTo(e.x, motifY - 15); ctx.lineTo(e.x + 6, motifY - 6); ctx.lineTo(e.x, motifY - 2); ctx.lineTo(e.x - 6, motifY - 6); ctx.closePath(); ctx.fill();
+            } else if (skinMotif === 'cloud') {
+                ctx.beginPath(); ctx.arc(e.x - 5, motifY - 9, 4, 0, Math.PI * 2); ctx.arc(e.x, motifY - 12, 5, 0, Math.PI * 2); ctx.arc(e.x + 5, motifY - 9, 4, 0, Math.PI * 2); ctx.fill();
+            } else if (skinMotif === 'storm') {
+                ctx.beginPath(); ctx.moveTo(e.x - 3, motifY - 17); ctx.lineTo(e.x + 3, motifY - 9); ctx.lineTo(e.x - 1, motifY - 8); ctx.lineTo(e.x + 3, motifY - 2); ctx.stroke();
+            } else if (skinMotif === 'rock' || skinMotif === 'feather') {
+                ctx.beginPath(); ctx.moveTo(e.x - 8, motifY - 7); ctx.lineTo(e.x - 4, motifY - 15); ctx.lineTo(e.x, motifY - 9); ctx.lineTo(e.x + 5, motifY - 16); ctx.lineTo(e.x + 9, motifY - 7); ctx.stroke();
+            } else if (skinMotif === 'shell' || skinMotif === 'reef') {
+                ctx.beginPath(); ctx.arc(e.x, motifY + 6, 7, Math.PI, Math.PI * 2); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(e.x - 6, motifY + 6); ctx.lineTo(e.x - 2, motifY - 1); ctx.moveTo(e.x, motifY + 6); ctx.lineTo(e.x, motifY - 2); ctx.moveTo(e.x + 6, motifY + 6); ctx.lineTo(e.x + 2, motifY - 1); ctx.stroke();
+            } else if (skinMotif === 'fin') {
+                ctx.beginPath(); ctx.moveTo(e.x, motifY - 16); ctx.lineTo(e.x + 6, motifY - 7); ctx.lineTo(e.x - 2, motifY - 8); ctx.closePath(); ctx.fill();
+            } else if (skinMotif === 'visor' || skinMotif === 'drone') {
+                ctx.fillStyle = skinAccent; ctx.globalAlpha = 0.9; ctx.fillRect(e.x - 8, motifY - 5, 16, 5); ctx.globalAlpha = 1;
+                ctx.strokeStyle = skinShade; ctx.beginPath(); ctx.moveTo(e.x, motifY - 12); ctx.lineTo(e.x, motifY - 19); ctx.stroke();
+            } else if (skinMotif === 'tech') {
+                ctx.strokeStyle = skinAccent; ctx.strokeRect(e.x - 8, motifY - 14, 16, 20);
+                ctx.fillStyle = skinAccent; ctx.fillRect(e.x - 3, motifY - 9, 6, 3);
+            } else if (skinMotif === 'halo') {
+                ctx.beginPath(); ctx.ellipse(e.x, motifY - 11, 12, 4, 0, 0, Math.PI * 2); ctx.stroke();
+            } else if (skinMotif === 'star') {
+                ctx.beginPath(); ctx.moveTo(e.x, motifY - 17); ctx.lineTo(e.x + 3, motifY - 9); ctx.lineTo(e.x + 11, motifY - 9); ctx.lineTo(e.x + 4, motifY - 4); ctx.lineTo(e.x + 7, motifY + 4); ctx.lineTo(e.x, motifY - 1); ctx.lineTo(e.x - 7, motifY + 4); ctx.lineTo(e.x - 4, motifY - 4); ctx.lineTo(e.x - 11, motifY - 9); ctx.lineTo(e.x - 3, motifY - 9); ctx.closePath(); ctx.stroke();
+            } else if (skinMotif === 'horns' || skinMotif === 'demon') {
+                ctx.beginPath(); ctx.moveTo(e.x - 10, motifY - 9); ctx.lineTo(e.x - 6, motifY - 18); ctx.lineTo(e.x - 2, motifY - 10); ctx.moveTo(e.x + 10, motifY - 9); ctx.lineTo(e.x + 6, motifY - 18); ctx.lineTo(e.x + 2, motifY - 10); ctx.stroke();
+            } else if (skinMotif === 'ember') {
+                ctx.beginPath(); ctx.moveTo(e.x, motifY - 17); ctx.quadraticCurveTo(e.x + 8, motifY - 10, e.x, motifY - 4); ctx.quadraticCurveTo(e.x - 7, motifY - 10, e.x, motifY - 17); ctx.fill();
+            }
 
             // Ojos mirando a la dirección de movimiento
             let eyeOffsetX = e.vx > 0 ? 3 : (e.vx < 0 ? -3 : 0);

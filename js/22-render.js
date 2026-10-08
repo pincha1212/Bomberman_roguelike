@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.6 — Canvas rendering and theme-backed sprite drawing
+// Bomberman Roguelike v6.14.0 — Canvas rendering and biome enemy skin drawing
 // V3.17: cache de terreno estático para evitar reconstruir la cuadrícula completa
 // en cada frame. El mapa se regenera solo cuando cambia la referencia/revisión.
 const renderCacheV317 = {
@@ -795,6 +795,11 @@ function draw() {
 
         function drawEnemySprite(e) {
             ctx.save();
+            const enemySkin = typeof getEnemySkinV614 === 'function' ? getEnemySkinV614(e) : null;
+            const skinBody = enemySkin?.body || e.type.color;
+            const skinShade = enemySkin?.shade || e.type.color;
+            const skinAccent = enemySkin?.accent || themeColorV46('enemyEye', '#ffffff');
+            const skinMotif = enemySkin?.motif || 'classic';
             if (e.elite) {
                 ctx.strokeStyle = gameState.roomType.color;
                 ctx.globalAlpha = 0.45 + Math.sin(gameState.animFrame * 0.15) * 0.1;
@@ -812,9 +817,8 @@ function draw() {
             ctx.ellipse(e.x, e.y + e.height/2, e.width/2, 4, 0, 0, Math.PI*2);
             ctx.fill();
 
-            // Cuerpo
-            const enemyThemeKey = e?.type?.name === 'Rastrero' ? 'enemyRastrero' : e?.type?.name === 'Volador' ? 'enemyVolador' : e?.type?.name === 'Especial' ? 'enemyEspecial' : null;
-            ctx.fillStyle = enemyThemeKey && typeof themeColorV46 === 'function' ? themeColorV46(enemyThemeKey, e.type.color) : e.type.color;
+            // Cuerpo base; la skin solo cambia la representación visual.
+            ctx.fillStyle = skinBody;
             ctx.beginPath();
             if (e.type.canFly) {
                 // Cola de fantasma
@@ -830,7 +834,52 @@ function draw() {
                 ctx.fill();
             }
 
-
+            // Motivo de bioma: accesorio ligero, procedural y barato.
+            const motifY = e.y + floaty;
+            ctx.fillStyle = skinAccent;
+            ctx.strokeStyle = skinShade;
+            ctx.lineWidth = 2;
+            if (skinMotif === 'snow' || skinMotif === 'ice') {
+                ctx.beginPath();
+                ctx.moveTo(e.x - 7, motifY - e.height * 0.34); ctx.lineTo(e.x, motifY - e.height * 0.52); ctx.lineTo(e.x + 7, motifY - e.height * 0.34);
+                ctx.stroke();
+                if (skinMotif === 'ice') { ctx.beginPath(); ctx.moveTo(e.x, motifY - 2); ctx.lineTo(e.x, motifY - 12); ctx.stroke(); }
+            } else if (skinMotif === 'leaf') {
+                ctx.beginPath(); ctx.ellipse(e.x - 8, motifY - 10, 4, 7, -0.65, 0, Math.PI * 2); ctx.ellipse(e.x + 8, motifY - 10, 4, 7, 0.65, 0, Math.PI * 2); ctx.fill();
+            } else if (skinMotif === 'flower') {
+                for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; ctx.beginPath(); ctx.arc(e.x + Math.cos(a) * 8, motifY - 10 + Math.sin(a) * 3, 3, 0, Math.PI * 2); ctx.fill(); }
+            } else if (skinMotif === 'vine') {
+                ctx.beginPath(); ctx.arc(e.x, motifY - 12, 7, 0, Math.PI * 2); ctx.stroke();
+            } else if (skinMotif === 'sun') {
+                for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; ctx.beginPath(); ctx.moveTo(e.x + Math.cos(a) * 9, motifY - 10 + Math.sin(a) * 5); ctx.lineTo(e.x + Math.cos(a) * 13, motifY - 10 + Math.sin(a) * 7); ctx.stroke(); }
+            } else if (skinMotif === 'crystal' || skinMotif === 'ore') {
+                ctx.beginPath(); ctx.moveTo(e.x, motifY - 15); ctx.lineTo(e.x + 6, motifY - 6); ctx.lineTo(e.x, motifY - 2); ctx.lineTo(e.x - 6, motifY - 6); ctx.closePath(); ctx.fill();
+            } else if (skinMotif === 'cloud') {
+                ctx.beginPath(); ctx.arc(e.x - 5, motifY - 9, 4, 0, Math.PI * 2); ctx.arc(e.x, motifY - 12, 5, 0, Math.PI * 2); ctx.arc(e.x + 5, motifY - 9, 4, 0, Math.PI * 2); ctx.fill();
+            } else if (skinMotif === 'storm') {
+                ctx.beginPath(); ctx.moveTo(e.x - 3, motifY - 17); ctx.lineTo(e.x + 3, motifY - 9); ctx.lineTo(e.x - 1, motifY - 8); ctx.lineTo(e.x + 3, motifY - 2); ctx.stroke();
+            } else if (skinMotif === 'rock' || skinMotif === 'feather') {
+                ctx.beginPath(); ctx.moveTo(e.x - 8, motifY - 7); ctx.lineTo(e.x - 4, motifY - 15); ctx.lineTo(e.x, motifY - 9); ctx.lineTo(e.x + 5, motifY - 16); ctx.lineTo(e.x + 9, motifY - 7); ctx.stroke();
+            } else if (skinMotif === 'shell' || skinMotif === 'reef') {
+                ctx.beginPath(); ctx.arc(e.x, motifY + 6, 7, Math.PI, Math.PI * 2); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(e.x - 6, motifY + 6); ctx.lineTo(e.x - 2, motifY - 1); ctx.moveTo(e.x, motifY + 6); ctx.lineTo(e.x, motifY - 2); ctx.moveTo(e.x + 6, motifY + 6); ctx.lineTo(e.x + 2, motifY - 1); ctx.stroke();
+            } else if (skinMotif === 'fin') {
+                ctx.beginPath(); ctx.moveTo(e.x, motifY - 16); ctx.lineTo(e.x + 6, motifY - 7); ctx.lineTo(e.x - 2, motifY - 8); ctx.closePath(); ctx.fill();
+            } else if (skinMotif === 'visor' || skinMotif === 'drone') {
+                ctx.fillStyle = skinAccent; ctx.globalAlpha = 0.9; ctx.fillRect(e.x - 8, motifY - 5, 16, 5); ctx.globalAlpha = 1;
+                ctx.strokeStyle = skinShade; ctx.beginPath(); ctx.moveTo(e.x, motifY - 12); ctx.lineTo(e.x, motifY - 19); ctx.stroke();
+            } else if (skinMotif === 'tech') {
+                ctx.strokeStyle = skinAccent; ctx.strokeRect(e.x - 8, motifY - 14, 16, 20);
+                ctx.fillStyle = skinAccent; ctx.fillRect(e.x - 3, motifY - 9, 6, 3);
+            } else if (skinMotif === 'halo') {
+                ctx.beginPath(); ctx.ellipse(e.x, motifY - 11, 12, 4, 0, 0, Math.PI * 2); ctx.stroke();
+            } else if (skinMotif === 'star') {
+                ctx.beginPath(); ctx.moveTo(e.x, motifY - 17); ctx.lineTo(e.x + 3, motifY - 9); ctx.lineTo(e.x + 11, motifY - 9); ctx.lineTo(e.x + 4, motifY - 4); ctx.lineTo(e.x + 7, motifY + 4); ctx.lineTo(e.x, motifY - 1); ctx.lineTo(e.x - 7, motifY + 4); ctx.lineTo(e.x - 4, motifY - 4); ctx.lineTo(e.x - 11, motifY - 9); ctx.lineTo(e.x - 3, motifY - 9); ctx.closePath(); ctx.stroke();
+            } else if (skinMotif === 'horns' || skinMotif === 'demon') {
+                ctx.beginPath(); ctx.moveTo(e.x - 10, motifY - 9); ctx.lineTo(e.x - 6, motifY - 18); ctx.lineTo(e.x - 2, motifY - 10); ctx.moveTo(e.x + 10, motifY - 9); ctx.lineTo(e.x + 6, motifY - 18); ctx.lineTo(e.x + 2, motifY - 10); ctx.stroke();
+            } else if (skinMotif === 'ember') {
+                ctx.beginPath(); ctx.moveTo(e.x, motifY - 17); ctx.quadraticCurveTo(e.x + 8, motifY - 10, e.x, motifY - 4); ctx.quadraticCurveTo(e.x - 7, motifY - 10, e.x, motifY - 17); ctx.fill();
+            }
 
             // Ojos mirando a la dirección de movimiento
             let eyeOffsetX = e.vx > 0 ? 3 : (e.vx < 0 ? -3 : 0);

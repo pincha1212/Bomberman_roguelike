@@ -424,6 +424,86 @@
         { tipo:'snow', color:'ambientDust', densidad:.62, velocidad:.16, sizeMin:1, sizeMax:2, alpha:.34 }
     );
 
+    // v6.14: skins visuales de enemigos por bioma.
+    // No modifican IA, estadísticas, colisiones, daño ni tipo de enemigo.
+    const ENEMY_SKIN_PROFILES_V614 = Object.freeze({
+        classic: Object.freeze({
+            RASTRERO: Object.freeze({ body:'#ef4444', shade:'#991b1b', accent:'#facc15', motif:'classic' }),
+            VOLADOR: Object.freeze({ body:'#3b82f6', shade:'#1d4ed8', accent:'#93c5fd', motif:'classic' }),
+            ESPECIAL: Object.freeze({ body:'#22c55e', shade:'#15803d', accent:'#bbf7d0', motif:'classic' })
+        }),
+        winter: Object.freeze({
+            RASTRERO: Object.freeze({ body:'#9dd9ef', shade:'#397b96', accent:'#f5fdff', motif:'snow' }),
+            VOLADOR: Object.freeze({ body:'#78bce8', shade:'#315f92', accent:'#e0f2fe', motif:'snow' }),
+            ESPECIAL: Object.freeze({ body:'#b9e6ef', shade:'#527d8d', accent:'#ffffff', motif:'ice' })
+        }),
+        autumn: Object.freeze({
+            RASTRERO: Object.freeze({ body:'#c96a2d', shade:'#6d2f12', accent:'#f6cf74', motif:'leaf' }),
+            VOLADOR: Object.freeze({ body:'#a94d2d', shade:'#64231a', accent:'#ffd27a', motif:'leaf' }),
+            ESPECIAL: Object.freeze({ body:'#7c6932', shade:'#443914', accent:'#efb34b', motif:'acorn' })
+        }),
+        spring: Object.freeze({
+            RASTRERO: Object.freeze({ body:'#63b86b', shade:'#2e6e3a', accent:'#f5a3c7', motif:'flower' }),
+            VOLADOR: Object.freeze({ body:'#58a9a0', shade:'#245e59', accent:'#f8d36c', motif:'flower' }),
+            ESPECIAL: Object.freeze({ body:'#8abf52', shade:'#4c732c', accent:'#f8b4d9', motif:'vine' })
+        }),
+        summer: Object.freeze({
+            RASTRERO: Object.freeze({ body:'#d99a32', shade:'#8a5414', accent:'#ffe38a', motif:'sun' }),
+            VOLADOR: Object.freeze({ body:'#4fa7a0', shade:'#235d5a', accent:'#fff0a8', motif:'sun' }),
+            ESPECIAL: Object.freeze({ body:'#c97938', shade:'#743b18', accent:'#58d8c4', motif:'shell' })
+        }),
+        underground: Object.freeze({
+            RASTRERO: Object.freeze({ body:'#8e67b7', shade:'#4b2d67', accent:'#d8b4fe', motif:'crystal' }),
+            VOLADOR: Object.freeze({ body:'#6f7fb9', shade:'#303b69', accent:'#c4b5fd', motif:'crystal' }),
+            ESPECIAL: Object.freeze({ body:'#9e7a61', shade:'#503f35', accent:'#a7f3d0', motif:'ore' })
+        }),
+        clouds: Object.freeze({
+            RASTRERO: Object.freeze({ body:'#b9d8ea', shade:'#607f96', accent:'#ffffff', motif:'cloud' }),
+            VOLADOR: Object.freeze({ body:'#9dbce0', shade:'#516987', accent:'#dbeafe', motif:'cloud' }),
+            ESPECIAL: Object.freeze({ body:'#cad7e3', shade:'#6b7c8e', accent:'#93c5fd', motif:'storm' })
+        }),
+        mountains: Object.freeze({
+            RASTRERO: Object.freeze({ body:'#817d75', shade:'#45423e', accent:'#e5d8b8', motif:'rock' }),
+            VOLADOR: Object.freeze({ body:'#607a79', shade:'#30403f', accent:'#d8eadf', motif:'feather' }),
+            ESPECIAL: Object.freeze({ body:'#8c7461', shade:'#4b382d', accent:'#d8b08c', motif:'rock' })
+        }),
+        beach: Object.freeze({
+            RASTRERO: Object.freeze({ body:'#e0a353', shade:'#855624', accent:'#8ee7e0', motif:'shell' }),
+            VOLADOR: Object.freeze({ body:'#54b6c5', shade:'#276673', accent:'#f6e3a6', motif:'fin' }),
+            ESPECIAL: Object.freeze({ body:'#d17d5a', shade:'#713f31', accent:'#f8c46c', motif:'reef' })
+        }),
+        space: Object.freeze({
+            RASTRERO: Object.freeze({ body:'#7e7cf0', shade:'#36358a', accent:'#57e6ff', motif:'visor' }),
+            VOLADOR: Object.freeze({ body:'#4f9fd8', shade:'#254d76', accent:'#c7d2fe', motif:'drone' }),
+            ESPECIAL: Object.freeze({ body:'#9c6cf3', shade:'#4a2b82', accent:'#6ee7ff', motif:'tech' })
+        }),
+        sky: Object.freeze({
+            RASTRERO: Object.freeze({ body:'#d58de5', shade:'#703f7c', accent:'#8ff3e7', motif:'halo' }),
+            VOLADOR: Object.freeze({ body:'#9fa9e8', shade:'#505a8e', accent:'#f0abfc', motif:'halo' }),
+            ESPECIAL: Object.freeze({ body:'#ba83cf', shade:'#603a6f', accent:'#a7f3d0', motif:'star' })
+        }),
+        inferno: Object.freeze({
+            RASTRERO: Object.freeze({ body:'#e85b2a', shade:'#741f0d', accent:'#ffd166', motif:'horns' }),
+            VOLADOR: Object.freeze({ body:'#8f3e37', shade:'#46130f', accent:'#ff9b55', motif:'ember' }),
+            ESPECIAL: Object.freeze({ body:'#b43d21', shade:'#57170b', accent:'#ffe066', motif:'demon' })
+        })
+    });
+
+    function getEnemySkinV614(enemyOrType) {
+        const type = enemyOrType?.type || enemyOrType;
+        const typeKey = type === ENEMY_TYPES?.RASTRERO || type?.name === 'Rastrero' ? 'RASTRERO'
+            : type === ENEMY_TYPES?.VOLADOR || type?.name === 'Volador' ? 'VOLADOR'
+            : type === ENEMY_TYPES?.ESPECIAL || type?.name === 'Especial' ? 'ESPECIAL'
+            : 'RASTRERO';
+        const theme = getThemeV46();
+        return ENEMY_SKIN_PROFILES_V614[theme.id]?.[typeKey] || ENEMY_SKIN_PROFILES_V614.classic[typeKey];
+    }
+
+    global.ENEMY_SKIN_PROFILES_V614 = ENEMY_SKIN_PROFILES_V614;
+    global.getEnemySkinV614 = getEnemySkinV614;
+    global.BOMBER_ENGINE = global.BOMBER_ENGINE || {};
+    global.BOMBER_ENGINE.getEnemySkin = getEnemySkinV614;
+
     const registry = { classic: CLASSIC_THEME, winter: WINTER_THEME, autumn: AUTUMN_THEME, spring: SPRING_THEME, summer: SUMMER_THEME, underground: UNDERGROUND_THEME, clouds: CLOUDS_THEME, mountains: MOUNTAINS_THEME, beach: BEACH_THEME, space: SPACE_THEME, sky: SKY_THEME, inferno: INFERNO_THEME };
     let activeThemeId = 'classic';
 

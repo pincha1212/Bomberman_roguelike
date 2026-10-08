@@ -442,13 +442,11 @@ const UI = {};
         window.applyPowerupV67=applyPowerupV67;
         window.getPowerupDropPoolV67=getPowerupDropPoolV67;
 
-        const ENEMY_TYPES = {
-            RASTRERO: { name: 'Rastrero', color: '#ef4444', speed: 1.4, canFly: false },
-            VOLADOR: { name: 'Volador', color: '#3b82f6', speed: 1.1, canFly: true },
-            ESPECIAL: { name: 'Especial', color: '#22c55e', speed: 2.2, canFly: false },
-            OSO_NIEVE: { name: 'Oso de nieve', color: '#e5e7eb', speed: 0.72, canFly: false, winterRole: 'bear', contactDamage: 0 },
-            ESTORBADOR_HIELO: { name: 'Estorbador', color: '#93c5fd', speed: 0.52, canFly: false, winterRole: 'obstructor', contactDamage: 0 }
-        };
+        const ENEMY_TYPES = Object.freeze({
+            RASTRERO: Object.freeze({ name: 'Rastrero', color: '#ef4444', speed: 1.4, canFly: false }),
+            VOLADOR: Object.freeze({ name: 'Volador', color: '#3b82f6', speed: 1.1, canFly: true }),
+            ESPECIAL: Object.freeze({ name: 'Especial', color: '#22c55e', speed: 2.2, canFly: false })
+        });
 
         // v3.24: perfiles de comportamiento separados del tipo visual/fisico.
         // Cada enemigo conserva un solo arquetipo durante toda la vida de la entidad.
@@ -482,7 +480,6 @@ const UI = {};
         });
 
         function pickEnemyBehaviorV324(type, level = 1, index = 0, roll = Math.random()) {
-            if (type?.winterRole) return ENEMY_BEHAVIORS_V324.PATROLLER;
             if (type === ENEMY_TYPES.VOLADOR || type?.canFly) return ENEMY_BEHAVIORS_V324.FLYER;
             if (type === ENEMY_TYPES.ESPECIAL) return ENEMY_BEHAVIORS_V324.AGGRESSIVE;
 

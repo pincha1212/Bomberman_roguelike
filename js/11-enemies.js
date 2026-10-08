@@ -1,5 +1,6 @@
-// Bomberman Roguelike v6.25.0 — Enemy spawning delegated to biome authority
+// Bomberman Roguelike v6.26.0 — Enemy spawning delegated to biome authority
         function spawnEnemies() {
+            if (typeof isBossRoomV626 === 'function' && isBossRoomV626()) return;
             const diff = gameState.difficulty || (typeof getDifficultyV323 === 'function' ? getDifficultyV323(gameState.level) : null);
             const maxEnemies = diff?.maxEnemies || largeSupport.maxEnemies;
             const spawnCap = typeof getDifficultyEnemySpawnCapV619 === 'function'
@@ -33,14 +34,14 @@
             }
 
             const spawnTotal = Math.min(count, candidates.length);
-            const spawnPlan = typeof buildEnemySpawnPlanV625 === 'function'
-                ? buildEnemySpawnPlanV625(spawnTotal)
+            const spawnPlan = typeof buildEnemySpawnPlanV626 === 'function'
+                ? buildEnemySpawnPlanV626(spawnTotal)
                 : [];
             for (let i = 0; i < spawnTotal; i++) {
                 const {x, y} = candidates[i];
-                const spec = spawnPlan[i] || (typeof resolveEnemySpawnSpecV625 === 'function' ? resolveEnemySpawnSpecV625({ index: i, count: spawnTotal }) : null);
-                const entity = typeof makeEnemyEntityV625 === 'function'
-                    ? makeEnemyEntityV625({ x, y }, spec, { source: 'initial' })
+                const spec = spawnPlan[i] || (typeof resolveEnemySpawnSpecV626 === 'function' ? resolveEnemySpawnSpecV626({ index: i, count: spawnTotal }) : null);
+                const entity = typeof makeEnemyEntityV626 === 'function'
+                    ? makeEnemyEntityV626({ x, y }, spec, { source: 'initial' })
                     : null;
                 if (entity) gameState.enemies.push(entity);
             }

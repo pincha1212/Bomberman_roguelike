@@ -270,7 +270,7 @@ function enemyAxisLineClearV312(ex, ey, px, py) {
     return false;
 }
 
-function enemyCanSeePlayerV312(e, visionRange = 9) {
+function enemyCanSeePlayerV312(e) {
     const ex = e.x;
     const ey = e.y;
     const px = player.x + player.width / 2;
@@ -281,7 +281,7 @@ function enemyCanSeePlayerV312(e, visionRange = 9) {
         y: Math.floor(py / TILE_SIZE)
     };
     const tileDistance = Math.abs(pxTile.x - exTile.x) + Math.abs(pxTile.y - exTile.y);
-    if (tileDistance > Math.max(1, Number(visionRange) || 9)) return false;
+    if (tileDistance > 9) return false;
 
     // En proximidad inmediata, el enemigo detecta al jugador aunque haya girado
     // apenas dentro de la misma zona del corredor.
@@ -861,8 +861,7 @@ function updateEnemyIntentV312(e, index, dt) {
 
     if (ai.visionTimer <= 0) {
         ai.visionTimer = enemyAI_V312.visionInterval + (index % 3) * 9;
-        const livingVision = typeof getLivingBiomeEnemyVisionRangeV620 === 'function' ? getLivingBiomeEnemyVisionRangeV620(e) : null;
-        const sees = enemyCanSeePlayerV312(e, livingVision);
+        const sees = enemyCanSeePlayerV312(e);
         ai.seesPlayer = sees;
         if (sees) {
             const pt = enemyPlayerTileV312();
@@ -894,14 +893,8 @@ function updateEnemyIntentV312(e, index, dt) {
     const playerDistance = enemyDistanceToV312(tile.x, tile.y, playerTile.x, playerTile.y);
     const evasiveEngaged = profile.id === 'evasive' && (ai.seesPlayer || playerDistance <= Number(profile.fleeRadius || 5));
     const patrollerEngaged = profile.id === 'patroller' && playerDistance <= 4 && (ai.seesPlayer || ai.memoryTimer > 0);
-    const winterPassive = !!e.type?.winterRole;
-
     if (dangerHere || imminentDanger || evasiveEngaged) {
         ai.alert = 'flee';
-        ai.behavior = profile.id;
-    } else if (winterPassive) {
-        // Enemigos de Invierno: patrullan y ocupan espacio; no persiguen al jugador.
-        ai.alert = 'patrol';
         ai.behavior = profile.id;
     } else if ((ai.seesPlayer || ai.memoryTimer > 0) && profile.id !== 'patroller') {
         ai.alert = profile.id === 'aggressive' ? 'aggressive' : 'chase';
@@ -1001,16 +994,12 @@ function getEnemyMovementSpeedV610(e) {
     return Math.max(0.1, Number(e.baseSpeed) || 1)
         * Number(profile.speedMultiplier || 1)
         * threatMultiplier
-        * gameplaySpeedMultiplier
-        * (typeof getEnemyBiomeSpeciesMovementMultiplierV615 === 'function' ? getEnemyBiomeSpeciesMovementMultiplierV615(e) : 1)
-        * (typeof getEnemyBiomeSpeciesEnvironmentMovementMultiplierV615 === 'function' ? getEnemyBiomeSpeciesEnvironmentMovementMultiplierV615(e) : 1)
-        * (typeof getLivingBiomeEnemyMovementMultiplierV620 === 'function' ? getLivingBiomeEnemyMovementMultiplierV620(e) : 1);
+        * gameplaySpeedMultiplier;
 }
 
 function moveEnemyV312(e, dt) {
     const ai = e.ai;
     const speed = getEnemyMovementSpeedV610(e);
-    if (typeof updateEnemyBiomeSpeciesV615 === 'function') updateEnemyBiomeSpeciesV615(e, dt);
     const safeDt = Math.max(0, Number(dt) || 0);
 
     if (!e._tileMoveInitialized) {

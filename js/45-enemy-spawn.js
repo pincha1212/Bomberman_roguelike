@@ -1,94 +1,25 @@
-// BOMBERMAN ROGUELIKE v6.25.0 — Biome Enemy Spawn Authority.
-// Una sola fuente de verdad para: bioma + profundidad/etapa + rol + especie + entidad.
-// No cambia la navegación, colisiones ni el algoritmo de IA existente.
-(function installEnemySpawnAuthorityV625(global) {
+// BOMBERMAN ROGUELIKE v6.26.0 — Autoridad unificada de spawn de enemigos.
+// Contexto único: bioma + etapa + sala + especie + arquetipo + IA.
+(function installEnemySpawnAuthorityV626(global) {
     'use strict';
 
-    const ROLE = Object.freeze({
-        GROUND: 'ground',
-        FLYING: 'flying',
-        SPECIAL: 'special',
-        WINTER_BEAR: 'winter_bear',
-        WINTER_OBSTRUCTOR: 'winter_obstructor'
-    });
+    const ROLE = Object.freeze({ GROUND: 'ground', FLYING: 'flying', SPECIAL: 'special' });
+    const TYPE_BY_ROLE = Object.freeze({ ground: 'RASTRERO', flying: 'VOLADOR', special: 'ESPECIAL' });
 
-    // Los nombres visuales se resuelven desde 43-biome-enemy-species.js.
-    // Este catálogo decide únicamente qué familia/tipo entra en la sala.
-    const BIOME_POOLS = Object.freeze({
-        winter: Object.freeze([
-            Object.freeze({ role: ROLE.GROUND, typeKey: 'RASTRERO' }),
-            Object.freeze({ role: ROLE.FLYING, typeKey: 'VOLADOR' }),
-            Object.freeze({ role: ROLE.WINTER_BEAR, typeKey: 'OSO_NIEVE' }),
-            Object.freeze({ role: ROLE.WINTER_OBSTRUCTOR, typeKey: 'ESTORBADOR_HIELO' })
-        ]),
-        autumn: Object.freeze([
-            Object.freeze({ role: ROLE.GROUND, typeKey: 'RASTRERO' }),
-            Object.freeze({ role: ROLE.FLYING, typeKey: 'VOLADOR' }),
-            Object.freeze({ role: ROLE.SPECIAL, typeKey: 'ESPECIAL' })
-        ]),
-        spring: Object.freeze([
-            Object.freeze({ role: ROLE.GROUND, typeKey: 'RASTRERO' }),
-            Object.freeze({ role: ROLE.FLYING, typeKey: 'VOLADOR' }),
-            Object.freeze({ role: ROLE.SPECIAL, typeKey: 'ESPECIAL' })
-        ]),
-        summer: Object.freeze([
-            Object.freeze({ role: ROLE.GROUND, typeKey: 'RASTRERO' }),
-            Object.freeze({ role: ROLE.FLYING, typeKey: 'VOLADOR' }),
-            Object.freeze({ role: ROLE.SPECIAL, typeKey: 'ESPECIAL' })
-        ]),
-        underground: Object.freeze([
-            Object.freeze({ role: ROLE.GROUND, typeKey: 'RASTRERO' }),
-            Object.freeze({ role: ROLE.FLYING, typeKey: 'VOLADOR' }),
-            Object.freeze({ role: ROLE.SPECIAL, typeKey: 'ESPECIAL' })
-        ]),
-        clouds: Object.freeze([
-            Object.freeze({ role: ROLE.GROUND, typeKey: 'RASTRERO' }),
-            Object.freeze({ role: ROLE.FLYING, typeKey: 'VOLADOR' }),
-            Object.freeze({ role: ROLE.SPECIAL, typeKey: 'ESPECIAL' })
-        ]),
-        mountains: Object.freeze([
-            Object.freeze({ role: ROLE.GROUND, typeKey: 'RASTRERO' }),
-            Object.freeze({ role: ROLE.FLYING, typeKey: 'VOLADOR' }),
-            Object.freeze({ role: ROLE.SPECIAL, typeKey: 'ESPECIAL' })
-        ]),
-        beach: Object.freeze([
-            Object.freeze({ role: ROLE.GROUND, typeKey: 'RASTRERO' }),
-            Object.freeze({ role: ROLE.FLYING, typeKey: 'VOLADOR' }),
-            Object.freeze({ role: ROLE.SPECIAL, typeKey: 'ESPECIAL' })
-        ]),
-        space: Object.freeze([
-            Object.freeze({ role: ROLE.GROUND, typeKey: 'RASTRERO' }),
-            Object.freeze({ role: ROLE.FLYING, typeKey: 'VOLADOR' }),
-            Object.freeze({ role: ROLE.SPECIAL, typeKey: 'ESPECIAL' })
-        ]),
-        sky: Object.freeze([
-            Object.freeze({ role: ROLE.GROUND, typeKey: 'RASTRERO' }),
-            Object.freeze({ role: ROLE.FLYING, typeKey: 'VOLADOR' }),
-            Object.freeze({ role: ROLE.SPECIAL, typeKey: 'ESPECIAL' })
-        ]),
-        inferno: Object.freeze([
-            Object.freeze({ role: ROLE.GROUND, typeKey: 'RASTRERO' }),
-            Object.freeze({ role: ROLE.FLYING, typeKey: 'VOLADOR' }),
-            Object.freeze({ role: ROLE.SPECIAL, typeKey: 'ESPECIAL' })
-        ])
-    });
-
-    const BASE_STAGE_WEIGHTS = Object.freeze({
+    const STAGE_WEIGHTS = Object.freeze({
         1: Object.freeze({ ground: 1, flying: 0, special: 0 }),
         2: Object.freeze({ ground: 0.70, flying: 0.30, special: 0 }),
         3: Object.freeze({ ground: 0.48, flying: 0.27, special: 0.25 }),
         4: Object.freeze({ ground: 0.38, flying: 0.27, special: 0.35 })
     });
 
-    const WINTER_STAGE_WEIGHTS = Object.freeze({
-        1: Object.freeze({ ground: 1, flying: 0, winter_bear: 0, winter_obstructor: 0 }),
-        2: Object.freeze({ ground: 0.68, flying: 0.22, winter_bear: 0.10, winter_obstructor: 0 }),
-        3: Object.freeze({ ground: 0.44, flying: 0.20, winter_bear: 0.24, winter_obstructor: 0.12 }),
-        4: Object.freeze({ ground: 0.32, flying: 0.20, winter_bear: 0.28, winter_obstructor: 0.20 })
-    });
+    const ROLE_BY_TYPE = Object.freeze({ RASTRERO: ROLE.GROUND, VOLADOR: ROLE.FLYING, ESPECIAL: ROLE.SPECIAL });
+    const BIOMES = Object.freeze(['winter','autumn','spring','summer','underground','clouds','mountains','beach','space','sky','inferno']);
 
-    function tileSizeV625() {
-        return typeof TILE_SIZE !== 'undefined' ? Number(TILE_SIZE) || 48 : 48;
+    function stateObject() {
+        return (typeof gameState !== 'undefined' && gameState)
+            ? gameState
+            : (global.BOMBER_ENGINE?.getState?.() || {});
     }
 
     function safeNumber(value, fallback = 0) {
@@ -96,56 +27,58 @@
         return Number.isFinite(n) ? n : fallback;
     }
 
+    function tileSizeV626() {
+        return typeof TILE_SIZE !== 'undefined' ? Number(TILE_SIZE) || 48 : 48;
+    }
+
     function currentBiomeId() {
-        const state = (typeof gameState !== 'undefined' && gameState) ? gameState : (global.BOMBER_ENGINE?.getState?.() || {});
-        const direct = state.biomeOverrideV49 || state.biomeV49?.id;
-        if (direct) return String(direct);
+        const state = stateObject();
+        const override = state.biomeOverrideV49;
+        if (BIOMES.includes(override)) return String(override);
         if (typeof global.getBiomeForDepthV49 === 'function') {
             const meta = global.getBiomeForDepthV49(state.level || 1);
-            if (meta?.id) return String(meta.id);
+            if (BIOMES.includes(meta?.id)) return String(meta.id);
         }
-        return typeof global.getThemeV46 === 'function' ? String(global.getThemeV46()?.id || 'classic') : 'classic';
+        const snapshot = state.biomeV49?.id;
+        if (BIOMES.includes(snapshot)) return String(snapshot);
+        return 'winter';
     }
 
     function currentStage() {
-        const state = (typeof gameState !== 'undefined' && gameState) ? gameState : (global.BOMBER_ENGINE?.getState?.() || {});
-        const explicit = safeNumber(state.biomeV49?.stage, 0);
-        if (explicit >= 1) return Math.max(1, Math.min(4, Math.floor(explicit)));
+        const state = stateObject();
         if (typeof global.getBiomeStageV49 === 'function') {
             return Math.max(1, Math.min(4, Math.floor(safeNumber(global.getBiomeStageV49(state.level || 1), 1))));
         }
+        const explicit = safeNumber(state.biomeV49?.stage, 0);
+        if (explicit >= 1) return Math.max(1, Math.min(4, Math.floor(explicit)));
         return Math.max(1, Math.min(4, Math.ceil(Math.max(1, safeNumber(state.level, 1)) / 4)));
     }
 
     function stateLevel() {
-        return safeNumber((typeof gameState !== 'undefined' && gameState) ? gameState.level : global.BOMBER_ENGINE?.getState?.()?.level, 1);
-    }
-
-    function stateObject() {
-        return (typeof gameState !== 'undefined' && gameState) ? gameState : (global.BOMBER_ENGINE?.getState?.() || {});
+        return safeNumber(stateObject().level, 1);
     }
 
     function roomId() {
         return String(stateObject().roomType?.id || 'STANDARD').toUpperCase();
     }
 
-    function getWeightTable(biomeId, stage) {
-        if (biomeId === 'winter') return WINTER_STAGE_WEIGHTS[stage] || WINTER_STAGE_WEIGHTS[4];
-        return BASE_STAGE_WEIGHTS[stage] || BASE_STAGE_WEIGHTS[4];
+    function isBossRoomV626() {
+        return roomId() === 'BOSS';
+    }
+
+    function getStageWeights(stage) {
+        return STAGE_WEIGHTS[stage] || STAGE_WEIGHTS[4];
     }
 
     function applyRoomPressure(weights) {
         const out = { ...weights };
         const id = roomId();
         if (id === 'ELITE' || id === 'CURSED') {
-            if (out.special !== undefined) out.special *= 1.35;
-            if (out.flying !== undefined) out.flying *= 1.12;
-            if (out.winter_bear !== undefined) out.winter_bear *= 1.18;
-            if (out.winter_obstructor !== undefined) out.winter_obstructor *= 1.20;
-        } else if (id === 'TREASURE') {
-            if (out.special !== undefined) out.special *= 0.78;
-            if (out.winter_bear !== undefined) out.winter_bear *= 0.85;
-            if (out.winter_obstructor !== undefined) out.winter_obstructor *= 0.85;
+            out.special *= 1.25;
+            out.flying *= 1.10;
+        } else if (id === 'TREASURE' || id === 'SHRINE') {
+            out.special *= 0.80;
+            out.flying *= 0.95;
         }
         return out;
     }
@@ -157,7 +90,7 @@
         return entries.map(([role, weight]) => ({ role, weight: safeNumber(weight) / total }));
     }
 
-    function chooseWeightedRoleV625(weights, roll = Math.random()) {
+    function chooseWeightedRole(weights, roll = Math.random()) {
         let cursor = Math.max(0, Math.min(0.999999, safeNumber(roll, Math.random())));
         for (const item of weights) {
             cursor -= item.weight;
@@ -166,128 +99,148 @@
         return weights.length ? weights[weights.length - 1].role : ROLE.GROUND;
     }
 
-    function chooseEntryForRoleV625(pool, role, roll = Math.random()) {
-        const candidates = pool.filter(entry => entry.role === role);
-        if (!candidates.length) return pool[0] || null;
-        const index = Math.min(candidates.length - 1, Math.floor(Math.max(0, Math.min(0.999999, safeNumber(roll, Math.random()))) * candidates.length));
-        return candidates[index];
-    }
-
-    function roleForIndexV625(index, count, biomeId, stage) {
-        const weights = normalizeWeights(applyRoomPressure(getWeightTable(biomeId, stage)));
+    function resolveRoleForIndex(index, count, stage) {
+        const weights = normalizeWeights(applyRoomPressure(getStageWeights(stage)));
         const unlocked = new Set(weights.map(item => item.role));
-
-        // Diversidad mínima por sala: no dejar una sala completa en un solo arquetipo
-        // cuando ya existe más de un rol desbloqueado.
         if (count >= 2 && index === 1 && unlocked.has(ROLE.FLYING)) return ROLE.FLYING;
-        if (biomeId === 'winter' && count >= 3 && index === 2 && unlocked.has(ROLE.WINTER_BEAR)) return ROLE.WINTER_BEAR;
-        if (biomeId === 'winter' && count >= 4 && index === 3 && unlocked.has(ROLE.WINTER_OBSTRUCTOR)) return ROLE.WINTER_OBSTRUCTOR;
         if (count >= 3 && index === 2 && unlocked.has(ROLE.SPECIAL)) return ROLE.SPECIAL;
-
-        return chooseWeightedRoleV625(weights, Math.random());
+        return chooseWeightedRole(weights, Math.random());
     }
 
-    function resolveEnemySpawnSpecV625(options = {}) {
-        const biomeId = currentBiomeId();
+    function getSpeciesCatalog() {
+        return global.BIOME_ENEMY_SPECIES_CATALOG_V626 || {};
+    }
+
+    function getSpeciesForRole(biomeId, role, roll = Math.random()) {
+        const typeKey = TYPE_BY_ROLE[role] || TYPE_BY_ROLE.ground;
+        const species = getSpeciesCatalog()?.[biomeId]?.[typeKey];
+        return species || null;
+    }
+
+    function getBehaviorFromSpecies(species, type, level, roll) {
+        const requested = species?.preferredAi;
+        const table = global.ENEMY_BEHAVIORS_V324 || {};
+        if (requested) {
+            const behavior = Object.values(table).find(profile => profile?.id === requested);
+            if (behavior) return behavior;
+        }
+        return typeof global.pickEnemyBehaviorV324 === 'function'
+            ? global.pickEnemyBehaviorV324(type, level, 0, roll)
+            : null;
+    }
+
+    function resolveEnemySpawnSpecV626(options = {}) {
+        const biomeId = BIOMES.includes(options.biomeId) ? options.biomeId : currentBiomeId();
         const stage = Math.max(1, Math.min(4, Math.floor(safeNumber(options.stage, currentStage()))));
         const count = Math.max(1, Math.floor(safeNumber(options.count, 1)));
         const index = Math.max(0, Math.floor(safeNumber(options.index, 0)));
-        const pool = BIOME_POOLS[biomeId] || BIOME_POOLS.autumn;
-        const forcedRole = options.forceRole && pool.some(entry => entry.role === options.forceRole) ? options.forceRole : null;
-        const role = forcedRole || roleForIndexV625(index, count, biomeId, stage);
-        const entry = chooseEntryForRoleV625(pool, role, safeNumber(options.roll, Math.random()));
+        const forcedRole = options.forceRole && ROLE_BY_TYPE[options.forceRole] ? ROLE_BY_TYPE[options.forceRole] : options.forceRole;
+        const role = Object.values(ROLE).includes(forcedRole) ? forcedRole : resolveRoleForIndex(index, count, stage);
+        const typeKey = TYPE_BY_ROLE[role] || 'RASTRERO';
+        const species = getSpeciesForRole(biomeId, role, options.roll);
+        if (!species) return null;
         const typeMap = (typeof ENEMY_TYPES !== 'undefined' && ENEMY_TYPES) ? ENEMY_TYPES : {};
-        const type = typeMap[entry?.typeKey] || typeMap.RASTRERO;
-        const behaviorRoll = safeNumber(options.behaviorRoll, Math.random());
-        const behavior = typeof global.pickEnemyBehaviorV324 === 'function'
-            ? global.pickEnemyBehaviorV324(type, stateLevel(), index, behaviorRoll)
-            : null;
-        const speciesProfile = typeof global.getEnemyBiomeSpeciesProfileV615 === 'function'
-            ? global.getEnemyBiomeSpeciesProfileV615({ type })
-            : null;
+        const type = typeMap[typeKey] || typeMap.RASTRERO;
+        const behavior = getBehaviorFromSpecies(species, type, stateLevel(), safeNumber(options.behaviorRoll, Math.random()));
         return Object.freeze({
             biomeId,
             stage,
-            role: entry?.role || ROLE.GROUND,
-            typeKey: entry?.typeKey || 'RASTRERO',
+            role,
+            archetype: typeKey,
+            typeKey,
             type,
+            speciesId: species?.id || `${biomeId}_${typeKey.toLowerCase()}`,
+            speciesName: species?.name || type?.name || typeKey,
+            speciesRuleId: species?.ruleId || 'none',
+            preferredAi: species?.preferredAi || behavior?.id || null,
             behaviorId: behavior?.id || null,
-            behaviorLabel: behavior?.label || null,
-            speciesName: speciesProfile?.name || type?.name || 'Rastrero',
-            speciesRuleId: speciesProfile?.ruleId || 'none'
+            behaviorLabel: behavior?.label || null
         });
     }
 
-    function buildEnemySpawnPlanV625(count = 1, options = {}) {
+    function buildEnemySpawnPlanV626(count = 1, options = {}) {
+        if (isBossRoomV626()) return [];
         const safeCount = Math.max(0, Math.floor(safeNumber(count, 0)));
         const result = [];
-        for (let i = 0; i < safeCount; i++) result.push(resolveEnemySpawnSpecV625({ ...options, count: safeCount, index: i }));
+        for (let i = 0; i < safeCount; i++) {
+            result.push(resolveEnemySpawnSpecV626({ ...options, count: safeCount, index: i }));
+        }
         return result;
     }
 
-    function getEnemySpawnCapV625() {
+    function getEnemySpawnCapV626() {
         const configured = typeof global.getDifficultyEnemySpawnCapV619 === 'function'
             ? global.getDifficultyEnemySpawnCapV619(stateLevel())
             : Math.min(12, 2 + Math.max(1, Math.floor(stateLevel())));
         return Math.max(1, Math.floor(safeNumber(configured, 3)));
     }
 
-    function canSpawnEnemyV625(requested = 1) {
+    function canSpawnEnemyV626(requested = 1) {
         const current = Array.isArray(stateObject().enemies) ? stateObject().enemies.length : 0;
-        return Math.max(0, Math.min(Math.floor(safeNumber(requested, 0)), getEnemySpawnCapV625() - current));
+        return Math.max(0, Math.min(Math.floor(safeNumber(requested, 0)), getEnemySpawnCapV626() - current));
     }
 
-    function makeEnemyEntityV625(position, spec, options = {}) {
+    function makeEnemyEntityV626(position, spec, options = {}) {
         const state = stateObject();
-        if (!spec?.type || !state) return null;
+        if (isBossRoomV626() || !spec?.type || !state) return null;
         const diff = state.difficulty || (typeof global.getDifficultyV323 === 'function' ? global.getDifficultyV323(state.level) : null);
         const roomMult = safeNumber(state.roomType?.enemySpeedMult, 1);
         const difficultyMult = safeNumber(diff?.enemySpeedMult, 1);
         const type = spec.type;
-        const speed = typeof global.getEnemyBaseSpeedV610 === 'function'
+        const baseSpeed = typeof global.getEnemyBaseSpeedV610 === 'function'
             ? global.getEnemyBaseSpeedV610(type)
             : safeNumber(type.speed, 1) * roomMult * difficultyMult;
-        const initialDirection = options.direction === 'up' || options.direction === 'down' || options.direction === 'left' || options.direction === 'right'
-            ? options.direction : 'down';
+        const behaviorTable = global.ENEMY_BEHAVIORS_V324 || {};
+        const behavior = spec.behaviorId ? Object.values(behaviorTable).find(profile => profile?.id === spec.behaviorId) : null;
+        const movementMultiplier = behavior?.speedMultiplier || 1;
+        const speed = baseSpeed * movementMultiplier;
+        const initialDirection = ['up','down','left','right'].includes(options.direction) ? options.direction : 'down';
         const vx = initialDirection === 'left' ? -speed : initialDirection === 'right' ? speed : 0;
         const vy = initialDirection === 'up' ? -speed : initialDirection === 'down' ? speed : 0;
-        const species = typeof global.getEnemyBiomeSpeciesProfileV615 === 'function'
-            ? global.getEnemyBiomeSpeciesProfileV615({ type })
+        const speciesProfile = typeof global.getEnemyBiomeSpeciesProfileV626 === 'function'
+            ? global.getEnemyBiomeSpeciesProfileV626({ type, biomeSpawnIdV626: spec.biomeId, speciesIdV626: spec.speciesId })
             : null;
-        const eliteDefault = state.roomType?.id === 'ELITE' || state.roomType?.id === 'CURSED' || (safeNumber(diff?.eliteBonus) > 0 && Math.random() < safeNumber(diff?.eliteBonus));
+        const eliteDefault = state.roomType?.id === 'ELITE'
+            || state.roomType?.id === 'CURSED'
+            || (safeNumber(diff?.eliteBonus) > 0 && Math.random() < safeNumber(diff?.eliteBonus));
         return {
-            x: safeNumber(position?.x) * tileSizeV625() + tileSizeV625() / 2,
-            y: safeNumber(position?.y) * tileSizeV625() + tileSizeV625() / 2,
-            width: tileSizeV625() * 0.75,
-            height: tileSizeV625() * 0.75,
+            x: safeNumber(position?.x) * tileSizeV626() + tileSizeV626() / 2,
+            y: safeNumber(position?.y) * tileSizeV626() + tileSizeV626() / 2,
+            width: tileSizeV626() * 0.75,
+            height: tileSizeV626() * 0.75,
             type,
             vx: options.randomizeVelocity === false ? vx : speed * (Math.random() < 0.5 ? 1 : -1),
             vy: 0,
-            baseSpeed: speed,
+            baseSpeed: baseSpeed,
+            speed,
             changeTimer: options.changeTimer ?? Math.random() * 100,
             elite: options.elite ?? eliteDefault,
             lastDirection: initialDirection,
             __gridAnchor: 'center',
             desiredDirection: initialDirection,
             aiBehavior: spec.behaviorId || null,
-            biomeSpawnIdV625: spec.biomeId,
-            biomeStageV625: spec.stage,
-            spawnRoleV625: spec.role,
-            speciesNameV625: species?.name || spec.speciesName || type.name,
-            speciesRuleIdV625: species?.ruleId || spec.speciesRuleId || 'none',
+            biomeSpawnIdV626: spec.biomeId,
+            biomeStageV626: spec.stage,
+            spawnRoleV626: spec.role,
+            archetypeV626: spec.archetype || spec.typeKey,
+            speciesIdV626: spec.speciesId,
+            speciesNameV626: speciesProfile?.name || spec.speciesName || type.name,
+            speciesRuleIdV626: speciesProfile?.ruleId || spec.speciesRuleId || 'none',
+            preferredAiV626: spec.preferredAi || spec.behaviorId || null,
             reinforcement: Boolean(options.reinforcement),
-            spawnedByV625: String(options.source || 'room')
+            spawnedByV626: String(options.source || 'room')
         };
     }
 
-    global.ENEMY_SPAWN_CATALOG_V625 = BIOME_POOLS;
-    global.ENEMY_SPAWN_ROLES_V625 = ROLE;
-    global.resolveEnemySpawnSpecV625 = resolveEnemySpawnSpecV625;
-    global.buildEnemySpawnPlanV625 = buildEnemySpawnPlanV625;
-    global.getEnemySpawnCapV625 = getEnemySpawnCapV625;
-    global.canSpawnEnemyV625 = canSpawnEnemyV625;
-    global.makeEnemyEntityV625 = makeEnemyEntityV625;
+    global.ENEMY_SPAWN_CATALOG_V626 = getSpeciesCatalog();
+    global.ENEMY_SPAWN_ROLES_V626 = ROLE;
+    global.resolveEnemySpawnSpecV626 = resolveEnemySpawnSpecV626;
+    global.buildEnemySpawnPlanV626 = buildEnemySpawnPlanV626;
+    global.getEnemySpawnCapV626 = getEnemySpawnCapV626;
+    global.canSpawnEnemyV626 = canSpawnEnemyV626;
+    global.makeEnemyEntityV626 = makeEnemyEntityV626;
+    global.isBossRoomV626 = isBossRoomV626;
     global.BOMBER_ENGINE = global.BOMBER_ENGINE || {};
-    global.BOMBER_ENGINE.getEnemySpawnCatalog = () => BIOME_POOLS;
-    global.BOMBER_ENGINE.getEnemySpawnPlan = (count = 1) => buildEnemySpawnPlanV625(count);
+    global.BOMBER_ENGINE.getEnemySpawnCatalog = () => getSpeciesCatalog();
+    global.BOMBER_ENGINE.getEnemySpawnPlan = (count = 1) => buildEnemySpawnPlanV626(count);
 })(window);

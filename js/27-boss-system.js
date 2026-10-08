@@ -1,5 +1,5 @@
 /*
- * BOMBERMAN ROGUELIKE v4.1
+ * BOMBERMAN ROGUELIKE v6.26.0
  * Boss Bomb System
  *
  * Boss attacks are deliberately reduced to the game's core fantasy:
@@ -366,6 +366,78 @@ function bossV41DrawTelegraphWorld() {
     ctx.restore();
 }
 
+function bossV41FindSpawnCellV626() {
+    if (!gameState?.grid || !player) return null;
+    const width = Math.max(3, Number(gameState.gridWidth) || gameState.grid[0]?.length || 15);
+    const height = Math.max(3, Number(gameState.gridHeight) || gameState.grid.length || 15);
+    const px = Math.floor((Number(player.x) + Number(player.width || 0) / 2) / Number(TILE_SIZE || 48));
+    const py = Math.floor((Number(player.y) + Number(player.height || 0) / 2) / Number(TILE_SIZE || 48));
+    const cx = Math.floor(width / 2);
+    const cy = Math.floor(height / 2);
+    const candidates = [];
+    for (let radius = 0; radius <= Math.max(width, height); radius++) {
+        for (let y = Math.max(1, cy - radius); y <= Math.min(height - 2, cy + radius); y++) {
+            for (let x = Math.max(1, cx - radius); x <= Math.min(width - 2, cx + radius); x++) {
+                if (Math.abs(x - cx) !== radius && Math.abs(y - cy) !== radius) continue;
+                if (gameState.grid?.[y]?.[x] !== TYPES.EMPTY) continue;
+                if (Math.abs(x - px) + Math.abs(y - py) < 6) continue;
+                candidates.push({ x, y });
+            }
+        }
+        if (candidates.length) break;
+    }
+    return candidates[0] || null;
+}
+
+function bossV41BuildEntityV626() {
+    if (!gameState || gameState.roomType?.id !== 'BOSS' || !gameState.grid) return null;
+    const spawn = bossV41FindSpawnCellV626();
+    if (!spawn) return null;
+    const tile = Number(TILE_SIZE || 48);
+    const level = Math.max(1, Number(gameState.level) || 1);
+    const meta = typeof getBiomeMetadataV49 === 'function' ? getBiomeMetadataV49(level) : null;
+    const maxHp = Math.max(20, Math.round(18 + level * 0.9));
+    const speed = Math.max(0.72, 0.72 + Math.min(0.45, level * 0.008));
+    return {
+        id: `boss-${level}-${gameState.gridRevision || 0}`,
+        name: 'Guardián del bioma',
+        x: spawn.x * tile + tile / 2,
+        y: spawn.y * tile + tile / 2,
+        width: tile * 1.35,
+        height: tile * 1.35,
+        vx: 0,
+        vy: 0,
+        baseSpeed: speed,
+        speed,
+        moveTimer: 420,
+        hp: maxHp,
+        maxHp,
+        health: maxHp,
+        maxHealth: maxHp,
+        phase: 1,
+        bossPhase: 1,
+        phaseSpeedMultiplier: 1,
+        invuln: 0,
+        flash: 0,
+        defeated: false,
+        contactDamage: 1,
+        biomeIdV626: meta?.id || gameState.biomeV49?.id || 'unknown',
+        stageV626: Number(meta?.stage) || Number(gameState.biomeV49?.stage) || 4,
+        spawnedByV626: 'biome-exam'
+    };
+}
+
+function spawnBossV626() {
+    if (!gameState || gameState.roomType?.id !== 'BOSS') return false;
+    if (gameState.boss && !gameState.boss.defeated) return true;
+    const boss = bossV41BuildEntityV626();
+    if (!boss) return false;
+    gameState.boss = boss;
+    bossV41Reset();
+    bossV41EnsureState().active = true;
+    return true;
+}
+
 function bossV41WrapFunctions() {
     if (BossV41.installed) return true;
     if (typeof update !== 'function' || typeof draw !== 'function' || typeof initLevel !== 'function') return false;
@@ -428,6 +500,8 @@ window.bossV4SpawnBomb = bossV41SpawnBomb;
 window.bossV4BombVolley = bossV41FireBombVolley;
 window.bossV4BombCount = bossV4BombCount;
 window.bossV41GroundSlam = bossV41GroundSlam;
+window.spawnBossV626 = spawnBossV626;
+window.bossV41BuildEntityV626 = bossV41BuildEntityV626;
 window.BOSS_V4_CONFIG = BOSS_V41_CONFIG;
 
 bossV41Bootstrap();

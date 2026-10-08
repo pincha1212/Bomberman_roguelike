@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.25.0 — Level generation + delegated enemy reinforcement spawn.
+// Bomberman Roguelike v6.26.0 — Level generation + delegated enemy reinforcement spawn.
         function applyProceduralMapV61220() {
             const generator = (typeof window !== 'undefined') ? window.DungeonGenerator : null;
             if (!generator || typeof generator.getRunRequest !== 'function') return false;
@@ -122,7 +122,8 @@
         }
 
         function initLevel() {
-            gameState.roomType = ROOM_TYPES.STANDARD;
+            const requestedRoomType = gameState.__roomTypeOverrideV626;
+            gameState.roomType = requestedRoomType && ROOM_TYPES[requestedRoomType] ? ROOM_TYPES[requestedRoomType] : ROOM_TYPES.STANDARD;
             if (typeof applyDifficultyV323 === 'function') applyDifficultyV323();
             gameState.gridWidth = 15;
             gameState.gridHeight = 15;
@@ -163,7 +164,12 @@
 
             if (typeof resetCameraToPlayer === 'function') resetCameraToPlayer();
 
-            spawnEnemies();
+            if (gameState.roomType?.id === 'BOSS') {
+                if (typeof spawnBossV626 === 'function') spawnBossV626();
+            } else {
+                spawnEnemies();
+            }
+            gameState.__roomTypeOverrideV626 = null;
             updateRoguePresentation();
             updateUI();
         }
@@ -200,6 +206,8 @@
         }
 
         function updateBoss(dt) {
+            // v6.26: el Boss V4.1 es la única autoridad de actualización cuando está cargado.
+            if (typeof updateBossV41 === 'function') return;
             const b=gameState.boss;
             if(!b || b.defeated) return;
             b.invuln=Math.max(0,b.invuln-dt); b.flash=Math.max(0,b.flash-dt);
@@ -259,6 +267,7 @@
         // Este módulo mantiene la generación del nivel y delega allí la lógica
         // de generación, activación, efectos y renderizado de trampas.
         function spawnReinforcement(count = 1) {
+            if (gameState.roomType?.id === 'BOSS') return;
             const currentCount = Array.isArray(gameState.enemies) ? gameState.enemies.length : 0;
             const spawnCap = typeof getDifficultyEnemySpawnCapV619 === 'function'
                 ? getDifficultyEnemySpawnCapV619(gameState.level)
@@ -278,15 +287,15 @@
                 }
             }
             candidates.sort((a,b) => b.distance - a.distance);
-            const spawnTotal = Math.min(count, candidates.length, typeof canSpawnEnemyV625 === 'function' ? canSpawnEnemyV625(count) : count);
-            const spawnPlan = typeof buildEnemySpawnPlanV625 === 'function'
-                ? buildEnemySpawnPlanV625(spawnTotal)
+            const spawnTotal = Math.min(count, candidates.length, typeof canSpawnEnemyV626 === 'function' ? canSpawnEnemyV626(count) : count);
+            const spawnPlan = typeof buildEnemySpawnPlanV626 === 'function'
+                ? buildEnemySpawnPlanV626(spawnTotal)
                 : [];
             for (let i = 0; i < spawnTotal; i++) {
                 const c = candidates[i];
-                const spec = spawnPlan[i] || (typeof resolveEnemySpawnSpecV625 === 'function' ? resolveEnemySpawnSpecV625({ index: i, count: spawnTotal }) : null);
-                const entity = typeof makeEnemyEntityV625 === 'function'
-                    ? makeEnemyEntityV625({ x:c.x, y:c.y }, spec, { source: 'reinforcement', reinforcement: true, changeTimer: 15 + Math.random() * 35 })
+                const spec = spawnPlan[i] || (typeof resolveEnemySpawnSpecV626 === 'function' ? resolveEnemySpawnSpecV626({ index: i, count: spawnTotal }) : null);
+                const entity = typeof makeEnemyEntityV626 === 'function'
+                    ? makeEnemyEntityV626({ x:c.x, y:c.y }, spec, { source: 'reinforcement', reinforcement: true, changeTimer: 15 + Math.random() * 35 })
                     : null;
                 if (entity) {
                     entity.elite = false;

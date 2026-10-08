@@ -1,5 +1,5 @@
 /*
- * BOMBERMAN ROGUELIKE v6.25.0
+ * BOMBERMAN ROGUELIKE v6.26.0
  * Roguelike Update
  *
  * Adds a lightweight meta layer over the existing run:
@@ -67,6 +67,17 @@ const ROGUELIKE_ROOM_PLANS_V327 = Object.freeze([
         startCoins: 0,
         clearBonus: 1,
         risk: 'bajo',
+        relicQualityBoost: 1
+    }
+,
+    {
+        id: 'boss',
+        name: 'JEFE',
+        icon: '☠',
+        desc: 'Sala de examen del bioma.',
+        startCoins: 0,
+        clearBonus: 0,
+        risk: 'alto',
         relicQualityBoost: 1
     }
 ]);
@@ -373,7 +384,7 @@ function rogueV327RollRelicOffers(count = ROGUELIKE_V327_CONFIG.relicOfferCount,
 }
 
 function rogueV327RollRoomOffers(count = ROGUELIKE_V327_CONFIG.roomOfferCount) {
-    const pool = ROGUELIKE_ROOM_PLANS_V327.slice();
+    const pool = ROGUELIKE_ROOM_PLANS_V327.filter(plan => plan.id !== 'boss');
     const result = [];
     const target = Math.min(count, pool.length);
 
@@ -404,12 +415,38 @@ function rogueV327ChooseRoomPlan(id) {
     return true;
 }
 
+function rogueV327IsBossExamV626() {
+    try {
+        const meta = typeof getBiomeMetadataV49 === 'function' ? getBiomeMetadataV49(gameState.level) : null;
+        return Boolean(meta && Number(meta.stage) === 4 && meta.bossEnabled !== false && String(meta.examRoomType || 'BOSS').toUpperCase() === 'BOSS');
+    } catch (_) {
+        return false;
+    }
+}
+
+function rogueV327ResolveRoomTypeKeyV626() {
+    if (rogueV327IsBossExamV626()) return 'BOSS';
+    const planId = ROGUELIKE_V327.pendingRoomPlan || ROGUELIKE_V327.currentRoomPlan || 'standard';
+    const map = { standard: 'STANDARD', treasure: 'TREASURE', elite: 'ELITE', shrine: 'SHRINE' };
+    return map[planId] || 'STANDARD';
+}
+
 function rogueV327ApplyRoomPlan() {
+    rogueV327EnsureEconomyState();
+
+    if (rogueV327IsBossExamV626()) {
+        ROGUELIKE_V327.currentRoomPlan = 'boss';
+        ROGUELIKE_V327.pendingRoomPlan = 'standard';
+        if (gameState && gameState.roguelikeV327) gameState.roguelikeV327.currentRoomPlan = 'boss';
+        const bossPlan = rogueV327GetPlan('boss');
+        rogueV327RefreshGameStateMirror();
+        rogueV327UpdateRoomBanner(bossPlan);
+        return;
+    }
+
     const plan = rogueV327GetPlan(ROGUELIKE_V327.pendingRoomPlan);
     ROGUELIKE_V327.currentRoomPlan = plan.id;
     ROGUELIKE_V327.pendingRoomPlan = 'standard';
-
-    rogueV327EnsureEconomyState();
     if (gameState && gameState.roguelikeV327) gameState.roguelikeV327.currentRoomPlan = plan.id;
 
     if (plan.startCoins > 0) rogueV327AddCoins(plan.startCoins, 'room-start');
@@ -437,13 +474,12 @@ function rogueV327HealPlayer(amount) {
 
 function rogueV327SpawnExtraEnemy() {
     try {
-        if (!gameState || !Array.isArray(gameState.enemies) || !Array.isArray(gameState.grid)) return;
+        if (!gameState || gameState.roomType?.id === 'BOSS' || !Array.isArray(gameState.enemies) || !Array.isArray(gameState.grid)) return;
         const spawnCap = typeof getDifficultyEnemySpawnCapV619 === 'function'
             ? getDifficultyEnemySpawnCapV619(gameState.level)
             : Math.min(12, 2 + Math.max(1, Math.floor(Number(gameState.level) || 1)));
         if (gameState.enemies.length >= spawnCap) return;
-        if (!gameState.enemies.length) return;
-        const template = gameState.enemies[0];
+
         const width = gameState.gridWidth || gameState.grid[0]?.length || 15;
         const height = gameState.gridHeight || gameState.grid.length || 15;
         let spot = null;
@@ -463,11 +499,11 @@ function rogueV327SpawnExtraEnemy() {
 
         if (!spot) return;
         const tileSize = rogueV327Num(window.TILE_SIZE, 48);
-        const spec = typeof resolveEnemySpawnSpecV625 === 'function'
-            ? resolveEnemySpawnSpecV625({ index: gameState.enemies.length, count: gameState.enemies.length + 1 })
+        const spec = typeof resolveEnemySpawnSpecV626 === 'function'
+            ? resolveEnemySpawnSpecV626({ index: gameState.enemies.length, count: gameState.enemies.length + 1 })
             : null;
-        const extra = typeof makeEnemyEntityV625 === 'function'
-            ? makeEnemyEntityV625({ x:spot.gx, y:spot.gy }, spec, { source: 'roguelike-extra', elite: Boolean(template?.elite), changeTimer: 20 })
+        const extra = typeof makeEnemyEntityV626 === 'function'
+            ? makeEnemyEntityV626({ x:spot.gx, y:spot.gy }, spec, { source: 'roguelike-extra', elite: true, changeTimer: 20 })
             : null;
         if (!extra) return;
         extra.x = spot.gx * tileSize + tileSize / 2;
@@ -718,6 +754,7 @@ function rogueV327Install() {
     };
 
     window.initLevel = function initLevelV327(...args) {
+        gameState.__roomTypeOverrideV626 = rogueV327ResolveRoomTypeKeyV626();
         const result = ROGUELIKE_V327.original.initLevel(...args);
         rogueV327EnsureEconomyState();
         rogueV327ApplyDerivedBonuses();
@@ -858,3 +895,6 @@ window.rogueV327AddCoins = rogueV327AddCoins;
 window.rogueV327SpendCoins = rogueV327SpendCoins;
 
 rogueV327Bootstrap();
+
+window.rogueV327ResolveRoomTypeKeyV626 = rogueV327ResolveRoomTypeKeyV626;
+window.rogueV327IsBossExamV626 = rogueV327IsBossExamV626;

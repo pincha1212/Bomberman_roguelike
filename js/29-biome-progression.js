@@ -4,7 +4,7 @@
 
     const ROOMS_PER_BIOME = 4;
     const BIOME_PROGRESSION = Object.freeze([
-        Object.freeze({ id:'winter', name:'Invierno', themeId:'winter', rooms:ROOMS_PER_BIOME, accent:'#7dd3fc', bossEnabled:false, examRoomType:'ELITE', verbSentence:'Aprendés a comprometerte antes de moverte.' }),
+        Object.freeze({ id:'winter', name:'Invierno', themeId:'winter', rooms:ROOMS_PER_BIOME, accent:'#7dd3fc', verbSentence:'Aprendés a comprometerte antes de moverte.' }),
         Object.freeze({ id:'autumn', name:'Otoño', themeId:'autumn', rooms:ROOMS_PER_BIOME, accent:'#f59e0b' }),
         Object.freeze({ id:'spring', name:'Primavera', themeId:'spring', rooms:ROOMS_PER_BIOME, accent:'#86efac' }),
         Object.freeze({ id:'summer', name:'Verano', themeId:'summer', rooms:ROOMS_PER_BIOME, accent:'#fbbf24' }),

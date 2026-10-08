@@ -2,7 +2,10 @@
         function spawnEnemies() {
             const diff = gameState.difficulty || (typeof getDifficultyV323 === 'function' ? getDifficultyV323(gameState.level) : null);
             const maxEnemies = diff?.maxEnemies || largeSupport.maxEnemies;
-            const count = Math.min(maxEnemies, Math.max(1, Math.round(Math.min(3 + Math.floor(gameState.level * 1.5), 12) * gameState.roomType.enemyMult * (diff?.enemyCountMult || 1))));
+            const spawnCap = typeof getDifficultyEnemySpawnCapV619 === 'function'
+                ? getDifficultyEnemySpawnCapV619(gameState.level)
+                : Math.min(12, 2 + Math.max(1, Math.floor(Number(gameState.level) || 1)));
+            const count = Math.min(spawnCap, maxEnemies, Math.max(1, Math.round(Math.min(3 + Math.floor(gameState.level * 1.5), 12) * gameState.roomType.enemyMult * (diff?.enemyCountMult || 1))));
             const candidates = [];
             const px = Math.floor((player.x + player.width / 2) / TILE_SIZE);
             const py = Math.floor((player.y + player.height / 2) / TILE_SIZE);

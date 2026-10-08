@@ -9,7 +9,8 @@
         maxEnemySpeedMult: 1.24,
         maxTrapBonus: 6,
         maxBlockDensityBonus: 0.08,
-        minReinforcementInterval: 10500
+        minReinforcementInterval: 10500,
+        enemySpawnCap: 12
     });
 
     function depthV323(value) {
@@ -30,6 +31,7 @@
         const reinforcementIntervalMult = 1 - Math.min(0.28, steps * 0.014);
         const reinforcementAmountBonus = Math.min(2, Math.floor(steps / 5));
         const maxEnemies = Math.min(LIMITS.maxEnemies, 8 + Math.floor(d * 0.85));
+        const enemySpawnCap = getDifficultyEnemySpawnCapV619(d);
         const eliteBonus = Math.min(0.24, tier * 0.04);
 
         return Object.freeze({
@@ -45,6 +47,7 @@
             reinforcementIntervalMult,
             reinforcementAmountBonus,
             maxEnemies,
+            enemySpawnCap,
             eliteBonus,
             limits: LIMITS
         });
@@ -73,6 +76,12 @@
         return Math.max(0, Math.round((Number(baseCount) || 0) + profile.trapBonus));
     }
 
+    function getDifficultyEnemySpawnCapV619(depth = gameState?.level || 1) {
+        const d = depthV323(depth);
+        // Escala conservadora: profundidad 1 = 3 enemigos simultáneos.
+        return Math.min(LIMITS.enemySpawnCap, 2 + d);
+    }
+
     window.BOMBER_DIFFICULTY_V323 = Object.freeze({
         version: '3.23.0',
         limits: LIMITS,
@@ -80,7 +89,8 @@
         apply: applyDifficultyV323,
         roomTime: getDifficultyRoomTimeV323,
         reinforcementInterval: getDifficultyReinforcementIntervalV323,
-        trapCount: getDifficultyTrapCountV323
+        trapCount: getDifficultyTrapCountV323,
+        enemySpawnCap: getDifficultyEnemySpawnCapV619
     });
 
     window.getDifficultyV323 = getDifficultyV323;
@@ -89,3 +99,5 @@
     window.getDifficultyReinforcementIntervalV323 = getDifficultyReinforcementIntervalV323;
     window.getDifficultyTrapCountV323 = getDifficultyTrapCountV323;
 })();
+
+    window.getDifficultyEnemySpawnCapV619 = getDifficultyEnemySpawnCapV619;

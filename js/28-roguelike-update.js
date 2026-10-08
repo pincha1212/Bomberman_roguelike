@@ -438,6 +438,10 @@ function rogueV327HealPlayer(amount) {
 function rogueV327SpawnExtraEnemy() {
     try {
         if (!gameState || !Array.isArray(gameState.enemies) || !Array.isArray(gameState.grid)) return;
+        const spawnCap = typeof getDifficultyEnemySpawnCapV619 === 'function'
+            ? getDifficultyEnemySpawnCapV619(gameState.level)
+            : Math.min(12, 2 + Math.max(1, Math.floor(Number(gameState.level) || 1)));
+        if (gameState.enemies.length >= spawnCap) return;
         if (!gameState.enemies.length) return;
         const template = gameState.enemies[0];
         const width = gameState.gridWidth || gameState.grid[0]?.length || 15;

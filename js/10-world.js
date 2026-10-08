@@ -259,6 +259,14 @@
         // Este módulo mantiene la generación del nivel y delega allí la lógica
         // de generación, activación, efectos y renderizado de trampas.
         function spawnReinforcement(count = 1) {
+            const currentCount = Array.isArray(gameState.enemies) ? gameState.enemies.length : 0;
+            const spawnCap = typeof getDifficultyEnemySpawnCapV619 === 'function'
+                ? getDifficultyEnemySpawnCapV619(gameState.level)
+                : Math.min(12, 2 + Math.max(1, Math.floor(Number(gameState.level) || 1)));
+            const remainingCapacity = Math.max(0, spawnCap - currentCount);
+            if (remainingCapacity <= 0) return;
+            count = Math.min(Math.max(0, Math.floor(Number(count) || 0)), remainingCapacity);
+            if (count <= 0) return;
             const candidates = [];
             const px = Math.floor((player.x + player.width / 2) / TILE_SIZE);
             const py = Math.floor((player.y + player.height / 2) / TILE_SIZE);

@@ -1,12 +1,12 @@
-// Bomberman Roguelike v6.12.18 — Death Echo V3: personaje muerto
+// Bomberman Roguelike v6.28.0 — Death Echo: grid estable y dificultad reducida
 // Echo representa al personaje que murió: conserva su build y utiliza los mismos
 // verbos de interacción, pero con una IA autónoma y movimiento estrictamente tile-to-tile.
 (function installDeathEchoV618(global) {
     'use strict';
 
-    const VERSION = '6.12.18';
+    const VERSION = '6.28.0';
     const COMPATIBLE_VERSIONS = new Set([
-        '6.3.0','6.3.1','6.5.1','6.7.0','6.7.1','6.7.1.1','6.11.0','6.12.12','6.12.13','6.12.17','6.12.18'
+        '6.3.0','6.3.1','6.5.1','6.7.0','6.7.1','6.7.1.1','6.11.0','6.12.12','6.12.13','6.12.17','6.12.18','6.28.0'
     ]);
     if (global.__DEATH_ECHO_V618_INSTALLED__) return;
     global.__DEATH_ECHO_V618_INSTALLED__ = true;
@@ -16,21 +16,24 @@
     const GHOST_OWNER = 'death_echo';
 
     const ECHO_AI = Object.freeze({
-        visionRange: 5,
-        thinkMs: 260,
-        patrolThinkMs: 720,
-        directionCommitMs: 420,
-        reactionMs: 320,
-        wallPauseMs: 2000,
-        blockedRetryMs: 220,
-        bombCooldownMs: 1900,
-        grabCooldownMs: 420,
-        throwDelayMs: 420,
-        carryTimeoutMs: 1400,
-        escapeThinkMs: 120,
+        // Encuentro sencillo: visión más corta, decisiones pausadas y pocos ataques.
+        visionRange: 4,
+        thinkMs: 680,
+        patrolThinkMs: 1120,
+        directionCommitMs: 650,
+        reactionMs: 1250,
+        wallPauseMs: 900,
+        blockedRetryMs: 300,
+        bombCooldownMs: 5200,
+        grabCooldownMs: 800,
+        throwDelayMs: 1000,
+        carryTimeoutMs: 1800,
+        escapeThinkMs: 180,
         bombSpatialRange: 2,
-        patrolSideChance: 0.32,
-        attackChance: 0.72
+        patrolSideChance: 0.20,
+        attackChance: 0.12,
+        minimumFuseMs: 2600,
+        maxBombRange: 2
     });
 
     const state = {
@@ -63,10 +66,42 @@
 
     function tileFromEntity(entity) {
         if (!entity) return { x: 1, y: 1 };
+        if (typeof global.gridEntityTileV628 === 'function') return global.gridEntityTileV628(entity);
+        // Compatibilidad defensiva si el helper central no está disponible.
+        if (entity.__gridAnchor === 'center') {
+            return {
+                x: Math.max(0, Math.min(gameState.gridWidth - 1, Math.round((num(entity.x) - TILE_SIZE / 2) / TILE_SIZE))),
+                y: Math.max(0, Math.min(gameState.gridHeight - 1, Math.round((num(entity.y) - TILE_SIZE / 2) / TILE_SIZE)))
+            };
+        }
         return {
-            x: Math.floor(num(entity.x) / TILE_SIZE),
-            y: Math.floor(num(entity.y) / TILE_SIZE)
+            x: Math.floor((num(entity.x) + num(entity.width) / 2) / TILE_SIZE),
+            y: Math.floor((num(entity.y) + num(entity.height) / 2) / TILE_SIZE)
         };
+    }
+
+    function isCenteredOnTile(ghost) {
+        if (!ghost || ghost._tileMoveActive) return false;
+        if (typeof global.gridEntityCenteredV628 === 'function') return global.gridEntityCenteredV628(ghost, 1.25);
+        const tile = tileFromEntity(ghost);
+        return Math.abs(num(ghost.x) - (tile.x + 0.5) * TILE_SIZE) <= 1.25 &&
+            Math.abs(num(ghost.y) - (tile.y + 0.5) * TILE_SIZE) <= 1.25;
+    }
+
+    function snapEchoToGrid(ghost) {
+        if (!ghost || ghost._tileMoveActive) return false;
+        const tile = tileFromEntity(ghost);
+        if (typeof global.gridSnapEntityCenteredV628 === 'function') {
+            return global.gridSnapEntityCenteredV628(ghost, tile.x, tile.y);
+        }
+        ghost.x = (tile.x + 0.5) * TILE_SIZE;
+        ghost.y = (tile.y + 0.5) * TILE_SIZE;
+        ghost.__gridAnchor = 'center';
+        ghost._tileMoveTargetGX = tile.x;
+        ghost._tileMoveTargetGY = tile.y;
+        ghost._tileMoveTargetX = ghost.x;
+        ghost._tileMoveTargetY = ghost.y;
+        return true;
     }
 
     function playerTile() {
@@ -334,6 +369,7 @@
     }
 
     function chooseEscapeDirection(ghost) {
+        if (!isCenteredOnTile(ghost)) return null;
         const current = tileFromEntity(ghost);
         const danger = dangerCells();
         const options = adjacentOptions(ghost);
@@ -440,7 +476,7 @@
     }
 
     function chooseAttack(ghost) {
-        if (!visibleToPlayer(ghost)) return null;
+        if (ghost._tileMoveActive || !isCenteredOnTile(ghost) || !visibleToPlayer(ghost)) return null;
         const a = tileFromEntity(ghost);
         const b = playerTile();
         if (a.x !== b.x && a.y !== b.y) return null;
@@ -527,10 +563,11 @@
     }
 
     function createGhostBomb(ghost) {
+        if (!ghost || ghost._tileMoveActive || !snapEchoToGrid(ghost) || !isCenteredOnTile(ghost)) return false;
         if (ghost.bombCooldown > 0 || ghostBombCount(ghost) >= ghost.maxBombs) return false;
         const tile = tileFromEntity(ghost);
         const baseFuse = gameState.roomType?.id === 'CURSED' ? BOMB_HANDLING.cursedFuse : BOMB_HANDLING.normalFuse;
-        const fuseTotal = Math.max(700, Math.round(baseFuse * Math.max(0.5, num(ghost.relicMods?.bombFuseMultiplier, 1))));
+        const fuseTotal = Math.max(ECHO_AI.minimumFuseMs, Math.round(baseFuse * Math.max(1.2, num(ghost.relicMods?.bombFuseMultiplier, 1))));
         const worldX = (tile.x + 0.5) * TILE_SIZE;
         const worldY = (tile.y + 0.5) * TILE_SIZE;
         const bomb = {
@@ -539,7 +576,7 @@
             echoId:ghost.echoId,
             x:tile.x,
             y:tile.y,
-            range:ghost.bombRange,
+            range:Math.min(ECHO_AI.maxBombRange, Math.max(1, Math.floor(num(ghost.bombRange, 1)))),
             timer:fuseTotal,
             fuseTotal,
             warnBucket:Math.ceil(fuseTotal / 300),
@@ -584,7 +621,8 @@
     }
 
     function beginTileMove(ghost, direction) {
-        if (!direction) return false;
+        if (!direction || ghost._tileMoveActive) return false;
+        if (!snapEchoToGrid(ghost) || !isCenteredOnTile(ghost)) return false;
         const tile = tileFromEntity(ghost);
         const gx = tile.x + direction.x;
         const gy = tile.y + direction.y;
@@ -604,6 +642,11 @@
             const result = gridAdvanceTileMove(ghost, ghost.speed, dt, { kind:'enemy', allowCurrentBombTile:false });
             ghost.moving = !result.arrived;
             if (result.arrived) {
+                const gx = Number(ghost._tileMoveTargetGX);
+                const gy = Number(ghost._tileMoveTargetGY);
+                if (Number.isInteger(gx) && Number.isInteger(gy) && typeof global.gridSnapEntityCenteredV628 === 'function') {
+                    global.gridSnapEntityCenteredV628(ghost, gx, gy);
+                }
                 ghost.moving = false;
                 ghost.moveDistance += TILE_SIZE;
             }
@@ -701,10 +744,11 @@
             y:spawn.y * TILE_SIZE + TILE_SIZE / 2,
             width:TILE_SIZE * 0.68,
             height:TILE_SIZE * 0.68,
-            speed:clamp(num(build.speed, 3), 1, 8),
-            sourceSpeed:clamp(num(build.speed, 3), 1, 8),
-            maxBombs:clamp(Math.floor(num(build.maxBombs, 1)), 1, 10),
-            bombRange:clamp(Math.floor(num(build.bombRange, 1)), 1, 16),
+            // El Echo conserva la identidad de su build, pero combate despacio y con una sola bomba corta.
+            speed:clamp(Math.min(num(build.speed, 2) * 0.42, 1.35), 0.75, 1.35),
+            sourceSpeed:clamp(Math.min(num(build.speed, 2) * 0.42, 1.35), 0.75, 1.35),
+            maxBombs:1,
+            bombRange:clamp(Math.floor(num(build.bombRange, 1)), 1, ECHO_AI.maxBombRange),
             bombElementV612:['normal','fire','ice','electric'].includes(String(build.bombElementV612)) ? String(build.bombElementV612) : 'normal',
             dir:['up','down','left','right'].includes(build.dir) ? build.dir : 'down',
             lastDirection:['up','down','left','right'].includes(build.dir) ? build.dir : 'down',
@@ -730,13 +774,13 @@
             blockedRetryMs:0,
             blockedDirection:null,
             wallHits:0,
-            bombCooldown:0,
+            bombCooldown:ECHO_AI.bombCooldownMs,
             interactionTimer:0,
             carryTimer:0,
-            reactionTimer:0,
-            directionCommitMs:0,
+            reactionTimer:ECHO_AI.reactionMs,
+            directionCommitMs:ECHO_AI.directionCommitMs,
             wasVisible:false,
-            thinkTimer:0,
+            thinkTimer:ECHO_AI.thinkMs,
             thinkCount:0,
             patrolTurnCount:0,
             aiSeed:Math.floor(num(saved.createdAt, Date.now()) % 97),
@@ -744,9 +788,17 @@
             _tileMoveActive:false,
             _tileMoveTargetX:spawn.x * TILE_SIZE + TILE_SIZE / 2,
             _tileMoveTargetY:spawn.y * TILE_SIZE + TILE_SIZE / 2,
+            _tileMoveTargetGX:spawn.x,
+            _tileMoveTargetGY:spawn.y,
             __gridAnchor:'center'
         };
 
+        if (typeof global.gridSnapEntityCenteredV628 === 'function') {
+            global.gridSnapEntityCenteredV628(ghost, spawn.x, spawn.y);
+        } else {
+            ghost.x = (spawn.x + 0.5) * TILE_SIZE;
+            ghost.y = (spawn.y + 0.5) * TILE_SIZE;
+        }
         state.active = ghost;
         gameState.deathEchoV61 = ghost;
         return ghost;
@@ -824,6 +876,17 @@
         if (visible && !ghost.wasVisible) ghost.reactionTimer = ECHO_AI.reactionMs;
         ghost.wasVisible = visible;
 
+        // v6.28: una transición reservada se completa antes de evaluar otra
+        // casilla. No se replantea una ruta ni se planta una bomba desde media celda.
+        if (ghost._tileMoveActive) {
+            moveTileByTile(ghost, null, delta);
+            if (ghost._tileMoveActive) {
+                applyEchoContactDamage(ghost, visible);
+                return;
+            }
+        }
+        snapEchoToGrid(ghost);
+
         // 1. Primero resuelve peligro real. No intenta atacar mientras está en peligro.
         const danger = dangerCells();
         const current = tileFromEntity(ghost);
@@ -888,7 +951,7 @@
         }
 
         // 5. Decisión ofensiva sólo tras una reacción humana mínima.
-        if (visible && ghost.reactionTimer <= 0 && ghost.bombCooldown <= 0 && ghost.thinkTimer <= 0) {
+        if (!ghost._tileMoveActive && isCenteredOnTile(ghost) && visible && ghost.reactionTimer <= 0 && ghost.bombCooldown <= 0 && ghost.thinkTimer <= 0) {
             const attack = chooseAttack(ghost);
             if (attack && echoRoll(ghost, 41) <= ECHO_AI.attackChance && createGhostBomb(ghost)) {
                 return;
@@ -923,12 +986,15 @@
         }
 
         // 7. Daño por contacto, sólo cuando realmente está al alcance del jugador.
-        if (visible) {
-            const pRect = { left:player.x + player.width * 0.25, right:player.x + player.width * 0.75, top:player.y + player.height * 0.20, bottom:player.y + player.height * 0.82 };
-            const gRect = { left:ghost.x - ghost.width * 0.32, right:ghost.x + ghost.width * 0.32, top:ghost.y - ghost.height * 0.38, bottom:ghost.y + ghost.height * 0.38 };
-            if (pRect.right > gRect.left && pRect.left < gRect.right && pRect.bottom > gRect.top && pRect.top < gRect.bottom && typeof takeDamage === 'function') {
-                takeDamage('death-echo', ghost.x, ghost.y);
-            }
+        applyEchoContactDamage(ghost, visible);
+    }
+
+    function applyEchoContactDamage(ghost, visible) {
+        if (!visible || !player || !ghost) return;
+        const pRect = { left:player.x + player.width * 0.25, right:player.x + player.width * 0.75, top:player.y + player.height * 0.20, bottom:player.y + player.height * 0.82 };
+        const gRect = { left:ghost.x - ghost.width * 0.32, right:ghost.x + ghost.width * 0.32, top:ghost.y - ghost.height * 0.38, bottom:ghost.y + ghost.height * 0.38 };
+        if (pRect.right > gRect.left && pRect.left < gRect.right && pRect.bottom > gRect.top && pRect.top < gRect.bottom && typeof takeDamage === 'function') {
+            takeDamage('death-echo', ghost.x, ghost.y);
         }
     }
 

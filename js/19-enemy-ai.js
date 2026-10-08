@@ -55,6 +55,73 @@ const ENEMY_DIRS_V312 = [
 const ENEMY_DIR_INDEX_V312 = new Map(ENEMY_DIRS_V312.map((d, i) => [d.dir, i]));
 const ENEMY_OPPOSITE_V312 = { up: 'down', down: 'up', left: 'right', right: 'left' };
 
+
+// v6.28 — helpers de grid para entidades centradas (Death Echo).
+// No cambian la navegación de los enemigos normales: se usan explícitamente
+// desde Death Echo para que sus decisiones tácticas siempre partan de una celda.
+function gridEntityTileV628(entity) {
+    if (!entity || typeof TILE_SIZE !== 'number' || TILE_SIZE <= 0) return { x: 0, y: 0 };
+    const width = Math.max(1, Number(gameState?.gridWidth) || 1);
+    const height = Math.max(1, Number(gameState?.gridHeight) || 1);
+    const clampTile = (value, max) => Math.max(0, Math.min(max - 1, Math.trunc(value)));
+
+    // Mientras hay un desplazamiento tile-to-tile, la celda lógica es el
+    // destino ya reservado, no el lado de la línea media que ocupa el sprite.
+    if (entity._tileMoveActive && Number.isFinite(Number(entity._tileMoveTargetGX)) && Number.isFinite(Number(entity._tileMoveTargetGY))) {
+        return {
+            x: clampTile(Number(entity._tileMoveTargetGX), width),
+            y: clampTile(Number(entity._tileMoveTargetGY), height)
+        };
+    }
+
+    if (entity.__gridAnchor === 'center') {
+        return {
+            x: clampTile(Math.round((Number(entity.x) - TILE_SIZE / 2) / TILE_SIZE), width),
+            y: clampTile(Math.round((Number(entity.y) - TILE_SIZE / 2) / TILE_SIZE), height)
+        };
+    }
+
+    const x = Number(entity.x) + (Number(entity.width) || 0) / 2;
+    const y = Number(entity.y) + (Number(entity.height) || 0) / 2;
+    return {
+        x: clampTile(Math.floor(x / TILE_SIZE), width),
+        y: clampTile(Math.floor(y / TILE_SIZE), height)
+    };
+}
+
+function gridEntityCenteredV628(entity, tolerancePx = 1.25) {
+    if (!entity || entity._tileMoveActive || typeof TILE_SIZE !== 'number' || TILE_SIZE <= 0) return false;
+    const tile = gridEntityTileV628(entity);
+    const centerX = (tile.x + 0.5) * TILE_SIZE;
+    const centerY = (tile.y + 0.5) * TILE_SIZE;
+    const tolerance = Math.max(0.1, Number(tolerancePx) || 1.25);
+    return Math.abs(Number(entity.x) - centerX) <= tolerance && Math.abs(Number(entity.y) - centerY) <= tolerance;
+}
+
+function gridSnapEntityCenteredV628(entity, gx, gy) {
+    if (!entity || !Number.isInteger(Number(gx)) || !Number.isInteger(Number(gy))) return false;
+    const x = Number(gx);
+    const y = Number(gy);
+    if (typeof gridIsInside === 'function' && !gridIsInside(x, y)) return false;
+    entity.__gridAnchor = 'center';
+    if (typeof gridSnapEntityToTile === 'function') {
+        if (!gridSnapEntityToTile(entity, x, y, 'enemy')) return false;
+    } else {
+        entity.x = (x + 0.5) * TILE_SIZE;
+        entity.y = (y + 0.5) * TILE_SIZE;
+    }
+    entity._tileMoveActive = false;
+    entity._tileMoveTargetGX = x;
+    entity._tileMoveTargetGY = y;
+    entity._tileMoveTargetX = (x + 0.5) * TILE_SIZE;
+    entity._tileMoveTargetY = (y + 0.5) * TILE_SIZE;
+    return true;
+}
+
+window.gridEntityTileV628 = gridEntityTileV628;
+window.gridEntityCenteredV628 = gridEntityCenteredV628;
+window.gridSnapEntityCenteredV628 = gridSnapEntityCenteredV628;
+
 let enemyBehaviorProfileMapV329 = null;
 let enemyBehaviorProfileSourceV329 = null;
 

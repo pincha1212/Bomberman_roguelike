@@ -144,43 +144,7 @@
             updateUI();
         }
 
-        function setupBossArena() {
-            // El jefe necesita espacio real: despejamos una arena central sin tocar las paredes estructurales.
-            const cx = Math.floor(gameState.gridWidth / 2);
-            const cy = Math.floor(gameState.gridHeight / 2);
-            for (let y = cy - 3; y <= cy + 3; y++) {
-                for (let x = cx - 3; x <= cx + 3; x++) {
-                    if (x > 0 && x < gameState.gridWidth - 1 && y > 0 && y < gameState.gridHeight - 1) {
-                        if (!(x % 2 === 0 && y % 2 === 0)) gameState.grid[y][x] = TYPES.EMPTY;
-                    }
-                }
-            }
-            const designedExit = gameState.roomDesign?.exitGate || { x: gameState.gridWidth - 2, y: gameState.gridHeight - 2 };
-            gameState.exitPos = { x: designedExit.x, y: designedExit.y };
-            if (gameState.grid[gameState.exitPos.y][gameState.exitPos.x] === TYPES.WALL) gameState.grid[gameState.exitPos.y][gameState.exitPos.x] = TYPES.EMPTY;
-            gameState.grid[gameState.exitPos.y][gameState.exitPos.x] = TYPES.EXIT_LOCKED;
-            gameState.enemies = [];
-            const maxHp = 28 + gameState.level * 3;
-            gameState.boss = {
-                x: cx * TILE_SIZE + TILE_SIZE / 2,
-                y: cy * TILE_SIZE + TILE_SIZE / 2,
-                width: TILE_SIZE * 2.35,
-                height: TILE_SIZE * 2.35,
-                hp: maxHp,
-                maxHp,
-                phase: 1,
-                vx: 1.05,
-                vy: 0,
-                moveTimer: 0,
-                invuln: 0,
-                flash: 0,
-                defeated: false,
-                lastBlastHitId: -1
-            };
-            sfx('bossRoar');
-            triggerScreenShake(8, 350);
-            addFloatingText('☠ COLOSO DE LA PROFUNDIDAD', gameState.boss.x, gameState.boss.y - 72, '#f43f5e');
-        }
+
 
         function damageBoss(amount = 1) {
             const b = gameState.boss;

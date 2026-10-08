@@ -37,10 +37,7 @@ function getRelicCategoryColor(category){
     return getRelicCategoryMeta(category).color;
 }
 
-function getRelicMod(key, fallback=0){
-    const value = gameState.relicMods?.[key];
-    return typeof value === 'number' ? value : (typeof value === 'boolean' ? value : fallback);
-}
+
 
 function getBombFuseMultiplier(){
     return Math.max(0.5, Number(gameState.relicMods?.bombFuseMultiplier || 1));

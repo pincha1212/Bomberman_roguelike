@@ -151,9 +151,7 @@
         return x >= 0 && y >= 0 && x < width && y < height;
     }
 
-    function cloneTiles(tiles) {
-        return tiles.map(row => row.slice());
-    }
+
 
     function roomIntersects(a, b, padding = 1) {
         return !(

@@ -55,12 +55,7 @@ function bossV41GetPhase(boss) {
     return 1;
 }
 
-function bossV41GetPosition(boss) {
-    if (!boss) return null;
-    const x = Number.isFinite(boss.x) ? boss.x : (Number.isFinite(boss.cx) ? boss.cx : null);
-    const y = Number.isFinite(boss.y) ? boss.y : (Number.isFinite(boss.cy) ? boss.cy : null);
-    return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
-}
+
 
 function bossV41EnsureState() {
     if (!BossV41.state) BossV41.state = bossV41CreateState();

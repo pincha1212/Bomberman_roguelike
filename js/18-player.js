@@ -35,33 +35,7 @@
             return !gridCanOccupy(probe, x, y, { kind: 'player' });
         }
 
-        function moveAxisWithCollision(axis, amount) {
-            if (!amount) return false;
-            const beforeX = player.x;
-            const beforeY = player.y;
-            const result = gridMoveCardinal(player, axis === 'x' ? amount : 0, axis === 'y' ? amount : 0, {
-                kind: 'player',
-                maxStep: MOTION.maxStep
-            });
-            if (!result.moved) return false;
 
-            // Invierno: oso/estorbador ocupan espacio, pero no hacen daño de contacto.
-            // Si el jugador intenta atravesarlos, revertimos solo este paso físico.
-            if (gameState.biomeV49?.id === 'winter' && Array.isArray(gameState.enemies)) {
-                const hitbox = { left: player.x, right: player.x + player.width, top: player.y, bottom: player.y + player.height };
-                const blocked = gameState.enemies.some(e => {
-                    if (!e?.type?.winterRole) return false;
-                    const er = { left: e.x - e.width / 2, right: e.x + e.width / 2, top: e.y - e.height / 2, bottom: e.y + e.height / 2 };
-                    return hitbox.right > er.left && hitbox.left < er.right && hitbox.bottom > er.top && hitbox.top < er.bottom;
-                });
-                if (blocked) {
-                    player.x = beforeX;
-                    player.y = beforeY;
-                    return false;
-                }
-            }
-            return true;
-        }
 
         function getLaneTarget(axis) {
             const center = axis === 'x' ? player.y + player.height / 2 : player.x + player.width / 2;
@@ -80,27 +54,9 @@
             return target - current;
         }
 
-        function trySnapToLane(axis) {
-            const offset = getLaneOffset(axis);
-            const snapRadius = MOTION.turnSnapRadius + (Number(gameState.relicMods?.turnSnapBonus) || 0);
-            if (Math.abs(offset) > snapRadius) return false;
 
-            const current = axis === 'x' ? player.y : player.x;
-            const target = current + offset;
-            const candidateX = axis === 'x' ? player.x : target;
-            const candidateY = axis === 'x' ? target : player.y;
-            if (rectCollidesSolid(candidateX, candidateY, player.width, player.height)) return false;
 
-            if (axis === 'x') player.y = target;
-            else player.x = target;
-            return true;
-        }
 
-        function isReadyForTurn(axis) {
-            const offset = getLaneOffset(axis);
-            const assistRadius = MOTION.turnAssistRadius + (Number(gameState.relicMods?.turnAssistBonus) || 0);
-            return Math.abs(offset) <= assistRadius;
-        }
 
         function getCardinalInput() {
             let dx = gameState.touchControls.x;

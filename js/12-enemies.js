@@ -112,10 +112,5 @@
             }
         }
 
-        function isSolid(gx, gy, canFly = false) {
-            if (gx < 0 || gx >= gameState.gridWidth || gy < 0 || gy >= gameState.gridHeight) return true;
-            let tile = gameState.grid[gy][gx];
-            if (canFly) return tile === TYPES.WALL;
-            return tile === TYPES.WALL || tile === TYPES.BLOCK;
-        }
+
 

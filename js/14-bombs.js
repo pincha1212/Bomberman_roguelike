@@ -233,11 +233,7 @@ function getBombAtTile(gx, gy){
     }) || null;
 }
 
-function isBombSolidForPlayer(gx, gy){
-    const bomb = getBombAtTile(gx, gy);
-    if (!bomb) return false;
-    return !bomb.playerPassThrough;
-}
+
 
 function markBombEscapeState(){
     // La salida segura termina SOLO cuando la hitbox de movimiento del jugador

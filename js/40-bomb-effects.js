@@ -262,18 +262,7 @@
         });
     }
 
-    function getEntityId(entity) {
-        if (!entity || typeof entity !== 'object') return null;
-        if (!Object.prototype.hasOwnProperty.call(entity, '__bombEffectEntityIdV64')) {
-            Object.defineProperty(entity, '__bombEffectEntityIdV64', {
-                value: `efx-${Math.random().toString(36).slice(2, 10)}`,
-                enumerable: false,
-                configurable: false,
-                writable: false
-            });
-        }
-        return entity.__bombEffectEntityIdV64;
-    }
+
 
     function ensureEntityStatuses(entity) {
         if (!entity || typeof entity !== 'object') return null;
@@ -332,17 +321,7 @@
         return fields.filter(field => field?.key === key);
     }
 
-    function showEffectMessage(effectId, x, y) {
-        if (typeof global.addFloatingText !== 'function') return;
-        const def = definition(effectId);
-        if (!def) return;
-        global.addFloatingText(
-            def.label.toUpperCase(),
-            (x + 0.5) * TILE_SIZE,
-            (y + 0.28) * TILE_SIZE,
-            def.color
-        );
-    }
+
 
     function removeField(fields, field) {
         const index = fields.indexOf(field);
@@ -529,12 +508,7 @@
         return Number.isFinite(Number(value));
     }
 
-    function clearEntityEffect(entity, effectId) {
-        const statuses = ensureEntityStatuses(entity);
-        if (!statuses || !statuses[effectId]) return false;
-        delete statuses[effectId];
-        return true;
-    }
+
 
     function applyEntityStatus(target, effectId, options = {}) {
         const entity = target?.entity || target;

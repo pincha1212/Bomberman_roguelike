@@ -134,13 +134,7 @@ function gridCanOccupy(entity, x, y, options = {}) {
 // Las entidades se desplazan de centro de celda a centro de celda. La animación
 // puede interpolar entre ambos centros, pero nunca cambia de carril ni termina
 // una orden en una posición intermedia.
-function gridGetEntityCenterPosition(entity, kind = null) {
-    const resolvedKind = kind || (entity && entity.__gridAnchor === 'center' ? 'enemy' : 'player');
-    if (resolvedKind === 'player') {
-        return { x: Number(entity.x) + Number(entity.width) / 2, y: Number(entity.y) + Number(entity.height) / 2 };
-    }
-    return { x: Number(entity.x), y: Number(entity.y) };
-}
+
 
 function gridGetEntityTileCenterPosition(entity, gx, gy, kind = null) {
     const resolvedKind = kind || (entity && entity.__gridAnchor === 'center' ? 'enemy' : 'player');
@@ -333,30 +327,7 @@ function gridIsNearTileCenter(entity, radius = GRID_COLLISION_V312.centerSnapRad
     return Math.abs(entity.x - center.x) <= radius && Math.abs(entity.y - center.y) <= radius;
 }
 
-function gridSnapEntityToCenter(entity, radius = GRID_COLLISION_V312.centerSnapRadius, options = {}) {
-    const kind = options.kind || (entity && entity.__gridAnchor === 'center' ? 'enemy' : 'player');
-    const tile = gridCurrentTile(entity, kind);
-    const center = gridTileCenter(tile.x, tile.y);
 
-    if (kind === 'player') {
-        const targetX = center.x - entity.width / 2;
-        const targetY = center.y - entity.height / 2;
-        if (Math.abs(entity.x - targetX) > radius || Math.abs(entity.y - targetY) > radius) return false;
-        if (!gridCanOccupy(entity, targetX, targetY, options)) return false;
-        entity.x = targetX;
-        entity.y = targetY;
-        return true;
-    }
 
-    if (Math.abs(entity.x - center.x) > radius || Math.abs(entity.y - center.y) > radius) return false;
-    if (!gridCanOccupy(entity, center.x, center.y, options)) return false;
-    entity.x = center.x;
-    entity.y = center.y;
-    return true;
-}
 
-function gridGetNeighborCell(entity, dir) {
-    const tile = gridCurrentTile(entity, 'enemy');
-    return { x: tile.x + dir.x, y: tile.y + dir.y };
-}
 

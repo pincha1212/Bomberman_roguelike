@@ -163,9 +163,7 @@ function tickRunClock(dt) {
     gameState.runElapsedMs = RUN_LIFECYCLE.elapsedMs;
 }
 
-function getCurrentRunTimeMs() {
-    return RUN_LIFECYCLE.elapsedMs;
-}
+
 
 function getDeathCauseLabel(source) {
     const labels = {

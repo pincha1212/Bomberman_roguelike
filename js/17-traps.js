@@ -75,54 +75,7 @@ function chooseTrapType() {
     return TRAP_TYPES.DELAYED;
 }
 
-function generateHazards() {
-    const candidates = [];
-    for (let y = 1; y < gameState.gridHeight - 1; y++) {
-        for (let x = 1; x < gameState.gridWidth - 1; x++) {
-            if (gameState.grid[y][x] !== TYPES.EMPTY) continue;
-            if ((x <= 3 && y <= 3) || (gameState.exitPos && gameState.exitPos.x === x && gameState.exitPos.y === y)) continue;
-            if (gameState.roomDesign?.secretInterior?.has(`${x},${y}`)) continue;
-            candidates.push({ x, y });
-        }
-    }
 
-    const riskCandidates = candidates.filter(c => gameState.roomDesign?.riskCells?.has(`${c.x},${c.y}`));
-    const normalCandidates = candidates.filter(c => !gameState.roomDesign?.riskCells?.has(`${c.x},${c.y}`));
-    for (let i = riskCandidates.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [riskCandidates[i], riskCandidates[j]] = [riskCandidates[j], riskCandidates[i]];
-    }
-    for (let i = normalCandidates.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [normalCandidates[i], normalCandidates[j]] = [normalCandidates[j], normalCandidates[i]];
-    }
-    candidates.splice(0, candidates.length, ...riskCandidates, ...normalCandidates);
-
-    const baseCount = Math.max(2, 2 + Math.floor(gameState.level / 2) + (gameState.roomType.id === 'CURSED' ? 2 : 0));
-    const difficultyCount = typeof getDifficultyTrapCountV323 === 'function'
-        ? getDifficultyTrapCountV323(baseCount)
-        : baseCount;
-    const count = Math.min(candidates.length, difficultyCount);
-
-    player.hazardSlowTimer = 0;
-    player.hazardSlowFactor = 1;
-    player.hazardSlowType = '';
-
-    gameState.hazards = candidates.slice(0, count).map((h, index) => ({
-        ...h,
-        id: `hazard-${gameState.animFrame}-${index}-${Math.random().toString(36).slice(2, 6)}`,
-        type: chooseTrapType(),
-        triggered: false,
-        visible: false,
-        telegraphTimer: 0,
-        flashTimer: 0,
-        effectTimer: 0,
-        delayTimer: 0,
-        effectConsumed: false,
-        detonated: false,
-        phase: Math.random() * Math.PI * 2
-    }));
-}
 
 function getHazardSpeedFactor() {
     const timer = player.hazardSlowTimer || 0;

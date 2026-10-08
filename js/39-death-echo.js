@@ -466,9 +466,7 @@
         return (gameState.bombs || []).filter(b => b && b.owner === GHOST_OWNER && b.echoId === ghost.echoId && !b.carriedBy).length;
     }
 
-    function chooseInteractionBombV2(ghost) {
-        return chooseInteractionBomb(ghost);
-    }
+
 
     function createGhostBomb(ghost) {
         if (!hasAbility(ghost, 'GRAB')) return null;

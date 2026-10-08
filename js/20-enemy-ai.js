@@ -391,34 +391,7 @@ function directionBetweenEnemyCellsV312(from, to) {
     return null;
 }
 
-function enemyCornerAssistV312(e, dir, dt, avoidDanger = false) {
-    if (!e || !dir || !gameState.grid?.length) return false;
-    const tile = enemyTileV312(e);
-    const center = enemyCenterV312(tile.x, tile.y);
-    // Solo corregimos el eje perpendicular al avance. Nunca movemos X e Y en
-    // el mismo frame y no hacemos snap: es una asistencia gradual.
-    const perpendicularAxis = dir.x !== 0 ? 'y' : 'x';
-    const current = e[perpendicularAxis];
-    const target = center[perpendicularAxis];
-    const offset = target - current;
-    const absOffset = Math.abs(offset);
-    if (absOffset < 0.5 || absOffset > TILE_SIZE * 0.5) return false;
 
-    const scale = Math.min(Math.max(dt / 16.6667, 0.5), 2);
-    const amount = Math.min(absOffset, enemyAI_V312.cornerAssistSpeed * scale);
-    const delta = Math.sign(offset) * amount;
-    const nx = perpendicularAxis === 'x' ? e.x + delta : e.x;
-    const ny = perpendicularAxis === 'y' ? e.y + delta : e.y;
-    if (!gridCanOccupy(e, nx, ny, {
-        kind: 'enemy',
-        canFly: !!e.type.canFly,
-        avoidDanger,
-        allowCurrentBombTile: true
-    })) return false;
-
-    e[perpendicularAxis] = perpendicularAxis === 'x' ? nx : ny;
-    return true;
-}
 
 function enemyDirectionPassableV312(e, dir, avoidDanger = false) {
     const tile = enemyTileV312(e);
@@ -529,20 +502,7 @@ function enemyChooseSurroundTargetV312(e) {
 }
 
 
-function enemyRememberNavigationTileV321(e) {
-    if (!e?.ai) return;
-    const tile = enemyTileV312(e);
-    const key = enemyTileKeyV312(tile.x, tile.y);
-    if (key === e.ai.lastNavigationTileKey) return;
-    const recent = Array.isArray(e.ai.recentTileKeys) ? e.ai.recentTileKeys : [];
-    const priorIndex = recent.lastIndexOf(key);
-    if (priorIndex >= 0) recent.splice(priorIndex, 1);
-    recent.push(key);
-    while (recent.length > enemyAI_V312.navigationMemoryTiles) recent.shift();
-    e.ai.recentTileKeys = recent;
-    e.ai.lastNavigationTileKey = key;
-    e.ai.navigationMemoryTimer = enemyAI_V312.navigationMemoryMs;
-}
+
 
 function enemyRecentNavigationPenaltyV321(e, key, options = {}) {
     const recent = e?.ai?.recentTileKeys;
@@ -1035,42 +995,7 @@ function updateEnemyIntentV312(e, index, dt) {
 
 }
 
-function applyEnemyDirectionAtCenterV312(e) {
-    const ai = e.ai;
-    const desired = enemyDirectionV312(ai.desiredDirection);
 
-    // FIX v3.12.2: no volver a centrar al enemigo mientras sigue avanzando en
-    // la misma dirección. Antes, cada frame dentro del radio de 9 px hacía
-    // `snap -> avanzar -> snap -> avanzar`, produciendo el temblor en el lugar.
-    // El centrado solo debe ocurrir cuando realmente hay un giro pendiente.
-    const wantsTurn = desired.dir !== ai.direction;
-    if (!wantsTurn || !enemyIsNearCenterV312(e)) return false;
-
-    const tile = enemyTileV312(e);
-    const center = enemyCenterV312(tile.x, tile.y);
-    if (Math.abs(e.x - center.x) <= enemyAI_V312.turnRadius && Math.abs(e.y - center.y) <= enemyAI_V312.turnRadius) {
-        if (enemyDirectionPassableV312(e, desired, ai.alert === 'flee')) {
-            e.x = center.x;
-            e.y = center.y;
-            ai.direction = desired.dir;
-            e.lastDirection = desired.dir;
-            ai.blockedTimer = 0;
-            return true;
-        }
-
-        // Desired direction quedó obstruida: elegir otra antes de que la entidad
-        // vuelva a salir del centro de la intersección.
-        const fallback = enemyChooseDirectionAtIntersectionV312(e);
-        if (fallback && enemyDirectionPassableV312(e, fallback, ai.alert === 'flee')) {
-            ai.direction = fallback.dir;
-            ai.desiredDirection = fallback.dir;
-            e.lastDirection = fallback.dir;
-            ai.blockedTimer = 0;
-            return true;
-        }
-    }
-    return false;
-}
 
 function getEnemyMovementSpeedV610(e) {
     const profile = enemyBehaviorProfileV324(e);

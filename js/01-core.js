@@ -2,9 +2,7 @@
 // V2.0 IMMERSIVE SYSTEMS
 let audioCtx = null;
 
-function getThemePaletteSafeV46(){
-    return typeof getThemePaletteV46 === 'function' ? getThemePaletteV46() : null;
-}
+
 
 const ambient = { dustTimer: 0, lastFoot: 0, introTimer: 0 };
 function initAudio(){
@@ -589,16 +587,7 @@ const UI = {};
             COMMON: '#94a3b8', UNCOMMON: '#34d399', RARE: '#60a5fa', EPIC: '#c084fc'
         };
 
-        function getRoomForDepth(depth) {
-            if (depth === 1) return ROOM_TYPES.STANDARD;
-            const roll = Math.random();
-            if (depth % 5 === 0) return ROOM_TYPES.BOSS;
-            if (depth % 5 === 1 && depth > 1) return ROOM_TYPES.SHRINE;
-            if (roll < 0.16) return ROOM_TYPES.ELITE;
-            if (roll < 0.34) return ROOM_TYPES.TREASURE;
-            if (roll < 0.48) return ROOM_TYPES.CURSED;
-            return ROOM_TYPES.STANDARD;
-        }
+
 
         function getAvailableRelics() {
             return RELICS.filter(r => !gameState.relics.some(owned => owned.id === r.id));

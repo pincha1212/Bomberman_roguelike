@@ -191,14 +191,7 @@
         return null;
     }
 
-    function getSameTileGrabBomb(entity) {
-        const state = getState();
-        const tile = getEntityTile(entity);
-        if (!state || !tile) return null;
-        const bomb = state.bombs?.find(b => b && b.x === tile.x && b.y === tile.y && b.state === global.BOMB_V4_STATES.ARMED && !isBombCarried(b)) || null;
-        if (!bomb || bomb.playerPassThrough) return null;
-        return bomb;
-    }
+
 
     function startBombKickV682(bomb, entity, dir) {
         const state = getState();

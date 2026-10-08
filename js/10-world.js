@@ -171,15 +171,22 @@
 
         function damageBoss(amount = 1) {
             const b = gameState.boss;
-            if (!b || b.defeated || b.invuln > 0) return false;
-            b.hp -= amount;
+            if (!b || b.defeated || Number(b.invuln) > 0) return false;
+            const maxHp = Math.max(1, Number(b.maxHp) || Number(b.maxHealth) || 1);
+            const currentHp = Number.isFinite(b.hp) ? b.hp : (Number.isFinite(b.health) ? b.health : maxHp);
+            const damage = Math.max(1, Number(amount) || 1);
+            b.maxHp = maxHp;
+            b.maxHealth = maxHp;
+            b.hp = Math.max(0, currentHp - damage);
+            b.health = b.hp; // mirror field used by older UI/save code
             b.invuln = 220;
             triggerBossHitFeedback(b);
             b.flash = 180;
             gameState.score += 75;
             sfx('bossHit');
             triggerScreenShake(3, 100);
-            addFloatingText(`-${amount}`, b.x, b.y - b.height / 2, '#fb7185');
+            addFloatingText(`-${damage}`, b.x, b.y - b.height / 2, '#fb7185');
+            if (typeof bossV41SetHUD === 'function') bossV41SetHUD(b, typeof bossV41GetPhase === 'function' ? bossV41GetPhase(b) : b.phase || 1);
             if (b.hp <= 0) defeatBoss();
             return true;
         }
@@ -189,7 +196,10 @@
             if (!b || b.defeated) return;
             b.defeated = true;
             b.hp = 0;
-            gameState.grid[gameState.exitPos.y][gameState.exitPos.x] = TYPES.EXIT_OPEN;
+            b.health = 0;
+            b.maxHp = Math.max(1, Number(b.maxHp) || Number(b.maxHealth) || 1);
+            b.maxHealth = b.maxHp;
+            if (gameState.exitPos && gameState.grid?.[gameState.exitPos.y]) gameState.grid[gameState.exitPos.y][gameState.exitPos.x] = TYPES.EXIT_OPEN;
             gameState.coins += 30;
             gameState.score += 1500;
             addParticles(b.x, b.y, 'particleBoss', 55);
@@ -197,6 +207,7 @@
             addFloatingText('+30¢  +1500', b.x, b.y + 20, '#fbbf24');
             sfx('boom');
             triggerScreenShake(12, 500);
+            if (typeof bossV41SetHUD === 'function') bossV41SetHUD(b, 0);
             updateUI();
         }
 
@@ -232,7 +243,7 @@
             const pulse=1+Math.sin(gameState.animFrame*.10)*.035;
             const rage=b.phase===3;
             ctx.translate(b.x,b.y);ctx.scale(pulse,pulse);
-            ctx.globalAlpha=b.flash>0 ? .55 : 1;
+            ctx.globalAlpha = b.flash > 0 ? .55 : (b.invuln > 0 && Math.floor(gameState.animFrame / 3) % 2 === 0 ? .72 : 1);
             const aura=ctx.createRadialGradient(0,0,20,0,0,b.width*.8);
             aura.addColorStop(0,rage?'rgba(244,63,94,.20)':'rgba(168,85,247,.16)');
             aura.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=aura;ctx.beginPath();ctx.arc(0,0,b.width*.8,0,Math.PI*2);ctx.fill();

@@ -391,8 +391,6 @@ function directionBetweenEnemyCellsV312(from, to) {
     return null;
 }
 
-
-
 function enemyDirectionPassableV312(e, dir, avoidDanger = false) {
     const tile = enemyTileV312(e);
     const next = { x: tile.x + dir.x, y: tile.y + dir.y };
@@ -500,8 +498,6 @@ function enemyChooseSurroundTargetV312(e) {
     }
     return best || { x: pt.x, y: pt.y, score: 0 };
 }
-
-
 
 
 function enemyRecentNavigationPenaltyV321(e, key, options = {}) {
@@ -994,8 +990,6 @@ function updateEnemyIntentV312(e, index, dt) {
 
 
 }
-
-
 
 function getEnemyMovementSpeedV610(e) {
     const profile = enemyBehaviorProfileV324(e);

@@ -90,21 +90,13 @@
             UI['ui-range'].innerText = player.bombRange;
             UI['ui-speed'].innerText = (player.speed - 2).toFixed(1);
             UI['ui-coins'].innerText = gameState.coins;
-            const v327Relics = Array.isArray(window.ROGUELIKE_V327?.relics) ? window.ROGUELIKE_V327.relics : [];
-            const totalRelics = gameState.relics.length + v327Relics.length;
+            const totalRelics = Array.isArray(gameState.relics) ? gameState.relics.length : 0;
             UI['ui-relics'].innerText = totalRelics;
             if (UI['ui-relic-count-label']) UI['ui-relic-count-label'].textContent = String(totalRelics);
             if (UI['ui-relic-list']) {
-                const legacyRelics = gameState.relics.map(r => ({ icon:r.icon || '✦', name:r.name, desc:r.desc || '' }));
-                const modernRelics = v327Relics.map(id => {
-                    const r = Array.isArray(window.ROGUELIKE_RELICS_V327)
-                        ? window.ROGUELIKE_RELICS_V327.find(item => item.id === id)
-                        : null;
-                    return r ? { icon:r.icon || '✦', name:r.name, desc:r.desc || '' } : { icon:'✦', name:String(id), desc:'' };
-                });
-                const relics = [...legacyRelics, ...modernRelics];
+                const relics = Array.isArray(gameState.relics) ? gameState.relics : [];
                 UI['ui-relic-list'].innerHTML = relics.length
-                    ? relics.map(r => `<div class="info-relic-row"><span>${r.icon}</span><div><strong>${r.name}</strong><small>${r.desc}</small></div></div>`).join('')
+                    ? relics.map(r => `<div class="info-relic-row"><span>${r.icon || '✦'}</span><div><strong>${r.name}</strong><small>${r.desc || ''}</small></div></div>`).join('')
                     : '<div class="info-empty">Sin reliquias activas</div>';
             }
             if (UI['ui-bomb-element']) {

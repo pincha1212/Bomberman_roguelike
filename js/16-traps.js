@@ -58,25 +58,6 @@ function trapDistanceToPlayer(h) {
     return Math.hypot(px - c.x, py - c.y) / TILE_SIZE;
 }
 
-function chooseTrapType() {
-    const cursed = gameState.roomType?.id === 'CURSED';
-    const r = Math.random();
-    if (cursed) {
-        if (r < 0.24) return TRAP_TYPES.DELAYED;
-        if (r < 0.46) return TRAP_TYPES.FIRE;
-        if (r < 0.66) return TRAP_TYPES.SPIKE;
-        if (r < 0.84) return TRAP_TYPES.SLOW;
-        return TRAP_TYPES.ICE;
-    }
-    if (r < 0.28) return TRAP_TYPES.SPIKE;
-    if (r < 0.50) return TRAP_TYPES.FIRE;
-    if (r < 0.68) return TRAP_TYPES.ICE;
-    if (r < 0.86) return TRAP_TYPES.SLOW;
-    return TRAP_TYPES.DELAYED;
-}
-
-
-
 function getHazardSpeedFactor() {
     const timer = player.hazardSlowTimer || 0;
     if (timer <= 0) return 1;

@@ -121,22 +121,12 @@
     function snapshotRelics() {
         const result = [];
         const seen = new Set();
-        const legacy = Array.isArray(gameState?.relics) ? gameState.relics : [];
-        for (const relic of legacy) {
+        const relics = Array.isArray(gameState?.relics) ? gameState.relics : [];
+        for (const relic of relics) {
             const id = String(relic?.id || '');
             if (!id || seen.has(id)) continue;
             seen.add(id);
             result.push({ id, name:String(relic?.name || ''), icon:String(relic?.icon || '◆'), category:String(relic?.category || 'BOMB') });
-        }
-        const ids = global.ROGUELIKE_V327?.relics;
-        const defs = Array.isArray(global.ROGUELIKE_RELICS_V327) ? global.ROGUELIKE_RELICS_V327 : [];
-        for (const raw of (Array.isArray(ids) ? ids : [])) {
-            const id = String(raw || '');
-            if (!id || seen.has(id)) continue;
-            const relic = defs.find(item => item.id === id);
-            if (!relic) continue;
-            seen.add(id);
-            result.push({ id, name:String(relic.name || ''), icon:String(relic.icon || '◆'), category:String(relic.category || 'BOMB') });
         }
         return result;
     }
@@ -466,8 +456,6 @@
         return (gameState.bombs || []).filter(b => b && b.owner === GHOST_OWNER && b.echoId === ghost.echoId && !b.carriedBy).length;
     }
 
-
-
     function createGhostBomb(ghost) {
         if (!hasAbility(ghost, 'GRAB')) return null;
         if (typeof global.getAdjacentGrabBombAnyDirectionV687 !== 'function') return null;
@@ -781,9 +769,6 @@
                     recovered.push(relic);
                     restored = true;
                 }
-            }
-            if (!restored && typeof global.rogueV327AcquireRelic === 'function' && global.rogueV327AcquireRelic(saved.id)) {
-                recovered.push({ ...saved });
             }
         }
         if (typeof addFloatingText === 'function') addFloatingText(recovered.length ? `ECO RECUPERADO ×${recovered.length}` : 'ECO DISIPADO', ghost.x, ghost.y, recovered.length ? '#c4b5fd' : '#94a3b8');

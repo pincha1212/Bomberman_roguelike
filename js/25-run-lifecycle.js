@@ -79,14 +79,12 @@ function resetWorldRuntimeState() {
     gameState.hazardCooldown = 0;
     if (typeof materialResetV60 === 'function') materialResetV60();
     gameState.boss = null;
-    gameState.bossProjectiles = [];
     gameState.roomTime = 0;
     gameState.threatLevel = 0;
     gameState.difficulty = null;
     gameState.nextReinforcement = 20000;
     gameState.exitPos = null;
-    gameState.roomDesign = null;
-    gameState.dungeonV44 = null;
+    gameState.exitUnlocked = false;
     gameState.lastTime = 0;
     gameState.keys = {};
     gameState.touchControls = { x: 0, y: 0 };
@@ -163,14 +161,11 @@ function tickRunClock(dt) {
     gameState.runElapsedMs = RUN_LIFECYCLE.elapsedMs;
 }
 
-
-
 function getDeathCauseLabel(source) {
     const labels = {
         explosion: 'Explosión',
         trap: 'Trampa',
         'boss-contact': 'Contacto con el jefe',
-        'boss-projectile': 'Proyectil del jefe',
         enemy: 'Enemigo',
         'enemy-contact': 'Enemigo',
         'unknown': 'Daño recibido'
@@ -188,7 +183,6 @@ function finishRun(source = 'unknown') {
         deathRelicsSnapshot = Array.isArray(gameState.relics) ? gameState.relics.map(relic => ({ ...relic })) : [];
         recordDeathEchoV61(source);
         if (Array.isArray(gameState.relics)) gameState.relics = [];
-        if (window.ROGUELIKE_V327 && Array.isArray(window.ROGUELIKE_V327.relics)) window.ROGUELIKE_V327.relics = [];
         if (window.ROGUELIKE_V327?.appliedBonus) window.ROGUELIKE_V327.appliedBonus = { bombs: 0, range: 0, speed: 0, maxHealth: 0 };
         if (typeof resetRelicModifiers === 'function') resetRelicModifiers();
     }

@@ -85,21 +85,39 @@
                 }
             }
 
-            const designedExit = gameState.roomDesign?.exitGate;
-            if (designedExit && designedExit.x > 0 && designedExit.x < gameState.gridWidth - 1 && designedExit.y > 0 && designedExit.y < gameState.gridHeight - 1) {
-                gameState.exitPos = { x: designedExit.x, y: designedExit.y };
-                if (gameState.grid[designedExit.y][designedExit.x] === TYPES.WALL) gameState.grid[designedExit.y][designedExit.x] = TYPES.EMPTY;
-                gameState.grid[designedExit.y][designedExit.x] = TYPES.BLOCK;
-            } else if (blocks.length > 0) {
+            if (blocks.length > 0) {
                 const exitBlock = blocks[Math.floor(Math.random() * blocks.length)];
                 gameState.exitPos = { x: exitBlock.x, y: exitBlock.y };
             } else {
                 gameState.exitPos = { x: gameState.gridWidth - 2, y: gameState.gridHeight - 2 };
                 gameState.grid[gameState.exitPos.y][gameState.exitPos.x] = TYPES.EXIT_OPEN;
+            gameState.exitUnlocked = true;
             }
 
             gameState.gridRevision = (gameState.gridRevision || 0) + 1;
             if (typeof invalidateRenderCacheV317 === 'function') invalidateRenderCacheV317();
+        }
+
+        function setExitStateV613(open = false) {
+            const pos = gameState.exitPos;
+            if (!pos || !gameState.grid?.[pos.y]) return false;
+            const current = gameState.grid[pos.y][pos.x];
+            if (current === TYPES.BLOCK && open) return false;
+            gameState.grid[pos.y][pos.x] = open ? TYPES.EXIT_OPEN : TYPES.EXIT_LOCKED;
+            gameState.exitUnlocked = !!open;
+            gameState.gridRevision = (gameState.gridRevision || 0) + 1;
+            if (typeof invalidateRenderCacheV317 === 'function') invalidateRenderCacheV317();
+            return true;
+        }
+
+        function tryUnlockExitCurrentRoom() {
+            if (!gameState?.exitPos || gameState.roomType?.id === 'BOSS') return false;
+            if (gameState.exitUnlocked) return true;
+            if (Array.isArray(gameState.enemies) && gameState.enemies.length > 0) return false;
+            const pos = gameState.exitPos;
+            const tile = gameState.grid?.[pos.y]?.[pos.x];
+            if (tile === TYPES.BLOCK) return false;
+            return setExitStateV613(true);
         }
 
         function initLevel() {
@@ -119,7 +137,6 @@
             gameState.floaters = [];
             gameState.hazards = [];
             gameState.boss = null;
-            gameState.bossProjectiles = [];
             gameState.blastSerial = 0;
             gameState.roomTime = typeof getDifficultyRoomTimeV323 === 'function'
                 ? getDifficultyRoomTimeV323(Math.max(35000, 80000 - gameState.level * 1500))
@@ -143,8 +160,6 @@
             updateRoguePresentation();
             updateUI();
         }
-
-
 
         function damageBoss(amount = 1) {
             const b = gameState.boss;
@@ -267,10 +282,6 @@
 
         function updateRoomThreat(dt) {
             gameState.roomTime -= dt;
-            if (gameState.dungeonV44?.fixedEnemyCount) {
-                gameState.nextReinforcement = Number.MAX_SAFE_INTEGER;
-                return;
-            }
             gameState.nextReinforcement -= dt;
             if (gameState.roomType.id === 'BOSS') return;
             if (gameState.nextReinforcement <= 0) {

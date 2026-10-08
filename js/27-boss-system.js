@@ -55,8 +55,6 @@ function bossV41GetPhase(boss) {
     return 1;
 }
 
-
-
 function bossV41EnsureState() {
     if (!BossV41.state) BossV41.state = bossV41CreateState();
     return BossV41.state;
@@ -86,8 +84,6 @@ function bossV41CreateState() {
 function bossV41Reset() {
     BossV41.state = bossV41CreateState();
     try {
-        gameState.bossProjectilesV325 = [];
-        gameState.bossProjectiles = [];
     } catch (_) {}
 }
 

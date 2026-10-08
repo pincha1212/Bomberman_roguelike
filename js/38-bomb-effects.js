@@ -262,8 +262,6 @@
         });
     }
 
-
-
     function ensureEntityStatuses(entity) {
         if (!entity || typeof entity !== 'object') return null;
         if (!entity.__bombEffectStatusesV64 || typeof entity.__bombEffectStatusesV64 !== 'object') {
@@ -320,8 +318,6 @@
         const key = tileKey(x, y);
         return fields.filter(field => field?.key === key);
     }
-
-
 
     function removeField(fields, field) {
         const index = fields.indexOf(field);
@@ -508,8 +504,6 @@
         return Number.isFinite(Number(value));
     }
 
-
-
     function applyEntityStatus(target, effectId, options = {}) {
         const entity = target?.entity || target;
         const kind = target?.kind || 'generic';
@@ -585,7 +579,7 @@
         state.enemies.splice(index, 1);
         state.totalKills = (Number(state.totalKills) || 0) + 1;
         if (typeof global.addFloatingText === 'function') global.addFloatingText('EFECTO', enemy.x, enemy.y, '#93c5fd');
-        if (typeof global.tryUnlockExitV44 === 'function') global.tryUnlockExitV44();
+        if (typeof global.tryUnlockExitCurrentRoom === 'function') global.tryUnlockExitCurrentRoom();
         return true;
     }
 

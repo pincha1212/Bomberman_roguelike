@@ -37,8 +37,6 @@ function getRelicCategoryColor(category){
     return getRelicCategoryMeta(category).color;
 }
 
-
-
 function getBombFuseMultiplier(){
     return Math.max(0.5, Number(gameState.relicMods?.bombFuseMultiplier || 1));
 }
@@ -113,6 +111,24 @@ const RELICS_V314 = [
 
 RELICS_V314.forEach(relic => applyRelicCategoryMetadata(relic));
 RELICS.push(...RELICS_V314);
+
+const ROGUELIKE_RELICS_CANONICAL_V613 = [
+    { id:'ember_core_rogue', icon:'🔥', name:'NÚCLEO DE BRASA', rarity:'COMMON', category:'FIRE', roguelikeOnly:true, tags:['combustion'], bonuses:{ range:1 }, desc:'+1 rango de bomba.', apply:()=>{ clampPlayerCapacitiesV67(); if(typeof rogueV327ApplyDerivedBonuses==='function') rogueV327ApplyDerivedBonuses(); } },
+    { id:'double_charge', icon:'💣', name:'DOBLE CARGA', rarity:'COMMON', category:'BOMB', roguelikeOnly:true, tags:['demolition'], bonuses:{ bombs:1 }, desc:'+1 bomba máxima.', apply:()=>{ clampPlayerCapacitiesV67(); if(typeof rogueV327ApplyDerivedBonuses==='function') rogueV327ApplyDerivedBonuses(); } },
+    { id:'hot_boots', icon:'👟', name:'BOTAS CALIENTES', rarity:'COMMON', category:'SPEED', roguelikeOnly:true, tags:['mobility'], bonuses:{ speed:0.35 }, desc:'+0.35 velocidad.', apply:()=>{ clampPlayerCapacitiesV67(); if(typeof rogueV327ApplyDerivedBonuses==='function') rogueV327ApplyDerivedBonuses(); } },
+    { id:'salvage_hook', icon:'🪝', name:'GANCHO CHATARRERO', rarity:'COMMON', category:'ECONOMY', roguelikeOnly:true, tags:['economy'], bonuses:{ coinBlock:1 }, desc:'+1 moneda por bloque destruido.', apply:()=>{} },
+    { id:'bounty_seal', icon:'¢', name:'SELLO DE COBRO', rarity:'COMMON', category:'ECONOMY', roguelikeOnly:true, tags:['economy','combat'], bonuses:{ coinEnemy:2 }, desc:'+2 monedas por enemigo eliminado.', apply:()=>{} },
+    { id:'iron_heart', icon:'♥', name:'CORAZÓN DE HIERRO', rarity:'UNCOMMON', category:'DEFENSE', roguelikeOnly:true, tags:['survival'], bonuses:{ maxHealth:1 }, desc:'+1 vida máxima.', apply:()=>{ clampPlayerCapacitiesV67(); if(typeof rogueV327ApplyDerivedBonuses==='function') rogueV327ApplyDerivedBonuses(); } },
+    { id:'blast_capacitor', icon:'⚡', name:'CAPACITOR DE ESTALLIDO', rarity:'UNCOMMON', category:'BOMB', roguelikeOnly:true, tags:['combustion','demolition'], bonuses:{ range:1, fuseMs:-200 }, desc:'+1 rango y mecha 200 ms más corta.', apply:()=>{ clampPlayerCapacitiesV67(); if(typeof rogueV327ApplyDerivedBonuses==='function') rogueV327ApplyDerivedBonuses(); } },
+    { id:'quick_wick', icon:'⏱', name:'MECHA CORTA', rarity:'UNCOMMON', category:'BOMB', roguelikeOnly:true, tags:['demolition','mobility'], bonuses:{ fuseMs:-350 }, desc:'Mecha 350 ms más corta.', apply:()=>{} },
+    { id:'greedy_spark', icon:'✦', name:'CHISPA CODICIOSA', rarity:'UNCOMMON', category:'ECONOMY', roguelikeOnly:true, tags:['economy'], bonuses:{ coinMultiplier:0.20 }, desc:'+20% a todas las monedas ganadas.', apply:()=>{} },
+    { id:'glass_fuse', icon:'◆', name:'MECHA DE VIDRIO', rarity:'RARE', category:'RISK', roguelikeOnly:true, tags:['combustion','risk'], bonuses:{ range:2, maxHealth:-1 }, desc:'+2 rango, -1 vida máxima.', apply:()=>{ clampPlayerCapacitiesV67(); if(typeof rogueV327ApplyDerivedBonuses==='function') rogueV327ApplyDerivedBonuses(); } },
+    { id:'redline', icon:'↯', name:'LÍNEA ROJA', rarity:'RARE', category:'RISK', roguelikeOnly:true, tags:['mobility','risk'], bonuses:{ speed:0.6, maxHealth:-1 }, desc:'+0.6 velocidad, -1 vida máxima.', apply:()=>{ clampPlayerCapacitiesV67(); if(typeof rogueV327ApplyDerivedBonuses==='function') rogueV327ApplyDerivedBonuses(); } },
+    { id:'last_stand', icon:'🛡', name:'ÚLTIMA RESERVA', rarity:'RARE', category:'DEFENSE', roguelikeOnly:true, tags:['survival','risk'], bonuses:{ roomHeal:1 }, desc:'Recuperás 1 vida al entrar a cada sala.', apply:()=>{} }
+];
+
+ROGUELIKE_RELICS_CANONICAL_V613.forEach(relic => applyRelicCategoryMetadata(relic));
+RELICS.push(...ROGUELIKE_RELICS_CANONICAL_V613);
 
 // Categoría por defecto para cualquier reliquia futura añadida por otro módulo.
 RELICS.forEach(applyRelicCategoryMetadata);

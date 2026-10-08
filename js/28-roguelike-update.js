@@ -27,116 +27,6 @@ const ROGUELIKE_V327_CONFIG = Object.freeze({
     version: '3.27.0'
 });
 
-const ROGUELIKE_RELICS_V327 = Object.freeze([
-    {
-        id: 'ember_core',
-        name: 'NÚCLEO ÍGNEO',
-        rarity: 'common',
-        tags: ['combustion'],
-        icon: '🔥',
-        desc: '+1 rango de bomba.',
-        bonuses: { range: 1 }
-    },
-    {
-        id: 'double_charge',
-        name: 'DOBLE CARGA',
-        rarity: 'common',
-        tags: ['demolition'],
-        icon: '💣',
-        desc: '+1 bomba máxima.',
-        bonuses: { bombs: 1 }
-    },
-    {
-        id: 'hot_boots',
-        name: 'BOTAS CALIENTES',
-        rarity: 'common',
-        tags: ['mobility'],
-        icon: '👟',
-        desc: '+0.35 velocidad.',
-        bonuses: { speed: 0.35 }
-    },
-    {
-        id: 'salvage_hook',
-        name: 'GANCHO CHATARRERO',
-        rarity: 'common',
-        tags: ['economy'],
-        icon: '🪝',
-        desc: '+1 moneda por bloque destruido.',
-        bonuses: { coinBlock: 1 }
-    },
-    {
-        id: 'bounty_seal',
-        name: 'SELLO DE COBRO',
-        rarity: 'common',
-        tags: ['economy', 'combat'],
-        icon: '¢',
-        desc: '+2 monedas por enemigo eliminado.',
-        bonuses: { coinEnemy: 2 }
-    },
-    {
-        id: 'iron_heart',
-        name: 'CORAZÓN DE HIERRO',
-        rarity: 'uncommon',
-        tags: ['survival'],
-        icon: '❤',
-        desc: '+1 vida máxima.',
-        bonuses: { maxHealth: 1 }
-    },
-    {
-        id: 'blast_capacitor',
-        name: 'CAPACITOR DE ESTALLIDO',
-        rarity: 'uncommon',
-        tags: ['combustion', 'demolition'],
-        icon: '⚡',
-        desc: '+1 rango y mecha 200 ms más corta.',
-        bonuses: { range: 1, fuseMs: -200 }
-    },
-    {
-        id: 'quick_wick',
-        name: 'MECHA CORTA',
-        rarity: 'uncommon',
-        tags: ['demolition', 'mobility'],
-        icon: '⏱',
-        desc: 'Mecha 350 ms más corta.',
-        bonuses: { fuseMs: -350 }
-    },
-    {
-        id: 'greedy_spark',
-        name: 'CHISPA CODICIOSA',
-        rarity: 'uncommon',
-        tags: ['economy'],
-        icon: '✦',
-        desc: '+20% a todas las monedas ganadas.',
-        bonuses: { coinMultiplier: 0.20 }
-    },
-    {
-        id: 'glass_fuse',
-        name: 'MECHA DE VIDRIO',
-        rarity: 'rare',
-        tags: ['combustion', 'risk'],
-        icon: '◆',
-        desc: '+2 rango, -1 vida máxima.',
-        bonuses: { range: 2, maxHealth: -1 }
-    },
-    {
-        id: 'redline',
-        name: 'LÍNEA ROJA',
-        rarity: 'rare',
-        tags: ['mobility', 'risk'],
-        icon: '↯',
-        desc: '+0.6 velocidad, -1 vida máxima.',
-        bonuses: { speed: 0.6, maxHealth: -1 }
-    },
-    {
-        id: 'last_stand',
-        name: 'ÚLTIMA RESERVA',
-        rarity: 'rare',
-        tags: ['survival', 'risk'],
-        icon: '🛡',
-        desc: 'Recuperás 1 vida al entrar a cada sala.',
-        bonuses: { roomHeal: 1 }
-    }
-]);
 
 const ROGUELIKE_ROOM_PLANS_V327 = Object.freeze([
     {
@@ -238,7 +128,6 @@ const ROGUELIKE_V327 = {
     roomOffers: [],
     selectedRelic: null,
     rerollsUsed: 0,
-    relics: [],
     coinStats: {
         blocks: 0,
         enemies: 0,
@@ -269,7 +158,8 @@ function rogueV327Random() {
 }
 
 function rogueV327GetRelic(id) {
-    return ROGUELIKE_RELICS_V327.find(relic => relic.id === id) || null;
+    const canonical = Array.isArray(RELICS) ? RELICS : [];
+    return canonical.find(relic => relic.id === id && relic.roguelikeOnly) || null;
 }
 
 function rogueV327GetPlan(id) {
@@ -277,7 +167,6 @@ function rogueV327GetPlan(id) {
 }
 
 function rogueV327ResetRelicRuntime() {
-    ROGUELIKE_V327.relics = [];
     ROGUELIKE_V327.relicOffers = [];
     ROGUELIKE_V327.roomOffers = [];
     ROGUELIKE_V327.selectedRelic = null;
@@ -294,8 +183,7 @@ function rogueV327EnsureEconomyState() {
             version: ROGUELIKE_V327_CONFIG.version,
             currentRoomPlan: 'standard',
             pendingRoomPlan: 'standard',
-            relics: [],
-            synergies: [],
+                    synergies: [],
             totalCoinsEarned: 0,
             totalCoinsSpent: 0
         };
@@ -307,7 +195,6 @@ function rogueV327RefreshGameStateMirror() {
     if (!gameState || !gameState.roguelikeV327) return;
     gameState.roguelikeV327.currentRoomPlan = ROGUELIKE_V327.currentRoomPlan;
     gameState.roguelikeV327.pendingRoomPlan = ROGUELIKE_V327.pendingRoomPlan;
-    gameState.roguelikeV327.relics = ROGUELIKE_V327.relics.slice();
     gameState.roguelikeV327.synergies = rogueV327GetActiveSynergies().map(s => s.id);
 }
 
@@ -369,7 +256,8 @@ function rogueV327GetRelicBonuses() {
         roomHeal: 0
     };
 
-    for (const id of ROGUELIKE_V327.relics) {
+    for (const relicState of (Array.isArray(gameState?.relics) ? gameState.relics : [])) {
+        const id = relicState?.id;
         const relic = rogueV327GetRelic(id);
         if (!relic) continue;
         const b = relic.bonuses || {};
@@ -392,7 +280,8 @@ function rogueV327GetRelicBonuses() {
 
 function rogueV327GetTagCounts() {
     const counts = {};
-    for (const id of ROGUELIKE_V327.relics) {
+    for (const relicState of (Array.isArray(gameState?.relics) ? gameState.relics : [])) {
+        const id = relicState?.id;
         const relic = rogueV327GetRelic(id);
         if (!relic) continue;
         for (const tag of relic.tags || []) counts[tag] = (counts[tag] || 0) + 1;
@@ -425,29 +314,34 @@ function rogueV327ApplyDerivedBonuses() {
 function rogueV327AcquireRelic(id) {
     const relic = rogueV327GetRelic(id);
     if (!relic) return false;
-    if (ROGUELIKE_V327.relics.includes(id)) return false;
-    if (ROGUELIKE_V327.relics.length >= ROGUELIKE_V327_CONFIG.maxRelics) return false;
+    const ownedStrategyCount = Array.isArray(gameState?.relics)
+        ? gameState.relics.filter(item => item?.roguelikeOnly).length
+        : 0;
+    if (Array.isArray(gameState?.relics) && gameState.relics.some(item => item?.id === id)) return false;
+    if (ownedStrategyCount >= ROGUELIKE_V327_CONFIG.maxRelics) return false;
+    if (typeof grantRelic !== 'function' || !grantRelic(relic)) return false;
 
-    ROGUELIKE_V327.relics.push(id);
     ROGUELIKE_V327.selectedRelic = id;
     rogueV327ApplyDerivedBonuses();
     rogueV327RefreshGameStateMirror();
     try {
-        const textColor = relic.rarity === 'rare' ? '#fca5a5' : relic.rarity === 'uncommon' ? '#93c5fd' : '#fde68a';
+        const rarity = String(relic.rarity || '').toLowerCase();
+        const textColor = rarity === 'rare' ? '#fca5a5' : rarity === 'uncommon' ? '#93c5fd' : '#fde68a';
         if (typeof addFloatingText === 'function' && player) addFloatingText(`+ ${relic.name}`, player.x, player.y, textColor);
     } catch (_) {}
     return true;
 }
 
 function rogueV327RollRelicOffers(count = ROGUELIKE_V327_CONFIG.relicOfferCount, qualityBoost = 0) {
-    const owned = new Set(ROGUELIKE_V327.relics);
-    const candidates = ROGUELIKE_RELICS_V327.filter(relic => !owned.has(relic.id));
+    const owned = new Set(Array.isArray(gameState?.relics) ? gameState.relics.map(r => r.id) : []);
+    const candidates = (Array.isArray(RELICS) ? RELICS : []).filter(relic => relic.roguelikeOnly && !owned.has(relic.id));
     if (!candidates.length) return [];
 
     const weighted = [];
     for (const relic of candidates) {
-        let weight = relic.rarity === 'common' ? 8 : relic.rarity === 'uncommon' ? 4 : 1;
-        if (qualityBoost > 0 && relic.rarity !== 'common') weight += qualityBoost * (relic.rarity === 'rare' ? 5 : 2);
+        const rarity = String(relic.rarity || '').toLowerCase();
+        let weight = rarity === 'common' ? 8 : rarity === 'uncommon' ? 4 : 1;
+        if (qualityBoost > 0 && rarity !== 'common') weight += qualityBoost * (rarity === 'rare' ? 5 : 2);
         const tagCounts = rogueV327GetTagCounts();
         for (const tag of relic.tags || []) {
             if (tagCounts[tag] > 0) weight += 2 * Math.min(3, tagCounts[tag]);
@@ -757,8 +651,8 @@ function rogueV327UpdateRelicHUD() {
     try {
         const el = document.getElementById('ui-relics');
         if (!el) return;
-        const legacy = gameState && Array.isArray(gameState.relics) ? gameState.relics.length : 0;
-        el.textContent = String(legacy + ROGUELIKE_V327.relics.length);
+        const count = gameState && Array.isArray(gameState.relics) ? gameState.relics.length : 0;
+        el.textContent = String(count);
     } catch (_) {}
 }
 
@@ -767,7 +661,7 @@ function rogueV327RenderDeathRelics() {
         const list = document.getElementById('go-relic-list');
         const count = document.getElementById('go-relics');
         if (!list) return;
-        const relics = ROGUELIKE_V327.relics.map(rogueV327GetRelic).filter(Boolean);
+        const relics = (Array.isArray(gameState?.relics) ? gameState.relics : []).map(item => rogueV327GetRelic(item.id) || item).filter(Boolean);
         if (count) count.textContent = String(relics.length);
         list.innerHTML = relics.length
             ? relics.map(relic => `<div class="death-relic-item"><span>${relic.icon}</span><strong>${relic.name}</strong><small>${relic.desc}</small></div>`).join('')
@@ -941,7 +835,6 @@ function rogueV327InstallStyles() {
 }
 
 window.ROGUELIKE_V327_CONFIG = ROGUELIKE_V327_CONFIG;
-window.ROGUELIKE_RELICS_V327 = ROGUELIKE_RELICS_V327;
 window.ROGUELIKE_ROOM_PLANS_V327 = ROGUELIKE_ROOM_PLANS_V327;
 window.ROGUELIKE_SYNERGIES_V327 = ROGUELIKE_SYNERGIES_V327;
 window.ROGUELIKE_V327 = ROGUELIKE_V327;

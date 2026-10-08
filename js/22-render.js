@@ -149,9 +149,6 @@ function draw() {
                 }
             }
 
-            // V3.13: acentos espaciales; las salas se leen en el propio piso, sin minimapa.
-            if (getRenderProfileV65().showRoomDecor && typeof drawRoomDesignLayerV313 === 'function') drawRoomDesignLayerV313();
-
             // v6.0: residuos materiales persistentes; quedan por debajo de items, bombas y personajes.
             if (typeof drawMaterialResiduesV60 === 'function') drawMaterialResiduesV60(ctx);
 

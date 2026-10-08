@@ -233,8 +233,6 @@ function getBombAtTile(gx, gy){
     }) || null;
 }
 
-
-
 function markBombEscapeState(){
     // La salida segura termina SOLO cuando la hitbox de movimiento del jugador
     // deja de tocar por completo la casilla de la bomba. Antes se usaba el

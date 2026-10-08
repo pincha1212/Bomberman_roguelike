@@ -1,10 +1,10 @@
 // Bomberman Roguelike v6.12.6 — Run Save
-// Persistencia de una run en localStorage. Schema versionado. Sin dependencia de Theme/Mechanics/Hazards.
+// Persistencia de una run en localStorage. Schema versionado. Sin dependencia de módulos de presentación.
 (function initRunSaveV55(global) {
     'use strict';
 
     const STORAGE_KEY = 'bombermanRoguelikeRunSaveV55';
-    const SCHEMA_VERSION = 2;
+    const SCHEMA_VERSION = 3;
     const AUTOSAVE_MS = 8000;
     let autosaveTimer = 0;
 
@@ -13,63 +13,6 @@
 
     function clone(value) {
         try { return JSON.parse(JSON.stringify(value)); } catch (_) { return null; }
-    }
-
-    function serializeDungeon(dungeon) {
-        if (!dungeon) return null;
-        const copy = clone({ ...dungeon, hardWallCells: undefined });
-        if (!copy) return null;
-        const isSet = Object.prototype.toString.call(dungeon.hardWallCells) === '[object Set]';
-        if (isSet) copy.hardWallCells = [...dungeon.hardWallCells];
-        else if (Array.isArray(dungeon.hardWallCells)) copy.hardWallCells = [...dungeon.hardWallCells];
-        return copy;
-    }
-
-    function serializeRoomDesign(design) {
-        if (!design) return null;
-        const sets = ['riskCells','combatCells','treasureCells','secretCells','secretInterior'];
-        const isSet = value => Object.prototype.toString.call(value) === '[object Set]';
-        const out = {
-            rooms: clone(design.rooms || []),
-            exitGate: clone(design.exitGate),
-            secretRoom: clone(design.secretRoom),
-            version: design.version || '4.5.2',
-            layoutVariant: design.layoutVariant || 'corridors',
-            layoutMetrics: clone(design.layoutMetrics)
-        };
-        for (const key of sets) out[key] = isSet(design[key]) ? [...design[key]] : (Array.isArray(design[key]) ? [...design[key]] : []);
-        return out;
-    }
-
-    function restoreRoomDesign(design) {
-        if (!design) return null;
-        const out = {
-            rooms: Array.isArray(design.rooms) ? clone(design.rooms) : [],
-            riskCells: new Set(design.riskCells || []),
-            combatCells: new Set(design.combatCells || []),
-            treasureCells: new Set(design.treasureCells || []),
-            secretCells: new Set(design.secretCells || []),
-            secretInterior: new Set(design.secretInterior || []),
-            exitGate: clone(design.exitGate),
-            secretRoom: clone(design.secretRoom),
-            version: design.version || '4.5.2',
-            layoutVariant: design.layoutVariant || 'corridors',
-            layoutMetrics: clone(design.layoutMetrics)
-        };
-        if (typeof roomDesignV313 !== 'undefined') {
-            roomDesignV313.rooms = out.rooms;
-            roomDesignV313.riskCells = new Set(out.riskCells);
-            roomDesignV313.combatCells = new Set(out.combatCells);
-            roomDesignV313.treasureCells = new Set(out.treasureCells);
-            roomDesignV313.secretCells = new Set(out.secretCells);
-            roomDesignV313.secretInterior = new Set(out.secretInterior);
-            roomDesignV313.exitGate = clone(out.exitGate);
-            roomDesignV313.secretRoom = clone(out.secretRoom);
-            roomDesignV313.version = out.version;
-            roomDesignV313.layoutVariant = out.layoutVariant;
-            roomDesignV313.layoutMetrics = clone(out.layoutMetrics);
-        }
-        return out;
     }
 
     function restoreCanonicalRelics(ids) {
@@ -101,16 +44,34 @@
         return mods;
     }
 
+    function mergeLegacyRoguelikeRelics(save) {
+        const legacyIds = Array.isArray(save?.run?.roguelikeV327Relics) ? save.run.roguelikeV327Relics : [];
+        if (!legacyIds.length || !Array.isArray(save?.run?.relics) || typeof RELICS === 'undefined') return;
+        const known = new Set(save.run.relics.map(item => String(item?.id || '')));
+        const aliases = { ember_core: 'ember_core_rogue' };
+        for (const rawId of legacyIds) {
+            const sourceId = String(rawId || '');
+            const id = aliases[sourceId] || sourceId;
+            if (!id || known.has(id)) continue;
+            const relic = RELICS.find(candidate => candidate.id === id);
+            if (!relic) continue;
+            save.run.relics.push({ id: relic.id, icon: relic.icon, name: relic.name, rarity: relic.rarity, desc: relic.desc, category: relic.category || 'BOMB' });
+            known.add(relic.id);
+        }
+        delete save.run.roguelikeV327Relics;
+    }
+
     function migrateSaveSchemaV55(save) {
         if (!save || typeof save !== 'object') return null;
         if (save.schemaVersion === SCHEMA_VERSION) return save;
-        if (save.schemaVersion !== 1) return null;
+        if (![1, 2].includes(Number(save.schemaVersion))) return null;
         if (!save.run || !save.world?.grid?.length) return null;
 
         const migrated = clone(save);
         if (!migrated) return null;
         migrated.schemaVersion = SCHEMA_VERSION;
-        migrated.migratedFromSchemaVersion = 1;
+        migrated.migratedFromSchemaVersion = Number(save.schemaVersion) || 1;
+        mergeLegacyRoguelikeRelics(migrated);
         migrated.run.relicMods = migrated.run.relicMods || deriveLegacyRelicModsV55(migrated.run.relics);
 
         migrated.player = migrated.player || {};
@@ -252,7 +213,6 @@
                 lastMoveInputAt: Number(state.lastMoveInputAt) || 0,
                 blocksBroken: Number(state.blocksBroken) || 0,
                 totalKills: Number(state.totalKills) || 0,
-                roguelikeV327Relics: clone(global.ROGUELIKE_V327?.relics || [])
             },
             player: serializePlayer(player),
             biome: clone(state.biomeV49),
@@ -265,8 +225,7 @@
                 gridRevision: Number(state.gridRevision) || 0,
                 roomTypeId: state.roomType?.id || 'STANDARD',
                 exitPos: clone(state.exitPos),
-                roomDesign: serializeRoomDesign(state.roomDesign),
-                dungeonV44: serializeDungeon(state.dungeonV44),
+                exitUnlocked: !!state.exitUnlocked,
                 bombs: serializeBombs(state.bombs || [], player, state),
                 explosions: [],
                 enemies: clone(state.enemies || []),
@@ -277,7 +236,6 @@
                 biomeLiquidTilesV630: clone(state.biomeLiquidTilesV630 || []),
                 hazardCooldown: Number(state.hazardCooldown) || 0,
                 boss: clone(state.boss),
-                bossProjectiles: clone(state.bossProjectiles || []),
                 blastSerial: Number(state.blastSerial) || 0,
                 difficulty: clone(state.difficulty)
             }
@@ -368,27 +326,13 @@
                 biomeLiquidTilesV630: clone(save.world.biomeLiquidTilesV630) || [],
                 hazardCooldown: save.world.hazardCooldown,
                 boss: clone(save.world.boss),
-                bossProjectiles: clone(save.world.bossProjectiles) || [],
                 blastSerial: save.world.blastSerial,
                 difficulty: clone(save.world.difficulty),
                 exitPos: clone(save.world.exitPos),
-                roomDesign: restoreRoomDesign(save.world.roomDesign),
+                exitUnlocked: !!save.world.exitUnlocked,
                 roomType: typeof ROOM_TYPES !== 'undefined' ? (ROOM_TYPES[save.world.roomTypeId] || ROOM_TYPES.STANDARD) : state.roomType
             });
 
-            const dungeon = clone(save.world.dungeonV44);
-            if (dungeon && Array.isArray(dungeon.hardWallCells)) dungeon.hardWallCells = new Set(dungeon.hardWallCells);
-            state.dungeonV44 = dungeon;
-
-            if (global.ROGUELIKE_V327 && Array.isArray(save.run.roguelikeV327Relics)) {
-                global.ROGUELIKE_V327.relics = save.run.roguelikeV327Relics.slice();
-                global.ROGUELIKE_V327.selectedRelic = null;
-                global.ROGUELIKE_V327.relicOffers = [];
-                global.ROGUELIKE_V327.appliedBonus = typeof rogueV327GetRelicBonuses === 'function'
-                    ? rogueV327GetRelicBonuses()
-                    : { bombs: 0, range: 0, speed: 0, maxHealth: 0 };
-                if (state.roguelikeV327) state.roguelikeV327.relics = save.run.roguelikeV327Relics.slice();
-            }
 
             Object.assign(player, clone(save.player) || {});
             if (!player.bombElementV612) player.bombElementV612 = 'normal';

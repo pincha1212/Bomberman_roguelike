@@ -2,8 +2,6 @@
 // V2.0 IMMERSIVE SYSTEMS
 let audioCtx = null;
 
-
-
 const ambient = { dustTimer: 0, lastFoot: 0, introTimer: 0 };
 function initAudio(){
     if(audioCtx) return;
@@ -30,13 +28,11 @@ function updatePerfSceneV329(){
     const frame=Number(gameState.animFrame||0);
     if(perf.heavySceneFrame===frame) return perf.heavyScene;
     perf.heavySceneFrame=frame;
-    const projectileCount = (gameState.bossProjectiles?.length || 0) + (gameState.bossProjectilesV325?.length || 0);
     perf.heavyScene =
         gameState.enemies.length >= 12 ||
         gameState.particles.length >= 80 ||
         gameState.bombs.length >= 5 ||
-        gameState.explosions.length >= 8 ||
-        projectileCount >= 5;
+        gameState.explosions.length >= 8;
     return perf.heavyScene;
 }
 
@@ -131,7 +127,6 @@ const perf = {
 // V3.2.2 LARGE SUPPORT LAYER
 // Optimiza entidades grandes y evita que los efectos escalen sin control.
 const largeSupport = {
-    maxBossProjectiles: 34,
     maxEnemies: 22,
     particleBudget: 150,
     maxFloaters: 48,
@@ -141,9 +136,6 @@ const largeSupport = {
 };
 
 function clampLargeEntities(){
-    if(gameState.bossProjectiles.length > largeSupport.maxBossProjectiles){
-        gameState.bossProjectiles.splice(0, gameState.bossProjectiles.length - largeSupport.maxBossProjectiles);
-    }
     if(gameState.enemies.length > largeSupport.maxEnemies){
         gameState.enemies.length = largeSupport.maxEnemies;
     }
@@ -313,14 +305,6 @@ const UI = {};
             hard: Object.freeze({ maxHealth: 10, maxBombs: 10, bombRange: 16, speed: 7.0 }),
         });
 
-        const LEGACY_RELIC_CAP_BONUSES_V67 = Object.freeze({
-            ember_core: Object.freeze({ bombRange: 1 }),
-            twin_fuse: Object.freeze({ maxBombs: 1 }),
-            heart_engine: Object.freeze({ maxHealth: 1 }),
-            unstable_powder: Object.freeze({ bombRange: 1 }),
-            heat_lens: Object.freeze({ bombRange: 1 })
-        });
-
         // SPEED_UP es un incremento finito: al alcanzar el hard cap central, devuelve false.
         // No existe overflow ni cap paralelo. El no-op en 7.0 es intencional.
         function getPlayerCapacityCapsV67(){
@@ -334,18 +318,13 @@ const UI = {};
             for (const relic of (Array.isArray(gameState?.relics) ? gameState.relics : [])) {
                 const id = String(relic?.id || ''); if (id) owned.add(id);
             }
-            const v327 = window.ROGUELIKE_V327;
-            if (Array.isArray(v327?.relics)) for (const id of v327.relics) owned.add(String(id));
-
+            const canonicalRelics = Array.isArray(window.RELICS) ? window.RELICS : (typeof RELICS !== 'undefined' ? RELICS : []);
             for (const id of owned){
-                const v327Relic = Array.isArray(window.ROGUELIKE_RELICS_V327) ? window.ROGUELIKE_RELICS_V327.find(r => r.id === id) : null;
-                const bonus = v327Relic?.bonuses
-                    ? { maxBombs:Number(v327Relic.bonuses.bombs)||0, bombRange:Number(v327Relic.bonuses.range)||0, maxHealth:Number(v327Relic.bonuses.maxHealth)||0 }
-                    : (LEGACY_RELIC_CAP_BONUSES_V67[id] || null);
-                if (!bonus) continue;
-                cap.maxBombs += Number(bonus.maxBombs) || 0;
-                cap.bombRange += Number(bonus.bombRange) || 0;
-                cap.maxHealth += Number(bonus.maxHealth) || 0;
+                const relic = canonicalRelics.find(r => r.id === id);
+                const b = relic?.bonuses || {};
+                cap.maxBombs += Number(b.bombs) || 0;
+                cap.bombRange += Number(b.range) || 0;
+                cap.maxHealth += Number(b.maxHealth) || 0;
             }
 
             const synergies = typeof window.rogueV327GetActiveSynergies === 'function' ? window.rogueV327GetActiveSynergies() : [];
@@ -557,13 +536,13 @@ const UI = {};
         };
 
         const RELICS = [
-            { id: 'ember_core', icon: '🔥', name: 'NÚCLEO ÍGNEO', rarity: 'RARE', desc: '+1 rango de bomba. Las explosiones valen +25 puntos extra.',
+            { id: 'ember_core', icon: '🔥', name: 'NÚCLEO ÍGNEO', rarity: 'RARE', bonuses: { range: 1 }, desc: '+1 rango de bomba. Las explosiones valen +25 puntos extra.',
               apply: () => { clampPlayerCapacitiesV67(); } },
-            { id: 'twin_fuse', icon: '💣', name: 'MECHA GEMELA', rarity: 'UNCOMMON', desc: '+1 bomba máxima.',
+            { id: 'twin_fuse', icon: '💣', name: 'MECHA GEMELA', rarity: 'UNCOMMON', bonuses: { bombs: 1 }, desc: '+1 bomba máxima.',
               apply: () => { clampPlayerCapacitiesV67(); } },
             { id: 'iron_boots', icon: '👟', name: 'BOTAS DE HIERRO', rarity: 'UNCOMMON', desc: '+0.6 velocidad permanente.',
               apply: () => { const cap = getPlayerCapacityCapsV67(); player.speed = Math.min(player.speed + 0.6, cap.speed); } },
-            { id: 'heart_engine', icon: '♥', name: 'MOTOR VITAL', rarity: 'RARE', desc: '+1 vida máxima y recuperas 1 vida ahora.',
+            { id: 'heart_engine', icon: '♥', name: 'MOTOR VITAL', rarity: 'RARE', bonuses: { maxHealth: 1 }, desc: '+1 vida máxima y recuperas 1 vida ahora.',
               apply: () => { clampPlayerCapacitiesV67({ healNewMax: true }); } },
             { id: 'ward_plate', icon: '🛡', name: 'PLACA DE GUARDA', rarity: 'RARE', desc: 'Obtienes un escudo. Un golpe no destruye la run.',
               apply: () => { player.hasShield = true; } },
@@ -587,10 +566,8 @@ const UI = {};
             COMMON: '#94a3b8', UNCOMMON: '#34d399', RARE: '#60a5fa', EPIC: '#c084fc'
         };
 
-
-
         function getAvailableRelics() {
-            return RELICS.filter(r => !gameState.relics.some(owned => owned.id === r.id));
+            return RELICS.filter(r => !r.roguelikeOnly && !gameState.relics.some(owned => owned.id === r.id));
         }
 
         function grantRelic(relic) {
@@ -622,7 +599,6 @@ const UI = {};
             deathEchoV61: null,
             hazardCooldown: 0,
             boss: null,
-            bossProjectiles: [],
             roomTime: 0,
             threatLevel: 0,
             nextReinforcement: 20000,
@@ -651,7 +627,7 @@ const UI = {};
             blocksBroken: 0,
             totalKills: 0,
             bestDepth: Number(localStorage.getItem('bombermanBestDepth') || 0),
-            dungeonV44: null
+            exitUnlocked: false
         };
 
         let player = {

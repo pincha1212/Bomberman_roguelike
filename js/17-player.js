@@ -35,8 +35,6 @@
             return !gridCanOccupy(probe, x, y, { kind: 'player' });
         }
 
-
-
         function getLaneTarget(axis) {
             const center = axis === 'x' ? player.y + player.height / 2 : player.x + player.width / 2;
             const maxCell = axis === 'x' ? gameState.gridHeight - 1 : gameState.gridWidth - 1;
@@ -53,10 +51,6 @@
             const current = axis === 'x' ? player.y : player.x;
             return target - current;
         }
-
-
-
-
 
         function getCardinalInput() {
             let dx = gameState.touchControls.x;

@@ -68,11 +68,11 @@
             );
 
             if (gameState.exitPos && gameState.exitPos.x === tx && gameState.exitPos.y === ty) {
-                // v4.4: destruir el bloque de salida no alcanza para abrirla.
+                // La salida se revela bloqueada al destruir su cobertura.
+                // Solo se abre cuando no quedan enemigos.
                 gameState.grid[ty][tx] = TYPES.EXIT_LOCKED;
-                if (typeof tryUnlockExitV44 === 'function') tryUnlockExitV44();
-                if (gameState.dungeonV44?.exitUnlocked) {
-                    gameState.grid[ty][tx] = TYPES.EXIT_OPEN;
+                gameState.exitUnlocked = false;
+                if (typeof tryUnlockExitCurrentRoom === 'function' && tryUnlockExitCurrentRoom()) {
                     addFloatingText(
                         '🚪 SALIDA DESBLOQUEADA',
                         (tx + 0.5) * TILE_SIZE,

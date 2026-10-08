@@ -191,8 +191,6 @@
         return null;
     }
 
-
-
     function startBombKickV682(bomb, entity, dir) {
         const state = getState();
         if (!bomb || !entity || !dir || !state) return false;

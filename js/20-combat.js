@@ -172,7 +172,7 @@
                         gameState.totalKills++;
                         if (typeof gameplayPowerupOnEnemyDefeatedV676 === 'function') gameplayPowerupOnEnemyDefeatedV676(e);
                         addFloatingText(`+${killScore}  +${killCoins}¢`, e.x, e.y, e.elite ? '#fb7185' : '#38bdf8');
-                        if (typeof tryUnlockExitV44 === 'function') tryUnlockExitV44();
+                        if (typeof tryUnlockExitCurrentRoom === 'function') tryUnlockExitCurrentRoom();
                     }
                 }
 

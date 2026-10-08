@@ -151,8 +151,6 @@
         return x >= 0 && y >= 0 && x < width && y < height;
     }
 
-
-
     function roomIntersects(a, b, padding = 1) {
         return !(
             a.x + a.w + padding <= b.x ||

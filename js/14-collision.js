@@ -134,8 +134,6 @@ function gridCanOccupy(entity, x, y, options = {}) {
 // Las entidades se desplazan de centro de celda a centro de celda. La animación
 // puede interpolar entre ambos centros, pero nunca cambia de carril ni termina
 // una orden en una posición intermedia.
-
-
 function gridGetEntityTileCenterPosition(entity, gx, gy, kind = null) {
     const resolvedKind = kind || (entity && entity.__gridAnchor === 'center' ? 'enemy' : 'player');
     const center = gridTileCenter(gx, gy);
@@ -326,8 +324,4 @@ function gridIsNearTileCenter(entity, radius = GRID_COLLISION_V312.centerSnapRad
     }
     return Math.abs(entity.x - center.x) <= radius && Math.abs(entity.y - center.y) <= radius;
 }
-
-
-
-
 

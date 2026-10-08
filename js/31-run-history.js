@@ -99,7 +99,7 @@
                 biome: gameState.biomeV49?.id || null,
                 stage: Number(gameState.biomeV49?.stage) || null,
                 roomType: gameState.roomType?.id || null,
-                enemyTarget: Number(gameState.dungeonV44?.enemyTarget) || 0
+                enemyTarget: Array.isArray(gameState.enemies) ? gameState.enemies.length : 0
             });
             return result;
         };
@@ -111,7 +111,7 @@
                     biome: gameState.biomeV49?.id || null,
                     stage: Number(gameState.biomeV49?.stage) || null,
                     roomType: gameState.roomType?.id || null,
-                    enemyTarget: Number(gameState.dungeonV44?.enemyTarget) || 0
+                    enemyTarget: Array.isArray(gameState.enemies) ? gameState.enemies.length : 0
                 });
             }
             return result;

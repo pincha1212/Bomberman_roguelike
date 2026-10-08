@@ -2,42 +2,23 @@
         function spawnEnemies() {
             const diff = gameState.difficulty || (typeof getDifficultyV323 === 'function' ? getDifficultyV323(gameState.level) : null);
             const maxEnemies = diff?.maxEnemies || largeSupport.maxEnemies;
-            const fixedV44 = gameState.dungeonV44?.fixedEnemyCount && gameState.roomType.id !== 'BOSS';
-            const count = fixedV44
-                ? Math.min(maxEnemies, getDungeonEnemyCountV44(gameState.level))
-                : Math.min(maxEnemies, Math.max(1, Math.round(Math.min(3 + Math.floor(gameState.level * 1.5), 12) * gameState.roomType.enemyMult * (diff?.enemyCountMult || 1))));
+            const count = Math.min(maxEnemies, Math.max(1, Math.round(Math.min(3 + Math.floor(gameState.level * 1.5), 12) * gameState.roomType.enemyMult * (diff?.enemyCountMult || 1))));
             const candidates = [];
             const px = Math.floor((player.x + player.width / 2) / TILE_SIZE);
             const py = Math.floor((player.y + player.height / 2) / TILE_SIZE);
             for (let y = 1; y < gameState.gridHeight - 1; y++) {
                 for (let x = 1; x < gameState.gridWidth - 1; x++) {
                     if (gameState.grid[y][x] !== TYPES.EMPTY) continue;
-                    if (gameState.roomDesign?.secretInterior?.has(`${x},${y}`)) continue;
                     const distance = Math.abs(x - px) + Math.abs(y - py);
                     if (distance >= 7) candidates.push({x, y, distance});
                 }
             }
-            // V3.13: priorizamos celdas de arenas de combate, pero mantenemos
-            // variación aleatoria dentro de cada grupo.
-            const combatCandidates = candidates.filter(c => gameState.roomDesign?.combatCells?.has(`${c.x},${c.y}`));
-            const otherCandidates = candidates.filter(c => !gameState.roomDesign?.combatCells?.has(`${c.x},${c.y}`));
-            for (let i = combatCandidates.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [combatCandidates[i], combatCandidates[j]] = [combatCandidates[j], combatCandidates[i]];
-            }
-            for (let i = otherCandidates.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [otherCandidates[i], otherCandidates[j]] = [otherCandidates[j], otherCandidates[i]];
-            }
-            candidates.splice(0, candidates.length, ...combatCandidates, ...otherCandidates);
-
             // Si el mapa es muy compacto, bajamos el radio de seguridad solo lo necesario.
             if (candidates.length < count) {
                 for (let y = 1; y < gameState.gridHeight - 1; y++) {
                     for (let x = 1; x < gameState.gridWidth - 1; x++) {
                         if (gameState.grid[y][x] !== TYPES.EMPTY) continue;
-                        if (gameState.roomDesign?.secretInterior?.has(`${x},${y}`)) continue;
-                        const distance = Math.abs(x - px) + Math.abs(y - py);
+                            const distance = Math.abs(x - px) + Math.abs(y - py);
                         if (distance >= 5 && !candidates.some(c => c.x === x && c.y === y)) candidates.push({x, y, distance});
                     }
                 }
@@ -111,6 +92,4 @@
                 });
             }
         }
-
-
 

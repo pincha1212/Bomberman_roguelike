@@ -52,6 +52,7 @@
                     const other = gameState.bombs[i];
                     if (!other || !blastKeys.has(`${other.x},${other.y}`)) continue;
                     if (other.state === 'moving' || other.motionState === 'moving') continue;
+                    if (typeof isBombSubmergedV631 === 'function' && isBombSubmergedV631(other)) continue;
                     gameState.bombs.splice(i, 1);
                     if (other.countsTowardPlayerCapacity !== false) player.bombsPlaced = Math.max(0, player.bombsPlaced - 1);
                     registerBombChainLink(bomb, other, detonatedCount + 1, detonatedCount + 1);
@@ -95,6 +96,7 @@
             updateRoomThreat(dt);
             updateHazards(dt);
             if (typeof materialUpdateV60 === 'function') materialUpdateV60(dt);
+            if (typeof updateBiomeLiquidPlayerEffectsV631 === 'function') updateBiomeLiquidPlayerEffectsV631(dt);
             updateBoss(dt);
 
             // Shake countdown

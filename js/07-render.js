@@ -49,6 +49,7 @@ function buildTerrainCacheV317() {
             cacheCtx.fillRect(px + TILE_SIZE - 2, py, 2, TILE_SIZE);
 
             const tile = row[x];
+            if (typeof hasLiquidTileV630 === 'function' && hasLiquidTileV630(x, y)) drawBiomeLiquidTileV630(px, py, x, y, cacheCtx);
             if (tile === TYPES.WALL) drawSteelWall(px, py, cacheCtx);
             else if (tile === TYPES.BLOCK) drawBrickBlock(px, py, cacheCtx);
         }
@@ -253,6 +254,63 @@ function draw() {
             // La diferencia es monocromática + alpha 0.50. No hay aura, ojos,
             // partículas ni una segunda animación superpuesta.
             drawBombermanSprite(ghost.x - ghost.width / 2, ghost.y - ghost.height / 2, ghost, { ghost: true });
+        }
+
+        function drawBiomeLiquidTileV630(x, y, gx, gy, targetCtx = ctx) {
+            const liquid = typeof getLiquidKindV630 === 'function' ? getLiquidKindV630() : null;
+            if (!liquid) return;
+            const north = typeof hasLiquidTileV630 === 'function' && hasLiquidTileV630(gx, gy - 1);
+            const south = typeof hasLiquidTileV630 === 'function' && hasLiquidTileV630(gx, gy + 1);
+            const west = typeof hasLiquidTileV630 === 'function' && hasLiquidTileV630(gx - 1, gy);
+            const east = typeof hasLiquidTileV630 === 'function' && hasLiquidTileV630(gx + 1, gy);
+
+            targetCtx.fillStyle = liquid.edge;
+            targetCtx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+            targetCtx.fillStyle = liquid.color;
+            targetCtx.fillRect(x + 3, y + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+
+            // Bordes redondeados entre celdas para que la mancha se lea como una sola masa.
+            const r = Math.max(5, TILE_SIZE * 0.18);
+            targetCtx.fillStyle = liquid.color;
+            if (north) targetCtx.fillRect(x + r, y, TILE_SIZE - r * 2, r + 2);
+            if (south) targetCtx.fillRect(x + r, y + TILE_SIZE - r - 2, TILE_SIZE - r * 2, r + 2);
+            if (west) targetCtx.fillRect(x, y + r, r + 2, TILE_SIZE - r * 2);
+            if (east) targetCtx.fillRect(x + TILE_SIZE - r - 2, y + r, r + 2, TILE_SIZE - r * 2);
+
+            // Brillo irregular, fijo por coordenada para que no "tiemble" en el cache.
+            const mark = Math.abs((gx * 37 + gy * 53 + Number(gameState.level || 1) * 17) % 4);
+            targetCtx.fillStyle = liquid.hi;
+            targetCtx.globalAlpha = 0.34;
+            if (liquid.shimmer) {
+                if (mark === 0 || mark === 2) {
+                    targetCtx.fillRect(x + TILE_SIZE * 0.18, y + TILE_SIZE * 0.30, TILE_SIZE * 0.28, 2);
+                    targetCtx.fillRect(x + TILE_SIZE * 0.54, y + TILE_SIZE * 0.62, TILE_SIZE * 0.22, 2);
+                } else {
+                    targetCtx.fillRect(x + TILE_SIZE * 0.30, y + TILE_SIZE * 0.50, TILE_SIZE * 0.22, 2);
+                }
+            } else {
+                targetCtx.fillRect(x + TILE_SIZE * 0.22, y + TILE_SIZE * 0.36, TILE_SIZE * 0.20, 2);
+            }
+            targetCtx.globalAlpha = 1;
+
+            if (liquid.id === 'lava') {
+                targetCtx.fillStyle = liquid.hi;
+                targetCtx.globalAlpha = 0.32;
+                targetCtx.fillRect(x + TILE_SIZE * 0.42, y + TILE_SIZE * 0.18, 3, TILE_SIZE * 0.36);
+                targetCtx.globalAlpha = 1;
+            } else if (liquid.id === 'toxic') {
+                targetCtx.fillStyle = liquid.hi;
+                targetCtx.globalAlpha = 0.24;
+                targetCtx.beginPath();
+                targetCtx.arc(x + TILE_SIZE * 0.70, y + TILE_SIZE * 0.28, Math.max(2, TILE_SIZE * 0.07), 0, Math.PI * 2);
+                targetCtx.fill();
+                targetCtx.globalAlpha = 1;
+            } else if (liquid.id === 'mud') {
+                targetCtx.fillStyle = liquid.edge;
+                targetCtx.globalAlpha = 0.32;
+                targetCtx.fillRect(x + TILE_SIZE * 0.60, y + TILE_SIZE * 0.58, TILE_SIZE * 0.16, 2);
+                targetCtx.globalAlpha = 1;
+            }
         }
 
         function drawSteelWall(x, y, targetCtx = ctx) {
@@ -823,12 +881,17 @@ function draw() {
             const moving = b?.motionState === 'moving' || b?.state === 'moving';
             const pulse = Math.sin(gameState.animFrame * 0.2 + (b?.bobPhase || 0)) * 0.08;
             let scale = 1.0 + pulse + (moving ? 0.04 * Math.sin((b.motionProgress || 0) * Math.PI * 2) : 0);
+            const submergedLiquid = typeof isBombSubmergedV631 === 'function' && isBombSubmergedV631(b);
+            const sinkElapsed = Number(b?.biomeLiquidState?.elapsedMs) || 0;
+            const sinkEffect = submergedLiquid && typeof getLiquidBombEffectV631 === 'function' ? getLiquidBombEffectV631(b.x, b.y) : null;
+            const sinkProgress = sinkEffect?.sinkBombAfterMs > 0 ? Math.max(0, Math.min(1, sinkElapsed / sinkEffect.sinkBombAfterMs)) : 0;
             ctx.save();
-            ctx.translate(cx, cy);
+            ctx.translate(cx, cy + (sinkProgress * TILE_SIZE * 0.22));
             if (typeof getBombElementDefV612 === 'function' && b?.elementV612 && b.elementV612 !== 'normal') { const ed=getBombElementDefV612(b); ctx.strokeStyle=ed.color; ctx.lineWidth=3; ctx.globalAlpha=.9; ctx.beginPath(); ctx.arc(0,0,TILE_SIZE*.48,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; }
             if (moving) ctx.rotate((b.motionRotation || 0) * 0.35);
             else if (Number.isFinite(b.windTilt)) ctx.rotate(Number(b.windTilt));
-            ctx.scale(scale, scale);
+            ctx.scale(scale * (1 - sinkProgress * 0.20), scale * (1 - sinkProgress * 0.20));
+            ctx.globalAlpha *= 1 - sinkProgress * 0.65;
 
             const bossBomb = (b.owner || 'player') === 'boss';
             // La bomba del jugador usa un aro cian; la bomba del boss usa identidad roja.

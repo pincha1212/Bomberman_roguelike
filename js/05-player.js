@@ -144,6 +144,9 @@
             const materialMods = typeof getMaterialMovementModifiersV67 === 'function'
                 ? getMaterialMovementModifiersV67(player)
                 : { speedMultiplier: 1 };
+            const liquidMods = typeof getBiomeLiquidPlayerEffectV631 === 'function'
+                ? getBiomeLiquidPlayerEffectV631(player)
+                : null;
             const gameplayMods = typeof getGameplayPowerupMovementModifiersV676 === 'function'
                 ? getGameplayPowerupMovementModifiersV676(player)
                 : { speedMultiplier: 1 };
@@ -151,6 +154,7 @@
                 * Number(movementMods.speedMultiplier || 1)
                 * Number(effectMods.speedMultiplier || 1)
                 * Number(materialMods.speedMultiplier || 1)
+                * Number(liquidMods?.playerSpeed || 1)
                 * Number(gameplayMods.speedMultiplier || 1)
                 * (typeof getHazardSpeedFactor === 'function' ? getHazardSpeedFactor() : 1));
 

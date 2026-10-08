@@ -68,6 +68,10 @@ function startBombV4Motion(bomb, targetX, targetY, durationMs = 360, arc = 18){
 
     const targetTileX = Math.round(worldTargetX / TILE_SIZE - 0.5);
     const targetTileY = Math.round(worldTargetY / TILE_SIZE - 0.5);
+    const liquidMotionMultiplier = typeof getBombLiquidMotionMultiplierV631 === 'function'
+        ? getBombLiquidMotionMultiplierV631(targetTileX, targetTileY)
+        : 1;
+    const adjustedDurationMs = Math.max(80, (Number(durationMs) || 360) * liquidMotionMultiplier);
     if (targetTileX < 0 || targetTileY < 0 ||
         targetTileX >= gameState.gridWidth || targetTileY >= gameState.gridHeight) {
         // Nunca permitimos que una bomba tenga un objetivo aéreo fuera del mapa.
@@ -85,7 +89,7 @@ function startBombV4Motion(bomb, targetX, targetY, durationMs = 360, arc = 18){
     bomb.state = BOMB_V4_STATES.MOVING;
     bomb.motionState = BOMB_V4_STATES.MOVING;
     bomb.motionProgress = 0;
-    bomb.motionTimer = Math.max(80, Number(durationMs) || 360);
+    bomb.motionTimer = adjustedDurationMs;
     bomb.motionDuration = bomb.motionTimer;
     bomb.motionStartX = startWorldX;
     bomb.motionStartY = startWorldY;
@@ -502,13 +506,34 @@ function bombUpdate(dt){
         ensureBombV4State(bomb);
 
         // La mecha corre durante ARMADO y VUELO, pero queda pausada en CARRIED.
-        if(bomb.state !== BOMB_V4_STATES.CARRIED){
-            bomb.timer-=dt;
+        let liquidPausedFuse = false;
+        let liquidFuseRate = 1;
+        const preLiquidEffect = typeof getLiquidBombEffectV631 === 'function'
+            ? getLiquidBombEffectV631(bomb.x, bomb.y)
+            : null;
+        if (bomb.state !== BOMB_V4_STATES.CARRIED && preLiquidEffect) {
+            liquidPausedFuse = Number(preLiquidEffect.sinkBombAfterMs) > 0 || Number(preLiquidEffect.bombFuseRate) === 0;
+            liquidFuseRate = Number(preLiquidEffect.bombFuseRate);
+        }
+        if(bomb.state !== BOMB_V4_STATES.CARRIED && !liquidPausedFuse){
+            bomb.timer-=dt * liquidFuseRate;
             if(bomb.timer<=0) bomb.pendingDetonation=true;
         }
 
         updateBombV4Motion(bomb, dt);
         ensureBombV4State(bomb);
+
+        const liquidProcess = typeof processBombLiquidV631 === 'function'
+            ? processBombLiquidV631(bomb, dt)
+            : { consumed:false, pausedFuse:false, instant:false };
+        if (liquidProcess.consumed) {
+            gameState.bombs.splice(i, 1);
+            if (bomb.countsTowardPlayerCapacity !== false) player.bombsPlaced = Math.max(0, player.bombsPlaced - 1);
+            if (typeof addParticles === 'function') addParticles((bomb.x + 0.5) * TILE_SIZE, (bomb.y + 0.5) * TILE_SIZE, 'particleImpact', 8);
+            continue;
+        }
+        if (liquidProcess.instant) bomb.pendingDetonation = true;
+        if (liquidProcess.pausedFuse) bomb.pendingDetonation = false;
 
         if(bomb.state !== BOMB_V4_STATES.ARMED) continue;
         if(bomb.timer>0 && bomb.timer<=BOMB_HANDLING.warningStart){

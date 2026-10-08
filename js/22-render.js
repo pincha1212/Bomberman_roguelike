@@ -231,6 +231,7 @@ function draw() {
             if (getRenderProfileV65().showAmbientDust) drawAmbientDust();
             if (getRenderProfileV65().showLighting) drawLighting();
             if (getRenderProfileV65().showCombatFeedback) renderCombatFeedback();
+            if (typeof drawLivingBiomeOverlayV620 === 'function') drawLivingBiomeOverlayV620(ctx, canvas.width, canvas.height);
         }
 
         function drawDeathEchoV61() {
@@ -801,6 +802,8 @@ function draw() {
             const skinShade = enemySkin?.shade || e.type.color;
             const skinAccent = enemySkin?.accent || themeColorV46('enemyEye', '#ffffff');
             const skinMotif = enemySkin?.motif || 'classic';
+            const biomeFoliageCover = typeof isLivingBiomeFoliageV620 === 'function' && isLivingBiomeFoliageV620(e);
+            if (biomeFoliageCover) ctx.globalAlpha *= 0.62;
             if (e.elite) {
                 ctx.strokeStyle = gameState.roomType.color;
                 ctx.globalAlpha = 0.45 + Math.sin(gameState.animFrame * 0.15) * 0.1;

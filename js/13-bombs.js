@@ -502,6 +502,15 @@ function bombUpdate(dt){
         // La mecha corre durante ARMADO y VUELO, pero queda pausada en CARRIED.
         let liquidPausedFuse = false;
         let liquidFuseRate = 1;
+        let biomeBombRate = 1;
+        let biomeBombMotion = 1;
+        let biomeBombInstant = false;
+        const biomeBombEffect = typeof getLivingBiomeBombModifiersV620 === 'function' ? getLivingBiomeBombModifiersV620(bomb) : null;
+        if (biomeBombEffect) {
+            biomeBombRate = Math.max(0.1, Number(biomeBombEffect.fuseRate) || 1);
+            biomeBombMotion = Math.max(0.4, Number(biomeBombEffect.motionMultiplier) || 1);
+            biomeBombInstant = !!biomeBombEffect.instant;
+        }
         const preLiquidEffect = typeof getLiquidBombEffectV631 === 'function'
             ? getLiquidBombEffectV631(bomb.x, bomb.y)
             : null;
@@ -510,11 +519,12 @@ function bombUpdate(dt){
             liquidFuseRate = Number(preLiquidEffect.bombFuseRate);
         }
         if(bomb.state !== BOMB_V4_STATES.CARRIED && !liquidPausedFuse){
-            bomb.timer-=dt * liquidFuseRate;
+            bomb.timer-=dt * liquidFuseRate * biomeBombRate;
             if(bomb.timer<=0) bomb.pendingDetonation=true;
         }
 
-        updateBombV4Motion(bomb, dt);
+        if (biomeBombMotion !== 1) bomb.__biomeMotionMultiplierV620 = biomeBombMotion;
+        updateBombV4Motion(bomb, dt * biomeBombMotion);
         ensureBombV4State(bomb);
 
         const liquidProcess = typeof processBombLiquidV631 === 'function'
@@ -526,7 +536,7 @@ function bombUpdate(dt){
             if (typeof addParticles === 'function') addParticles((bomb.x + 0.5) * TILE_SIZE, (bomb.y + 0.5) * TILE_SIZE, 'particleImpact', 8);
             continue;
         }
-        if (liquidProcess.instant) bomb.pendingDetonation = true;
+        if (liquidProcess.instant || biomeBombInstant) bomb.pendingDetonation = true;
         if (liquidProcess.pausedFuse) bomb.pendingDetonation = false;
 
         if(bomb.state !== BOMB_V4_STATES.ARMED) continue;

@@ -270,7 +270,7 @@ function enemyAxisLineClearV312(ex, ey, px, py) {
     return false;
 }
 
-function enemyCanSeePlayerV312(e) {
+function enemyCanSeePlayerV312(e, visionRange = 9) {
     const ex = e.x;
     const ey = e.y;
     const px = player.x + player.width / 2;
@@ -281,7 +281,7 @@ function enemyCanSeePlayerV312(e) {
         y: Math.floor(py / TILE_SIZE)
     };
     const tileDistance = Math.abs(pxTile.x - exTile.x) + Math.abs(pxTile.y - exTile.y);
-    if (tileDistance > 9) return false;
+    if (tileDistance > Math.max(1, Number(visionRange) || 9)) return false;
 
     // En proximidad inmediata, el enemigo detecta al jugador aunque haya girado
     // apenas dentro de la misma zona del corredor.
@@ -861,7 +861,8 @@ function updateEnemyIntentV312(e, index, dt) {
 
     if (ai.visionTimer <= 0) {
         ai.visionTimer = enemyAI_V312.visionInterval + (index % 3) * 9;
-        const sees = enemyCanSeePlayerV312(e);
+        const livingVision = typeof getLivingBiomeEnemyVisionRangeV620 === 'function' ? getLivingBiomeEnemyVisionRangeV620(e) : null;
+        const sees = enemyCanSeePlayerV312(e, livingVision);
         ai.seesPlayer = sees;
         if (sees) {
             const pt = enemyPlayerTileV312();
@@ -1002,7 +1003,8 @@ function getEnemyMovementSpeedV610(e) {
         * threatMultiplier
         * gameplaySpeedMultiplier
         * (typeof getEnemyBiomeSpeciesMovementMultiplierV615 === 'function' ? getEnemyBiomeSpeciesMovementMultiplierV615(e) : 1)
-        * (typeof getEnemyBiomeSpeciesEnvironmentMovementMultiplierV615 === 'function' ? getEnemyBiomeSpeciesEnvironmentMovementMultiplierV615(e) : 1);
+        * (typeof getEnemyBiomeSpeciesEnvironmentMovementMultiplierV615 === 'function' ? getEnemyBiomeSpeciesEnvironmentMovementMultiplierV615(e) : 1)
+        * (typeof getLivingBiomeEnemyMovementMultiplierV620 === 'function' ? getLivingBiomeEnemyMovementMultiplierV620(e) : 1);
 }
 
 function moveEnemyV312(e, dt) {

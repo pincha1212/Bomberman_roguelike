@@ -100,12 +100,14 @@
             const gameplayMods = typeof getGameplayPowerupMovementModifiersV676 === 'function'
                 ? getGameplayPowerupMovementModifiersV676(player)
                 : { speedMultiplier: 1 };
+            const windBias = Number(player.__biomeWindPushV620 || 0);
             const effectiveSpeed = Math.max(0.1, player.speed
                 * Number(movementMods.speedMultiplier || 1)
                 * Number(effectMods.speedMultiplier || 1)
                 * Number(materialMods.speedMultiplier || 1)
                 * Number(liquidMods?.playerSpeed || 1)
                 * Number(gameplayMods.speedMultiplier || 1)
+                * (1 + (windBias * 0.045))
                 * (typeof getHazardSpeedFactor === 'function' ? getHazardSpeedFactor() : 1));
 
             const playerTile = gridCurrentTile(player, 'player');
@@ -156,6 +158,7 @@
                 }
             }
 
+            player.__biomeWindPushV620 = 0;
             player.isMoving = moved;
             if (moved) player.walkCycle += motionDt * 0.015;
 

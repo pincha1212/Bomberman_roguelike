@@ -97,6 +97,7 @@
             updateHazards(dt);
             if (typeof materialUpdateV60 === 'function') materialUpdateV60(dt);
             if (typeof updateBiomeLiquidPlayerEffectsV631 === 'function') updateBiomeLiquidPlayerEffectsV631(dt);
+            if (typeof updateLivingBiomeV620 === 'function') updateLivingBiomeV620(dt);
             updateBoss(dt);
 
             // Shake countdown

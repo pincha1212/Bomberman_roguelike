@@ -1,9 +1,221 @@
 // Bomberman Roguelike v4.6 — Canvas rendering and theme-backed sprite drawing
+// V6.22: 11 paredes de bioma procedurales integradas al caché V6.21
 // V3.17: cache de terreno estático para evitar reconstruir la cuadrícula completa
 // en cada frame. El mapa se regenera solo cuando cambia la referencia/revisión.
 
 // V6.21: infraestructura común para tiles procedurales en Canvas 2D.
 // El caché por tile complementa al caché de terreno existente; no crea un segundo renderer.
+
+// V6.22: paredes procedurales por bioma. Solo visual; reutiliza el caché V6.21.
+const BIOME_WALL_SPECS_V622 = Object.freeze({
+    classic: Object.freeze({ family: 'structured', base: '#475569', light: '#94a3b8', shadow: '#334155', deep: '#0f172a', accent: '#38bdf8', inset: '#1e293b' }),
+    winter: Object.freeze({ family: 'rock', base: '#526f7e', light: '#d9f4ff', shadow: '#314956', deep: '#1b2c35', accent: '#8ee8ff', secondary: '#6ea7bb', detail: 'ice' }),
+    autumn: Object.freeze({ family: 'organic', base: '#3f2418', light: '#8e5a32', shadow: '#24140d', deep: '#170c08', accent: '#d28a2e', secondary: '#63351f', detail: 'roots' }),
+    spring: Object.freeze({ family: 'organic', base: '#687164', light: '#b5c4ab', shadow: '#404a3e', deep: '#252d23', accent: '#4f8f4f', secondary: '#7da263', detail: 'vine' }),
+    summer: Object.freeze({ family: 'structured', base: '#a84f32', light: '#e28a5f', shadow: '#70321f', deep: '#4b2116', accent: '#c97a55', secondary: '#8f422a', detail: 'brick' }),
+    underground: Object.freeze({ family: 'rock', base: '#292a32', light: '#666674', shadow: '#17181f', deep: '#0b0b10', accent: '#a56cff', secondary: '#573987', detail: 'crystal' }),
+    clouds: Object.freeze({ family: 'cloud', base: '#66788c', light: '#aabbd0', shadow: '#415064', deep: '#2d3745', accent: '#ffe34f', secondary: '#8296ad', detail: 'lightning' }),
+    mountains: Object.freeze({ family: 'rock', base: '#4d535b', light: '#929aa4', shadow: '#2e3339', deep: '#171b20', accent: '#c1cad2', secondary: '#646c76', detail: 'facets' }),
+    beach: Object.freeze({ family: 'organic', base: '#98755a', light: '#dbc39d', shadow: '#684d3b', deep: '#433125', accent: '#d76b49', secondary: '#b79a6f', detail: 'coral' }),
+    space: Object.freeze({ family: 'structured', base: '#384652', light: '#7e95a7', shadow: '#202932', deep: '#10161b', accent: '#53b8d9', secondary: '#566673', detail: 'panel' }),
+    sky: Object.freeze({ family: 'column', base: '#d8d5ce', light: '#fffdf6', shadow: '#aaa69d', deep: '#78736b', accent: '#cabca3', secondary: '#ece7db', detail: 'marble' }),
+    inferno: Object.freeze({ family: 'rock', base: '#34201c', light: '#704337', shadow: '#1d100e', deep: '#100807', accent: '#ff7a21', secondary: '#8d2f1e', detail: 'magma' })
+});
+
+function getBiomeWallSpecV622() {
+    const themeId = typeof getThemeV46 === 'function' ? (getThemeV46()?.id || 'classic') : 'classic';
+    return BIOME_WALL_SPECS_V622[themeId] || BIOME_WALL_SPECS_V622.classic;
+}
+
+function drawWallFaceV622(targetCtx, x, y, size, spec) {
+    const edge = Math.max(2, Math.floor(size * 0.06));
+    targetCtx.fillStyle = spec.shadow;
+    targetCtx.fillRect(x, y, size, size);
+    targetCtx.fillStyle = spec.base;
+    targetCtx.fillRect(x + edge, y + edge, size - edge * 2, size - edge * 2);
+    targetCtx.fillStyle = spec.light;
+    targetCtx.globalAlpha = 0.36;
+    targetCtx.fillRect(x + edge, y + edge, size - edge * 2, Math.max(2, edge));
+    targetCtx.fillRect(x + edge, y + edge, Math.max(2, edge), size - edge * 2);
+    targetCtx.globalAlpha = 1;
+    targetCtx.fillStyle = spec.deep;
+    targetCtx.globalAlpha = 0.30;
+    targetCtx.fillRect(x + size * 0.16, y + size * 0.16, size * 0.68, size * 0.68);
+    targetCtx.globalAlpha = 1;
+}
+
+function drawRockWallFamilyV622(targetCtx, x, y, size, spec, seed = 0) {
+    drawWallFaceV622(targetCtx, x, y, size, spec);
+    const n = Math.abs(Number(seed) || 0) + 1;
+    const inset = size * 0.11;
+    const colors = [spec.base, spec.secondary || spec.shadow, spec.light];
+    for (let i = 0; i < 5; i++) {
+        const px = x + inset + ((n * (i + 7) * 23) % 67) / 67 * (size - inset * 2);
+        const py = y + inset + ((n * (i + 3) * 29) % 71) / 71 * (size - inset * 2);
+        const w = size * (0.18 + ((n + i) % 4) * 0.035);
+        const h = size * (0.14 + ((n + i * 2) % 3) * 0.04);
+        drawTilePolygonV621(targetCtx, [
+            [px, py + h * 0.35], [px + w * 0.35, py], [px + w, py + h * 0.24],
+            [px + w * 0.78, py + h], [px + w * 0.22, py + h * 0.82]
+        ], colors[i % colors.length]);
+    }
+    drawTileCrackV621(targetCtx, x, y, size, spec.accent, n, 2);
+    drawTileNoiseV621(targetCtx, x + inset, y + inset, size - inset * 2, spec.accent, n + 5, 8, 0.11);
+
+    if (spec.detail === 'crystal') {
+        const crystal = spec.accent;
+        drawTilePolygonV621(targetCtx, [[x + size*.16, y + size*.75], [x + size*.25, y + size*.48], [x + size*.31, y + size*.76]], crystal);
+        drawTilePolygonV621(targetCtx, [[x + size*.68, y + size*.72], [x + size*.76, y + size*.34], [x + size*.84, y + size*.72]], spec.secondary);
+    } else if (spec.detail === 'magma') {
+        targetCtx.save();
+        targetCtx.strokeStyle = spec.accent;
+        targetCtx.lineWidth = Math.max(2, size * 0.04);
+        targetCtx.globalAlpha = 0.9;
+        targetCtx.beginPath();
+        targetCtx.moveTo(x + size*.22, y + size*.10);
+        targetCtx.lineTo(x + size*.34, y + size*.35);
+        targetCtx.lineTo(x + size*.27, y + size*.57);
+        targetCtx.lineTo(x + size*.45, y + size*.83);
+        targetCtx.moveTo(x + size*.72, y + size*.16);
+        targetCtx.lineTo(x + size*.62, y + size*.45);
+        targetCtx.lineTo(x + size*.76, y + size*.70);
+        targetCtx.stroke();
+        targetCtx.restore();
+    } else if (spec.detail === 'ice') {
+        drawTilePolygonV621(targetCtx, [[x+size*.18,y+size*.15],[x+size*.32,y+size*.08],[x+size*.28,y+size*.28]], spec.light);
+        drawTilePolygonV621(targetCtx, [[x+size*.69,y+size*.78],[x+size*.82,y+size*.63],[x+size*.84,y+size*.88]], spec.accent);
+    }
+}
+
+function drawOrganicWallFamilyV622(targetCtx, x, y, size, spec, seed = 0) {
+    drawWallFaceV622(targetCtx, x, y, size, spec);
+    if (spec.detail === 'roots') {
+        const trunkW = size * 0.22;
+        targetCtx.fillStyle = spec.base;
+        targetCtx.fillRect(x + size*.14, y + size*.08, trunkW, size*.78);
+        targetCtx.fillRect(x + size*.52, y + size*.04, trunkW, size*.82);
+        targetCtx.fillStyle = spec.light;
+        targetCtx.fillRect(x + size*.17, y + size*.12, Math.max(2, size*.045), size*.62);
+        targetCtx.fillRect(x + size*.55, y + size*.08, Math.max(2, size*.045), size*.66);
+        targetCtx.fillStyle = spec.shadow;
+        targetCtx.beginPath();
+        targetCtx.moveTo(x+size*.12,y+size*.88); targetCtx.lineTo(x+size*.29,y+size*.70); targetCtx.lineTo(x+size*.38,y+size*.88); targetCtx.closePath(); targetCtx.fill();
+        targetCtx.beginPath();
+        targetCtx.moveTo(x+size*.43,y+size*.88); targetCtx.lineTo(x+size*.61,y+size*.70); targetCtx.lineTo(x+size*.86,y+size*.89); targetCtx.closePath(); targetCtx.fill();
+        drawTileNoiseV621(targetCtx, x+size*.1, y+size*.08, size*.8, spec.accent, seed, 10, .14);
+    } else if (spec.detail === 'vine') {
+        for (let i = 0; i < 4; i++) {
+            targetCtx.save();
+            targetCtx.strokeStyle = i % 2 ? spec.accent : spec.secondary;
+            targetCtx.lineWidth = Math.max(2, size*.035);
+            targetCtx.beginPath();
+            targetCtx.moveTo(x + size*(0.12 + i*.23), y + size*.08);
+            targetCtx.quadraticCurveTo(x + size*(0.02 + i*.25), y + size*.42, x + size*(0.16 + i*.19), y + size*.90);
+            targetCtx.stroke();
+            targetCtx.restore();
+        }
+        drawTileNoiseV621(targetCtx, x+size*.08, y+size*.08, size*.84, spec.accent, seed+9, 14, .12);
+    } else if (spec.detail === 'coral') {
+        targetCtx.fillStyle = spec.accent;
+        targetCtx.fillRect(x+size*.16, y+size*.72, size*.16, size*.14);
+        targetCtx.fillRect(x+size*.36, y+size*.63, size*.10, size*.23);
+        targetCtx.fillRect(x+size*.72, y+size*.70, size*.13, size*.15);
+        targetCtx.fillStyle = spec.secondary;
+        for (let i=0;i<4;i++) targetCtx.fillRect(x+size*(.22+i*.16), y+size*(.20+(i%2)*.08), size*.05, size*.05);
+    }
+}
+
+function drawStructuredWallFamilyV622(targetCtx, x, y, size, spec, seed = 0) {
+    drawWallFaceV622(targetCtx, x, y, size, spec);
+    const edge = Math.max(2, size*.045);
+    targetCtx.strokeStyle = spec.shadow;
+    targetCtx.lineWidth = Math.max(2, size*.035);
+    targetCtx.beginPath();
+    targetCtx.moveTo(x+size*.05, y+size*.33); targetCtx.lineTo(x+size*.95, y+size*.33);
+    targetCtx.moveTo(x+size*.05, y+size*.67); targetCtx.lineTo(x+size*.95, y+size*.67);
+    targetCtx.stroke();
+
+    if (spec.detail === 'brick') {
+        targetCtx.beginPath();
+        targetCtx.moveTo(x+size*.50,y+edge); targetCtx.lineTo(x+size*.50,y+size*.33);
+        targetCtx.moveTo(x+size*.26,y+size*.33); targetCtx.lineTo(x+size*.26,y+size*.67);
+        targetCtx.moveTo(x+size*.74,y+size*.33); targetCtx.lineTo(x+size*.74,y+size*.67);
+        targetCtx.moveTo(x+size*.50,y+size*.67); targetCtx.lineTo(x+size*.50,y+size-edge);
+        targetCtx.stroke();
+    } else {
+        targetCtx.fillStyle = spec.accent;
+        const rivet = Math.max(2, size*.045);
+        [[.13,.13],[.87,.13],[.13,.87],[.87,.87]].forEach(([rx,ry]) => targetCtx.fillRect(x+size*rx-rivet/2,y+size*ry-rivet/2,rivet,rivet));
+        targetCtx.fillStyle = spec.secondary || spec.light;
+        targetCtx.globalAlpha = .35;
+        targetCtx.fillRect(x+size*.20,y+size*.18,size*.60,Math.max(2,size*.035));
+        targetCtx.globalAlpha = 1;
+    }
+}
+
+function drawCloudWallV622(targetCtx, x, y, size, spec, seed = 0) {
+    drawWallFaceV622(targetCtx, x, y, size, spec);
+    targetCtx.fillStyle = spec.secondary;
+    [[.24,.55,.23],[.46,.39,.30],[.70,.55,.24]].forEach(([cx,cy,r]) => {
+        targetCtx.beginPath();
+        targetCtx.arc(x+size*cx,y+size*cy,size*r,0,Math.PI*2);
+        targetCtx.fill();
+    });
+    targetCtx.fillStyle = spec.base;
+    targetCtx.fillRect(x+size*.12,y+size*.58,size*.76,size*.18);
+    targetCtx.fillStyle = spec.accent;
+    drawTilePolygonV621(targetCtx, [[x+size*.68,y+size*.12],[x+size*.61,y+size*.42],[x+size*.69,y+size*.42],[x+size*.62,y+size*.78]], spec.accent);
+    drawTileNoiseV621(targetCtx, x+size*.12, y+size*.18, size*.76, spec.light, seed, 8, .09);
+}
+
+function drawSkyWallV622(targetCtx, x, y, size, spec) {
+    drawWallFaceV622(targetCtx, x, y, size, spec);
+    const cols = [0.18,0.46,0.74];
+    cols.forEach((offset, i) => {
+        const w = size*.18;
+        targetCtx.fillStyle = spec.secondary;
+        targetCtx.fillRect(x+size*offset, y+size*.16, w, size*.66);
+        targetCtx.fillStyle = spec.light;
+        targetCtx.fillRect(x+size*offset, y+size*.20, w*.22, size*.60);
+        targetCtx.fillStyle = spec.shadow;
+        targetCtx.fillRect(x+size*(offset+w/size-.06), y+size*.20, size*.06, size*.60);
+        targetCtx.fillStyle = spec.accent;
+        targetCtx.fillRect(x+size*(offset-.04), y+size*.09, w+size*.08, size*.10);
+        targetCtx.fillRect(x+size*(offset-.04), y+size*.76, w+size*.08, size*.09);
+    });
+    drawTileCrackV621(targetCtx, x, y, size, spec.accent, 7, 1);
+}
+
+function drawWinterWallV622(targetCtx, x, y, size, spec, seed) { drawRockWallFamilyV622(targetCtx, x, y, size, spec, seed); }
+function drawAutumnWallV622(targetCtx, x, y, size, spec, seed) { drawOrganicWallFamilyV622(targetCtx, x, y, size, spec, seed); }
+function drawSpringWallV622(targetCtx, x, y, size, spec, seed) { drawOrganicWallFamilyV622(targetCtx, x, y, size, spec, seed); }
+function drawSummerWallV622(targetCtx, x, y, size, spec, seed) { drawStructuredWallFamilyV622(targetCtx, x, y, size, spec, seed); }
+function drawUndergroundWallV622(targetCtx, x, y, size, spec, seed) { drawRockWallFamilyV622(targetCtx, x, y, size, spec, seed); }
+function drawCloudWallEntryV622(targetCtx, x, y, size, spec, seed) { drawCloudWallV622(targetCtx, x, y, size, spec, seed); }
+function drawMountainWallV622(targetCtx, x, y, size, spec, seed) { drawRockWallFamilyV622(targetCtx, x, y, size, spec, seed); }
+function drawBeachWallV622(targetCtx, x, y, size, spec, seed) { drawOrganicWallFamilyV622(targetCtx, x, y, size, spec, seed); }
+function drawSpaceWallV622(targetCtx, x, y, size, spec, seed) { drawStructuredWallFamilyV622(targetCtx, x, y, size, spec, seed); }
+function drawSkyWallEntryV622(targetCtx, x, y, size, spec, seed) { drawSkyWallV622(targetCtx, x, y, size, spec, seed); }
+function drawInfernoWallV622(targetCtx, x, y, size, spec, seed) { drawRockWallFamilyV622(targetCtx, x, y, size, spec, seed); }
+
+function drawBiomeWallV622(targetCtx, x, y, size, seed = 0) {
+    const themeId = typeof getThemeV46 === 'function' ? (getThemeV46()?.id || 'classic') : 'classic';
+    const spec = BIOME_WALL_SPECS_V622[themeId] || BIOME_WALL_SPECS_V622.classic;
+    switch (themeId) {
+        case 'winter': return drawWinterWallV622(targetCtx, x, y, size, spec, seed);
+        case 'autumn': return drawAutumnWallV622(targetCtx, x, y, size, spec, seed);
+        case 'spring': return drawSpringWallV622(targetCtx, x, y, size, spec, seed);
+        case 'summer': return drawSummerWallV622(targetCtx, x, y, size, spec, seed);
+        case 'underground': return drawUndergroundWallV622(targetCtx, x, y, size, spec, seed);
+        case 'clouds': return drawCloudWallEntryV622(targetCtx, x, y, size, spec, seed);
+        case 'mountains': return drawMountainWallV622(targetCtx, x, y, size, spec, seed);
+        case 'beach': return drawBeachWallV622(targetCtx, x, y, size, spec, seed);
+        case 'space': return drawSpaceWallV622(targetCtx, x, y, size, spec, seed);
+        case 'sky': return drawSkyWallEntryV622(targetCtx, x, y, size, spec, seed);
+        case 'inferno': return drawInfernoWallV622(targetCtx, x, y, size, spec, seed);
+        default: return drawStructuredWallFamilyV622(targetCtx, x, y, size, spec, seed);
+    }
+}
 const renderTileCacheV621 = new Map();
 
 const BIOME_TILE_PROFILES_V621 = Object.freeze({
@@ -189,8 +401,10 @@ function buildBiomeTileCacheV621(type, variant = 0) {
     if (!tileCtx) return null;
 
     const profile = getBiomeTileProfileV621(type);
-    if (profile === 'base') {
-        drawBiomeTileBaseV621(tileCtx, 0, 0, type, TILE_SIZE, variant);
+    if (type === 'wall' && typeof drawBiomeWallV622 === 'function') {
+        // V6.22: WALL pasa por el nuevo dibujo procedural, siempre dentro del caché V6.21.
+        // drawSteelWall() se conserva por ahora como código legado hasta una limpieza posterior.
+        drawBiomeWallV622(tileCtx, 0, 0, TILE_SIZE, variant);
     } else {
         drawBiomeTileBaseV621(tileCtx, 0, 0, type, TILE_SIZE, variant);
     }

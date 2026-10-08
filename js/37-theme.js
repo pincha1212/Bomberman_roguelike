@@ -110,6 +110,7 @@
             floor: 'procedural:floor',
             wall: 'procedural:steel-wall',
             brick: 'procedural:wood-block',
+            blockStyle: 'wood-crate', barrelStyle: 'wood-barrel',
             bomb: 'procedural:bomb',
             fire: 'procedural:explosion',
             player: 'procedural:bomberman',
@@ -207,6 +208,7 @@
         },
         {
             floor: 'procedural:ice-floor', wall: 'procedural:ice-wall', brick: 'procedural:frozen-block',
+            blockStyle: 'ice-crate', barrelStyle: 'ice-drum',
             bomb: 'procedural:ice-bomb', fire: 'procedural:frost-fire'
         },
         { tipo: 'snow', color: 'ambientDust', densidad: 1, velocidad: 0.42, sizeMin: 1, sizeMax: 3, alpha: 0.55 }
@@ -272,6 +274,7 @@
         },
         {
             floor: 'procedural:scorched-floor', wall: 'procedural:basalt-wall', brick: 'procedural:charred-block',
+            blockStyle: 'lava-crate', barrelStyle: 'lava-drum',
             bomb: 'procedural:inferno-bomb', fire: 'procedural:inferno-flame'
         },
         { tipo: 'ember', color: 'ambientDust', densidad: 0.9, velocidad: 0.52, sizeMin: 1, sizeMax: 2, alpha: 0.58 }
@@ -289,7 +292,7 @@
             particleImpact:'#f7d18a', particleFire:'#fb923c', particleBlock:'#b45309', particleDanger:'#ef4444', particleShield:'#f59e0b', particleLoot:'#fbbf24', particleEnemy:'#fb923c', particleEnemyElite:'#fda4af', particleBoss:'#dc2626',
             feedbackRingSoft:'#fed7aa', feedbackFlash:'#fff7ed', ambientDust:'rgba(255,191,105,.48)'
         },
-        { floor:'procedural:autumn-floor', wall:'procedural:autumn-wall', brick:'procedural:autumn-block', bomb:'procedural:autumn-bomb', fire:'procedural:autumn-flame' },
+        { floor:'procedural:autumn-floor', wall:'procedural:autumn-wall', brick:'procedural:autumn-block', blockStyle:'leaf-crate', barrelStyle:'leaf-barrel', bomb:'procedural:autumn-bomb', fire:'procedural:autumn-flame' },
         { tipo:'dust', color:'ambientDust', densidad:1.15, velocidad:.26, sizeMin:1, sizeMax:2, alpha:.5 }
     );
 
@@ -305,7 +308,7 @@
             particleImpact:'#d9f99d', particleFire:'#86efac', particleBlock:'#65a30d', particleDanger:'#fb7185', particleShield:'#67e8f9', particleLoot:'#facc15', particleEnemy:'#34d399', particleEnemyElite:'#f9a8d4', particleBoss:'#e879f9',
             feedbackRingSoft:'#bbf7d0', feedbackFlash:'#f0fdf4', ambientDust:'rgba(187,247,208,.42)'
         },
-        { floor:'procedural:spring-floor', wall:'procedural:moss-wall', brick:'procedural:hedge-block', bomb:'procedural:spring-bomb', fire:'procedural:verdant-flame' },
+        { floor:'procedural:spring-floor', wall:'procedural:moss-wall', brick:'procedural:hedge-block', blockStyle:'garden-crate', barrelStyle:'garden-pot', bomb:'procedural:spring-bomb', fire:'procedural:verdant-flame' },
         { tipo:'dust', color:'ambientDust', densidad:1.2, velocidad:.18, sizeMin:1, sizeMax:2, alpha:.4 }
     );
 
@@ -321,7 +324,7 @@
             particleImpact:'#fde68a', particleFire:'#fdba74', particleBlock:'#d97706', particleDanger:'#f43f5e', particleShield:'#2dd4bf', particleLoot:'#fde047', particleEnemy:'#f59e0b', particleEnemyElite:'#fb7185', particleBoss:'#ef4444',
             feedbackRingSoft:'#ccfbf1', feedbackFlash:'#fffbeb', ambientDust:'rgba(253,224,71,.38)'
         },
-        { floor:'procedural:sand-floor', wall:'procedural:sunstone-wall', brick:'procedural:sand-block', bomb:'procedural:sun-bomb', fire:'procedural:solar-flame' },
+        { floor:'procedural:sand-floor', wall:'procedural:sunstone-wall', brick:'procedural:sand-block', blockStyle:'sun-crate', barrelStyle:'sun-drum', bomb:'procedural:sun-bomb', fire:'procedural:solar-flame' },
         { tipo:'dust', color:'ambientDust', densidad:.8, velocidad:.12, sizeMin:1, sizeMax:2, alpha:.36 }
     );
 
@@ -337,7 +340,7 @@
             particleImpact:'#e9d5ff', particleFire:'#d8b4fe', particleBlock:'#8b5cf6', particleDanger:'#f472b6', particleShield:'#a78bfa', particleLoot:'#f5d0fe', particleEnemy:'#8b5cf6', particleEnemyElite:'#f0abfc', particleBoss:'#c026d3',
             feedbackRingSoft:'#ddd6fe', feedbackFlash:'#faf5ff', ambientDust:'rgba(196,181,253,.36)'
         },
-        { floor:'procedural:cavern-floor', wall:'procedural:deep-wall', brick:'procedural:ore-block', bomb:'procedural:crystal-bomb', fire:'procedural:arcane-flame' },
+        { floor:'procedural:cavern-floor', wall:'procedural:deep-wall', brick:'procedural:ore-block', blockStyle:'ore-crate', barrelStyle:'ore-barrel', bomb:'procedural:crystal-bomb', fire:'procedural:arcane-flame' },
         { tipo:'dust', color:'ambientDust', densidad:1.05, velocidad:.2, sizeMin:1, sizeMax:2, alpha:.34 }
     );
 
@@ -353,7 +356,7 @@
             particleImpact:'#e0f2fe', particleFire:'#bae6fd', particleBlock:'#94a3b8', particleDanger:'#60a5fa', particleShield:'#a5f3fc', particleLoot:'#fde68a', particleEnemy:'#38bdf8', particleEnemyElite:'#c4b5fd', particleBoss:'#818cf8',
             feedbackRingSoft:'#dbeafe', feedbackFlash:'#f8fafc', ambientDust:'rgba(219,234,254,.54)'
         },
-        { floor:'procedural:cloud-floor', wall:'procedural:sky-wall', brick:'procedural:cloud-block', bomb:'procedural:cloud-bomb', fire:'procedural:sky-flame' },
+        { floor:'procedural:cloud-floor', wall:'procedural:sky-wall', brick:'procedural:cloud-block', blockStyle:'cloud-crate', barrelStyle:'cloud-canister', bomb:'procedural:cloud-bomb', fire:'procedural:sky-flame' },
         { tipo:'snow', color:'ambientDust', densidad:.75, velocidad:.28, sizeMin:1, sizeMax:3, alpha:.38 }
     );
 
@@ -369,7 +372,7 @@
             particleImpact:'#e2e8f0', particleFire:'#7dd3fc', particleBlock:'#a8a29e', particleDanger:'#fb7185', particleShield:'#bae6fd', particleLoot:'#fde68a', particleEnemy:'#94a3b8', particleEnemyElite:'#fca5a5', particleBoss:'#64748b',
             feedbackRingSoft:'#e2e8f0', feedbackFlash:'#f8fafc', ambientDust:'rgba(203,213,225,.34)'
         },
-        { floor:'procedural:mountain-floor', wall:'procedural:rock-wall', brick:'procedural:stone-block', bomb:'procedural:granite-bomb', fire:'procedural:blue-flame' },
+        { floor:'procedural:mountain-floor', wall:'procedural:rock-wall', brick:'procedural:stone-block', blockStyle:'rock-crate', barrelStyle:'rock-barrel', bomb:'procedural:granite-bomb', fire:'procedural:blue-flame' },
         { tipo:'snow', color:'ambientDust', densidad:.48, velocidad:.2, sizeMin:1, sizeMax:2, alpha:.3 }
     );
 
@@ -385,7 +388,7 @@
             particleImpact:'#cffafe', particleFire:'#67e8f9', particleBlock:'#d6a76d', particleDanger:'#fb7185', particleShield:'#5eead4', particleLoot:'#fef08a', particleEnemy:'#06b6d4', particleEnemyElite:'#f9a8d4', particleBoss:'#0ea5e9',
             feedbackRingSoft:'#ccfbf1', feedbackFlash:'#ecfeff', ambientDust:'rgba(103,232,249,.34)'
         },
-        { floor:'procedural:shore-floor', wall:'procedural:coral-wall', brick:'procedural:sandstone-block', bomb:'procedural:tide-bomb', fire:'procedural:water-flame' },
+        { floor:'procedural:shore-floor', wall:'procedural:coral-wall', brick:'procedural:sandstone-block', blockStyle:'sand-crate', barrelStyle:'sand-barrel', bomb:'procedural:tide-bomb', fire:'procedural:water-flame' },
         { tipo:'dust', color:'ambientDust', densidad:.65, velocidad:.09, sizeMin:1, sizeMax:2, alpha:.3 }
     );
 
@@ -401,7 +404,7 @@
             particleImpact:'#c7d2fe', particleFire:'#a5b4fc', particleBlock:'#6366f1', particleDanger:'#f472b6', particleShield:'#67e8f9', particleLoot:'#fde68a', particleEnemy:'#22d3ee', particleEnemyElite:'#c084fc', particleBoss:'#e879f9',
             feedbackRingSoft:'#c7d2fe', feedbackFlash:'#eef2ff', ambientDust:'rgba(165,180,252,.42)'
         },
-        { floor:'procedural:space-floor', wall:'procedural:starship-wall', brick:'procedural:asteroid-block', bomb:'procedural:cosmic-bomb', fire:'procedural:void-flame' },
+        { floor:'procedural:space-floor', wall:'procedural:starship-wall', brick:'procedural:asteroid-block', blockStyle:'tech-crate', barrelStyle:'tech-drum', bomb:'procedural:cosmic-bomb', fire:'procedural:void-flame' },
         { tipo:'dust', color:'ambientDust', densidad:.7, velocidad:.2, sizeMin:1, sizeMax:2, alpha:.42 }
     );
 
@@ -417,7 +420,7 @@
             particleImpact:'#fae8ff', particleFire:'#f0abfc', particleBlock:'#a855f7', particleDanger:'#fb7185', particleShield:'#67e8f9', particleLoot:'#fde68a', particleEnemy:'#d946ef', particleEnemyElite:'#fda4af', particleBoss:'#c026d3',
             feedbackRingSoft:'#f5d0fe', feedbackFlash:'#fdf4ff', ambientDust:'rgba(240,171,252,.40)'
         },
-        { floor:'procedural:sky-floor', wall:'procedural:cloudstone-wall', brick:'procedural:twilight-block', bomb:'procedural:aurora-bomb', fire:'procedural:nebula-flame' },
+        { floor:'procedural:sky-floor', wall:'procedural:cloudstone-wall', brick:'procedural:twilight-block', blockStyle:'aurora-crate', barrelStyle:'aurora-barrel', bomb:'procedural:aurora-bomb', fire:'procedural:nebula-flame' },
         { tipo:'snow', color:'ambientDust', densidad:.62, velocidad:.16, sizeMin:1, sizeMax:2, alpha:.34 }
     );
 

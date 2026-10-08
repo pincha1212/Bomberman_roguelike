@@ -279,31 +279,319 @@ function draw() {
         }
 
         function drawBrickBlock(x, y, targetCtx = ctx) {
-            // Cajas de madera (Crates) destructibles
-            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('blockBase') : '#b45309'; // Marrón base
-            targetCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-            
-            // Bordes de madera
-            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('blockHighlight') : '#f59e0b'; // Borde claro
-            targetCtx.fillRect(x, y, TILE_SIZE, 3);
-            targetCtx.fillRect(x, y, 3, TILE_SIZE);
-            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('blockShadow') : '#78350f'; // Borde oscuro
-            targetCtx.fillRect(x, y + TILE_SIZE - 4, TILE_SIZE, 4);
-            targetCtx.fillRect(x + TILE_SIZE - 4, y, 4, TILE_SIZE);
+            // Los dos objetos destructibles siguen usando TYPES.BLOCK para no crear
+            // una segunda capa de colisiones. Visualmente, algunos se presentan como
+            // barriles/urnas: misma resistencia y mismo drop, pero silueta distinta.
+            const style = typeof themeSpriteV46 === 'function' ? themeSpriteV46('blockStyle', 'wood-crate') : 'wood-crate';
+            const barrelStyle = typeof themeSpriteV46 === 'function' ? themeSpriteV46('barrelStyle', 'wood-barrel') : 'wood-barrel';
+            const levelSeed = Math.max(1, Number(gameState.level) || 1);
+            const barrelVariant = Math.abs((x * 17 + y * 31 + levelSeed * 13) % 7) === 0;
+            const base = typeof themeColorV46 === 'function' ? themeColorV46('blockBase') : '#b45309';
+            const hi = typeof themeColorV46 === 'function' ? themeColorV46('blockHighlight') : '#f59e0b';
+            const shadow = typeof themeColorV46 === 'function' ? themeColorV46('blockShadow') : '#78350f';
+            const pattern = typeof themeColorV46 === 'function' ? themeColorV46('blockPattern') : '#92400e';
+            const core = typeof themeColorV46 === 'function' ? themeColorV46('blockCore') : '#451a03';
 
-            // Patrón de cruz
-            targetCtx.strokeStyle = typeof themeColorV46 === 'function' ? themeColorV46('blockPattern') : '#92400e';
-            targetCtx.lineWidth = 4;
+            if (barrelVariant) {
+                drawBiomeBarrelV61229(x, y, targetCtx, barrelStyle, { base, hi, shadow, pattern, core });
+                return;
+            }
+
+            const inset = Math.max(4, TILE_SIZE * 0.12);
+            const inner = TILE_SIZE - inset * 2;
+
+            targetCtx.fillStyle = shadow;
+            targetCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+            targetCtx.fillStyle = base;
+            targetCtx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 5);
+            targetCtx.fillStyle = hi;
+            targetCtx.fillRect(x + 2, y + 2, TILE_SIZE - 4, Math.max(2, TILE_SIZE * 0.08));
+            targetCtx.fillRect(x + 2, y + 2, Math.max(2, TILE_SIZE * 0.08), TILE_SIZE - 7);
+
+            if (style === 'ice-crate') {
+                // Caja de hielo: panel translúcido + grietas.
+                targetCtx.fillStyle = base;
+                targetCtx.fillRect(x + inset, y + inset, inner, inner);
+                targetCtx.strokeStyle = hi;
+                targetCtx.lineWidth = 2;
+                targetCtx.beginPath();
+                targetCtx.moveTo(x + inset + inner * .18, y + inset + inner * .08);
+                targetCtx.lineTo(x + inset + inner * .45, y + inset + inner * .44);
+                targetCtx.lineTo(x + inset + inner * .30, y + inset + inner * .86);
+                targetCtx.moveTo(x + inset + inner * .70, y + inset + inner * .10);
+                targetCtx.lineTo(x + inset + inner * .54, y + inset + inner * .40);
+                targetCtx.lineTo(x + inset + inner * .78, y + inset + inner * .82);
+                targetCtx.stroke();
+                targetCtx.fillStyle = hi;
+                targetCtx.fillRect(x + TILE_SIZE/2 - 3, y + TILE_SIZE/2 - 3, 6, 6);
+            } else if (style === 'leaf-crate') {
+                // Caja de hojas: marco verde y cuatro hojas/placas diagonales.
+                targetCtx.fillStyle = base;
+                targetCtx.fillRect(x + inset, y + inset, inner, inner);
+                targetCtx.fillStyle = pattern;
+                targetCtx.beginPath();
+                targetCtx.moveTo(x + inset, y + inset + inner * .28);
+                targetCtx.lineTo(x + inset + inner * .28, y + inset);
+                targetCtx.lineTo(x + inset + inner * .16, y + inset + inner * .18);
+                targetCtx.closePath(); targetCtx.fill();
+                targetCtx.beginPath();
+                targetCtx.moveTo(x + inset + inner, y + inset + inner * .28);
+                targetCtx.lineTo(x + inset + inner * .72, y + inset);
+                targetCtx.lineTo(x + inset + inner * .84, y + inset + inner * .18);
+                targetCtx.closePath(); targetCtx.fill();
+                targetCtx.beginPath();
+                targetCtx.moveTo(x + inset + inner * .50, y + inset + inner * .50);
+                targetCtx.lineTo(x + inset + inner * .23, y + inset + inner * .84);
+                targetCtx.lineTo(x + inset + inner * .77, y + inset + inner * .84);
+                targetCtx.closePath(); targetCtx.fill();
+                targetCtx.fillStyle = core;
+                targetCtx.fillRect(x + TILE_SIZE/2 - 3, y + TILE_SIZE/2 - 3, 6, 6);
+            } else if (style === 'garden-crate') {
+                // Caja de jardín: listones horizontales + brote central.
+                targetCtx.fillStyle = base;
+                targetCtx.fillRect(x + inset, y + inset, inner, inner);
+                targetCtx.fillStyle = pattern;
+                for (let i = 1; i < 4; i++) targetCtx.fillRect(x + inset, y + inset + inner * (i/4), inner, 2);
+                targetCtx.fillStyle = hi;
+                targetCtx.fillRect(x + inset + inner * .46, y + inset + inner * .22, 2, inner * .55);
+                targetCtx.beginPath();
+                targetCtx.arc(x + inset + inner * .36, y + inset + inner * .28, Math.max(2, inner*.10), 0, Math.PI*2); targetCtx.fill();
+                targetCtx.beginPath();
+                targetCtx.arc(x + inset + inner * .60, y + inset + inner * .34, Math.max(2, inner*.10), 0, Math.PI*2); targetCtx.fill();
+            } else if (style === 'sun-crate') {
+                // Caja solar: amarillo intenso, rayos y centro.
+                targetCtx.fillStyle = base;
+                targetCtx.fillRect(x + inset, y + inset, inner, inner);
+                targetCtx.strokeStyle = pattern; targetCtx.lineWidth = 2;
+                targetCtx.beginPath();
+                targetCtx.moveTo(x + inset + inner*.18, y + inset + inner*.18); targetCtx.lineTo(x + inset + inner*.82, y + inset + inner*.82);
+                targetCtx.moveTo(x + inset + inner*.82, y + inset + inner*.18); targetCtx.lineTo(x + inset + inner*.18, y + inset + inner*.82);
+                targetCtx.stroke();
+                targetCtx.fillStyle = hi;
+                targetCtx.beginPath(); targetCtx.arc(x + TILE_SIZE/2, y + TILE_SIZE/2, Math.max(3, TILE_SIZE*.16), 0, Math.PI*2); targetCtx.fill();
+            } else if (style === 'ore-crate') {
+                // Caja de mineral: placas rocosas con gema central.
+                targetCtx.fillStyle = base;
+                targetCtx.fillRect(x + inset, y + inset, inner, inner);
+                targetCtx.fillStyle = pattern;
+                const pts = [
+                    [x+inset+inner*.10,y+inset+inner*.20],[x+inset+inner*.38,y+inset+inner*.10],[x+inset+inner*.25,y+inset+inner*.42],
+                    [x+inset+inner*.72,y+inset+inner*.12],[x+inset+inner*.88,y+inset+inner*.35],[x+inset+inner*.58,y+inset+inner*.30]
+                ];
+                targetCtx.beginPath(); targetCtx.moveTo(...pts[0]); for(const p of pts.slice(1)) targetCtx.lineTo(...p); targetCtx.closePath(); targetCtx.fill();
+                targetCtx.fillStyle = hi; targetCtx.beginPath(); targetCtx.moveTo(x+TILE_SIZE/2,y+inset+4); targetCtx.lineTo(x+TILE_SIZE/2+5,y+TILE_SIZE/2); targetCtx.lineTo(x+TILE_SIZE/2,y+TILE_SIZE/2+6); targetCtx.lineTo(x+TILE_SIZE/2-5,y+TILE_SIZE/2); targetCtx.closePath(); targetCtx.fill();
+            } else if (style === 'cloud-crate') {
+                // Caja de nube: caja clara con abombamientos suaves en las caras.
+                targetCtx.fillStyle = base;
+                targetCtx.fillRect(x + inset, y + inset, inner, inner);
+                targetCtx.fillStyle = hi;
+                for (const p of [[.24,.34,.13],[.48,.28,.16],[.72,.38,.13]]) {
+                    targetCtx.beginPath(); targetCtx.arc(x+inset+inner*p[0], y+inset+inner*p[1], inner*p[2], 0, Math.PI*2); targetCtx.fill();
+                }
+                targetCtx.fillStyle = pattern;
+                targetCtx.fillRect(x + inset + inner*.16, y + inset + inner*.62, inner*.68, 2);
+            } else if (style === 'rock-crate') {
+                // Caja de piedra: panel con quiebres angulares.
+                targetCtx.fillStyle = base;
+                targetCtx.fillRect(x + inset, y + inset, inner, inner);
+                targetCtx.fillStyle = pattern;
+                targetCtx.beginPath();
+                targetCtx.moveTo(x+inset+inner*.08,y+inset+inner*.20); targetCtx.lineTo(x+inset+inner*.36,y+inset+inner*.08); targetCtx.lineTo(x+inset+inner*.30,y+inset+inner*.40); targetCtx.lineTo(x+inset+inner*.08,y+inset+inner*.54); targetCtx.closePath(); targetCtx.fill();
+                targetCtx.beginPath();
+                targetCtx.moveTo(x+inset+inner*.58,y+inset+inner*.10); targetCtx.lineTo(x+inset+inner*.90,y+inset+inner*.25); targetCtx.lineTo(x+inset+inner*.78,y+inset+inner*.50); targetCtx.lineTo(x+inset+inner*.52,y+inset+inner*.38); targetCtx.closePath(); targetCtx.fill();
+                targetCtx.strokeStyle = hi; targetCtx.lineWidth = 2;
+                targetCtx.beginPath(); targetCtx.moveTo(x+inset+inner*.40,y+inset+inner*.18); targetCtx.lineTo(x+inset+inner*.52,y+inset+inner*.78); targetCtx.stroke();
+            } else if (style === 'sand-crate') {
+                // Caja de arena: marco, cuerda cruzada y nudos.
+                targetCtx.fillStyle = base;
+                targetCtx.fillRect(x + inset, y + inset, inner, inner);
+                targetCtx.strokeStyle = pattern; targetCtx.lineWidth = 2;
+                targetCtx.beginPath();
+                targetCtx.moveTo(x+inset,y+inset); targetCtx.lineTo(x+inset+inner,y+inset+inner);
+                targetCtx.moveTo(x+inset+inner,y+inset); targetCtx.lineTo(x+inset,y+inset+inner);
+                targetCtx.stroke();
+                targetCtx.fillStyle = hi;
+                for (const [dx,dy] of [[.10,.10],[.90,.10],[.10,.90],[.90,.90]]) { targetCtx.fillRect(x+inset+inner*dx-2,y+inset+inner*dy-2,4,4); }
+            } else if (style === 'tech-crate') {
+                // Caja tecnológica: panel, tornillos y bandas de seguridad.
+                targetCtx.fillStyle = base;
+                targetCtx.fillRect(x + inset, y + inset, inner, inner);
+                targetCtx.fillStyle = hi;
+                targetCtx.fillRect(x+inset+inner*.12,y+inset+inner*.12,inner*.76,3);
+                targetCtx.fillStyle = pattern;
+                for (let i=0;i<4;i++) targetCtx.fillRect(x+inset+inner*.18+i*inner*.17,y+inset+inner*.52,inner*.11,3);
+                targetCtx.fillStyle = core;
+                for (const [dx,dy] of [[.12,.12],[.88,.12],[.12,.88],[.88,.88]]) { targetCtx.beginPath(); targetCtx.arc(x+inset+inner*dx,y+inset+inner*dy,2,0,Math.PI*2); targetCtx.fill(); }
+            } else if (style === 'aurora-crate') {
+                // Caja aurora: panel oscuro con bandas diagonales brillantes.
+                targetCtx.fillStyle = base; targetCtx.fillRect(x+inset,y+inset,inner,inner);
+                targetCtx.strokeStyle = hi; targetCtx.lineWidth = 3;
+                targetCtx.beginPath(); targetCtx.moveTo(x+inset,y+inset+inner*.72); targetCtx.lineTo(x+inset+inner*.34,y+inset+inner*.10); targetCtx.lineTo(x+inset+inner*.68,y+inset+inner*.90); targetCtx.lineTo(x+inset+inner,y+inset+inner*.28); targetCtx.stroke();
+                targetCtx.fillStyle = pattern; targetCtx.fillRect(x+inset+inner*.10,y+inset+inner*.44,inner*.80,3);
+            } else if (style === 'lava-crate') {
+                // Caja de lava: bloque de roca roja con grietas incandescentes.
+                targetCtx.fillStyle = base; targetCtx.fillRect(x+inset,y+inset,inner,inner);
+                targetCtx.strokeStyle = hi; targetCtx.lineWidth = 2.5;
+                targetCtx.beginPath();
+                targetCtx.moveTo(x+inset+inner*.12,y+inset+inner*.18); targetCtx.lineTo(x+inset+inner*.44,y+inset+inner*.44); targetCtx.lineTo(x+inset+inner*.28,y+inset+inner*.82);
+                targetCtx.moveTo(x+inset+inner*.62,y+inset+inner*.16); targetCtx.lineTo(x+inset+inner*.52,y+inset+inner*.58); targetCtx.lineTo(x+inset+inner*.84,y+inset+inner*.82);
+                targetCtx.stroke();
+                targetCtx.fillStyle = core; targetCtx.fillRect(x+TILE_SIZE/2-4,y+TILE_SIZE/2-4,8,8);
+            } else {
+                // Caja de madera clásica: listones cruzados.
+                targetCtx.strokeStyle = pattern;
+                targetCtx.lineWidth = 4;
+                targetCtx.beginPath();
+                targetCtx.moveTo(x + 6, y + 6);
+                targetCtx.lineTo(x + TILE_SIZE - 6, y + TILE_SIZE - 6);
+                targetCtx.moveTo(x + TILE_SIZE - 6, y + 6);
+                targetCtx.lineTo(x + 6, y + TILE_SIZE - 6);
+                targetCtx.stroke();
+                targetCtx.fillStyle = core;
+                targetCtx.fillRect(x + TILE_SIZE/2 - 4, y + TILE_SIZE/2 - 4, 8, 8);
+            }
+        }
+
+        function drawBiomeBarrelV61229(x, y, targetCtx, style, colors) {
+            const { base, hi, shadow, pattern, core } = colors;
+            const pad = Math.max(4, TILE_SIZE * 0.13);
+            const left = x + pad;
+            const right = x + TILE_SIZE - pad;
+            const top = y + pad + 2;
+            const bottom = y + TILE_SIZE - pad;
+            const width = right - left;
+            const centerX = x + TILE_SIZE / 2;
+
+            // Sombra inferior y cuerpo cilíndrico.
+            targetCtx.fillStyle = shadow;
+            targetCtx.fillRect(left + 1, top + 3, width - 2, bottom - top - 1);
+            targetCtx.fillStyle = base;
             targetCtx.beginPath();
-            targetCtx.moveTo(x + 6, y + 6);
-            targetCtx.lineTo(x + TILE_SIZE - 6, y + TILE_SIZE - 6);
-            targetCtx.moveTo(x + TILE_SIZE - 6, y + 6);
-            targetCtx.lineTo(x + 6, y + TILE_SIZE - 6);
-            targetCtx.stroke();
-            
-            // Refuerzo central
-            targetCtx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('blockCore') : '#451a03';
-            targetCtx.fillRect(x + TILE_SIZE/2 - 4, y + TILE_SIZE/2 - 4, 8, 8);
+            targetCtx.moveTo(left + 3, top);
+            targetCtx.quadraticCurveTo(centerX, top - 2, right - 3, top);
+            targetCtx.lineTo(right - 3, bottom);
+            targetCtx.quadraticCurveTo(centerX, bottom + 2, left + 3, bottom);
+            targetCtx.closePath();
+            targetCtx.fill();
+
+            // Tapa superior.
+            targetCtx.fillStyle = hi;
+            targetCtx.beginPath();
+            targetCtx.ellipse(centerX, top + 1, width * .43, Math.max(3, TILE_SIZE * .10), 0, 0, Math.PI * 2);
+            targetCtx.fill();
+            targetCtx.fillStyle = core;
+            targetCtx.beginPath();
+            targetCtx.ellipse(centerX, top + 1, width * .22, Math.max(1.5, TILE_SIZE * .045), 0, 0, Math.PI * 2);
+            targetCtx.fill();
+
+            // Aros del barril: hacen visible la silueta incluso en temas oscuros.
+            targetCtx.fillStyle = pattern;
+            targetCtx.fillRect(left + 1, y + TILE_SIZE * .31, width - 2, Math.max(2, TILE_SIZE * .055));
+            targetCtx.fillRect(left + 1, y + TILE_SIZE * .67, width - 2, Math.max(2, TILE_SIZE * .055));
+            targetCtx.fillStyle = hi;
+            targetCtx.fillRect(left + 2, y + TILE_SIZE * .30, width * .16, 2);
+            targetCtx.fillRect(left + 2, y + TILE_SIZE * .66, width * .16, 2);
+
+            if (style === 'ice-drum') {
+                targetCtx.strokeStyle = '#ffffff';
+                targetCtx.lineWidth = 1.5;
+                targetCtx.beginPath();
+                targetCtx.moveTo(centerX - 4, y + TILE_SIZE * .43);
+                targetCtx.lineTo(centerX + 2, y + TILE_SIZE * .54);
+                targetCtx.lineTo(centerX - 1, y + TILE_SIZE * .64);
+                targetCtx.stroke();
+            } else if (style === 'leaf-barrel') {
+                targetCtx.fillStyle = hi;
+                targetCtx.beginPath();
+                targetCtx.ellipse(centerX - 4, y + TILE_SIZE * .53, 4, 2.5, -.45, 0, Math.PI * 2);
+                targetCtx.ellipse(centerX + 4, y + TILE_SIZE * .57, 4, 2.5, .45, 0, Math.PI * 2);
+                targetCtx.fill();
+            } else if (style === 'garden-pot') {
+                targetCtx.fillStyle = hi;
+                targetCtx.fillRect(centerX - 3, y + TILE_SIZE * .43, 6, TILE_SIZE * .20);
+                targetCtx.fillStyle = pattern;
+                targetCtx.beginPath();
+                targetCtx.arc(centerX - 4, y + TILE_SIZE * .44, 4, Math.PI * .95, Math.PI * 1.85);
+                targetCtx.arc(centerX + 4, y + TILE_SIZE * .42, 4, Math.PI * 1.15, Math.PI * .05);
+                targetCtx.fill();
+            } else if (style === 'sun-drum') {
+                targetCtx.fillStyle = hi;
+                targetCtx.beginPath();
+                targetCtx.arc(centerX, y + TILE_SIZE * .53, 4, 0, Math.PI * 2);
+                targetCtx.fill();
+                targetCtx.strokeStyle = hi; targetCtx.lineWidth = 1.5;
+                for (let i = 0; i < 4; i++) {
+                    const a = i * Math.PI / 2;
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(centerX + Math.cos(a) * 6, y + TILE_SIZE * .53 + Math.sin(a) * 6);
+                    targetCtx.lineTo(centerX + Math.cos(a) * 9, y + TILE_SIZE * .53 + Math.sin(a) * 9);
+                    targetCtx.stroke();
+                }
+            } else if (style === 'ore-barrel') {
+                targetCtx.fillStyle = hi;
+                targetCtx.beginPath();
+                targetCtx.moveTo(centerX, y + TILE_SIZE * .42);
+                targetCtx.lineTo(centerX + 4, y + TILE_SIZE * .53);
+                targetCtx.lineTo(centerX, y + TILE_SIZE * .66);
+                targetCtx.lineTo(centerX - 4, y + TILE_SIZE * .53);
+                targetCtx.closePath(); targetCtx.fill();
+            } else if (style === 'cloud-canister') {
+                targetCtx.fillStyle = hi;
+                for (const [dx,dy,r] of [[-5,.52,3],[0,.47,4],[5,.52,3]]) {
+                    targetCtx.beginPath(); targetCtx.arc(centerX + dx, y + TILE_SIZE * dy, r, 0, Math.PI*2); targetCtx.fill();
+                }
+            } else if (style === 'rock-barrel') {
+                targetCtx.fillStyle = pattern;
+                targetCtx.beginPath();
+                targetCtx.moveTo(centerX - 5, y + TILE_SIZE * .48);
+                targetCtx.lineTo(centerX - 1, y + TILE_SIZE * .40);
+                targetCtx.lineTo(centerX + 5, y + TILE_SIZE * .49);
+                targetCtx.lineTo(centerX + 2, y + TILE_SIZE * .62);
+                targetCtx.lineTo(centerX - 4, y + TILE_SIZE * .60);
+                targetCtx.closePath(); targetCtx.fill();
+            } else if (style === 'sand-barrel') {
+                targetCtx.strokeStyle = hi; targetCtx.lineWidth = 2;
+                targetCtx.beginPath();
+                targetCtx.arc(centerX, y + TILE_SIZE * .54, 5, 0, Math.PI * 2);
+                targetCtx.stroke();
+            } else if (style === 'tech-drum') {
+                targetCtx.fillStyle = hi;
+                targetCtx.fillRect(centerX - 5, y + TILE_SIZE * .48, 10, 2);
+                targetCtx.fillStyle = pattern;
+                targetCtx.fillRect(centerX - 5, y + TILE_SIZE * .57, 3, 3);
+                targetCtx.fillRect(centerX + 2, y + TILE_SIZE * .57, 3, 3);
+            } else if (style === 'aurora-barrel') {
+                targetCtx.strokeStyle = hi; targetCtx.lineWidth = 2;
+                targetCtx.beginPath();
+                targetCtx.moveTo(left + 5, y + TILE_SIZE * .58);
+                targetCtx.quadraticCurveTo(centerX, y + TILE_SIZE * .42, right - 5, y + TILE_SIZE * .58);
+                targetCtx.stroke();
+            } else if (style === 'lava-drum') {
+                targetCtx.strokeStyle = hi; targetCtx.lineWidth = 2;
+                targetCtx.beginPath();
+                targetCtx.moveTo(centerX - 5, y + TILE_SIZE * .41);
+                targetCtx.lineTo(centerX + 2, y + TILE_SIZE * .53);
+                targetCtx.lineTo(centerX - 2, y + TILE_SIZE * .66);
+                targetCtx.stroke();
+                targetCtx.fillStyle = hi;
+                targetCtx.fillRect(centerX - 2, y + TILE_SIZE * .51, 4, 4);
+            } else {
+                // Barril de madera clásico: símbolo en X.
+                targetCtx.strokeStyle = hi;
+                targetCtx.lineWidth = 2;
+                targetCtx.beginPath();
+                targetCtx.moveTo(centerX - 5, y + TILE_SIZE * .46);
+                targetCtx.lineTo(centerX + 5, y + TILE_SIZE * .61);
+                targetCtx.moveTo(centerX + 5, y + TILE_SIZE * .46);
+                targetCtx.lineTo(centerX - 5, y + TILE_SIZE * .61);
+                targetCtx.stroke();
+            }
+
+            // Base elíptica que termina de separar el barril de una caja.
+            targetCtx.fillStyle = shadow;
+            targetCtx.beginPath();
+            targetCtx.ellipse(centerX, bottom, width * .39, Math.max(2, TILE_SIZE * .085), 0, 0, Math.PI);
+            targetCtx.fill();
         }
 
         function drawExitPortal(x, y) {

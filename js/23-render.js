@@ -200,7 +200,6 @@ function draw() {
             // Draw Player Bomberman
             if (!player.isInvincible || Math.floor(gameState.animFrame / 4) % 2 === 0) {
                 drawBombermanSprite(player.x, player.y);
-                if (typeof drawWinterBodyEffectsV64 === 'function') drawWinterBodyEffectsV64(player);
             }
             // Una bomba agarrada pertenece visualmente al portador, no al suelo.
             const carriedPlayerBomb = typeof globalThis.getCarriedBombForEntityV682 === 'function'

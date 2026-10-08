@@ -343,7 +343,7 @@ function updateBossV41(dt) {
         }
     }
 
-    // Las bombas lanzadas se manejan en js/11-bombs.js como parte del runtime común.
+    // Las bombas lanzadas se manejan en js/14-bombs.js como parte del runtime común.
 }
 
 function bossV41DrawTelegraphWorld() {

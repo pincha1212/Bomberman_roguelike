@@ -152,14 +152,6 @@
 
         const state = getState();
         if (state) {
-            state.winterWindV64 = {
-                active: h.activeMs > 0,
-                axis: h.windAxis,
-                dir: h.windDir,
-                strength: h.windStrength,
-                remainingMs: h.activeMs,
-                source: h.id
-            };
         }
 
         // Un pulso de frío refresca la exposición de todas las entidades.
@@ -182,8 +174,6 @@
                 });
             }
         }
-
-        if (h.activeMs <= 0 && state) state.winterWindV64 = null;
     }
 
     function tideCreate() {
@@ -369,7 +359,6 @@
         const state = getState();
         if (!state) return false;
         state.environmentHazards = [];
-        state.winterWindV64 = null;
         HAZARD_RUNTIME.roomToken += 1;
         HAZARD_RUNTIME.cooldowns = Object.create(null);
         for (const id of themeHazardIds()) {
@@ -404,7 +393,6 @@
         const active = themeHazardIds();
         if (!active.length) {
             if (state.environmentHazards.length) state.environmentHazards = [];
-            state.winterWindV64 = null;
             return;
         }
         const activeSet = new Set(active);
@@ -419,7 +407,6 @@
         }
         removeExpiredHazards();
         if (!state.environmentHazards.some(h => h?.kind === 'blizzard' && h.lifeMs > 0 && h.state === 'active')) {
-            state.winterWindV64 = null;
         }
     }
 
@@ -509,11 +496,6 @@
         global.update = function updateV48(dt) {
             const result = wrapRuntime.originalUpdate(dt);
             updateHazardsV48(dt);
-            // v6.4: la ventisca debe actualizar primero su estado de viento y
-            // recién después empujar jugador, enemigos, eco y bombas.
-            if (typeof global.winterSystemUpdateV64 === 'function') {
-                global.winterSystemUpdateV64(dt);
-            }
             return result;
         };
         global.draw = function drawV48() {

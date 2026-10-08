@@ -1,7 +1,7 @@
 // Bomberman Roguelike v6.10.2 — Enemy Behaviors Update
 // Navegación local tipo corredor/intersección: la IA decide una dirección
 // v3.21: decisiones locales + memoria corta + continuidad de ruta; BFS solo para recovery excepcional.
-// y 13-collision.js se ocupa del movimiento y las paredes.
+// y 15-collision.js se ocupa del movimiento y las paredes.
 
 const enemyAI_V312 = {
     roomKey: '',

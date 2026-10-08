@@ -1,5 +1,5 @@
 // Bomberman Roguelike v6.12.6 — Bomberman-style bomb interactions
-// KICK / GRAB son capacidades declarativas resueltas por 54-entity-capabilities.js.
+// KICK / GRAB son capacidades declarativas resueltas por 02-entity-capabilities.js.
 // Este módulo contiene exclusivamente la interacción física con bombas.
 (function installBombInteractionsV682(global) {
     'use strict';

@@ -231,7 +231,7 @@
             if(!rectCollidesSolid(nx-b.width/2,ny-b.height/2,b.width,b.height)){b.x=nx;b.y=ny;} else {b.vx*=-1;b.vy*=-1;}
 
             // v4.1: el boss ya no tiene proyectiles, cargas ni refuerzos;
-            // sus ataques viven únicamente en js/27-boss-system.js.
+            // sus ataques viven únicamente en js/28-boss-system.js.
             const hit={left:b.x-b.width*.38,right:b.x+b.width*.38,top:b.y-b.height*.38,bottom:b.y+b.height*.38};
             const ph={left:player.x+5,right:player.x+player.width-5,top:player.y+5,bottom:player.y+player.height-5};
             if(checkOverlap(hit,ph)) takeDamage('boss-contact', b.x, b.y);
@@ -269,7 +269,7 @@
             ctx.restore();
         }
 
-        // V3.12.3: el sistema de trampas/hazards vive en js/14-traps.js.
+        // V3.12.3: el sistema de trampas/hazards vive en js/17-traps.js.
         // Este módulo mantiene la generación del nivel y delega allí la lógica
         // de generación, activación, efectos y renderizado de trampas.
         function spawnReinforcement(count = 1) {

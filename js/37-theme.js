@@ -326,8 +326,6 @@
             button.classList.toggle('is-selected', active);
             button.setAttribute('aria-checked', active ? 'true' : 'false');
         });
-        const summary = global.document?.getElementById?.('theme-selected-summary');
-        if (summary) summary.textContent = `${theme.nombre.toUpperCase()} · SOLO VISUAL`;
     }
 
     function setActiveThemeV46(id, persist = true) {

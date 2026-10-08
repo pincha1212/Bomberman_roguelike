@@ -1,0 +1,10 @@
+.biome-switch-card{margin-top:10px;padding:11px 12px;border:1px solid rgba(125,211,252,.16);border-radius:10px;background:rgba(15,23,42,.46);box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
+.biome-switch-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.biome-switch-kicker{display:block;font-size:.58rem;letter-spacing:.14em;color:rgba(226,232,240,.5);margin-bottom:2px}
+.biome-switch-head strong{font-size:.72rem;color:#f8fafc;letter-spacing:.05em}
+#biome-switch-status{font-size:.56rem;letter-spacing:.12em;color:#7dd3fc}
+.biome-switch-select{width:100%;padding:9px 10px;border:1px solid rgba(125,211,252,.24);border-radius:8px;background:#0f172a;color:#e2e8f0;font:700 .72rem Inter,sans-serif;outline:none}
+.biome-switch-select:focus{border-color:#7dd3fc;box-shadow:0 0 0 2px rgba(125,211,252,.12)}
+.biome-switch-select:disabled{opacity:.48;cursor:not-allowed}
+.biome-switch-note{margin:7px 0 0;font-size:.62rem;line-height:1.45;color:rgba(226,232,240,.55)}
+@media(max-width:760px){.biome-switch-card{margin-top:8px}.biome-switch-select{font-size:.68rem}}

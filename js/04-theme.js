@@ -424,68 +424,68 @@
         { tipo:'snow', color:'ambientDust', densidad:.62, velocidad:.16, sizeMin:1, sizeMax:2, alpha:.34 }
     );
 
-    // v6.14: skins visuales de enemigos por bioma.
+    // v6.15: especies por bioma = skin + nombre + exactamente una regla especial.
     // No modifican IA, estadísticas, colisiones, daño ni tipo de enemigo.
     const ENEMY_SKIN_PROFILES_V614 = Object.freeze({
         classic: Object.freeze({
-            RASTRERO: Object.freeze({ body:'#ef4444', shade:'#991b1b', accent:'#facc15', motif:'classic' }),
-            VOLADOR: Object.freeze({ body:'#3b82f6', shade:'#1d4ed8', accent:'#93c5fd', motif:'classic' }),
-            ESPECIAL: Object.freeze({ body:'#22c55e', shade:'#15803d', accent:'#bbf7d0', motif:'classic' })
+            RASTRERO: Object.freeze({ name:'Rastrero', ruleId:'none', body:'#ef4444', shade:'#991b1b', accent:'#facc15', motif:'classic' }),
+            VOLADOR: Object.freeze({ name:'Volador', ruleId:'none', body:'#3b82f6', shade:'#1d4ed8', accent:'#93c5fd', motif:'classic' }),
+            ESPECIAL: Object.freeze({ name:'Especial', ruleId:'none', body:'#22c55e', shade:'#15803d', accent:'#bbf7d0', motif:'classic' })
         }),
         winter: Object.freeze({
-            RASTRERO: Object.freeze({ body:'#9dd9ef', shade:'#397b96', accent:'#f5fdff', motif:'snow' }),
-            VOLADOR: Object.freeze({ body:'#78bce8', shade:'#315f92', accent:'#e0f2fe', motif:'snow' }),
-            ESPECIAL: Object.freeze({ body:'#b9e6ef', shade:'#527d8d', accent:'#ffffff', motif:'ice' })
+            RASTRERO: Object.freeze({ name:'Lobo de hielo', ruleId:'ice_resistance', body:'#9dd9ef', shade:'#397b96', accent:'#f5fdff', motif:'snow' }),
+            VOLADOR: Object.freeze({ name:'Búho ártico', ruleId:'ice_resistance', body:'#78bce8', shade:'#315f92', accent:'#e0f2fe', motif:'snow' }),
+            ESPECIAL: Object.freeze({ name:'Oso de nieve', ruleId:'ice_resistance', body:'#b9e6ef', shade:'#527d8d', accent:'#ffffff', motif:'ice' })
         }),
         autumn: Object.freeze({
-            RASTRERO: Object.freeze({ body:'#c96a2d', shade:'#6d2f12', accent:'#f6cf74', motif:'leaf' }),
-            VOLADOR: Object.freeze({ body:'#a94d2d', shade:'#64231a', accent:'#ffd27a', motif:'leaf' }),
-            ESPECIAL: Object.freeze({ body:'#7c6932', shade:'#443914', accent:'#efb34b', motif:'acorn' })
+            RASTRERO: Object.freeze({ name:'Jabalí', ruleId:'leaf_camouflage', body:'#c96a2d', shade:'#6d2f12', accent:'#f6cf74', motif:'leaf' }),
+            VOLADOR: Object.freeze({ name:'Cuervo', ruleId:'leaf_camouflage', body:'#a94d2d', shade:'#64231a', accent:'#ffd27a', motif:'leaf' }),
+            ESPECIAL: Object.freeze({ name:'Espantapájaros', ruleId:'leaf_camouflage', body:'#7c6932', shade:'#443914', accent:'#efb34b', motif:'acorn' })
         }),
         spring: Object.freeze({
-            RASTRERO: Object.freeze({ body:'#63b86b', shade:'#2e6e3a', accent:'#f5a3c7', motif:'flower' }),
-            VOLADOR: Object.freeze({ body:'#58a9a0', shade:'#245e59', accent:'#f8d36c', motif:'flower' }),
-            ESPECIAL: Object.freeze({ body:'#8abf52', shade:'#4c732c', accent:'#f8b4d9', motif:'vine' })
+            RASTRERO: Object.freeze({ name:'Rana', ruleId:'vegetation_regen', body:'#63b86b', shade:'#2e6e3a', accent:'#f5a3c7', motif:'flower' }),
+            VOLADOR: Object.freeze({ name:'Abeja', ruleId:'vegetation_regen', body:'#58a9a0', shade:'#245e59', accent:'#f8d36c', motif:'flower' }),
+            ESPECIAL: Object.freeze({ name:'Planta carnívora', ruleId:'vegetation_regen', body:'#8abf52', shade:'#4c732c', accent:'#f8b4d9', motif:'vine' })
         }),
         summer: Object.freeze({
-            RASTRERO: Object.freeze({ body:'#d99a32', shade:'#8a5414', accent:'#ffe38a', motif:'sun' }),
-            VOLADOR: Object.freeze({ body:'#4fa7a0', shade:'#235d5a', accent:'#fff0a8', motif:'sun' }),
-            ESPECIAL: Object.freeze({ body:'#c97938', shade:'#743b18', accent:'#58d8c4', motif:'shell' })
+            RASTRERO: Object.freeze({ name:'Lagarto', ruleId:'heat_resistance', body:'#d99a32', shade:'#8a5414', accent:'#ffe38a', motif:'sun' }),
+            VOLADOR: Object.freeze({ name:'Gaviota', ruleId:'heat_resistance', body:'#4fa7a0', shade:'#235d5a', accent:'#fff0a8', motif:'sun' }),
+            ESPECIAL: Object.freeze({ name:'Escarabajo gigante', ruleId:'heat_resistance', body:'#c97938', shade:'#743b18', accent:'#58d8c4', motif:'shell' })
         }),
         underground: Object.freeze({
-            RASTRERO: Object.freeze({ body:'#8e67b7', shade:'#4b2d67', accent:'#d8b4fe', motif:'crystal' }),
-            VOLADOR: Object.freeze({ body:'#6f7fb9', shade:'#303b69', accent:'#c4b5fd', motif:'crystal' }),
-            ESPECIAL: Object.freeze({ body:'#9e7a61', shade:'#503f35', accent:'#a7f3d0', motif:'ore' })
+            RASTRERO: Object.freeze({ name:'Topo', ruleId:'dark_vision', body:'#8e67b7', shade:'#4b2d67', accent:'#d8b4fe', motif:'crystal' }),
+            VOLADOR: Object.freeze({ name:'Murciélago', ruleId:'dark_vision', body:'#6f7fb9', shade:'#303b69', accent:'#c4b5fd', motif:'crystal' }),
+            ESPECIAL: Object.freeze({ name:'Gusano cavernario', ruleId:'dark_vision', body:'#9e7a61', shade:'#503f35', accent:'#a7f3d0', motif:'ore' })
         }),
         clouds: Object.freeze({
-            RASTRERO: Object.freeze({ body:'#b9d8ea', shade:'#607f96', accent:'#ffffff', motif:'cloud' }),
-            VOLADOR: Object.freeze({ body:'#9dbce0', shade:'#516987', accent:'#dbeafe', motif:'cloud' }),
-            ESPECIAL: Object.freeze({ body:'#cad7e3', shade:'#6b7c8e', accent:'#93c5fd', motif:'storm' })
+            RASTRERO: Object.freeze({ name:'Criatura de nube', ruleId:'floatation', body:'#b9d8ea', shade:'#607f96', accent:'#ffffff', motif:'cloud' }),
+            VOLADOR: Object.freeze({ name:'Ave celestial', ruleId:'floatation', body:'#9dbce0', shade:'#516987', accent:'#dbeafe', motif:'cloud' }),
+            ESPECIAL: Object.freeze({ name:'Elemental de tormenta', ruleId:'floatation', body:'#cad7e3', shade:'#6b7c8e', accent:'#93c5fd', motif:'storm' })
         }),
         mountains: Object.freeze({
-            RASTRERO: Object.freeze({ body:'#817d75', shade:'#45423e', accent:'#e5d8b8', motif:'rock' }),
-            VOLADOR: Object.freeze({ body:'#607a79', shade:'#30403f', accent:'#d8eadf', motif:'feather' }),
-            ESPECIAL: Object.freeze({ body:'#8c7461', shade:'#4b382d', accent:'#d8b08c', motif:'rock' })
+            RASTRERO: Object.freeze({ name:'Cabra montés', ruleId:'stability', body:'#817d75', shade:'#45423e', accent:'#e5d8b8', motif:'rock' }),
+            VOLADOR: Object.freeze({ name:'Águila', ruleId:'stability', body:'#607a79', shade:'#30403f', accent:'#d8eadf', motif:'feather' }),
+            ESPECIAL: Object.freeze({ name:'Golem de piedra', ruleId:'stability', body:'#8c7461', shade:'#4b382d', accent:'#d8b08c', motif:'rock' })
         }),
         beach: Object.freeze({
-            RASTRERO: Object.freeze({ body:'#e0a353', shade:'#855624', accent:'#8ee7e0', motif:'shell' }),
-            VOLADOR: Object.freeze({ body:'#54b6c5', shade:'#276673', accent:'#f6e3a6', motif:'fin' }),
-            ESPECIAL: Object.freeze({ body:'#d17d5a', shade:'#713f31', accent:'#f8c46c', motif:'reef' })
+            RASTRERO: Object.freeze({ name:'Cangrejo', ruleId:'terrain_mobility', body:'#e0a353', shade:'#855624', accent:'#8ee7e0', motif:'shell' }),
+            VOLADOR: Object.freeze({ name:'Gaviota costera', ruleId:'terrain_mobility', body:'#54b6c5', shade:'#276673', accent:'#f6e3a6', motif:'fin' }),
+            ESPECIAL: Object.freeze({ name:'Pulpo', ruleId:'terrain_mobility', body:'#d17d5a', shade:'#713f31', accent:'#f8c46c', motif:'reef' })
         }),
         space: Object.freeze({
-            RASTRERO: Object.freeze({ body:'#7e7cf0', shade:'#36358a', accent:'#57e6ff', motif:'visor' }),
-            VOLADOR: Object.freeze({ body:'#4f9fd8', shade:'#254d76', accent:'#c7d2fe', motif:'drone' }),
-            ESPECIAL: Object.freeze({ body:'#9c6cf3', shade:'#4a2b82', accent:'#6ee7ff', motif:'tech' })
+            RASTRERO: Object.freeze({ name:'Insecto alienígena', ruleId:'environment_immunity', body:'#7e7cf0', shade:'#36358a', accent:'#57e6ff', motif:'visor' }),
+            VOLADOR: Object.freeze({ name:'Dron orgánico', ruleId:'environment_immunity', body:'#4f9fd8', shade:'#254d76', accent:'#c7d2fe', motif:'drone' }),
+            ESPECIAL: Object.freeze({ name:'Criatura extraterrestre', ruleId:'environment_immunity', body:'#9c6cf3', shade:'#4a2b82', accent:'#6ee7ff', motif:'tech' })
         }),
         sky: Object.freeze({
-            RASTRERO: Object.freeze({ body:'#d58de5', shade:'#703f7c', accent:'#8ff3e7', motif:'halo' }),
-            VOLADOR: Object.freeze({ body:'#9fa9e8', shade:'#505a8e', accent:'#f0abfc', motif:'halo' }),
-            ESPECIAL: Object.freeze({ body:'#ba83cf', shade:'#603a6f', accent:'#a7f3d0', motif:'star' })
+            RASTRERO: Object.freeze({ name:'Querubín', ruleId:'high_altitude_speed', body:'#d58de5', shade:'#703f7c', accent:'#8ff3e7', motif:'halo' }),
+            VOLADOR: Object.freeze({ name:'Ave luminosa', ruleId:'high_altitude_speed', body:'#9fa9e8', shade:'#505a8e', accent:'#f0abfc', motif:'halo' }),
+            ESPECIAL: Object.freeze({ name:'Guardián celeste', ruleId:'high_altitude_speed', body:'#ba83cf', shade:'#603a6f', accent:'#a7f3d0', motif:'star' })
         }),
         inferno: Object.freeze({
-            RASTRERO: Object.freeze({ body:'#e85b2a', shade:'#741f0d', accent:'#ffd166', motif:'horns' }),
-            VOLADOR: Object.freeze({ body:'#8f3e37', shade:'#46130f', accent:'#ff9b55', motif:'ember' }),
-            ESPECIAL: Object.freeze({ body:'#b43d21', shade:'#57170b', accent:'#ffe066', motif:'demon' })
+            RASTRERO: Object.freeze({ name:'Sabueso infernal', ruleId:'lava_immunity', body:'#e85b2a', shade:'#741f0d', accent:'#ffd166', motif:'horns' }),
+            VOLADOR: Object.freeze({ name:'Demonio alado', ruleId:'lava_immunity', body:'#8f3e37', shade:'#46130f', accent:'#ff9b55', motif:'ember' }),
+            ESPECIAL: Object.freeze({ name:'Diablillo', ruleId:'lava_immunity', body:'#b43d21', shade:'#57170b', accent:'#ffe066', motif:'demon' })
         })
     });
 
@@ -501,6 +501,7 @@
 
     global.ENEMY_SKIN_PROFILES_V614 = ENEMY_SKIN_PROFILES_V614;
     global.getEnemySkinV614 = getEnemySkinV614;
+    global.getEnemySpeciesVisualProfileV615 = getEnemySkinV614;
     global.BOMBER_ENGINE = global.BOMBER_ENGINE || {};
     global.BOMBER_ENGINE.getEnemySkin = getEnemySkinV614;
 

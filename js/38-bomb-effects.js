@@ -513,7 +513,10 @@
         const statuses = ensureEntityStatuses(entity);
         if (!statuses) return false;
         const defaultDuration = config.persistent ? Infinity : config.durationMs;
-        const durationMs = config.persistent ? Infinity : Math.max(80, finite(options.durationMs, defaultDuration));
+        const speciesDurationMultiplier = kind === 'enemy' && typeof global.getEnemyBiomeSpeciesEffectDurationMultiplierV615 === 'function'
+            ? Math.max(0.1, Number(global.getEnemyBiomeSpeciesEffectDurationMultiplierV615(entity, effectId)) || 1)
+            : 1;
+        const durationMs = config.persistent ? Infinity : Math.max(80, finite(options.durationMs, defaultDuration) * speciesDurationMultiplier);
         const intensity = clamp(finite(options.intensity, 1), 0.1, 2);
         const existing = statuses[effectId];
 

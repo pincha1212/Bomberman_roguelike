@@ -1000,12 +1000,15 @@ function getEnemyMovementSpeedV610(e) {
     return Math.max(0.1, Number(e.baseSpeed) || 1)
         * Number(profile.speedMultiplier || 1)
         * threatMultiplier
-        * gameplaySpeedMultiplier;
+        * gameplaySpeedMultiplier
+        * (typeof getEnemyBiomeSpeciesMovementMultiplierV615 === 'function' ? getEnemyBiomeSpeciesMovementMultiplierV615(e) : 1)
+        * (typeof getEnemyBiomeSpeciesEnvironmentMovementMultiplierV615 === 'function' ? getEnemyBiomeSpeciesEnvironmentMovementMultiplierV615(e) : 1);
 }
 
 function moveEnemyV312(e, dt) {
     const ai = e.ai;
     const speed = getEnemyMovementSpeedV610(e);
+    if (typeof updateEnemyBiomeSpeciesV615 === 'function') updateEnemyBiomeSpeciesV615(e, dt);
     const safeDt = Math.max(0, Number(dt) || 0);
 
     if (!e._tileMoveInitialized) {

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.14.0 — Canvas rendering and biome enemy skin drawing
+// Bomberman Roguelike v6.15.0 — Canvas rendering and biome enemy species
 // V3.17: cache de terreno estático para evitar reconstruir la cuadrícula completa
 // en cada frame. El mapa se regenera solo cuando cambia la referencia/revisión.
 const renderCacheV317 = {
@@ -795,7 +795,8 @@ function draw() {
 
         function drawEnemySprite(e) {
             ctx.save();
-            const enemySkin = typeof getEnemySkinV614 === 'function' ? getEnemySkinV614(e) : null;
+            const enemySpecies = typeof getEnemyBiomeSpeciesProfileV615 === 'function' ? getEnemyBiomeSpeciesProfileV615(e) : null;
+            const enemySkin = enemySpecies || (typeof getEnemySkinV614 === 'function' ? getEnemySkinV614(e) : null);
             const skinBody = enemySkin?.body || e.type.color;
             const skinShade = enemySkin?.shade || e.type.color;
             const skinAccent = enemySkin?.accent || themeColorV46('enemyEye', '#ffffff');

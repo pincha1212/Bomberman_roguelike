@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.12.10 — Bomb Effect Registry
+// Bomberman Roguelike v6.12.32 — Bomb Effect Registry
 // Base simple y extensible para rastros/efectos de bombas.
 //
 // PRINCIPIOS
@@ -693,9 +693,23 @@
         }
     }
 
+    function isBombEffectFieldV61232(field) {
+        return !!field && field.sourceBombId != null;
+    }
+
+    function isBombEffectTargetV61232(target) {
+        const kind = target?.kind;
+        return kind === 'enemy' || kind === 'boss' || kind === 'death_echo';
+    }
+
     function syncFieldToEntities(field, dt) {
         const targets = collectEntities();
         for (const target of targets) {
+            // Los efectos producidos por una bomba son ofensivos: solo afectan
+            // a entidades hostiles. El jugador nunca recibe SLOW/DAMAGE/STATUS
+            // de una explosión elemental o de sus combinaciones.
+            if (isBombEffectFieldV61232(field) && !isBombEffectTargetV61232(target)) continue;
+
             const cell = entityCell(target.entity);
             if (!cell || cell.x !== field.x || cell.y !== field.y) continue;
             const config = getEffectConfigV64(field.effectId);
@@ -727,6 +741,12 @@
             if (!statuses) continue;
             for (const [effectId, status] of Object.entries(statuses)) {
                 if (!status) {
+                    delete statuses[effectId];
+                    continue;
+                }
+                // Limpieza defensiva: si un estado de bomba quedó guardado en
+                // el jugador, se elimina y no vuelve a aplicar ningún efecto.
+                if (target?.kind === 'player' && status.sourceBombId != null) {
                     delete statuses[effectId];
                     continue;
                 }
@@ -797,7 +817,9 @@
         const config = getEffectConfigV64(effectId);
         if (!config) return 0;
         let applied = 0;
+        const bombOrigin = options.sourceBombId != null || String(options.source || '').includes('bomb');
         for (const target of collectEntities()) {
+            if (bombOrigin && !isBombEffectTargetV61232(target)) continue;
             if (applyEntityStatus(target, effectId, options)) applied++;
         }
         return applied;

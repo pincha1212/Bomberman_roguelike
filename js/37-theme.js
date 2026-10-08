@@ -277,7 +277,151 @@
         { tipo: 'ember', color: 'ambientDust', densidad: 0.9, velocidad: 0.52, sizeMin: 1, sizeMax: 2, alpha: 0.58 }
     );
 
-    const registry = { classic: CLASSIC_THEME, winter: WINTER_THEME, inferno: INFERNO_THEME };
+    const AUTUMN_THEME = createVisualThemeV461(
+        'autumn',
+        'Otoño',
+        {
+            background:'#140d08', floorA:'#2f1b12', floorB:'#4a2917', floorHighlight:'rgba(255,214,153,.055)', floorShadow:'rgba(15,5,0,.34)',
+            wallBase:'#765033', wallHighlight:'#c79a63', wallShadow:'#4a2d1b', wallInset:'#2d1a10', wallDeep:'#170b06', wallAccent:'#e8a24a',
+            blockBase:'#8b451f', blockHighlight:'#d48a3a', blockShadow:'#5a2612', blockPattern:'#a85a28', blockCore:'#351207',
+            bombPlayerRing:'rgba(251,191,36,.88)', bombMovingFill:'rgba(245,158,11,.18)', bombMovingStroke:'rgba(251,191,36,.82)', bombBody:'#1a100b', bombCap:'#8d6b4d', bombSparkHot:'#fde68a', bombSparkDanger:'#f97316', bombFuse:'#ffedd5',
+            fireOuter:'rgba(234,88,12,.90)', bombGlow:'rgba(245,158,11,.24)', bombGlowOuter:'rgba(180,83,9,0)', fireMiddle:'#f97316', fireCore:'#fde68a',
+            particleImpact:'#f7d18a', particleFire:'#fb923c', particleBlock:'#b45309', particleDanger:'#ef4444', particleShield:'#f59e0b', particleLoot:'#fbbf24', particleEnemy:'#fb923c', particleEnemyElite:'#fda4af', particleBoss:'#dc2626',
+            feedbackRingSoft:'#fed7aa', feedbackFlash:'#fff7ed', ambientDust:'rgba(255,191,105,.48)'
+        },
+        { floor:'procedural:autumn-floor', wall:'procedural:autumn-wall', brick:'procedural:autumn-block', bomb:'procedural:autumn-bomb', fire:'procedural:autumn-flame' },
+        { tipo:'dust', color:'ambientDust', densidad:1.15, velocidad:.26, sizeMin:1, sizeMax:2, alpha:.5 }
+    );
+
+    const SPRING_THEME = createVisualThemeV461(
+        'spring',
+        'Primavera',
+        {
+            background:'#07130d', floorA:'#163321', floorB:'#20462d', floorHighlight:'rgba(187,247,208,.055)', floorShadow:'rgba(0,18,8,.30)',
+            wallBase:'#52745b', wallHighlight:'#9bd3a7', wallShadow:'#304b36', wallInset:'#1d3223', wallDeep:'#0c1c11', wallAccent:'#7ee2a1',
+            blockBase:'#5c7f4c', blockHighlight:'#a3c969', blockShadow:'#36502a', blockPattern:'#6f944f', blockCore:'#1e3318',
+            bombPlayerRing:'rgba(134,239,172,.88)', bombMovingFill:'rgba(74,222,128,.15)', bombMovingStroke:'rgba(134,239,172,.82)', bombBody:'#0c1b12', bombCap:'#668b70', bombSparkHot:'#dcfce7', bombSparkDanger:'#fb7185', bombFuse:'#ecfdf5',
+            fireOuter:'rgba(34,197,94,.84)', bombGlow:'rgba(74,222,128,.20)', bombGlowOuter:'rgba(22,101,52,0)', fireMiddle:'#4ade80', fireCore:'#ecfccb',
+            particleImpact:'#d9f99d', particleFire:'#86efac', particleBlock:'#65a30d', particleDanger:'#fb7185', particleShield:'#67e8f9', particleLoot:'#facc15', particleEnemy:'#34d399', particleEnemyElite:'#f9a8d4', particleBoss:'#e879f9',
+            feedbackRingSoft:'#bbf7d0', feedbackFlash:'#f0fdf4', ambientDust:'rgba(187,247,208,.42)'
+        },
+        { floor:'procedural:spring-floor', wall:'procedural:moss-wall', brick:'procedural:hedge-block', bomb:'procedural:spring-bomb', fire:'procedural:verdant-flame' },
+        { tipo:'dust', color:'ambientDust', densidad:1.2, velocidad:.18, sizeMin:1, sizeMax:2, alpha:.4 }
+    );
+
+    const SUMMER_THEME = createVisualThemeV461(
+        'summer',
+        'Verano',
+        {
+            background:'#10100a', floorA:'#40371a', floorB:'#655523', floorHighlight:'rgba(255,244,180,.06)', floorShadow:'rgba(28,21,0,.34)',
+            wallBase:'#8a7440', wallHighlight:'#e4c66a', wallShadow:'#5b471f', wallInset:'#392a10', wallDeep:'#1b1306', wallAccent:'#f6d36b',
+            blockBase:'#b2742a', blockHighlight:'#f0b85a', blockShadow:'#70410f', blockPattern:'#c88732', blockCore:'#3f2108',
+            bombPlayerRing:'rgba(45,212,191,.88)', bombMovingFill:'rgba(20,184,166,.16)', bombMovingStroke:'rgba(45,212,191,.80)', bombBody:'#14201e', bombCap:'#7b8f86', bombSparkHot:'#fef3c7', bombSparkDanger:'#14b8a6', bombFuse:'#fff7ed',
+            fireOuter:'rgba(249,115,22,.90)', bombGlow:'rgba(245,158,11,.22)', bombGlowOuter:'rgba(180,83,9,0)', fireMiddle:'#fb923c', fireCore:'#fef08a',
+            particleImpact:'#fde68a', particleFire:'#fdba74', particleBlock:'#d97706', particleDanger:'#f43f5e', particleShield:'#2dd4bf', particleLoot:'#fde047', particleEnemy:'#f59e0b', particleEnemyElite:'#fb7185', particleBoss:'#ef4444',
+            feedbackRingSoft:'#ccfbf1', feedbackFlash:'#fffbeb', ambientDust:'rgba(253,224,71,.38)'
+        },
+        { floor:'procedural:sand-floor', wall:'procedural:sunstone-wall', brick:'procedural:sand-block', bomb:'procedural:sun-bomb', fire:'procedural:solar-flame' },
+        { tipo:'dust', color:'ambientDust', densidad:.8, velocidad:.12, sizeMin:1, sizeMax:2, alpha:.36 }
+    );
+
+    const UNDERGROUND_THEME = createVisualThemeV461(
+        'underground',
+        'Bajo tierra',
+        {
+            background:'#0b0713', floorA:'#211532', floorB:'#33204a', floorHighlight:'rgba(221,214,254,.045)', floorShadow:'rgba(8,3,15,.42)',
+            wallBase:'#5b4f6f', wallHighlight:'#9f8fbe', wallShadow:'#3a3048', wallInset:'#241b31', wallDeep:'#110b18', wallAccent:'#c4b5fd',
+            blockBase:'#66506f', blockHighlight:'#a989ad', blockShadow:'#402d48', blockPattern:'#745a80', blockCore:'#241329',
+            bombPlayerRing:'rgba(196,181,253,.88)', bombMovingFill:'rgba(167,139,250,.16)', bombMovingStroke:'rgba(196,181,253,.82)', bombBody:'#110c17', bombCap:'#746888', bombSparkHot:'#f5f3ff', bombSparkDanger:'#e879f9', bombFuse:'#f5f3ff',
+            fireOuter:'rgba(192,132,252,.88)', bombGlow:'rgba(168,85,247,.22)', bombGlowOuter:'rgba(76,29,149,0)', fireMiddle:'#c084fc', fireCore:'#f5d0fe',
+            particleImpact:'#e9d5ff', particleFire:'#d8b4fe', particleBlock:'#8b5cf6', particleDanger:'#f472b6', particleShield:'#a78bfa', particleLoot:'#f5d0fe', particleEnemy:'#8b5cf6', particleEnemyElite:'#f0abfc', particleBoss:'#c026d3',
+            feedbackRingSoft:'#ddd6fe', feedbackFlash:'#faf5ff', ambientDust:'rgba(196,181,253,.36)'
+        },
+        { floor:'procedural:cavern-floor', wall:'procedural:deep-wall', brick:'procedural:ore-block', bomb:'procedural:crystal-bomb', fire:'procedural:arcane-flame' },
+        { tipo:'dust', color:'ambientDust', densidad:1.05, velocidad:.2, sizeMin:1, sizeMax:2, alpha:.34 }
+    );
+
+    const CLOUDS_THEME = createVisualThemeV461(
+        'clouds',
+        'Nubes',
+        {
+            background:'#07101c', floorA:'#23364c', floorB:'#38556f', floorHighlight:'rgba(224,242,254,.08)', floorShadow:'rgba(4,14,25,.34)',
+            wallBase:'#72869a', wallHighlight:'#c7d8e7', wallShadow:'#4a5e71', wallInset:'#304150', wallDeep:'#152431', wallAccent:'#dbeafe',
+            blockBase:'#8299ab', blockHighlight:'#d8e6f1', blockShadow:'#586e81', blockPattern:'#6f8799', blockCore:'#2d4050',
+            bombPlayerRing:'rgba(224,242,254,.92)', bombMovingFill:'rgba(147,197,253,.16)', bombMovingStroke:'rgba(191,219,254,.84)', bombBody:'#10202e', bombCap:'#8da7b9', bombSparkHot:'#ffffff', bombSparkDanger:'#60a5fa', bombFuse:'#eff6ff',
+            fireOuter:'rgba(96,165,250,.86)', bombGlow:'rgba(125,211,252,.20)', bombGlowOuter:'rgba(59,130,246,0)', fireMiddle:'#93c5fd', fireCore:'#f0f9ff',
+            particleImpact:'#e0f2fe', particleFire:'#bae6fd', particleBlock:'#94a3b8', particleDanger:'#60a5fa', particleShield:'#a5f3fc', particleLoot:'#fde68a', particleEnemy:'#38bdf8', particleEnemyElite:'#c4b5fd', particleBoss:'#818cf8',
+            feedbackRingSoft:'#dbeafe', feedbackFlash:'#f8fafc', ambientDust:'rgba(219,234,254,.54)'
+        },
+        { floor:'procedural:cloud-floor', wall:'procedural:sky-wall', brick:'procedural:cloud-block', bomb:'procedural:cloud-bomb', fire:'procedural:sky-flame' },
+        { tipo:'snow', color:'ambientDust', densidad:.75, velocidad:.28, sizeMin:1, sizeMax:3, alpha:.38 }
+    );
+
+    const MOUNTAINS_THEME = createVisualThemeV461(
+        'mountains',
+        'Montañas',
+        {
+            background:'#080e13', floorA:'#27333a', floorB:'#38464f', floorHighlight:'rgba(226,232,240,.05)', floorShadow:'rgba(1,6,10,.42)',
+            wallBase:'#68747b', wallHighlight:'#b9c5cb', wallShadow:'#3d484e', wallInset:'#273137', wallDeep:'#12191e', wallAccent:'#cbd5e1',
+            blockBase:'#6b6258', blockHighlight:'#a8a097', blockShadow:'#464039', blockPattern:'#7d7368', blockCore:'#28231e',
+            bombPlayerRing:'rgba(186,230,253,.90)', bombMovingFill:'rgba(148,163,184,.16)', bombMovingStroke:'rgba(203,213,225,.82)', bombBody:'#11171b', bombCap:'#7e8b91', bombSparkHot:'#f8fafc', bombSparkDanger:'#38bdf8', bombFuse:'#f8fafc',
+            fireOuter:'rgba(56,189,248,.82)', bombGlow:'rgba(125,211,252,.18)', bombGlowOuter:'rgba(14,116,144,0)', fireMiddle:'#38bdf8', fireCore:'#f0f9ff',
+            particleImpact:'#e2e8f0', particleFire:'#7dd3fc', particleBlock:'#a8a29e', particleDanger:'#fb7185', particleShield:'#bae6fd', particleLoot:'#fde68a', particleEnemy:'#94a3b8', particleEnemyElite:'#fca5a5', particleBoss:'#64748b',
+            feedbackRingSoft:'#e2e8f0', feedbackFlash:'#f8fafc', ambientDust:'rgba(203,213,225,.34)'
+        },
+        { floor:'procedural:mountain-floor', wall:'procedural:rock-wall', brick:'procedural:stone-block', bomb:'procedural:granite-bomb', fire:'procedural:blue-flame' },
+        { tipo:'snow', color:'ambientDust', densidad:.48, velocidad:.2, sizeMin:1, sizeMax:2, alpha:.3 }
+    );
+
+    const BEACH_THEME = createVisualThemeV461(
+        'beach',
+        'Playa',
+        {
+            background:'#061218', floorA:'#16434c', floorB:'#20616a', floorHighlight:'rgba(207,250,254,.065)', floorShadow:'rgba(0,13,18,.36)',
+            wallBase:'#557e7d', wallHighlight:'#a9d9cf', wallShadow:'#365b59', wallInset:'#203c3d', wallDeep:'#0c2023', wallAccent:'#67e8f9',
+            blockBase:'#a07c4f', blockHighlight:'#d8b985', blockShadow:'#725333', blockPattern:'#b18e5c', blockCore:'#3d2919',
+            bombPlayerRing:'rgba(34,211,238,.90)', bombMovingFill:'rgba(45,212,191,.16)', bombMovingStroke:'rgba(103,232,249,.84)', bombBody:'#092027', bombCap:'#6f8e8f', bombSparkHot:'#ecfeff', bombSparkDanger:'#2dd4bf', bombFuse:'#ecfeff',
+            fireOuter:'rgba(6,182,212,.84)', bombGlow:'rgba(45,212,191,.20)', bombGlowOuter:'rgba(8,145,178,0)', fireMiddle:'#22d3ee', fireCore:'#ecfeff',
+            particleImpact:'#cffafe', particleFire:'#67e8f9', particleBlock:'#d6a76d', particleDanger:'#fb7185', particleShield:'#5eead4', particleLoot:'#fef08a', particleEnemy:'#06b6d4', particleEnemyElite:'#f9a8d4', particleBoss:'#0ea5e9',
+            feedbackRingSoft:'#ccfbf1', feedbackFlash:'#ecfeff', ambientDust:'rgba(103,232,249,.34)'
+        },
+        { floor:'procedural:shore-floor', wall:'procedural:coral-wall', brick:'procedural:sandstone-block', bomb:'procedural:tide-bomb', fire:'procedural:water-flame' },
+        { tipo:'dust', color:'ambientDust', densidad:.65, velocidad:.09, sizeMin:1, sizeMax:2, alpha:.3 }
+    );
+
+    const SPACE_THEME = createVisualThemeV461(
+        'space',
+        'Espacio',
+        {
+            background:'#030514', floorA:'#11183a', floorB:'#1b2752', floorHighlight:'rgba(165,180,252,.055)', floorShadow:'rgba(0,0,12,.46)',
+            wallBase:'#3a466b', wallHighlight:'#7181b8', wallShadow:'#202a4a', wallInset:'#131b31', wallDeep:'#080d1d', wallAccent:'#a5b4fc',
+            blockBase:'#414b73', blockHighlight:'#7c8fca', blockShadow:'#252f4f', blockPattern:'#51608e', blockCore:'#141a32',
+            bombPlayerRing:'rgba(129,140,248,.92)', bombMovingFill:'rgba(99,102,241,.17)', bombMovingStroke:'rgba(165,180,252,.86)', bombBody:'#080c18', bombCap:'#59658e', bombSparkHot:'#eef2ff', bombSparkDanger:'#22d3ee', bombFuse:'#eef2ff',
+            fireOuter:'rgba(99,102,241,.90)', bombGlow:'rgba(129,140,248,.24)', bombGlowOuter:'rgba(79,70,229,0)', fireMiddle:'#818cf8', fireCore:'#e0e7ff',
+            particleImpact:'#c7d2fe', particleFire:'#a5b4fc', particleBlock:'#6366f1', particleDanger:'#f472b6', particleShield:'#67e8f9', particleLoot:'#fde68a', particleEnemy:'#22d3ee', particleEnemyElite:'#c084fc', particleBoss:'#e879f9',
+            feedbackRingSoft:'#c7d2fe', feedbackFlash:'#eef2ff', ambientDust:'rgba(165,180,252,.42)'
+        },
+        { floor:'procedural:space-floor', wall:'procedural:starship-wall', brick:'procedural:asteroid-block', bomb:'procedural:cosmic-bomb', fire:'procedural:void-flame' },
+        { tipo:'dust', color:'ambientDust', densidad:.7, velocidad:.2, sizeMin:1, sizeMax:2, alpha:.42 }
+    );
+
+    const SKY_THEME = createVisualThemeV461(
+        'sky',
+        'Cielo',
+        {
+            background:'#10071a', floorA:'#352046', floorB:'#4e2b63', floorHighlight:'rgba(250,232,255,.055)', floorShadow:'rgba(17,3,24,.44)',
+            wallBase:'#69547c', wallHighlight:'#b99bc9', wallShadow:'#473556', wallInset:'#2d2038', wallDeep:'#130b19', wallAccent:'#f0abfc',
+            blockBase:'#725070', blockHighlight:'#b77a9f', blockShadow:'#4b2d49', blockPattern:'#855d7e', blockCore:'#281526',
+            bombPlayerRing:'rgba(240,171,252,.90)', bombMovingFill:'rgba(217,70,239,.16)', bombMovingStroke:'rgba(240,171,252,.84)', bombBody:'#170b1a', bombCap:'#826382', bombSparkHot:'#fdf4ff', bombSparkDanger:'#e879f9', bombFuse:'#fdf4ff',
+            fireOuter:'rgba(217,70,239,.86)', bombGlow:'rgba(232,121,249,.22)', bombGlowOuter:'rgba(126,34,206,0)', fireMiddle:'#e879f9', fireCore:'#fdf4ff',
+            particleImpact:'#fae8ff', particleFire:'#f0abfc', particleBlock:'#a855f7', particleDanger:'#fb7185', particleShield:'#67e8f9', particleLoot:'#fde68a', particleEnemy:'#d946ef', particleEnemyElite:'#fda4af', particleBoss:'#c026d3',
+            feedbackRingSoft:'#f5d0fe', feedbackFlash:'#fdf4ff', ambientDust:'rgba(240,171,252,.40)'
+        },
+        { floor:'procedural:sky-floor', wall:'procedural:cloudstone-wall', brick:'procedural:twilight-block', bomb:'procedural:aurora-bomb', fire:'procedural:nebula-flame' },
+        { tipo:'snow', color:'ambientDust', densidad:.62, velocidad:.16, sizeMin:1, sizeMax:2, alpha:.34 }
+    );
+
+    const registry = { classic: CLASSIC_THEME, winter: WINTER_THEME, autumn: AUTUMN_THEME, spring: SPRING_THEME, summer: SUMMER_THEME, underground: UNDERGROUND_THEME, clouds: CLOUDS_THEME, mountains: MOUNTAINS_THEME, beach: BEACH_THEME, space: SPACE_THEME, sky: SKY_THEME, inferno: INFERNO_THEME };
     let activeThemeId = 'classic';
 
     function getThemeV46() {
@@ -342,7 +486,7 @@
     }
 
     function getThemeOptionsV461() {
-        return ['winter', 'inferno'].map(id => registry[id]);
+        return Object.keys(registry).filter(id => id !== 'classic').map(id => registry[id]);
     }
 
     function initializeThemeV461() {

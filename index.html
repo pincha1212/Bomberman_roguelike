@@ -6,8 +6,9 @@
     <title>BOMBERMAN ROGUELIKE — v6.9.6</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/13-game-information.css?v=6.12.22">
-    <link rel="stylesheet" href="css/14-viewport-layout.css?v=6.12.22">
+    <link rel="stylesheet" href="css/13-game-information.css?v=6.12.23">
+    <link rel="stylesheet" href="css/15-biome-switch.css?v=6.12.25">
+    <link rel="stylesheet" href="css/14-viewport-layout.css?v=6.12.24">
     <link rel="stylesheet" href="css/12-run-save.css">
     <link rel="stylesheet" href="css/06-mobile-performance.css">
     <link rel="stylesheet" href="css/12-mobile-controls.css?v=6.9.9">
@@ -24,10 +25,10 @@
                 <div class="menu-rail-content">
                     <div class="menu-mark">💣</div>
                     <h2 class="menu-rail-title pixel-font">ROGUELIKE</h2>
-                    <p class="menu-rail-subtitle">RUN-BASED ROGUELIKE</p>
+                    <p class="menu-rail-subtitle">ROGUELIKE POR PARTIDAS</p>
                     <p class="menu-rail-copy">Entrá, rompé el mapa, aprovechá cada apertura y sobreviví a la presión de la sala.</p>
                     <div class="menu-feature-list">
-                        <div class="menu-feature"><span>01</span><strong>MAPA PROCEDURAL</strong><small>Cada run reorganiza el desafío.</small></div>
+                        <div class="menu-feature"><span>01</span><strong>MAPA PROCEDURAL</strong><small>Cada partida reorganiza el desafío.</small></div>
                         <div class="menu-feature"><span>02</span><strong>LOOT Y RELIQUIAS</strong><small>Construí una configuración distinta.</small></div>
                         <div class="menu-feature"><span>03</span><strong>JEFES Y TRAMPAS</strong><small>Las decisiones importan en cada sala.</small></div>
                     </div>
@@ -35,19 +36,20 @@
             </aside>
 
             <div id="game-layout" class="game-layout" aria-label="Partida e información">
+                <div id="game-stage" class="game-stage" aria-label="Área de juego">
                 <section id="game-container" aria-label="Área de juego">
                     <canvas id="gameCanvas" width="600" height="600"></canvas>
                     <div id="immersion-vignette"></div>
 
                 <!-- Death / Run Summary -->
                 <div id="game-over-screen" class="screen hidden death-screen">
-                    <div class="death-kicker pixel-font">RUN TERMINADA</div>
+                    <div class="death-kicker pixel-font">PARTIDA TERMINADA</div>
                     <div class="death-icon">💀</div>
                     <h1 class="death-title pixel-font">GAME OVER</h1>
-                    <div id="go-record" class="death-record">RUN FINALIZADA</div>
+                    <div id="go-record" class="death-record">PARTIDA FINALIZADA</div>
                     <div class="death-cause">CAUSA · <strong id="go-cause">Daño recibido</strong></div>
                     <div class="death-summary-grid">
-                        <div class="death-stat"><span>RUN</span><strong id="go-run">RUN 01</strong></div>
+                        <div class="death-stat"><span>PARTIDA</span><strong id="go-run">PARTIDA 01</strong></div>
                         <div class="death-stat"><span>PROFUNDIDAD</span><strong id="go-level">1</strong></div>
                         <div class="death-stat"><span>TIEMPO</span><strong id="go-time">00:00</strong></div>
                         <div class="death-stat"><span>ENEMIGOS</span><strong id="go-kills">0</strong></div>
@@ -68,12 +70,12 @@
                         <div class="death-section-label">VERBOS DESCUBIERTOS</div>
                         <div id="go-verb-list" class="death-verb-list"></div>
                     </div>
-                    <button id="btn-restart" class="btn-pixel death-restart">NUEVA RUN</button>
+                    <button id="btn-restart" class="btn-pixel death-restart">NUEVA PARTIDA</button>
                 </div>
 
                 <!-- Reward screen -->
                 <div id="level-complete-screen" class="screen hidden">
-                    <div class="reward-kicker">RECOMPENSA DE RUN</div>
+                    <div class="reward-kicker">RECOMPENSA DE PARTIDA</div>
                     <h1 id="reward-title" class="text-lg mb-1 text-yellow-300 pixel-font">PROFUNDIDAD 01 SUPERADA</h1>
                     <p id="reward-meta" class="text-xs text-slate-300 mb-4">+10 monedas · elegí 1 mejora para la próxima sala</p>
                     <div id="relic-strip" class="relic-strip"></div>
@@ -83,18 +85,42 @@
 
                 <!-- Pause -->
                 <div id="pause-screen" class="screen hidden">
-                    <div class="reward-kicker">RUN PAUSADA</div>
+                    <div class="reward-kicker">PARTIDA PAUSADA</div>
                     <h1 class="text-xl mb-3 text-cyan-300 pixel-font">PAUSA</h1>
                     <button id="btn-resume" class="btn-pixel">CONTINUAR</button>
+                </section>
                 </div>
-            </section>
 
                 <aside id="game-info-panel" class="game-info-panel" aria-label="Información de la partida">
                     <div class="game-info-header">
-                        <div class="game-info-kicker">ESTADO DE LA RUN</div>
-                        <div id="run-banner">RUN 01 · DEPTH 01</div>
+                        <div class="game-info-kicker">ESTADO DE LA PARTIDA</div>
+                        <div id="run-banner">PARTIDA 01 · DEPTH 01</div>
                         <div id="room-banner">◆ NORMAL · Sin modificadores</div>
                     </div>
+
+                    <section class="biome-switch-card" aria-label="Cambiar bioma durante la partida">
+                        <div class="biome-switch-head">
+                            <div>
+                                <span class="biome-switch-kicker">ENTORNO</span>
+                                <strong>BIOMA ACTUAL</strong>
+                            </div>
+                            <span id="biome-switch-status">AUTOMÁTICO</span>
+                        </div>
+                        <select id="biome-switch-select" class="biome-switch-select" aria-label="Seleccionar bioma">
+                            <option value="winter">INVIERNO</option>
+                            <option value="autumn">OTOÑO</option>
+                            <option value="spring">PRIMAVERA</option>
+                            <option value="summer">VERANO</option>
+                            <option value="underground">BAJO TIERRA</option>
+                            <option value="clouds">NUBES</option>
+                            <option value="mountains">MONTAÑAS</option>
+                            <option value="beach">PLAYA</option>
+                            <option value="space">ESPACIO</option>
+                            <option value="sky">CIELO</option>
+                            <option value="inferno">INFIERNO</option>
+                        </select>
+                        <p class="biome-switch-note">Podés cambiar de bioma en cualquier momento de la partida.</p>
+                    </section>
 
                     <div id="ui-layer" aria-label="Interfaz de juego">
                         <div class="flex flex-col gap-1.5">
@@ -127,41 +153,14 @@
                         </div>
                     </div>
 
-                    <section class="info-card" aria-label="Habilidades de interacción">
-                        <div class="info-card-title">HABILIDADES</div>
-                        <div id="ui-abilities" class="ability-strip">
-                            <div class="ability-slots">
-                                <div id="ui-ability-kick" class="ability-slot" data-active="false" title="PATADA: empuja bombas al caminar contra ellas" aria-label="Patada: empujar bombas">
-                                    <span class="ability-icon" aria-hidden="true">🥾</span><span class="ability-copy"><strong>PATADA</strong><small id="ui-ability-kick-status">—</small></span>
-                                </div>
-                                <div id="ui-ability-grab" class="ability-slot" data-active="false" title="AGARRE: levanta y transporta una bomba" aria-label="Agarre: levantar y transportar bombas">
-                                    <span class="ability-icon" aria-hidden="true">🧤</span><span class="ability-copy"><strong>AGARRE</strong><small id="ui-ability-grab-status">—</small></span>
-                                </div>
-                                <div id="ui-ability-throw" class="ability-slot" data-active="false" title="LANZAMIENTO: requiere AGARRE" aria-label="Lanzamiento: lanzar bombas">
-                                    <span class="ability-icon" aria-hidden="true">🎯</span><span class="ability-copy"><strong>LANZAMIENTO</strong><small id="ui-ability-throw-status">—</small></span>
-                                </div>
-                            </div>
-                            <div id="ui-ability-detail" class="ability-detail" aria-live="polite">Sin habilidad de interacción activa</div>
-                            <div id="ui-powerup-toast" class="powerup-toast hidden" aria-live="polite" aria-atomic="true">
-                                <span id="ui-powerup-toast-icon" class="powerup-toast-icon" aria-hidden="true">◆</span>
-                                <span class="powerup-toast-copy"><strong id="ui-powerup-toast-name">POWER-UP</strong><small id="ui-powerup-toast-desc">—</small></span>
-                            </div>
-                        </div>
-                    </section>
+                    <div id="ui-powerup-toast" class="powerup-toast hidden" aria-live="polite" aria-atomic="true">
+                        <span id="ui-powerup-toast-icon" class="powerup-toast-icon" aria-hidden="true">◆</span>
+                        <span class="powerup-toast-copy"><strong id="ui-powerup-toast-name">POWER-UP</strong><small id="ui-powerup-toast-desc">—</small></span>
+                    </div>
 
                     <section class="info-card" aria-label="Reliquias activas">
                         <div class="info-card-title">RELIQUIAS ACTIVAS <span id="ui-relic-count-label">0</span></div>
                         <div id="ui-relic-list" class="info-relic-list"><div class="info-empty">Sin reliquias activas</div></div>
-                    </section>
-
-                    <section class="info-card" aria-label="Situación de la sala">
-                        <div class="info-card-title">SITUACIÓN</div>
-                        <div id="danger-indicator" class="info-danger hidden">PELIGRO</div>
-                        <div id="room-intro" class="info-room-intro hidden"></div>
-                        <div id="boss-hud" class="boss-hud hidden">
-                            <div class="boss-hud-top"><span>☠ COLOSO</span><span id="boss-phase">FASE 1</span></div>
-                            <div class="boss-bar-track"><div id="boss-bar" class="boss-bar"></div></div>
-                        </div>
                     </section>
 
                     <section class="info-card info-feed-card" aria-label="Información reciente">
@@ -181,10 +180,10 @@
                 </div>
                 <div class="menu-hero-icon">💣💥</div>
                 <h1 class="menu-title pixel-font">BOMBERMAN</h1>
-                <h2 class="menu-subtitle pixel-font">ROGUELIKE // RUN-BASED</h2>
+                <h2 class="menu-subtitle pixel-font">ROGUELIKE // PARTIDAS</h2>
                 <div class="menu-rules">
-                    <div><b>RUNS</b><span>Cada partida genera una progresión distinta.</span></div>
-                    <div><b>LOOT</b><span>Monedas, powerups y reliquias para construir tu run.</span></div>
+                    <div><b>PARTIDAS</b><span>Cada partida genera una progresión distinta.</span></div>
+                    <div><b>LOOT</b><span>Monedas, powerups y reliquias para construir tu partida.</span></div>
                     <div><b>RIESGO</b><span>Trampas, presión, refuerzos y jefes te obligan a moverte.</span></div>
                 </div>
                 <section class="quality-selector" aria-label="Calidad gráfica">
@@ -208,35 +207,12 @@
                     </div>
                     <p class="quality-selector-note">Elegí el nivel antes de comenzar la partida.</p>
                 </section>
-                <section class="theme-selector" aria-label="Progresión de biomas">
-                    <div class="theme-selector-head">
-                        <div>
-                            <span class="theme-selector-kicker">PROGRESIÓN</span>
-                            <strong>BIOMAS DE LA RUN</strong>
-                        </div>
-                        <span id="theme-selected-summary" class="theme-selected-summary">INVIERNO 1 · 44 PROFUNDIDADES</span>
-                    </div>
-                    <div class="biome-progression-list" aria-label="Orden de biomas">
-                        <div class="biome-progress-item" data-biome-id="winter"><strong>01 · INVIERNO</strong><span>1–4</span></div>
-                        <div class="biome-progress-item" data-biome-id="autumn"><strong>02 · OTOÑO</strong><span>5–8</span></div>
-                        <div class="biome-progress-item" data-biome-id="spring"><strong>03 · PRIMAVERA</strong><span>9–12</span></div>
-                        <div class="biome-progress-item" data-biome-id="summer"><strong>04 · VERANO</strong><span>13–16</span></div>
-                        <div class="biome-progress-item" data-biome-id="underground"><strong>05 · BAJO TIERRA</strong><span>17–20</span></div>
-                        <div class="biome-progress-item" data-biome-id="clouds"><strong>06 · NUBES</strong><span>21–24</span></div>
-                        <div class="biome-progress-item" data-biome-id="mountains"><strong>07 · MONTAÑAS</strong><span>25–28</span></div>
-                        <div class="biome-progress-item" data-biome-id="beach"><strong>08 · PLAYA</strong><span>29–32</span></div>
-                        <div class="biome-progress-item" data-biome-id="space"><strong>09 · ESPACIO</strong><span>33–36</span></div>
-                        <div class="biome-progress-item" data-biome-id="sky"><strong>10 · CIELO</strong><span>37–40</span></div>
-                        <div class="biome-progress-item" data-biome-id="inferno"><strong>11 · INFIERNO</strong><span>41–44</span></div>
-                    </div>
-                    <p class="biome-progression-note">La run recorre los biomas en orden. Cada bioma contiene 4 profundidades; las mecánicas y hazards se reutilizan desde sus registries.</p>
-                </section>
                 <div class="menu-actions">
-                    <button id="btn-resume-run" class="btn-pixel menu-resume-button hidden" type="button">CONTINUAR RUN</button>
-                    <button id="btn-start" class="btn-pixel menu-start-button" type="button">INICIAR RUN</button>
+                    <button id="btn-resume-run" class="btn-pixel menu-resume-button hidden" type="button">CONTINUAR PARTIDA</button>
+                    <button id="btn-start" class="btn-pixel menu-start-button" type="button">INICIAR PARTIDA</button>
                     <div class="menu-hint"><span>TECLADO</span><strong>WASD / ↑↓←→</strong><span>· BOMBA</span><strong>ESPACIO</strong></div>
                 </div>
-                <div class="menu-footer"><span>PROCEDURAL COMBAT</span><span>•</span><span>ADAPTIVE MOTION</span><span>•</span><span>DEEPER EVERY RUN</span></div>
+                <div class="menu-footer"><span>PROCEDURAL COMBAT</span><span>•</span><span>ADAPTIVE MOTION</span><span>•</span><span>MÁS PROFUNDA CADA PARTIDA</span></div>
             </aside>
         </main>
 
@@ -255,7 +231,7 @@
     <script src="js/01-core.js?v=6.12.21"></script>
     <script src="js/54-entity-capabilities.js?v=6.11.3"></script>
     <script src="js/35-device-quality.js?v=4.5.0"></script>
-    <script src="js/37-theme.js?v=6.8.7"></script>
+    <script src="js/37-theme.js?v=6.12.27"></script>
     <script src="js/38-mechanics-registry.js?v=6.3.0"></script>
     <script src="js/16-relics.js?v=6.7.0"></script>
     <script src="js/02-input.js?v=6.9.7"></script>
@@ -282,7 +258,7 @@
     <script src="js/27-boss-system.js?v=6.7.9"></script>
     <script src="js/29-feedback-system.js?v=4.6.2"></script>
     <script src="js/31-roguelike-update.js?v=6.7.0"></script>
-    <script src="js/40-biome-progression.js?v=6.10.1"></script>
+    <script src="js/40-biome-progression.js?v=6.12.26"></script>
     <script src="js/41-biome-journey.js?v=6.3.0"></script>
     <script src="js/42-run-history.js?v=5.6.0"></script>
     <script src="js/44-run-save.js?v=6.7.9"></script>
@@ -293,5 +269,7 @@
     <script src="js/50-death-echo.js?v=6.12.18"></script>
     <script src="js/51-bomb-effects.js?v=6.12.3"></script>
     <script src="js/56-elemental-bombs.js?v=6.12.3"></script>
+    <script src="js/59-biome-switch.js?v=6.12.25"></script>
+    <script src="js/60-partida-language.js?v=6.12.25"></script>
 </body>
 </html>

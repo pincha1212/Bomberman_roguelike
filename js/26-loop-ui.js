@@ -106,7 +106,6 @@
                 UI['ui-bomb-element'].style.setProperty('--element-color', def?.color || '#94a3b8');
             }
             if (UI['ui-timer']) UI['ui-timer'].innerText = `${Math.max(0, Math.ceil(gameState.roomTime / 1000))}s`;
-            if (UI['ui-threat']) UI['ui-threat'].innerText = gameState.threatLevel;
 
             if (UI['ui-shield-badge']) UI['ui-shield-badge'].classList.toggle('hidden', !player.hasShield);
 

@@ -990,10 +990,8 @@ function getEnemyMovementSpeedV610(e) {
     const gameplaySpeedMultiplier = typeof getGameplayPowerupEnemySpeedMultiplierV676 === 'function'
         ? Math.max(0.1, Number(getGameplayPowerupEnemySpeedMultiplierV676(e)) || 1)
         : 1;
-    const threatMultiplier = 1 + Math.max(0, Number(gameState.threatLevel) || 0) * 0.04;
     return Math.max(0.1, Number(e.baseSpeed) || 1)
         * Number(profile.speedMultiplier || 1)
-        * threatMultiplier
         * gameplaySpeedMultiplier;
 }
 

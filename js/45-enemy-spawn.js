@@ -227,7 +227,6 @@
             speciesNameV626: speciesProfile?.name || spec.speciesName || type.name,
             speciesRuleIdV626: speciesProfile?.ruleId || spec.speciesRuleId || 'none',
             preferredAiV626: spec.preferredAi || spec.behaviorId || null,
-            reinforcement: Boolean(options.reinforcement),
             spawnedByV626: String(options.source || 'room')
         };
     }

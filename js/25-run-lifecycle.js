@@ -46,7 +46,6 @@ function resetPlayerRuntimeState() {
     player._frameScale = 1;
     player.vx = 0;
     player.vy = 0;
-    if (typeof gridResetTileMove === 'function') gridResetTileMove(player, false);
     player.inputDir = 0;
     player.inputAxis = null;
     player.inputBuffer = null;
@@ -81,9 +80,7 @@ function resetWorldRuntimeState() {
     if (typeof materialResetV60 === 'function') materialResetV60();
     gameState.boss = null;
     gameState.roomTime = 0;
-    gameState.threatLevel = 0;
     gameState.difficulty = null;
-    gameState.nextReinforcement = 20000;
     gameState.exitPos = null;
     gameState.exitUnlocked = false;
     gameState.lastTime = 0;

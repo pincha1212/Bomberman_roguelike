@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.26.0 — Level generation + delegated enemy reinforcement spawn.
+// Bomberman Roguelike v6.27.0 — Level generation without periodic enemy reinforcements.
         function applyProceduralMapV61220() {
             const generator = (typeof window !== 'undefined') ? window.DungeonGenerator : null;
             if (!generator || typeof generator.getRunRequest !== 'function') return false;
@@ -143,11 +143,6 @@
             gameState.roomTime = typeof getDifficultyRoomTimeV323 === 'function'
                 ? getDifficultyRoomTimeV323(Math.max(35000, 80000 - gameState.level * 1500))
                 : Math.max(35000, 80000 - gameState.level * 1500);
-            gameState.threatLevel = 0;
-            const firstReinforcementBase = Math.max(10000, gameState.roomTime - 18000);
-            gameState.nextReinforcement = typeof getDifficultyReinforcementIntervalV323 === 'function'
-                ? getDifficultyReinforcementIntervalV323(firstReinforcementBase)
-                : firstReinforcementBase;
 
             // El mapa nunca se publica parcialmente: el generador trabaja sobre MapData aislado.
             player.x = TILE_SIZE + (TILE_SIZE - player.width) / 2;
@@ -224,8 +219,7 @@
             const nx=b.x+b.vx*scale, ny=b.y+b.vy*scale;
             if(!rectCollidesSolid(nx-b.width/2,ny-b.height/2,b.width,b.height)){b.x=nx;b.y=ny;} else {b.vx*=-1;b.vy*=-1;}
 
-            // v4.1: el boss ya no tiene proyectiles, cargas ni refuerzos;
-            // sus ataques viven únicamente en js/28-boss-system.js.
+            // Los ataques del Boss viven únicamente en js/27-boss-system.js.
             const hit={left:b.x-b.width*.38,right:b.x+b.width*.38,top:b.y-b.height*.38,bottom:b.y+b.height*.38};
             const ph={left:player.x+5,right:player.x+player.width-5,top:player.y+5,bottom:player.y+player.height-5};
             if(checkOverlap(hit,ph)) takeDamage('boss-contact', b.x, b.y);
@@ -266,61 +260,9 @@
         // V3.12.3: el sistema de trampas/hazards vive en js/17-traps.js.
         // Este módulo mantiene la generación del nivel y delega allí la lógica
         // de generación, activación, efectos y renderizado de trampas.
-        function spawnReinforcement(count = 1) {
-            if (gameState.roomType?.id === 'BOSS') return;
-            const currentCount = Array.isArray(gameState.enemies) ? gameState.enemies.length : 0;
-            const spawnCap = typeof getDifficultyEnemySpawnCapV619 === 'function'
-                ? getDifficultyEnemySpawnCapV619(gameState.level)
-                : Math.min(12, 2 + Math.max(1, Math.floor(Number(gameState.level) || 1)));
-            const remainingCapacity = Math.max(0, spawnCap - currentCount);
-            if (remainingCapacity <= 0) return;
-            count = Math.min(Math.max(0, Math.floor(Number(count) || 0)), remainingCapacity);
-            if (count <= 0) return;
-            const candidates = [];
-            const px = Math.floor((player.x + player.width / 2) / TILE_SIZE);
-            const py = Math.floor((player.y + player.height / 2) / TILE_SIZE);
-            for (let y = 1; y < gameState.gridHeight - 1; y++) {
-                for (let x = 1; x < gameState.gridWidth - 1; x++) {
-                    if (gameState.grid[y][x] !== TYPES.EMPTY) continue;
-                    const distance = Math.abs(x - px) + Math.abs(y - py);
-                    if (distance >= 6 && !gameState.enemies.some(e => Math.floor(e.x/TILE_SIZE) === x && Math.floor(e.y/TILE_SIZE) === y)) candidates.push({x,y,distance});
-                }
-            }
-            candidates.sort((a,b) => b.distance - a.distance);
-            const spawnTotal = Math.min(count, candidates.length, typeof canSpawnEnemyV626 === 'function' ? canSpawnEnemyV626(count) : count);
-            const spawnPlan = typeof buildEnemySpawnPlanV626 === 'function'
-                ? buildEnemySpawnPlanV626(spawnTotal)
-                : [];
-            for (let i = 0; i < spawnTotal; i++) {
-                const c = candidates[i];
-                const spec = spawnPlan[i] || (typeof resolveEnemySpawnSpecV626 === 'function' ? resolveEnemySpawnSpecV626({ index: i, count: spawnTotal }) : null);
-                const entity = typeof makeEnemyEntityV626 === 'function'
-                    ? makeEnemyEntityV626({ x:c.x, y:c.y }, spec, { source: 'reinforcement', reinforcement: true, changeTimer: 15 + Math.random() * 35 })
-                    : null;
-                if (entity) {
-                    entity.elite = false;
-                    entity.reinforcement = true;
-                    gameState.enemies.push(entity);
-                }
-                addFloatingText('REFUERZO', c.x*TILE_SIZE+TILE_SIZE/2, c.y*TILE_SIZE+TILE_SIZE/2, '#fb7185');
-            }
-            if (count > 0) sfx('alarm');
+        // v6.27: el reloj de sala continúa, pero no genera enemigos nuevos.
+        // La cantidad de enemigos queda fija al entrar en la sala.
+        function updateRoomTimerV627(dt) {
+            const elapsed = Math.max(0, Number(dt) || 0);
+            gameState.roomTime = Math.max(0, (Number(gameState.roomTime) || 0) - elapsed);
         }
-
-        function updateRoomThreat(dt) {
-            gameState.roomTime -= dt;
-            gameState.nextReinforcement -= dt;
-            if (gameState.roomType.id === 'BOSS') return;
-            if (gameState.nextReinforcement <= 0) {
-                gameState.threatLevel++;
-                const diff = gameState.difficulty || (typeof getDifficultyV323 === 'function' ? getDifficultyV323(gameState.level) : null);
-                const amount = Math.min(3, 1 + Math.floor(gameState.threatLevel / 2) + (diff?.reinforcementAmountBonus || 0));
-                spawnReinforcement(amount);
-                const baseInterval = Math.max(12000, 24000 - gameState.level * 500);
-                gameState.nextReinforcement = typeof getDifficultyReinforcementIntervalV323 === 'function'
-                    ? getDifficultyReinforcementIntervalV323(baseInterval)
-                    : baseInterval;
-                triggerScreenShake(3, 140);
-            }
-        }
-

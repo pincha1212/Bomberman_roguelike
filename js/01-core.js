@@ -597,8 +597,6 @@ const UI = {};
             hazardCooldown: 0,
             boss: null,
             roomTime: 0,
-            threatLevel: 0,
-            nextReinforcement: 20000,
             exitPos: null,
             lastTime: 0,
             keys: {},

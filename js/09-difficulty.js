@@ -8,9 +8,7 @@
         maxEnemies: 22,
         maxEnemySpeedMult: 1.24,
         maxTrapBonus: 6,
-        maxBlockDensityBonus: 0.08,
-        minReinforcementInterval: 10500,
-        enemySpawnCap: 12
+        maxBlockDensityBonus: 0.08
     });
 
     function depthV323(value) {
@@ -28,10 +26,7 @@
         const trapBonus = Math.min(LIMITS.maxTrapBonus, Math.floor(steps / 2));
         const blockDensityBonus = Math.min(LIMITS.maxBlockDensityBonus, Math.floor(steps / 3) * 0.01);
         const roomTimeMult = 1 - Math.min(0.22, steps * 0.012);
-        const reinforcementIntervalMult = 1 - Math.min(0.28, steps * 0.014);
-        const reinforcementAmountBonus = Math.min(2, Math.floor(steps / 5));
         const maxEnemies = Math.min(LIMITS.maxEnemies, 8 + Math.floor(d * 0.85));
-        const enemySpawnCap = getDifficultyEnemySpawnCapV619(d);
         const eliteBonus = Math.min(0.24, tier * 0.04);
 
         return Object.freeze({
@@ -44,10 +39,7 @@
             trapBonus,
             blockDensityBonus,
             roomTimeMult,
-            reinforcementIntervalMult,
-            reinforcementAmountBonus,
             maxEnemies,
-            enemySpawnCap,
             eliteBonus,
             limits: LIMITS
         });
@@ -65,21 +57,10 @@
         return Math.max(LIMITS.minRoomTime, Math.round(base * profile.roomTimeMult));
     }
 
-    function getDifficultyReinforcementIntervalV323(baseMs) {
-        const profile = gameState?.difficulty || getDifficultyV323();
-        const base = Math.max(0, Number(baseMs) || 0);
-        return Math.max(LIMITS.minReinforcementInterval, Math.round(base * profile.reinforcementIntervalMult));
-    }
 
     function getDifficultyTrapCountV323(baseCount) {
         const profile = gameState?.difficulty || getDifficultyV323();
         return Math.max(0, Math.round((Number(baseCount) || 0) + profile.trapBonus));
-    }
-
-    function getDifficultyEnemySpawnCapV619(depth = gameState?.level || 1) {
-        const d = depthV323(depth);
-        // Escala conservadora: profundidad 1 = 3 enemigos simultáneos.
-        return Math.min(LIMITS.enemySpawnCap, 2 + d);
     }
 
     window.BOMBER_DIFFICULTY_V323 = Object.freeze({
@@ -88,16 +69,11 @@
         get: getDifficultyV323,
         apply: applyDifficultyV323,
         roomTime: getDifficultyRoomTimeV323,
-        reinforcementInterval: getDifficultyReinforcementIntervalV323,
-        trapCount: getDifficultyTrapCountV323,
-        enemySpawnCap: getDifficultyEnemySpawnCapV619
+        trapCount: getDifficultyTrapCountV323
     });
 
     window.getDifficultyV323 = getDifficultyV323;
     window.applyDifficultyV323 = applyDifficultyV323;
     window.getDifficultyRoomTimeV323 = getDifficultyRoomTimeV323;
-    window.getDifficultyReinforcementIntervalV323 = getDifficultyReinforcementIntervalV323;
     window.getDifficultyTrapCountV323 = getDifficultyTrapCountV323;
 })();
-
-    window.getDifficultyEnemySpawnCapV619 = getDifficultyEnemySpawnCapV619;

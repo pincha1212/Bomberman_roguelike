@@ -93,11 +93,10 @@
             // El contador se descuenta cada frame y se desactiva al llegar a cero.
             updatePlayerInvulnerability(dt);
 
-            updateRoomThreat(dt);
+            updateRoomTimerV627(dt);
             updateHazards(dt);
             if (typeof materialUpdateV60 === 'function') materialUpdateV60(dt);
             if (typeof updateBiomeLiquidPlayerEffectsV631 === 'function') updateBiomeLiquidPlayerEffectsV631(dt);
-            if (typeof updateLivingBiomeV620 === 'function') updateLivingBiomeV620(dt);
             updateBoss(dt);
 
             // Shake countdown
@@ -294,9 +293,6 @@
             const gs = window.BOMBER_ENGINE?.getState?.() || gameState;
             const sx = sourceX == null ? p.x : sourceX;
             const sy = sourceY == null ? p.y : sourceY;
-            if (typeof globalThis.isGodModeActiveV616 === 'function' && globalThis.isGodModeActiveV616()) {
-                return false;
-            }
             if (!canApplyPlayerDamage()) {
                 return false;
             }

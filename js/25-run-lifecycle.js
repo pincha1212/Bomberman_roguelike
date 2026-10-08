@@ -46,6 +46,7 @@ function resetPlayerRuntimeState() {
     player._frameScale = 1;
     player.vx = 0;
     player.vy = 0;
+    if (typeof gridResetTileMove === 'function') gridResetTileMove(player, false);
     player.inputDir = 0;
     player.inputAxis = null;
     player.inputBuffer = null;

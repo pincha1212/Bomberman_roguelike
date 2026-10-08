@@ -293,6 +293,9 @@
             const gs = window.BOMBER_ENGINE?.getState?.() || gameState;
             const sx = sourceX == null ? p.x : sourceX;
             const sy = sourceY == null ? p.y : sourceY;
+            if (typeof globalThis.isGodModeActiveV616 === 'function' && globalThis.isGodModeActiveV616()) {
+                return false;
+            }
             if (!canApplyPlayerDamage()) {
                 return false;
             }

@@ -152,6 +152,17 @@ function gridSnapEntityToTile(entity, gx, gy, kind = null) {
     return true;
 }
 
+function gridResetTileMove(entity, initialized = false) {
+    if (!entity) return false;
+    entity._tileMoveActive = false;
+    entity._tileMoveTargetX = null;
+    entity._tileMoveTargetY = null;
+    entity._tileMoveTargetGX = null;
+    entity._tileMoveTargetGY = null;
+    entity._tileMoveInitialized = !!initialized;
+    return true;
+}
+
 function gridBeginTileMove(entity, gx, gy, options = {}) {
     if (!entity || !gridIsInside(gx, gy)) return false;
     const kind = options.kind || (entity && entity.__gridAnchor === 'center' ? 'enemy' : 'player');

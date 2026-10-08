@@ -39,6 +39,7 @@
             if (mapData.playerSpawn) {
                 player.x = mapData.playerSpawn.x * TILE_SIZE + (TILE_SIZE - player.width) / 2;
                 player.y = mapData.playerSpawn.y * TILE_SIZE + (TILE_SIZE - player.height) / 2;
+                if (typeof gridResetTileMove === 'function') gridResetTileMove(player, false);
             }
             gameState.proceduralMapActive = true;
             gameState.proceduralMapSeed = request.seed;
@@ -150,9 +151,15 @@
             // El mapa nunca se publica parcialmente: el generador trabaja sobre MapData aislado.
             player.x = TILE_SIZE + (TILE_SIZE - player.width) / 2;
             player.y = TILE_SIZE + (TILE_SIZE - player.height) / 2;
+            // El spawn inicia una nueva navegación: nunca heredar un tile-move
+            // activo ni su objetivo de la sala anterior.
+            if (typeof gridResetTileMove === 'function') gridResetTileMove(player, false);
 
             const proceduralApplied = applyProceduralMapV61220();
             if (!proceduralApplied) buildClassicMapV61220();
+            // Tanto el mapa procedural como el fallback dejan el jugador en un
+            // spawn válido y limpio para la nueva profundidad.
+            if (typeof gridResetTileMove === 'function') gridResetTileMove(player, false);
 
             if (typeof resetCameraToPlayer === 'function') resetCameraToPlayer();
 

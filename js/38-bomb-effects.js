@@ -590,6 +590,7 @@
         const p = getPlayer();
         const state = getState();
         if (!p || !state || !state.isPlaying) return false;
+        if (typeof global.isGodModeActiveV616 === 'function' && global.isGodModeActiveV616()) return false;
         if (typeof global.playerFSMDeath === 'function') global.playerFSMDeath(source);
         if (typeof global.gameOver === 'function') {
             global.gameOver(source);

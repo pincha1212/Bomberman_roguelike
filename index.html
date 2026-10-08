@@ -122,6 +122,18 @@
                         <p class="biome-switch-note">Podés cambiar de bioma en cualquier momento de la partida.</p>
                     </section>
 
+                    <section class="dev-tools-card" aria-label="Herramientas de desarrollo">
+                        <div class="dev-tools-head">
+                            <div>
+                                <span class="dev-tools-kicker">DESARROLLO</span>
+                                <strong>GOD MODE</strong>
+                            </div>
+                            <span id="god-mode-status" class="dev-tools-status">OFF</span>
+                        </div>
+                        <button id="btn-god-mode" class="btn-pixel dev-tools-button" type="button" aria-pressed="false">ACTIVAR GOD MODE</button>
+                        <p class="dev-tools-note">Anula el daño al jugador. No modifica vida, build ni estadísticas.</p>
+                    </section>
+
                     <div id="ui-layer" aria-label="Interfaz de juego">
                         <div class="flex flex-col gap-1.5">
                             <div class="info-section-title">JUGADOR</div>
@@ -271,5 +283,6 @@
     <script src="js/41-partida-language.js?v=6.12.25"></script>
     <script src="js/42-biome-liquids.js?v=6.12.31"></script>
     <script src="js/43-biome-enemy-species.js?v=6.15.0"></script>
+    <script src="js/44-god-mode.js?v=6.16.0"></script>
 </body>
 </html>

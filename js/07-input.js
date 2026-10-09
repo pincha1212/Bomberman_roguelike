@@ -56,106 +56,28 @@
 
 
 
-// v6.9.5 — Controles móviles orientados a movimiento por tiles.
-// D-pad digital: cada dirección representa una orden cardinal estable y puede
-// mantenerse presionada para encadenar tiles. Usa Pointer Events para evitar
-// conflictos entre touch/mouse y permite multitouch independiente con bomba.
-(function setupMobileTileControls() {
-    const pad = document.getElementById('mobile-dpad');
-    if (!pad) return;
-
-    const buttons = Array.from(pad.querySelectorAll('[data-mobile-dir]'));
-    const activePointers = new Map();
-    const values = {
-        up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0]
-    };
-
-    function clearPressed() {
-        buttons.forEach((button) => button.classList.remove('is-pressed'));
+// v6.31.0 — Gestos cardinales en la mitad izquierda; acciones independientes a la derecha.
+(function setupMobileGestureControlsV6310() {
+    const zone = document.getElementById('mobile-gesture-zone');
+    const grabBtn = document.getElementById('btn-grab-mobile');
+    const throwBtn = document.getElementById('btn-throw-mobile');
+    if (!zone) return;
+    const dirs = {up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
+    const pointers = new Map(); const threshold = 22;
+    function issue(dir) {
+        const v=dirs[dir]; if(!v||!gameState?.touchControls||!gameState.isPlaying||gameState.paused)return;
+        gameState.touchControls.x=v[0]; gameState.touchControls.y=v[1];
+        gameState.touchControls.queuedX=v[0]; gameState.touchControls.queuedY=v[1];
+        gameState.lastMoveAxis=v[0]?'horizontal':'vertical'; gameState.lastMoveInputAt=performance.now(); zone.dataset.direction=dir;
     }
-
-    function setDirection(dir) {
-        const value = values[dir];
-        if (!value || !gameState.touchControls) return;
-        gameState.touchControls.x = value[0];
-        gameState.touchControls.y = value[1];
-        // La cola representa SOLO la próxima orden. Mientras un tile está
-        // avanzando puede reemplazarse por la dirección más reciente.
-        gameState.touchControls.queuedX = value[0];
-        gameState.touchControls.queuedY = value[1];
-        gameState.lastMoveAxis = value[0] ? 'horizontal' : 'vertical';
-        gameState.lastMoveInputAt = performance.now();
-    }
-
-    function getButtonAtPoint(clientX, clientY) {
-        const element = document.elementFromPoint(clientX, clientY);
-        const button = element?.closest?.('[data-mobile-dir]');
-        return button && pad.contains(button) ? button : null;
-    }
-
-    function activateButton(button, pointerId) {
-        if (!button) return;
-        const dir = button.dataset.mobileDir;
-        if (!values[dir]) return;
-        activePointers.set(pointerId, dir);
-        clearPressed();
-        buttons.forEach((candidate) => {
-            if (Array.from(activePointers.values()).includes(candidate.dataset.mobileDir)) {
-                candidate.classList.add('is-pressed');
-            }
-        });
-        setDirection(dir);
-    }
-
-    function releasePointer(pointerId) {
-        activePointers.delete(pointerId);
-        const remaining = Array.from(activePointers.values()).pop();
-        clearPressed();
-        if (remaining) {
-            setDirection(remaining);
-            buttons.find((button) => button.dataset.mobileDir === remaining)?.classList.add('is-pressed');
-        } else if (gameState.touchControls) {
-            gameState.touchControls.x = 0;
-            gameState.touchControls.y = 0;
-            // No borrar la cola: un toque corto debe terminar exactamente
-            // el tile que ya fue ordenado, sin iniciar una segunda orden.
-        }
-    }
-
-    buttons.forEach((button) => {
-        button.addEventListener('pointerdown', (event) => {
-            event.preventDefault();
-            activateButton(button, event.pointerId);
-            try { button.setPointerCapture(event.pointerId); } catch (_) {}
-        }, { passive: false });
-
-        button.addEventListener('pointermove', (event) => {
-            event.preventDefault();
-            if (!activePointers.has(event.pointerId)) return;
-            const hovered = getButtonAtPoint(event.clientX, event.clientY);
-            if (hovered && hovered !== button) activateButton(hovered, event.pointerId);
-        }, { passive: false });
-
-        const release = (event) => {
-            event.preventDefault();
-            releasePointer(event.pointerId);
-        };
-        button.addEventListener('pointerup', release, { passive: false });
-        button.addEventListener('pointercancel', release, { passive: false });
-        button.addEventListener('lostpointercapture', (event) => {
-            if (activePointers.has(event.pointerId)) releasePointer(event.pointerId);
-        });
-        button.addEventListener('contextmenu', (event) => event.preventDefault());
-    });
-
-    window.addEventListener('blur', () => {
-        activePointers.clear();
-        clearPressed();
-        if (gameState.touchControls) {
-            gameState.touchControls.x = 0;
-            gameState.touchControls.y = 0;
-            gameState.touchControls.queuedX = 0;
-            gameState.touchControls.queuedY = 0;
-        }
-    });
+    function clear(id) { pointers.delete(id); if(!pointers.size&&gameState?.touchControls){gameState.touchControls.x=0;gameState.touchControls.y=0;delete zone.dataset.direction;} }
+    zone.addEventListener('pointerdown',e=>{if(!window.matchMedia('(max-width: 820px), (pointer: coarse)').matches||!gameState?.isPlaying||gameState.paused)return;e.preventDefault();pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});try{zone.setPointerCapture(e.pointerId)}catch(_){}},{passive:false});
+    zone.addEventListener('pointermove',e=>{const p=pointers.get(e.pointerId);if(!p)return;e.preventDefault();const dx=e.clientX-p.x,dy=e.clientY-p.y;if(Math.max(Math.abs(dx),Math.abs(dy))<threshold)return;const dir=Math.abs(dx)>Math.abs(dy)?(dx<0?'left':'right'):(dy<0?'up':'down');p.x=e.clientX;p.y=e.clientY;issue(dir)},{passive:false});
+    const release=e=>{if(!pointers.has(e.pointerId))return;e.preventDefault?.();clear(e.pointerId)};
+    zone.addEventListener('pointerup',release,{passive:false});zone.addEventListener('pointercancel',release,{passive:false});zone.addEventListener('lostpointercapture',release);
+    function reset(){pointers.clear();if(gameState?.touchControls){gameState.touchControls.x=0;gameState.touchControls.y=0;gameState.touchControls.queuedX=0;gameState.touchControls.queuedY=0;}delete zone.dataset.direction;if(typeof endBombHold==='function')endBombHold();}
+    window.addEventListener('blur',reset);document.addEventListener('visibilitychange',()=>{if(document.hidden)reset()});
+    function bindAction(btn,fn){if(!btn)return;btn.addEventListener('pointerdown',e=>{e.preventDefault();if(!gameState?.isPlaying||gameState.paused)return;btn.classList.add('is-pressed');try{btn.setPointerCapture(e.pointerId)}catch(_){}fn()},{passive:false});const up=e=>{e.preventDefault?.();btn.classList.remove('is-pressed')};btn.addEventListener('pointerup',up,{passive:false});btn.addEventListener('pointercancel',up,{passive:false});btn.addEventListener('lostpointercapture',up);btn.addEventListener('contextmenu',e=>e.preventDefault())}
+    bindAction(grabBtn,()=>{if(typeof window.tryGrabPlayerBombV610==='function')window.tryGrabPlayerBombV610()});
+    bindAction(throwBtn,()=>{if(typeof window.throwCarriedBombV683==='function')window.throwCarriedBombV683(window.player)});
 })();

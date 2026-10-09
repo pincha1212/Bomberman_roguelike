@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.30.7 — Bombas elementales; depósito delegado al registro único
+// Bomberman Roguelike v6.30.9 — Identidad elemental de cada bomba
 // Vertical slice: FIRE / ICE / ELECTRIC. La bomba conserva su elemento
 // al ser colocada, agarrada, lanzada o encadenada.
 (function installElementalBombsV612(global) {
@@ -49,9 +49,9 @@
     function getPowerupDefinitionV612(type){ return POWERUP_DEFS[String(type||'')] || null; }
     function getPowerupIdsV612(){ return Object.freeze(Object.keys(POWERUP_DEFS)); }
 
-    // v6.30.7: este módulo solo asigna el elemento y effectIds a las bombas.
-    // El depósito de campos y la aplicación de estados pertenecen exclusivamente
-    // a 38-bomb-effects.js, que escucha BOMBA_EXPLOTO y aplica sus combinaciones.
+    // Autoridad: este módulo asigna un único elemento a cada bomba colocada.
+    // 38-bomb-effects.js recibe la detonación y deposita el efecto correspondiente.
+    // Cada elemento conserva su identidad al detonar y al dejar un campo.
 
     function update(dt){ if(typeof global.bombEffectUpdateV64==='function') global.bombEffectUpdateV64(dt); }
     function draw(ctx){ if(typeof global.drawBombEffectsV64==='function') global.drawBombEffectsV64(ctx); }
@@ -65,8 +65,8 @@
         };
     }
 
-    // No registrar un segundo listener de BOMBA_EXPLOTO aquí. La autoridad
-    // única es bomb-explosion:effects en 38-bomb-effects.js.
+    // Este módulo NO escucha BOMBA_EXPLOTO. La única autoridad de campos es
+    // 38-bomb-effects.js; la explosión inmediata sigue bajo 20-combat.js.
 
     global.ELEMENTAL_BOMBS_V612=ELEMENTS;
     global.ELEMENTAL_BOMB_POWERUPS_V612=POWERUPS;

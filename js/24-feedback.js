@@ -195,7 +195,7 @@ const FEEDBACK_POOL_CONFIG = Object.freeze({
     particleSpeedMax: 2.8,
     flashMaxAlpha: 0.22,
     impactFlashMs: 90,
-    explosionFlashMs: 140,
+    explosionFlashMs: 55,
     cameraKickImpact: 1.6,
     cameraKickExplosion: 3.4,
     ringLifeMs: 260,
@@ -382,13 +382,13 @@ function feedbackPoolExplosion(x, y, color = null, scale = 1) {
     color = color || (typeof themeColorV46 === 'function' ? themeColorV46('particleFire', '#fb923c') : '#fb923c');
     feedbackPool.explosionCount += 1;
 
-    // La llama continua es la única silueta. Limpiar marcas circulares heredadas
-    // del depósito/colocación de la bomba en el punto que acaba de detonar.
-    feedbackPoolClearExplosionResidue(x, y);
+    // La llama continua es la única silueta. Los residuos circulares antiguos
+    // se limpian desde la autoridad de efectos, para cada bomba detonada.
     // No generar anillos circulares ni partículas radiales alrededor de la bomba.
     feedbackPoolFlash(typeof deviceQualityV45FeedbackFlash === 'function' ? deviceQualityV45FeedbackFlash(0.18 * scale) : 0.18 * scale, FEEDBACK_POOL_CONFIG.explosionFlashMs);
-    feedbackPoolKickCamera(typeof deviceQualityV45CameraKick === 'function' ? deviceQualityV45CameraKick(FEEDBACK_POOL_CONFIG.cameraKickExplosion * scale) : FEEDBACK_POOL_CONFIG.cameraKickExplosion * scale);
-    feedbackPoolPlaySound('explosion', scale);
+    // El desplazamiento de cámara secundario prolongaba la sacudida. La explosión
+    // usa únicamente triggerScreenShake, acotado a 50–100 ms por el sistema de efectos.
+    // El sonido lo reproduce bomb-explosion:sound en 35-bomb-events.js.
 }
 
 function feedbackPoolDamage(x, y) {

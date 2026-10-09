@@ -1,19 +1,20 @@
-// Bomberman Roguelike v6.30.7 — Bomb Effect Registry / single explosion-field authority
+// Bomberman Roguelike v6.30.9 — Independent bomb effects / one field authority
 // Base simple y extensible para rastros/efectos de bombas.
 //
 // PRINCIPIOS
-// - Una bomba declara effectIds; el sistema decide cómo se materializan.
-// - Los efectos son datos + pequeñas funciones de aplicación/combina­ción.
-// - Un efecto de campo es independiente de la bomba que lo creó.
-// - El daño de efectos usa una capa común para PLAYER, ENEMY, BOSS y DEATH_ECHO.
-// - Las combinaciones se declaran en una tabla; agregar una nueva no requiere
-//   modificar explodeBomb().
-// - Las áreas se limitan por celda y el update está acotado para mantenerlo barato.
+// - La bomba colocada declara exactamente su elemento y sus effectIds.
+// - Cada efecto de campo funciona de forma independiente; no requiere que otra
+//   bomba elemental alcance la misma casilla.
+// - Dos efectos diferentes pueden coexistir en una casilla sin consumirse ni
+//   crear un tercer efecto implícito.
+// - Una bomba del mismo elemento que vuelva a alcanzar una casilla refresca el
+//   campo existente; no multiplica el daño por acumulación artificial.
+// - Solo el sistema base de detonación resuelve daño/hitboxes inmediatos.
 
 (function installBombEffectSystemV64(global) {
     'use strict';
 
-    const VERSION = '6.12.10';
+    const VERSION = '6.30.9';
     const EVENT = global.GAME_EVENTS_V60?.BOMBA_EXPLOTO || global.GAME_EVENTS_V59?.BOMBA_EXPLOTO;
     const LISTENER_KEY = 'bomb-explosion:effects';
     const MAX_FIELDS = 420;
@@ -65,40 +66,9 @@
         }),
         [EFFECTS.FROST]: Object.freeze({ id:EFFECTS.FROST, label:'Escarcha', color:'#7dd3fc', core:'#e0f2fe', defaultDurationMs:2800, tickMs:250, damage:0, movementMultiplier:0.62, enemyMovementMultiplier:0.62, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','ice','slow']) }),
         [EFFECTS.SHOCK]: Object.freeze({ id:EFFECTS.SHOCK, label:'Descarga', color:'#facc15', core:'#fef9c3', defaultDurationMs:1800, tickMs:600, damage:1, movementMultiplier:0.86, enemyMovementMultiplier:0.86, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','electric','damage']) }),
-        [EFFECTS.STEAM]: Object.freeze({ id:EFFECTS.STEAM, label:'Vapor', color:'#e2e8f0', core:'#ffffff', defaultDurationMs:2200, tickMs:300, damage:0, movementMultiplier:0.58, enemyMovementMultiplier:0.58, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','combo','steam','slow']), materialType: global.MATERIALS_V60?.STEAM || 'steam' }),
-        [EFFECTS.PLASMA]: Object.freeze({ id:EFFECTS.PLASMA, label:'Plasma', color:'#c084fc', core:'#f5d0fe', defaultDurationMs:1500, tickMs:300, damage:1, movementMultiplier:0.92, enemyMovementMultiplier:0.92, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','combo','plasma','damage']) }),
-        [EFFECTS.ARC]: Object.freeze({ id:EFFECTS.ARC, label:'Rayo extendido', color:'#fde047', core:'#ffffff', defaultDurationMs:900, tickMs:250, damage:1, movementMultiplier:0.90, enemyMovementMultiplier:0.90, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','combo','electric','extended','damage']) })
-    });
-
-    // Una tabla de combinaciones. Se puede ampliar con pares nuevos sin tocar
-    // los sistemas de bomba, render o entidades.
-    const COMBINATIONS = Object.freeze({
-        'cold|heat': Object.freeze({
-            result: EFFECTS.HEAT,
-            consume: Object.freeze([EFFECTS.COLD, EFFECTS.HEAT]),
-            message: 'DESCONGELADO'
-        }),
-        'frost|heat': Object.freeze({
-            result: EFFECTS.STEAM,
-            consume: Object.freeze([EFFECTS.FROST, EFFECTS.HEAT]),
-            message: 'VAPOR'
-        }),
-        'heat|shock': Object.freeze({
-            result: EFFECTS.PLASMA,
-            consume: Object.freeze([EFFECTS.HEAT, EFFECTS.SHOCK]),
-            message: 'PLASMA'
-        }),
-        'frost|shock': Object.freeze({
-            result: EFFECTS.ARC,
-            consume: Object.freeze([EFFECTS.FROST, EFFECTS.SHOCK]),
-            message: 'RAYO EXTENDIDO'
-        })
-    });
-
-    const COMBO_RADIUS_V6129 = Object.freeze({
-        steam: 1,
-        plasmaChainTargets: 4,
-        arcLength: 2
+        [EFFECTS.STEAM]: Object.freeze({ id:EFFECTS.STEAM, label:'Vapor', color:'#e2e8f0', core:'#ffffff', defaultDurationMs:2200, tickMs:300, damage:0, movementMultiplier:0.58, enemyMovementMultiplier:0.58, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','steam','slow']), materialType: global.MATERIALS_V60?.STEAM || 'steam' }),
+        [EFFECTS.PLASMA]: Object.freeze({ id:EFFECTS.PLASMA, label:'Plasma', color:'#c084fc', core:'#f5d0fe', defaultDurationMs:1500, tickMs:300, damage:1, movementMultiplier:0.92, enemyMovementMultiplier:0.92, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','plasma','damage']) }),
+        [EFFECTS.ARC]: Object.freeze({ id:EFFECTS.ARC, label:'Rayo extendido', color:'#fde047', core:'#ffffff', defaultDurationMs:900, tickMs:250, damage:1, movementMultiplier:0.90, enemyMovementMultiplier:0.90, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','electric','extended','damage']) })
     });
 
     const runtime = {
@@ -136,36 +106,21 @@
         return Math.max(min, Math.min(max, value));
     }
 
-    const ELEMENTAL_FEEDBACK_V61210 = Object.freeze({
-        heat: Object.freeze({ label: 'BRASA', color: '#fb923c' }),
-        frost: Object.freeze({ label: 'ESCARCHA', color: '#7dd3fc' }),
-        shock: Object.freeze({ label: 'CHISPA', color: '#facc15' }),
-        steam: Object.freeze({ label: 'VAPOR', color: '#e2e8f0' }),
-        plasma: Object.freeze({ label: 'PLASMA', color: '#c084fc' }),
-        arc: Object.freeze({ label: 'RAYO', color: '#fde047' })
-    });
-
-    function triggerElementalFeedbackV61210(effectId, x, y, options = {}) {
-        const meta = ELEMENTAL_FEEDBACK_V61210[effectId];
-        if (!meta) return false;
-        const worldX = (finite(x) + 0.5) * TILE_SIZE;
-        const worldY = (finite(y) + 0.5) * TILE_SIZE;
-        // La explosión ya se representa con la llama continua del renderer.
-        // No generar discos/partículas radiales superpuestos en el origen.
-        if (typeof global.addFloatingText === 'function') {
-            global.addFloatingText(meta.label, worldX, worldY - TILE_SIZE * 0.24, meta.color);
-        }
-        return true;
-    }
-
-    function triggerBombFeedbackV61210(bomb) {
+    function triggerBombFeedbackV61210(bomb, chainIndex = 1) {
         if (!bomb) return false;
-        const range = Math.max(1, finite(bomb.range, 1));
-        const intensity = clamp(5 + range * 0.9, 7, 12);
-        const duration = clamp(170 + range * 16, 190, 360);
-        if (typeof global.triggerScreenShake === 'function') {
-            global.triggerScreenShake(intensity, duration);
+        const originX = (finite(bomb.x) + 0.5) * TILE_SIZE;
+        const originY = (finite(bomb.y) + 0.5) * TILE_SIZE;
+        // Limpiar residuos circulares históricos en el origen de cada detonación,
+        // incluidas las bombas que explotan por cadena.
+        if (typeof global.feedbackPoolClearExplosionResidue === 'function') {
+            global.feedbackPoolClearExplosionResidue(originX, originY, TILE_SIZE * 1.1);
         }
+        const range = Math.max(1, finite(bomb.range, 1));
+        const chain = clamp(finite(chainIndex, 1), 1, 8);
+        const intensity = clamp(3.4 + range * 0.22 + chain * 0.28, 3.5, 7);
+        // La vibración es breve y limitada; no se acumula como un temblor largo.
+        const duration = clamp(50 + range * 1.5 + chain * 4, 50, 100);
+        if (typeof global.triggerScreenShake === 'function') global.triggerScreenShake(intensity, duration);
         return true;
     }
 
@@ -189,16 +144,25 @@
     }
 
     function getBombEffectIdsV64(bomb = {}) {
-        const direct = normalizeEffectIds(bomb.effectIds);
-        if (direct.length) return direct;
+        // La bomba colocada es la fuente de verdad. Un array vacío es deliberado
+        // (bomba normal) y no debe convertirse en todos los efectos del tema/etapa.
+        if (Array.isArray(bomb.effectIds)) return normalizeEffectIds(bomb.effectIds);
 
-        const stage = stageBombEffectConfig();
-        const theme = themeBombEffectConfig();
-        const stageIds = Array.isArray(stage) ? stage : Object.keys(stage);
-        const themeIds = Array.isArray(theme) ? theme : Object.keys(theme);
-        const ids = stageIds.length ? stageIds : themeIds;
-        return normalizeEffectIds(ids);
+        // Compatibilidad con bombas antiguas que solo guarden elementV612.
+        const element = String(bomb.elementV612 || 'normal').toLowerCase();
+        if (typeof global.getBombElementDefV612 === 'function') {
+            const def = global.getBombElementDefV612(bomb);
+            if (def && Array.isArray(def.effectIds)) return normalizeEffectIds(def.effectIds);
+        }
+        const elementalMap = {
+            normal: [],
+            fire: [EFFECTS.HEAT],
+            ice: [EFFECTS.FROST],
+            electric: [EFFECTS.SHOCK]
+        };
+        return normalizeEffectIds(elementalMap[element] || []);
     }
+
 
     function getEffectConfigV64(id) {
         const def = definition(id);
@@ -252,7 +216,7 @@
     }
 
     // Multiplicador separado para IA enemiga: el calor no acelera enemigos,
-    // pero escarcha/vapor/descarga y combos sí ralentizan mientras el estado viva.
+    // los efectos elementales de control (escarcha, vapor y descarga) ralentizan mientras el estado viva.
     function getBombEffectEnemyMovementMultiplierV6306(entity) {
         const statuses = entity?.__bombEffectStatusesV64;
         if (!statuses || typeof statuses !== 'object') return 1;
@@ -331,179 +295,47 @@
         return targets;
     }
 
-    function effectFieldsAt(fields, x, y) {
-        const key = tileKey(x, y);
-        return fields.filter(field => field?.key === key);
-    }
-
-    function removeField(fields, field) {
-        const index = fields.indexOf(field);
-        if (index < 0) return false;
-        fields.splice(index, 1);
-        return true;
-    }
-
     function findField(fields, effectId, x, y) {
         const key = tileKey(x, y);
         return fields.find(field => field?.key === key && field.effectId === effectId) || null;
     }
 
-    function comboCellOpenV6129(x, y) {
-        const state = getState();
-        if (!state || !isFiniteNumber(Number(x)) || !isFiniteNumber(Number(y))) return false;
-        const tx = Math.trunc(Number(x));
-        const ty = Math.trunc(Number(y));
-        if (tx < 0 || ty < 0 || tx >= Number(state.gridWidth) || ty >= Number(state.gridHeight)) return false;
-        const type = state.grid?.[ty]?.[tx];
-        const wall = global.TYPES?.WALL;
-        const locked = global.TYPES?.EXIT_LOCKED;
-        const block = global.TYPES?.BLOCK;
-        return type !== wall && type !== locked && type !== block;
-    }
-
-    function triggerPlasmaChainV6129(originX, originY, sourceBombId) {
-        const candidates = collectEntities().filter(target => target.kind === 'enemy' || target.kind === 'boss');
-        if (!candidates.length) return 0;
-        const hitToken = `plasma:${runtime.lastEventId}:${sourceBombId || 'none'}`;
-        let currentCell = { x: Math.trunc(originX), y: Math.trunc(originY) };
-        let totalHits = 0;
-
-        for (let hop = 0; hop <= COMBO_RADIUS_V6129.plasmaChainTargets; hop++) {
-            const available = candidates.filter(target => {
-                const entity = target.entity;
-                if (!entity || entity.__plasmaChainHitV6129 === hitToken) return false;
-                const cell = entityCell(entity);
-                if (!cell) return false;
-                return Math.abs(cell.x - currentCell.x) + Math.abs(cell.y - currentCell.y) === 0 ||
-                       Math.abs(cell.x - currentCell.x) + Math.abs(cell.y - currentCell.y) === 1;
-            });
-            if (!available.length) break;
-            available.sort((a, b) => {
-                const ac = entityCell(a.entity);
-                const bc = entityCell(b.entity);
-                return (Math.abs(ac.x - currentCell.x) + Math.abs(ac.y - currentCell.y)) -
-                       (Math.abs(bc.x - currentCell.x) + Math.abs(bc.y - currentCell.y));
-            });
-            const target = available[0];
-            const cell = entityCell(target.entity);
-            target.entity.__plasmaChainHitV6129 = hitToken;
-            if (damageTarget(target, 1, 'effect:plasma-chain')) totalHits++;
-            if (!cell) break;
-            currentCell = cell;
-        }
-        return totalHits;
-    }
-
-    function spawnSteamCloudV6129(fields, x, y, options = {}) {
-        const offsets = [
-            { x: 0, y: 0 },
-            { x: 1, y: 0 },
-            { x: -1, y: 0 },
-            { x: 0, y: 1 },
-            { x: 0, y: -1 }
-        ];
-        let created = 0;
-        for (const offset of offsets) {
-            const tx = Math.trunc(x) + offset.x;
-            const ty = Math.trunc(y) + offset.y;
-            if (!comboCellOpenV6129(tx, ty)) continue;
-            if (depositFieldInternal(EFFECTS.STEAM, tx, ty, {
-                durationMs: 2200, intensity: 1, source: 'combo:steam', owner: options.owner, sourceBombId: options.sourceBombId
-            })) created++;
-        }
-        return created;
-    }
-
-    function spawnExtendedLightningV6129(x, y, options = {}) {
-        const dirs = [
-            { x: 1, y: 0 }, { x: -1, y: 0 },
-            { x: 0, y: 1 }, { x: 0, y: -1 }
-        ];
-        let created = 0;
-        for (const dir of dirs) {
-            for (let step = 1; step <= COMBO_RADIUS_V6129.arcLength; step++) {
-                const tx = Math.trunc(x) + dir.x * step;
-                const ty = Math.trunc(y) + dir.y * step;
-                if (!comboCellOpenV6129(tx, ty)) break;
-                if (depositFieldInternal(EFFECTS.ARC, tx, ty, {
-                    durationMs: 900, intensity: 1, source: 'combo:arc', owner: options.owner, sourceBombId: options.sourceBombId
-                })) created++;
-            }
-        }
-        return created;
-    }
-
-    function combinationFor(a, b) {
-        const pair = [String(a), String(b)].sort().join('|');
-        return COMBINATIONS[pair] || null;
-    }
-
-    function depositFieldInternal(effectId, x, y, options = {}, resolveCombinations = true) {
+    function depositFieldInternal(effectId, x, y, options = {}) {
         const fields = ensureFields();
         const config = getEffectConfigV64(effectId);
         const tx = Math.trunc(Number(x));
         const ty = Math.trunc(Number(y));
         if (!fields || !config || !Number.isInteger(tx) || !Number.isInteger(ty)) return false;
-        if (fields.length >= MAX_FIELDS && !findField(fields, effectId, tx, ty)) return false;
 
-        const existingFields = effectFieldsAt(fields, tx, ty);
+        const durationMs = Math.max(80, finite(options.durationMs, config.durationMs));
+        const intensity = clamp(finite(options.intensity, 1), 0.1, 2);
+        const existing = findField(fields, effectId, tx, ty);
 
-        // Las combinaciones tienen prioridad sobre la simple acumulación del
-        // mismo efecto. Así, si una celda contiene HEAT + COLD y entra otro
-        // HEAT, primero resolvemos COLD+HEAT y no dejamos efectos incompatibles.
-        for (const existing of [...existingFields]) {
-            if (!resolveCombinations || existing.effectId === effectId) continue;
-            const combo = combinationFor(existing.effectId, effectId);
-            if (!combo) continue;
-
-            for (const consumedId of combo.consume || []) {
-                const consumed = findField(fields, consumedId, tx, ty);
-                if (consumed) removeField(fields, consumed);
-            }
-            if (combo.result) {
-                const created = depositFieldInternal(combo.result, tx, ty, {
-                    source: 'combination',
-                    durationMs: options.durationMs,
-                    owner: options.owner,
-                    sourceBombId: options.sourceBombId
-                }, false);
-                if (created && combo.result === EFFECTS.STEAM) {
-                    spawnSteamCloudV6129(fields, tx, ty, options);
-                } else if (created && combo.result === EFFECTS.PLASMA) {
-                    triggerPlasmaChainV6129(tx, ty, options.sourceBombId);
-                } else if (created && combo.result === EFFECTS.ARC) {
-                    spawnExtendedLightningV6129(tx, ty, options);
-                }
-                if (created) triggerElementalFeedbackV61210(combo.result, tx, ty, { intensity: 1.15 });
-                if (combo.message && typeof global.addFloatingText === 'function') {
-                    global.addFloatingText(
-                        combo.message,
-                        (tx + 0.5) * TILE_SIZE,
-                        (ty + 0.25) * TILE_SIZE,
-                        '#f8fafc'
-                    );
-                }
-                return created;
-            }
+        // Mismo efecto en la misma casilla: refrescar duración. No acumular
+        // intensidad ni reemplazar el efecto por una combinación implícita.
+        if (existing) {
+            existing.remainingMs = Math.max(existing.remainingMs, durationMs);
+            existing.visualAgeMs = 0;
+            existing.visualTotalMs = Math.max(existing.visualTotalMs, durationMs);
+            existing.intensity = Math.max(existing.intensity, intensity);
+            existing.source = String(options.source || existing.source || 'system');
+            existing.owner = String(options.owner || existing.owner || 'system');
+            if (options.sourceBombId != null) existing.sourceBombId = String(options.sourceBombId);
+            existing.lastEventId = runtime.lastEventId;
+            existing.createdEventId = runtime.lastEventId;
             return true;
         }
 
-        // Si no hubo combinación, acumulamos intensidad del mismo efecto.
-        const same = findField(fields, effectId, tx, ty);
-        if (same) {
-            same.remainingMs = Math.max(same.remainingMs, finite(options.durationMs, config.durationMs));
-            same.intensity = clamp(same.intensity + finite(options.intensity, 1) * 0.35, 0.1, 2);
-            same.lastEventId = runtime.lastEventId;
-            return true;
-        }
-
+        if (fields.length >= MAX_FIELDS) return false;
         fields.push({
             key: tileKey(tx, ty),
             x: tx,
             y: ty,
             effectId,
-            intensity: clamp(finite(options.intensity, 1), 0.1, 2),
-            remainingMs: Math.max(80, finite(options.durationMs, config.durationMs)),
+            intensity,
+            remainingMs: durationMs,
+            visualAgeMs: 0,
+            visualTotalMs: durationMs,
             tickAccumulatorMs: 0,
             source: String(options.source || 'system'),
             owner: String(options.owner || 'system'),
@@ -513,8 +345,9 @@
         return true;
     }
 
+
     function depositField(effectId, x, y, options = {}) {
-        return depositFieldInternal(effectId, x, y, options, true);
+        return depositFieldInternal(effectId, x, y, options);
     }
 
     function isFiniteNumber(value) {
@@ -700,7 +533,7 @@
         for (const target of targets) {
             // Los efectos producidos por una bomba son ofensivos: solo afectan
             // a entidades hostiles. El jugador nunca recibe SLOW/DAMAGE/STATUS
-            // de una explosión elemental o de sus combinaciones.
+            // de una explosión elemental.
             if (isBombEffectFieldV61232(field) && !isBombEffectTargetV61232(target)) continue;
 
             const cell = entityCell(target.entity);
@@ -752,8 +585,14 @@
     function update(dt = 16.6667) {
         const state = getState();
         const fields = ensureFields(state);
-        if (!state || !fields || !state.isPlaying || state.paused) return;
+        if (!state || !fields) return;
+        if (!state.isPlaying) {
+            if (typeof global.resetBombBlastVisualsV6308 === 'function') global.resetBombBlastVisualsV6308();
+            return;
+        }
+        if (state.paused) return;
         const safeDt = clamp(Number(dt) || 16.6667, 0, 100);
+        if (typeof global.updateBombBlastVisualsV6308 === 'function') global.updateBombBlastVisualsV6308(safeDt);
 
         for (let i = fields.length - 1; i >= 0; i--) {
             const field = fields[i];
@@ -762,6 +601,8 @@
                 continue;
             }
             field.remainingMs -= safeDt;
+            field.visualAgeMs = Math.max(0, finite(field.visualAgeMs, 0) + safeDt);
+            field.visualTotalMs = Math.max(finite(field.visualTotalMs, 0), field.visualAgeMs + Math.max(0, field.remainingMs));
             if (field.remainingMs <= 0) {
                 fields.splice(i, 1);
                 continue;
@@ -773,38 +614,53 @@
     }
 
     function resolveBombEffectIds(bomb) {
-        // La bomba no conoce el bioma: su configuración llega por datos de
-        // instancia, etapa o Theme. Así agregar heat+cold, acid, vapor, etc.
-        // no exige cambiar explodeBomb().
-        return getBombEffectIdsV64(bomb);
+        return getBombEffectIdsV64(bomb || {});
     }
+
 
     function handleBombExplosion(payload) {
         const cells = Array.isArray(payload?.cells) ? payload.cells : [];
         if (!cells.length) return;
         runtime.lastEventId = Number(payload?.eventId || payload?.blastId || runtime.lastEventId + 1);
         const bomb = payload?.bomb || {};
-        triggerBombFeedbackV61210(bomb);
+
+        // Las hitboxes inmediatas siguen siendo responsabilidad de 20-combat.js.
+        // Esta ruta registra solamente la animación y los campos persistentes.
+        if (typeof global.registerBombBlastVisualV6308 === 'function') {
+            global.registerBombBlastVisualV6308(payload);
+        }
+        triggerBombFeedbackV61210(bomb, payload?.chainIndex || 1);
+
         const effectIds = resolveBombEffectIds(bomb);
         if (!effectIds.length) return;
+        const sourceBombId = bomb.id == null
+            ? String(payload?.blastId ?? runtime.lastEventId)
+            : String(bomb.id);
+
+        // Deduplicar coordenadas dentro de este evento. Cada effectId deposita
+        // su propio campo; no se combinan, consumen ni transforman por tocarse.
+        const uniqueCells = new Map();
+        for (const cell of cells) {
+            const x = Math.trunc(Number(cell?.x));
+            const y = Math.trunc(Number(cell?.y));
+            if (Number.isInteger(x) && Number.isInteger(y)) uniqueCells.set(tileKey(x, y), { x, y });
+        }
 
         for (const effectId of effectIds) {
-            const feedbackCell = cells[0];
-            if (feedbackCell) triggerElementalFeedbackV61210(effectId, feedbackCell.x, feedbackCell.y);
             const config = getEffectConfigV64(effectId);
             if (!config) continue;
-            for (const cell of cells) {
-                if (!cell) continue;
+            for (const cell of uniqueCells.values()) {
                 depositField(effectId, cell.x, cell.y, {
                     durationMs: config.durationMs,
                     intensity: 1,
                     source: 'bomb',
                     owner: bomb.owner || 'player',
-                    sourceBombId: bomb.id
+                    sourceBombId
                 });
             }
         }
     }
+
 
     function applyEffectToAllEntitiesV64(effectId, options = {}) {
         const config = getEffectConfigV64(effectId);
@@ -833,6 +689,7 @@
     function reset() {
         const fields = ensureFields();
         if (fields) fields.length = 0;
+        if (typeof global.resetBombBlastVisualsV6308 === 'function') global.resetBombBlastVisualsV6308();
         for (const target of collectEntities()) {
             if (target.entity?.__bombEffectStatusesV64) target.entity.__bombEffectStatusesV64 = Object.create(null);
         }
@@ -868,15 +725,6 @@
         }
         if (fields.length > MAX_FIELDS) errors.push(`Límite de campos superado: ${fields.length}/${MAX_FIELDS}`);
 
-        for (const [pair, combo] of Object.entries(COMBINATIONS)) {
-            const [a, b] = String(pair).split('|');
-            if (!definition(a) || !definition(b)) errors.push(`Combinación inválida: ${pair}`);
-            if (combo?.result && !definition(combo.result)) errors.push(`Resultado inválido en combinación: ${pair}`);
-            for (const consumedId of combo?.consume || []) {
-                if (!definition(consumedId)) errors.push(`Consumo inválido en combinación: ${pair} → ${consumedId}`);
-            }
-        }
-
         const listenerCount = global.gameEventBus?.listenerCount?.(EVENT) || 0;
         return {
             valid: errors.length === 0,
@@ -887,46 +735,20 @@
             listenerCount,
             duplicateInstallAttempts: runtime.duplicateInstallAttempts,
             effects: Object.values(EFFECTS),
-            combinations: Object.keys(COMBINATIONS),
             errors
         };
     }
 
     function draw(targetCtx) {
-        const state = getState();
-        const fields = ensureFields(state);
-        const renderCtx = targetCtx;
-        if (!state || !fields?.length || !renderCtx) return;
-
-        renderCtx.save();
-        const size = Number(global.BOMBER_ENGINE?.getTileSize?.() || TILE_SIZE || 48);
-        const renderBudget = Number(global.getBomberRenderProfileV65?.().bombEffectBudget) || 360;
-        let rendered = 0;
-        for (const field of fields) {
-            if (rendered >= renderBudget) break;
-            const def = definition(field.effectId);
-            if (!def) continue;
-            const alpha = clamp(0.10 + Number(field.intensity || 1) * 0.15, 0.10, 0.34);
-            const x = field.x * size;
-            const y = field.y * size;
-            renderCtx.globalAlpha = alpha;
-            renderCtx.fillStyle = def.color;
-            renderCtx.fillRect(x + 4, y + 4, size - 8, size - 8);
-            renderCtx.globalAlpha = Math.min(0.55, alpha + 0.12);
-            renderCtx.strokeStyle = def.core;
-            renderCtx.lineWidth = 2;
-            renderCtx.strokeRect(x + 7, y + 7, size - 14, size - 14);
-            rendered++;
-        }
-        renderCtx.restore();
-        renderCtx.globalAlpha = 1;
+        // Compatibilidad sin dibujo duplicado: el único renderer de residuos es 07-render.js.
+        // No se dibujan rectángulos/contornos por tile desde este registro de lógica.
+        return 0;
     }
 
     installListener();
 
     global.BOMB_EFFECTS_V64 = EFFECTS;
     global.BOMB_EFFECT_DEFS_V64 = EFFECT_DEFS;
-    global.BOMB_EFFECT_COMBINATIONS_V64 = COMBINATIONS;
     global.getBombEffectIdsV64 = getBombEffectIdsV64;
     global.getBombEffectConfigV64 = getEffectConfigV64;
     global.getBombEffectStatusV64 = getEffectStatusV64;
@@ -941,10 +763,9 @@
     global.bombEffectSnapshotV64 = snapshot;
     global.bombEffectValidateV64 = validate;
     global.drawBombEffectsV64 = draw;
-    global.triggerElementalFeedbackV61210 = triggerElementalFeedbackV61210;
 
     global.BOMBER_ENGINE = global.BOMBER_ENGINE || {};
-    global.BOMBER_ENGINE.getBombEffects = () => ({ effects: EFFECTS, definitions: EFFECT_DEFS, combinations: COMBINATIONS, snapshot });
+    global.BOMBER_ENGINE.getBombEffects = () => ({ effects: EFFECTS, definitions: EFFECT_DEFS, snapshot });
     global.BOMBER_ENGINE.getBombEffectStatus = getEffectStatusV64;
     global.BOMBER_ENGINE.getBombEffectMovementModifiers = getBombEffectMovementModifiersV64;
     global.BOMBER_ENGINE.validateBombEffects = validate;

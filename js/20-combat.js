@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.30.7 — Bombs, explosions, damage and gameplay simulation
+// Bomberman Roguelike v6.30.9 — Bombs, explosions, damage and gameplay simulation
         function explodeBomb(bombIndex) {
             const first = gameState.bombs[bombIndex];
             if (!first) return;
@@ -20,11 +20,8 @@
                 if (!bomb) continue;
 
                 detonatedCount++;
-                triggerScreenShake(detonatedCount === 1 ? 7 : 5, detonatedCount === 1 ? 300 : 220);
-                if (typeof feedbackExplosion === 'function') feedbackExplosion(bomb.x, bomb.y);
-                // v6.30.6: la explosión continua de 07-render.js es la única
-                // silueta. El estallido radial particleFire anterior creaba el
-                // círculo/mota marrón superpuesto sobre la llama.
+                // v6.30.9: el feedback de detonación se centraliza en el listener
+                // BOMBA_EXPLOTO; aquí solo se resuelven alcance e hitboxes lógicas.
                 if (gameState.relics.some(r => r.id === 'ember_core')) gameState.score += 25;
 
                 const blastId = ++gameState.blastSerial;

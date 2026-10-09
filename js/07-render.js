@@ -809,450 +809,505 @@ function isWorldTileVisibleV329(tileX, tileY, margin = 1){
     return isWorldRectVisibleV329(tileX*TILE_SIZE, tileY*TILE_SIZE, TILE_SIZE, TILE_SIZE, margin*TILE_SIZE);
 }
 
-function drawExplosionClustersV6307(explosions, effectFields = []) {
-    const activeExplosions = Array.isArray(explosions) ? explosions : [];
-    const activeFields = Array.isArray(effectFields) ? effectFields : [];
-    if (!activeExplosions.length && !activeFields.length) return 0;
+// v6.30.9: la animación estética es un estado visual independiente de gameState.explosions,
+// que conserva su duración original para daño, hitboxes y combate.
+let blastVisualSerialV6308 = 0;
 
-    // Las casillas lógicas y los residuos elementales entran en UNA sola matriz
-    // visual. La clave es solo x,y: el elemento/color no crea componentes paralelos.
-    const cellMap = new Map();
-    const keyOf = (x, y) => `${x},${y}`;
-    const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-
-    const baseFirePalette = {
-        outer: typeof themeColorV46 === 'function' ? themeColorV46('fireOuter') : '#dc2626',
-        middle: typeof themeColorV46 === 'function' ? themeColorV46('fireMiddle') : '#f97316',
-        core: typeof themeColorV46 === 'function' ? themeColorV46('fireCore') : '#fef08a'
+function getExplosionEffectKeyV6308(effectId) {
+    const key = String(effectId || 'normal').toLowerCase();
+    const aliases = {
+        normal: 'fire', fire: 'fire', heat: 'fire',
+        ice: 'ice', frost: 'ice', cold: 'ice',
+        electric: 'electric', shock: 'electric', arc: 'arc',
+        steam: 'steam', plasma: 'plasma', acid: 'acid'
     };
-    const fixedPalettes = {
-        fire: baseFirePalette,
-        normal: baseFirePalette,
-        heat: baseFirePalette,
-        ice: { outer: '#0369a1', middle: '#38bdf8', core: '#e0f2fe' },
-        frost: { outer: '#0369a1', middle: '#38bdf8', core: '#e0f2fe' },
-        cold: { outer: '#1d4ed8', middle: '#60a5fa', core: '#eff6ff' },
-        electric: { outer: '#854d0e', middle: '#facc15', core: '#fffde4' },
-        shock: { outer: '#854d0e', middle: '#facc15', core: '#fffde4' },
-        arc: { outer: '#a16207', middle: '#fde047', core: '#ffffff' },
-        steam: { outer: '#64748b', middle: '#cbd5e1', core: '#ffffff' },
-        plasma: { outer: '#7e22ce', middle: '#c084fc', core: '#f5d0fe' }
+    return aliases[key] || key;
+}
+
+function mixExplosionColorV6308(a, b, amount) {
+    const parse = value => {
+        const text = String(value || '').trim();
+        const short = text.match(/^#([0-9a-f]{3})$/i);
+        const full = text.match(/^#([0-9a-f]{6})$/i);
+        let hex = full?.[1] || (short ? short[1].split('').map(ch => ch + ch).join('') : 'f97316');
+        return [parseInt(hex.slice(0,2),16), parseInt(hex.slice(2,4),16), parseInt(hex.slice(4,6),16)];
     };
+    const aa = parse(a), bb = parse(b), t = Math.max(0, Math.min(1, Number(amount) || 0));
+    return '#' + aa.map((v, i) => Math.max(0, Math.min(255, Math.round(v*(1-t)+bb[i]*t))).toString(16).padStart(2,'0')).join('');
+}
 
-    function clamp01(value) { return Math.max(0, Math.min(1, Number(value) || 0)); }
-    function rgbOf(value) {
-        const color = String(value || '').trim();
-        let m = color.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-        if (m) {
-            let hex = m[1];
-            if (hex.length === 3) hex = hex.split('').map(ch => ch + ch).join('');
-            return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
-        }
-        m = color.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
-        if (m) return [Math.round(Number(m[1])), Math.round(Number(m[2])), Math.round(Number(m[3]))];
-        return [249, 115, 22];
-    }
-    function hexOf(rgb) {
-        return '#' + rgb.map(channel => Math.max(0, Math.min(255, Math.round(channel))).toString(16).padStart(2, '0')).join('');
-    }
-    function mixColor(a, b, amount) {
-        const aa = rgbOf(a), bb = rgbOf(b), t = clamp01(amount);
-        return hexOf(aa.map((v, i) => v * (1 - t) + bb[i] * t));
-    }
-    function paletteForEffect(effectId) {
-        const key = String(effectId || 'normal').toLowerCase();
-        if (fixedPalettes[key]) return fixedPalettes[key];
-        const def = window.BOMB_EFFECT_DEFS_V64?.[key];
-        if (def?.color) {
-            const middle = String(def.color);
-            return { outer: mixColor(middle, '#111827', 0.48), middle, core: String(def.core || '#fff7ed') };
-        }
-        return baseFirePalette;
-    }
-    function paletteForElement(element) {
-        const key = String(element || 'normal').toLowerCase();
-        if (key === 'fire') return paletteForEffect('heat');
-        if (key === 'ice') return paletteForEffect('frost');
-        if (key === 'electric') return paletteForEffect('shock');
-        return paletteForEffect('normal');
-    }
-    function addPaletteOnce(list, palette, sourceKey, weight = 1) {
-        if (!list.some(item => item.key === sourceKey)) list.push({ key: sourceKey, palette, weight: Math.max(0.1, Number(weight) || 1) });
-    }
-    function ensureCell(x, y) {
-        const key = keyOf(x, y);
-        let cell = cellMap.get(key);
-        if (!cell) {
-            cell = { x, y, timer: 0, alpha: 0, blastPalettes: [], fieldPalettes: [] };
-            cellMap.set(key, cell);
-        }
-        return cell;
-    }
+function explosionPaletteV6308(effectId) {
+    const key = getExplosionEffectKeyV6308(effectId);
+    const fire = {
+        outer: typeof themeColorV46 === 'function' ? themeColorV46('fireOuter', '#b91c1c') : '#b91c1c',
+        middle: typeof themeColorV46 === 'function' ? themeColorV46('fireMiddle', '#f97316') : '#f97316',
+        core: typeof themeColorV46 === 'function' ? themeColorV46('fireCore', '#fff1a8') : '#fff1a8'
+    };
+    const palettes = {
+        fire,
+        ice: { outer:'#123f70', middle:'#38bdf8', core:'#e0f2fe' },
+        electric: { outer:'#1d4ed8', middle:'#22d3ee', core:'#f0fdff' },
+        arc: { outer:'#1e40af', middle:'#06b6d4', core:'#ffffff' },
+        steam: { outer:'#475569', middle:'#cbd5e1', core:'#ffffff' },
+        plasma: { outer:'#6b21a8', middle:'#d946ef', core:'#fae8ff' },
+        acid: { outer:'#365314', middle:'#84cc16', core:'#ecfccb' }
+    };
+    if (palettes[key]) return palettes[key];
+    const def = window.BOMB_EFFECT_DEFS_V64?.[String(effectId || '').toLowerCase()];
+    if (def?.color) return {
+        outer: mixExplosionColorV6308(def.color, '#111827', 0.55),
+        middle: String(def.color),
+        core: String(def.core || '#fff7ed')
+    };
+    return fire;
+}
 
-    // Explosión activa: se conserva el color elemental para que la transición
-    // al rastro persistente no cambie de estilo de manera arbitraria.
-    for (const exp of activeExplosions) {
-        if (!exp || !(Number(exp.timer) > 0)) continue;
-        const rawX = Number(exp.x), rawY = Number(exp.y);
-        if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) continue;
-        const x = Math.trunc(rawX), y = Math.trunc(rawY);
-        const cell = ensureCell(x, y);
-        const timer = Number(exp.timer) || 0;
-        cell.timer = Math.max(cell.timer, timer);
-        cell.alpha = Math.max(cell.alpha, clamp01(timer / 100));
-        addPaletteOnce(cell.blastPalettes, paletteForElement(exp.elementV612), String(exp.elementV612 || 'normal').toLowerCase());
-    }
+function residuePaletteV6308(effectId) {
+    const key = getExplosionEffectKeyV6308(effectId);
+    const palettes = {
+        fire: { outer:'#271d20', middle:'#71351f', core:'#c65b26', texture:'#f59e0b', kind:'burn' },
+        ice: { outer:'#122b40', middle:'#1e5b7a', core:'#60bce8', texture:'#dbeafe', kind:'ice' },
+        electric: { outer:'#102944', middle:'#075985', core:'#22d3ee', texture:'#a5f3fc', kind:'electric' },
+        arc: { outer:'#102944', middle:'#075985', core:'#22d3ee', texture:'#a5f3fc', kind:'electric' },
+        steam: { outer:'#232d3a', middle:'#64748b', core:'#94a3b8', texture:'#e2e8f0', kind:'steam' },
+        plasma: { outer:'#251831', middle:'#592a75', core:'#c084fc', texture:'#f0abfc', kind:'plasma' },
+        acid: { outer:'#1f2c16', middle:'#3f6212', core:'#84cc16', texture:'#d9f99d', kind:'acid' }
+    };
+    return palettes[key] || palettes.fire;
+}
 
-    // Residuo de fuego/electricidad/hielo/combinaciones. Ya no se dibuja en
-    // rectángulos independientes desde drawBombEffectsV64; comparte la misma
-    // conectividad y el mismo trazo que la explosión principal.
-    for (const field of activeFields) {
-        if (!field || !(Number(field.remainingMs) > 0)) continue;
-        const rawX = Number(field.x), rawY = Number(field.y);
-        if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) continue;
-        const x = Math.trunc(rawX), y = Math.trunc(rawY);
-        const effectId = String(field.effectId || 'normal').toLowerCase();
-        const remainingMs = Number(field.remainingMs) || 0;
-        const fieldAlpha = remainingMs < 360 ? clamp01(remainingMs / 360) : 1;
-        const cell = ensureCell(x, y);
-        cell.timer = Math.max(cell.timer, remainingMs);
-        cell.alpha = Math.max(cell.alpha, fieldAlpha);
-        addPaletteOnce(cell.fieldPalettes, paletteForEffect(effectId), effectId, field.intensity);
-    }
-    if (!cellMap.size) return 0;
+function registerBombBlastVisualV6308(payload) {
+    const state = window.BOMBER_ENGINE?.getState?.() || window.gameState;
+    const inputCells = Array.isArray(payload?.cells) ? payload.cells : [];
+    if (!state || !inputCells.length) return false;
+    if (!Array.isArray(state.bombBlastVisualsV6308)) state.bombBlastVisualsV6308 = [];
 
-    // Campo dominante por celda; si hay varios efectos en la misma celda, sus
-    // colores se promedian. Los campos tienen prioridad sobre la celda de la
-    // explosión original para que combinaciones como PLASMA no vuelvan a naranja.
-    function paletteForCell(cell) {
-        const sources = cell.fieldPalettes.length ? cell.fieldPalettes : cell.blastPalettes;
-        if (!sources.length) return baseFirePalette;
-        const totalWeight = sources.reduce((sum, item) => sum + item.weight, 0) || 1;
-        const blend = channel => {
-            const sums = [0, 0, 0];
-            for (const item of sources) {
-                const rgb = rgbOf(item.palette[channel]);
-                for (let i = 0; i < 3; i++) sums[i] += rgb[i] * item.weight;
-            }
-            return hexOf(sums.map(value => value / totalWeight));
-        };
-        return { outer: blend('outer'), middle: blend('middle'), core: blend('core') };
-    }
+    const bomb = payload.bomb || {};
+    const incomingId = payload.blastId == null ? null : String(payload.blastId);
+    if (incomingId && state.bombBlastVisualsV6308.some(item => item.blastId === incomingId)) return true;
 
-    // Componentes conectados: explosiones superpuestas de cualquier tipo se dibujan juntas.
+    let element = String(bomb.elementV612 || 'normal').toLowerCase();
+    if (element === 'normal' && Array.isArray(bomb.effectIds) && bomb.effectIds.length) {
+        const fromEffect = getExplosionEffectKeyV6308(bomb.effectIds[0]);
+        if (fromEffect !== 'fire' || String(bomb.effectIds[0]).toLowerCase() === 'heat') element = fromEffect;
+        else element = 'normal';
+    }
+    element = getExplosionEffectKeyV6308(element);
+
+    const uniqueCells = new Map();
+    for (const cell of inputCells) {
+        const x = Number(cell?.x), y = Number(cell?.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        const tx = Math.trunc(x), ty = Math.trunc(y);
+        uniqueCells.set(`${tx},${ty}`, { x: tx, y: ty, element });
+    }
+    if (!uniqueCells.size) return false;
+
+    const fallback = uniqueCells.values().next().value;
+    const originX = Number.isFinite(Number(bomb.x)) ? Math.trunc(Number(bomb.x)) : fallback.x;
+    const originY = Number.isFinite(Number(bomb.y)) ? Math.trunc(Number(bomb.y)) : fallback.y;
+    const cells = [...uniqueCells.values()];
+    const maxDistance = Math.max(1, ...cells.map(cell => Math.abs(cell.x-originX)+Math.abs(cell.y-originY)));
+
+    state.bombBlastVisualsV6308.push({
+        visualId: incomingId || `visual-${++blastVisualSerialV6308}`,
+        blastId: incomingId,
+        originX, originY,
+        element,
+        ageMs: 0,
+        durationMs: 350,
+        expansionMs: 80,
+        settleMs: 250,
+        maxDistance,
+        cells
+    });
+    if (state.bombBlastVisualsV6308.length > 96) state.bombBlastVisualsV6308.splice(0, state.bombBlastVisualsV6308.length - 96);
+    return true;
+}
+
+function updateBombBlastVisualsV6308(dt) {
+    const state = window.BOMBER_ENGINE?.getState?.() || window.gameState;
+    if (!state || !Array.isArray(state.bombBlastVisualsV6308)) return;
+    if (!state.isPlaying) { state.bombBlastVisualsV6308.length = 0; return; }
+    if (state.paused) return;
+    const elapsed = Math.max(0, Math.min(1000, Number(dt) || 0));
+    for (const visual of state.bombBlastVisualsV6308) visual.ageMs += elapsed;
+    for (let i = state.bombBlastVisualsV6308.length - 1; i >= 0; i--) {
+        if (!state.bombBlastVisualsV6308[i] || state.bombBlastVisualsV6308[i].ageMs >= 350) state.bombBlastVisualsV6308.splice(i, 1);
+    }
+}
+
+function resetBombBlastVisualsV6308() {
+    const state = window.BOMBER_ENGINE?.getState?.() || window.gameState;
+    if (state && Array.isArray(state.bombBlastVisualsV6308)) state.bombBlastVisualsV6308.length = 0;
+}
+
+function explosionComponentsV6308(cellMap) {
+    const directions = [[1,0],[-1,0],[0,1],[0,-1]];
+    const keyOf = (x,y) => `${x},${y}`;
     const unvisited = new Set(cellMap.keys());
     const components = [];
     while (unvisited.size) {
-        const seedKey = unvisited.values().next().value;
-        unvisited.delete(seedKey);
-        const queue = [cellMap.get(seedKey)];
+        const seed = unvisited.values().next().value;
+        unvisited.delete(seed);
+        const queue = [cellMap.get(seed)];
         const component = [];
         while (queue.length) {
             const cell = queue.pop();
             component.push(cell);
-            for (const [dx, dy] of directions) {
-                const nextKey = keyOf(cell.x + dx, cell.y + dy);
-                if (!unvisited.has(nextKey)) continue;
-                unvisited.delete(nextKey);
-                queue.push(cellMap.get(nextKey));
+            for (const [dx,dy] of directions) {
+                const key = keyOf(cell.x+dx, cell.y+dy);
+                if (!unvisited.has(key)) continue;
+                unvisited.delete(key);
+                queue.push(cellMap.get(key));
             }
         }
         if (component.some(cell => isWorldTileVisibleV329(cell.x, cell.y, 1))) components.push(component);
     }
+    return components;
+}
 
-    const visibleCount = Array.from(cellMap.values()).filter(cell => isWorldTileVisibleV329(cell.x, cell.y, 1)).length;
+function explosionGraphPathsV6308(component) {
+    const keyOf = cell => `${cell.x},${cell.y}`;
+    const edgeKey = (a,b) => [keyOf(a),keyOf(b)].sort().join('|');
+    const cells = new Map(component.map(cell => [keyOf(cell),cell]));
+    const neighbors = new Map();
+    for (const cell of component) {
+        const around = [];
+        for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+            const next = cells.get(`${cell.x+dx},${cell.y+dy}`);
+            if (next) around.push(next);
+        }
+        neighbors.set(keyOf(cell), around);
+    }
+    const visited = new Set();
+    const paths = [];
+    function walk(start,next) {
+        const points = [start];
+        let previous = start, current = next, closed = false;
+        for (let guard=0; guard<=component.length+2; guard++) {
+            visited.add(edgeKey(previous,current));
+            points.push(current);
+            const around = neighbors.get(keyOf(current)) || [];
+            if (around.length !== 2) break;
+            const following = around.find(cell => keyOf(cell) !== keyOf(previous));
+            if (!following) break;
+            if (visited.has(edgeKey(current,following))) {
+                if (keyOf(following) === keyOf(start)) { points.push(start); closed = true; }
+                break;
+            }
+            previous=current; current=following;
+        }
+        return { points, closed };
+    }
+    for (const cell of component) {
+        const around = neighbors.get(keyOf(cell)) || [];
+        if (around.length === 2) continue;
+        for (const next of around) if (!visited.has(edgeKey(cell,next))) paths.push(walk(cell,next));
+    }
+    for (const cell of component) for (const next of neighbors.get(keyOf(cell)) || []) {
+        if (!visited.has(edgeKey(cell,next))) paths.push(walk(cell,next));
+    }
+    return { paths, neighbors };
+}
+
+// Residuos discretos de suelo: dibujo tenue, unido y situado antes de las entidades.
+// Nunca reutiliza la silueta flameante de la detonación ni dibuja un cuadrado por tile.
+function drawElementalResiduesV6308(targetCtx, effectFields = []) {
+    const fields = Array.isArray(effectFields) ? effectFields : [];
+    if (!targetCtx || !fields.length) return 0;
+    const cellMap = new Map();
+    const keyOf = (x,y) => `${x},${y}`;
+    for (const field of fields) {
+        if (!field || !(Number(field.remainingMs) > 0)) continue;
+        if (field.sourceBombId == null && !['bomb','combination'].includes(String(field.source || ''))) continue;
+        const x = Math.trunc(Number(field.x)), y = Math.trunc(Number(field.y));
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        const total = Math.max(1, Number(field.visualTotalMs) || Number(window.getBombEffectConfigV64?.(field.effectId)?.durationMs) || Number(field.remainingMs));
+        const age = Math.max(0, Number.isFinite(Number(field.visualAgeMs)) ? Number(field.visualAgeMs) : total - Number(field.remainingMs));
+        const reveal = Math.max(0, Math.min(1, (age - 250) / 100));
+        if (reveal <= 0) continue;
+        const fade = Number(field.remainingMs) < 500 ? Math.max(0, Number(field.remainingMs) / 500) : 1;
+        const alpha = reveal * fade * Math.max(0.1, Math.min(1.5, Number(field.intensity) || 1));
+        if (alpha <= 0) continue;
+        const key = keyOf(x,y);
+        let cell = cellMap.get(key);
+        if (!cell) { cell = { x,y, alpha:0, sources:[] }; cellMap.set(key,cell); }
+        cell.alpha = Math.max(cell.alpha, alpha);
+        const id = String(field.effectId || 'heat').toLowerCase();
+        const sourceKey = `${id}:${field.sourceBombId ?? field.createdEventId ?? key}`;
+        if (!cell.sources.some(source => source.key === sourceKey)) cell.sources.push({ key:sourceKey, effectId:id, palette:residuePaletteV6308(id), weight:Math.max(0.1, Number(field.intensity)||1) });
+    }
+    if (!cellMap.size) return 0;
+
+    function localColor(cell, channel) {
+        const list = cell.sources.length ? cell.sources : [{ palette:residuePaletteV6308('heat'), weight:1 }];
+        const total = list.reduce((sum,item)=>sum+item.weight,0) || 1;
+        const colors = list.map(item=>({ color:item.palette[channel], weight:item.weight }));
+        if (colors.length === 1) return colors[0].color;
+        const first = colors[0].color;
+        let result = first;
+        let weight = colors[0].weight;
+        for (let i=1;i<colors.length;i++) {
+            const nextWeight = colors[i].weight;
+            result = mixExplosionColorV6308(result, colors[i].color, nextWeight/(weight+nextWeight));
+            weight += nextWeight;
+        }
+        return result;
+    }
+
+    const components = explosionComponentsV6308(cellMap);
     if (!components.length) return 0;
-
     const size = TILE_SIZE;
-    const frame = Number(gameState.animFrame) || 0;
-    const highlight = '#fff8d7';
-    const cellCenter = cell => ({ x: (cell.x + 0.5) * size, y: (cell.y + 0.5) * size });
-    const coordKey = cell => keyOf(cell.x, cell.y);
-    const edgeKey = (a, b) => {
-        const ka = coordKey(a), kb = coordKey(b);
-        return ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
-    };
-
-    function buildGraph(component) {
-        const cellsByKey = new Map(component.map(cell => [coordKey(cell), cell]));
-        const neighbors = new Map();
-        for (const cell of component) {
-            const next = [];
-            for (const [dx, dy] of directions) {
-                const candidate = cellsByKey.get(keyOf(cell.x + dx, cell.y + dy));
-                if (candidate) next.push(candidate);
-            }
-            neighbors.set(coordKey(cell), next);
-        }
-        return { neighbors, cellsByKey };
-    }
-
-    // Trazar una rama como una sola polilínea. Las casillas rectas intermedias no
-    // reciben tapas redondas: así desaparece el aspecto de cuentas/círculos por tile.
-    function buildContinuousPaths(component, neighbors) {
-        const visitedEdges = new Set();
-        const paths = [];
-        function walk(start, next) {
-            const path = [start];
-            let previous = start;
-            let current = next;
-            let closed = false;
-            for (let guard = 0; guard <= component.length + 2; guard++) {
-                visitedEdges.add(edgeKey(previous, current));
-                path.push(current);
-                const around = neighbors.get(coordKey(current)) || [];
-                if (around.length !== 2) break;
-                const following = around.find(candidate => coordKey(candidate) !== coordKey(previous));
-                if (!following) break;
-                if (visitedEdges.has(edgeKey(current, following))) {
-                    if (coordKey(following) === coordKey(start)) {
-                        path.push(start);
-                        closed = true;
-                    }
-                    break;
-                }
-                previous = current;
-                current = following;
-            }
-            return { points: path, closed };
-        }
-
-        // Las puntas y las uniones son anclas; cada tramo entre ellas se dibuja una vez.
-        for (const cell of component) {
-            const around = neighbors.get(coordKey(cell)) || [];
-            if (around.length === 2) continue;
-            for (const neighbor of around) {
-                if (!visitedEdges.has(edgeKey(cell, neighbor))) paths.push(walk(cell, neighbor));
-            }
-        }
-        // Respaldo para una componente cíclica sin extremos ni uniones.
-        for (const cell of component) {
-            for (const neighbor of neighbors.get(coordKey(cell)) || []) {
-                if (!visitedEdges.has(edgeKey(cell, neighbor))) paths.push(walk(cell, neighbor));
-            }
-        }
-        return paths;
-    }
-
-    function drawSoftJunction(cell, color, strokeWidth) {
-        const { x, y } = cellCenter(cell);
-        const half = strokeWidth * 0.49;
-        const radius = strokeWidth * 0.17;
-        // Cuadrado suavizado, no un disco por casilla: rellena solo las intersecciones.
-        ctx.beginPath();
-        ctx.moveTo(x - half + radius, y - half);
-        ctx.lineTo(x + half - radius, y - half);
-        ctx.quadraticCurveTo(x + half, y - half, x + half, y - half + radius);
-        ctx.lineTo(x + half, y + half - radius);
-        ctx.quadraticCurveTo(x + half, y + half, x + half - radius, y + half);
-        ctx.lineTo(x - half + radius, y + half);
-        ctx.quadraticCurveTo(x - half, y + half, x - half, y + half - radius);
-        ctx.lineTo(x - half, y - half + radius);
-        ctx.quadraticCurveTo(x - half, y - half, x - half + radius, y - half);
-        ctx.closePath();
-        ctx.fillStyle = color;
-        ctx.fill();
-    }
-
-    function drawTaperedTip(cell, neighbor, color, strokeWidth, extension, seed) {
-        const center = cellCenter(cell);
-        const adjacent = cellCenter(neighbor);
-        const dx = Math.sign(center.x - adjacent.x);
-        const dy = Math.sign(center.y - adjacent.y);
-        const px = -dy, py = dx;
-        const baseX = center.x - dx * size * 0.10;
-        const baseY = center.y - dy * size * 0.10;
-        const half = strokeWidth * 0.39;
-        const flicker = Math.sin(frame * 0.23 + seed) * size * 0.018;
-        const tipX = center.x + dx * extension + px * flicker;
-        const tipY = center.y + dy * extension + py * flicker;
-        const controlX = center.x + dx * extension * 0.52;
-        const controlY = center.y + dy * extension * 0.52;
-
-        ctx.beginPath();
-        ctx.moveTo(baseX + px * half, baseY + py * half);
-        ctx.quadraticCurveTo(controlX + px * half * 1.08, controlY + py * half * 1.08, tipX, tipY);
-        ctx.quadraticCurveTo(controlX - px * half * 0.72, controlY - py * half * 0.72, baseX - px * half, baseY - py * half);
-        ctx.quadraticCurveTo(baseX - dx * size * 0.02, baseY - dy * size * 0.02, baseX + px * half, baseY + py * half);
-        ctx.closePath();
-        ctx.fillStyle = color;
-        ctx.fill();
-    }
-
-    function drawSideFlameLick(cell, tangent, side, color, strokeWidth, extension, seed) {
-        const center = cellCenter(cell);
-        const tx = tangent.x, ty = tangent.y;
-        const nx = -ty * side, ny = tx * side;
-        const baseOffset = strokeWidth * 0.37;
-        const baseX = center.x + nx * baseOffset;
-        const baseY = center.y + ny * baseOffset;
-        const half = size * 0.065;
-        const wave = Math.sin(frame * 0.19 + seed) * size * 0.018;
-        const lean = Math.cos(frame * 0.16 + seed * 1.7) * size * 0.045;
-        const tipX = baseX + nx * (extension + wave) + tx * lean;
-        const tipY = baseY + ny * (extension + wave) + ty * lean;
-
-        ctx.beginPath();
-        ctx.moveTo(baseX - tx * half, baseY - ty * half);
-        ctx.quadraticCurveTo(
-            baseX + nx * (extension + wave) * 0.42 - tx * half * 0.48,
-            baseY + ny * (extension + wave) * 0.42 - ty * half * 0.48,
-            tipX, tipY
-        );
-        ctx.quadraticCurveTo(
-            baseX + nx * (extension + wave) * 0.72 + tx * half * 0.45,
-            baseY + ny * (extension + wave) * 0.72 + ty * half * 0.45,
-            baseX + tx * half, baseY + ty * half
-        );
-        ctx.quadraticCurveTo(baseX + nx * (extension + wave) * 0.18, baseY + ny * (extension + wave) * 0.18, baseX - tx * half, baseY - ty * half);
-        ctx.closePath();
-        ctx.fillStyle = color;
-        ctx.fill();
-    }
-
-    function drawLayer(component, paths, neighbors, layerName, strokeWidth, extension, lickExtension, isOuter) {
-        const colorFor = cell => (paletteForCell(cell)[layerName] || baseFirePalette[layerName]);
-        const gradientFor = (a, b) => {
-            const from = cellCenter(a), to = cellCenter(b);
-            const gradient = ctx.createLinearGradient(from.x, from.y, to.x, to.y);
-            gradient.addColorStop(0, colorFor(a));
-            gradient.addColorStop(1, colorFor(b));
-            return gradient;
-        };
-
-        // Cada tramo mantiene los colores de las dos celdas que une. La ruta
-        // sigue siendo continua; el gradiente cambia suavemente sin promediar
-        // toda la componente y borrar la identidad del elemento.
-        for (const path of paths) {
-            const points = path.points;
-            for (let i = 1; i < points.length; i++) {
-                const a = points[i - 1], b = points[i];
-                const from = cellCenter(a), to = cellCenter(b);
-                ctx.beginPath();
-                ctx.moveTo(from.x, from.y);
-                ctx.lineTo(to.x, to.y);
-                ctx.strokeStyle = gradientFor(a, b);
-                ctx.lineWidth = strokeWidth;
-                ctx.lineCap = 'butt';
-                ctx.lineJoin = 'round';
-                if (isOuter) {
-                    ctx.shadowColor = colorFor(a);
-                    ctx.shadowBlur = Math.min(12, size * 0.22);
-                }
-                ctx.stroke();
-                ctx.shadowBlur = 0;
-            }
-        }
-
-        // Sellar bifurcaciones y giros usando el color local de la celda, no
-        // un promedio global. Los tramos rectos no reciben una tapa por tile.
-        for (const cell of component) {
-            const around = neighbors.get(coordKey(cell)) || [];
-            let isTurn = false;
-            if (around.length === 2) {
-                const a = around[0], b = around[1];
-                isTurn = (a.x !== b.x && a.y !== b.y);
-            }
-            if (around.length >= 3 || isTurn) {
-                drawSoftJunction(cell, colorFor(cell), strokeWidth);
-            }
-        }
-
-        // Puntas afiladas con el color del efecto de esa casilla.
-        for (const path of paths) {
-            const points = path.points;
-            if (points.length < 2 || path.closed) continue;
-            const first = points[0], second = points[1];
-            const last = points[points.length - 1], beforeLast = points[points.length - 2];
-            if ((neighbors.get(coordKey(first)) || []).length === 1) {
-                drawTaperedTip(first, second, colorFor(first), strokeWidth, extension, first.x * 7 + first.y * 13);
-            }
-            if ((neighbors.get(coordKey(last)) || []).length === 1) {
-                drawTaperedTip(last, beforeLast, colorFor(last), strokeWidth, extension, last.x * 11 + last.y * 5);
-            }
-        }
-
-        // Lenguas laterales poco frecuentes, tintadas con el elemento local.
-        for (const path of paths) {
-            const points = path.points;
-            for (let i = 1; i < points.length - 1; i++) {
-                const cell = points[i];
-                const around = neighbors.get(coordKey(cell)) || [];
-                if (around.length !== 2) continue;
-                const a = points[i - 1], b = points[i + 1];
-                const horizontal = a.y === cell.y && b.y === cell.y;
-                const vertical = a.x === cell.x && b.x === cell.x;
-                if (!horizontal && !vertical) continue;
-                const hash = Math.abs(cell.x * 7 + cell.y * 11);
-                if (hash % 3 !== 0) continue;
-                const tangent = horizontal ? { x: 1, y: 0 } : { x: 0, y: 1 };
-                const side = ((cell.x * 5 + cell.y * 3) & 1) ? 1 : -1;
-                drawSideFlameLick(cell, tangent, side, colorFor(cell), strokeWidth, lickExtension, cell.x * 3.1 + cell.y * 8.7);
-            }
-        }
-
-        // Una sola casilla usa una llama en cruz, nunca un círculo.
-        if (component.length === 1) {
-            const cell = component[0];
-            const color = colorFor(cell);
-            drawSoftJunction(cell, color, strokeWidth * 0.88);
-            const fakeNeighbors = [
-                { x: cell.x, y: cell.y + 1 }, { x: cell.x, y: cell.y - 1 },
-                { x: cell.x + 1, y: cell.y }, { x: cell.x - 1, y: cell.y }
-            ];
-            for (let i = 0; i < fakeNeighbors.length; i++) {
-                drawTaperedTip(cell, fakeNeighbors[i], color, strokeWidth * 0.68, extension * 0.72, cell.x * 9 + cell.y * 7 + i);
-            }
-        }
-    }
-
-    ctx.save();
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.lineCap = 'butt';
-    ctx.lineJoin = 'round';
+    const center = cell => ({ x:(cell.x+0.5)*size, y:(cell.y+0.5)*size });
+    const keyOfCell = cell => keyOf(cell.x,cell.y);
+    targetCtx.save();
+    targetCtx.globalCompositeOperation = 'source-over';
+    targetCtx.lineCap = 'round';
+    targetCtx.lineJoin = 'round';
 
     for (const component of components) {
-        const { neighbors } = buildGraph(component);
-        const paths = buildContinuousPaths(component, neighbors);
-        const intensity = Math.max(0.08, Math.min(1, component.reduce((sum, cell) => sum + cell.alpha, 0) / component.length));
-        const phase = frame * 0.31 + component[0].x * 0.77 + component[0].y * 1.13;
-        const pulse = Math.sin(phase) * size * 0.018;
-        ctx.globalAlpha = 0.97 * intensity;
+        const { paths } = explosionGraphPathsV6308(component);
+        const alpha = Math.min(1, component.reduce((sum,cell)=>sum+cell.alpha,0)/component.length);
+        if (alpha <= 0) continue;
 
-        // Tres capas continuas, cada una con gradientes locales por segmento.
-        // La conectividad no depende del elemento; el color sí depende de cada celda.
-        drawLayer(component, paths, neighbors, 'outer', size * 0.82 + pulse, size * 0.14, size * 0.17, true);
-        ctx.globalAlpha = 0.97 * intensity;
-        drawLayer(component, paths, neighbors, 'middle', size * 0.57 + pulse * 0.55, size * 0.115, size * 0.105, false);
-        ctx.globalAlpha = Math.min(1, intensity);
-        drawLayer(component, paths, neighbors, 'core', size * 0.285 + pulse * 0.22, size * 0.075, size * 0.045, false);
+        // Base oscura integrada en el terreno; el cuerpo no tiene límites de tile.
+        targetCtx.globalAlpha = 0.20 * alpha;
+        targetCtx.strokeStyle = '#171923';
+        targetCtx.lineWidth = size * 0.52;
+        targetCtx.beginPath();
+        for (const path of paths) {
+            if (!path.points.length) continue;
+            let p = center(path.points[0]); targetCtx.moveTo(p.x,p.y);
+            for (let i=1;i<path.points.length;i++) { p=center(path.points[i]); targetCtx.lineTo(p.x,p.y); }
+        }
+        targetCtx.stroke();
 
-        // Reflejo caliente fino en el centro: continuo a lo largo de toda la onda.
-        if (paths.some(path => path.points.length > 1)) {
-            ctx.globalAlpha = 0.44 * intensity;
-            ctx.beginPath();
-            for (const path of paths) {
-                if (path.points.length < 2) continue;
-                const start = cellCenter(path.points[0]);
-                ctx.moveTo(start.x, start.y);
-                for (let i = 1; i < path.points.length; i++) {
-                    const point = cellCenter(path.points[i]);
-                    ctx.lineTo(point.x, point.y);
-                }
-                if (path.closed) ctx.closePath();
+        // Trazos locales: cambia el color por segmento, nunca se promedia la región conectada.
+        for (const path of paths) {
+            for (let i=1;i<path.points.length;i++) {
+                const a=path.points[i-1], b=path.points[i], pa=center(a), pb=center(b);
+                const grad=targetCtx.createLinearGradient(pa.x,pa.y,pb.x,pb.y);
+                grad.addColorStop(0,localColor(a,'middle'));
+                grad.addColorStop(1,localColor(b,'middle'));
+                targetCtx.globalAlpha = 0.24 * alpha;
+                targetCtx.strokeStyle=grad;
+                targetCtx.lineWidth=size*0.24;
+                targetCtx.beginPath(); targetCtx.moveTo(pa.x,pa.y); targetCtx.lineTo(pb.x,pb.y); targetCtx.stroke();
+                const core=targetCtx.createLinearGradient(pa.x,pa.y,pb.x,pb.y);
+                core.addColorStop(0,localColor(a,'core'));
+                core.addColorStop(1,localColor(b,'core'));
+                targetCtx.globalAlpha = 0.20 * alpha;
+                targetCtx.strokeStyle=core;
+                targetCtx.lineWidth=Math.max(1,size*0.028);
+                targetCtx.beginPath(); targetCtx.moveTo(pa.x,pa.y); targetCtx.lineTo(pb.x,pb.y); targetCtx.stroke();
             }
-            ctx.strokeStyle = highlight;
-            ctx.lineWidth = Math.max(1.2, size * (0.045 + (Math.sin(phase * 1.3) + 1) * 0.008));
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.stroke();
+        }
+
+        // Textura elemental mínima, sin contornos cuadrados ni formas circulares.
+        for (const cell of component) {
+            const source = cell.sources[0];
+            if (!source) continue;
+            const centerPoint = center(cell), kind = source.palette.kind;
+            if (((cell.x*7+cell.y*11)&1) !== 0) continue;
+            targetCtx.save();
+            targetCtx.globalAlpha = 0.26 * alpha;
+            targetCtx.strokeStyle = source.palette.texture;
+            targetCtx.lineWidth = Math.max(1,size*0.035);
+            targetCtx.lineCap = 'round'; targetCtx.lineJoin='round';
+            targetCtx.beginPath();
+            if (kind === 'ice') {
+                targetCtx.moveTo(centerPoint.x-size*.16,centerPoint.y-size*.08);
+                targetCtx.lineTo(centerPoint.x-size*.03,centerPoint.y+size*.01);
+                targetCtx.lineTo(centerPoint.x+size*.02,centerPoint.y+size*.12);
+                targetCtx.moveTo(centerPoint.x-size*.03,centerPoint.y+size*.01);
+                targetCtx.lineTo(centerPoint.x+size*.09,centerPoint.y-size*.08);
+            } else if (kind === 'electric') {
+                targetCtx.moveTo(centerPoint.x-size*.12,centerPoint.y-size*.08);
+                targetCtx.lineTo(centerPoint.x+size*.015,centerPoint.y-size*.015);
+                targetCtx.lineTo(centerPoint.x-size*.035,centerPoint.y+size*.06);
+                targetCtx.lineTo(centerPoint.x+size*.12,centerPoint.y+size*.09);
+            } else if (kind === 'plasma') {
+                targetCtx.moveTo(centerPoint.x-size*.13,centerPoint.y+size*.04);
+                targetCtx.lineTo(centerPoint.x-size*.025,centerPoint.y-size*.07);
+                targetCtx.lineTo(centerPoint.x+size*.04,centerPoint.y+size*.02);
+                targetCtx.lineTo(centerPoint.x+size*.14,centerPoint.y-size*.045);
+            } else if (kind === 'burn') {
+                targetCtx.moveTo(centerPoint.x-size*.14,centerPoint.y+size*.04);
+                targetCtx.lineTo(centerPoint.x-size*.035,centerPoint.y-size*.035);
+                targetCtx.lineTo(centerPoint.x+size*.04,centerPoint.y+size*.07);
+                targetCtx.lineTo(centerPoint.x+size*.14,centerPoint.y-size*.045);
+            } else if (kind === 'acid') {
+                targetCtx.moveTo(centerPoint.x-size*.12,centerPoint.y-size*.04);
+                targetCtx.lineTo(centerPoint.x-size*.02,centerPoint.y+size*.04);
+                targetCtx.lineTo(centerPoint.x+size*.1,centerPoint.y-size*.025);
+            } else {
+                targetCtx.moveTo(centerPoint.x-size*.12,centerPoint.y+size*.035);
+                targetCtx.quadraticCurveTo(centerPoint.x,centerPoint.y-size*.08,centerPoint.x+size*.12,centerPoint.y-size*.015);
+            }
+            targetCtx.stroke();
+            targetCtx.restore();
         }
     }
-    ctx.restore();
-    ctx.globalAlpha = 1;
-    ctx.shadowBlur = 0;
-    return visibleCount;
+    targetCtx.restore();
+    targetCtx.globalAlpha=1;
+    return cellMap.size;
 }
+
+function drawExplosionClustersV6308(blastVisuals = []) {
+    const visuals = Array.isArray(blastVisuals) ? blastVisuals : [];
+    if (!visuals.length) return 0;
+    const cellMap = new Map();
+    const keyOf = (x,y) => `${x},${y}`;
+    function ensureCell(x,y) {
+        const key=keyOf(x,y);
+        let cell=cellMap.get(key);
+        if (!cell) { cell={x,y,alpha:0,ageMs:Infinity,palettes:[]}; cellMap.set(key,cell); }
+        return cell;
+    }
+    function addPalette(cell,palette,key) {
+        if (!cell.palettes.some(entry=>entry.key===key)) cell.palettes.push({key,palette,weight:1});
+    }
+    for (const visual of visuals) {
+        if (!visual || !(Number(visual.ageMs) >= 0) || Number(visual.ageMs) >= 350) continue;
+        const age=Math.max(0,Number(visual.ageMs)||0);
+        const expansion=age<80 ? Math.max(0,Math.min(1,age/80)) : 1;
+        const originX=Math.trunc(Number(visual.originX)||0), originY=Math.trunc(Number(visual.originY)||0);
+        const sourceCells=Array.isArray(visual.cells)?visual.cells:[];
+        const maxDistance=Math.max(1,Number(visual.maxDistance)||1);
+        const effect=String(visual.element||'fire');
+        const palette=explosionPaletteV6308(effect);
+        for (const raw of sourceCells) {
+            const x=Math.trunc(Number(raw?.x)), y=Math.trunc(Number(raw?.y));
+            if (!Number.isFinite(x)||!Number.isFinite(y)) continue;
+            const distance=Math.abs(x-originX)+Math.abs(y-originY);
+            if (age<80 && distance>maxDistance*expansion+0.0001) continue;
+            const cell=ensureCell(x,y);
+            const alpha=age<80 ? 0.55+0.45*expansion : 1;
+            cell.alpha=Math.max(cell.alpha,alpha);
+            cell.ageMs=Math.min(cell.ageMs,age);
+            addPalette(cell,palette,`${visual.visualId||visual.blastId||'blast'}:${effect}`);
+        }
+    }
+    if (!cellMap.size) return 0;
+    function colorAt(cell,channel) {
+        const list=cell.palettes.length?cell.palettes:[{palette:explosionPaletteV6308('fire'),weight:1}];
+        if (list.length===1) return list[0].palette[channel];
+        const total=list.reduce((sum,item)=>sum+item.weight,0)||1;
+        let result=list[0].palette[channel], weight=list[0].weight;
+        for (let i=1;i<list.length;i++) {
+            result=mixExplosionColorV6308(result,list[i].palette[channel],list[i].weight/(weight+list[i].weight));
+            weight+=list[i].weight;
+        }
+        return result;
+    }
+    const components=explosionComponentsV6308(cellMap);
+    if (!components.length) return 0;
+    const size=TILE_SIZE, frame=Number(gameState.animFrame)||0;
+    const center=cell=>({x:(cell.x+0.5)*size,y:(cell.y+0.5)*size});
+    const keyOfCell=cell=>keyOf(cell.x,cell.y);
+
+    function softJunction(cell,color,width) {
+        const p=center(cell), h=width*.49, r=width*.16;
+        ctx.beginPath();
+        ctx.moveTo(p.x-h+r,p.y-h); ctx.lineTo(p.x+h-r,p.y-h);
+        ctx.quadraticCurveTo(p.x+h,p.y-h,p.x+h,p.y-h+r); ctx.lineTo(p.x+h,p.y+h-r);
+        ctx.quadraticCurveTo(p.x+h,p.y+h,p.x+h-r,p.y+h); ctx.lineTo(p.x-h+r,p.y+h);
+        ctx.quadraticCurveTo(p.x-h,p.y+h,p.x-h,p.y+h-r); ctx.lineTo(p.x-h,p.y-h+r);
+        ctx.quadraticCurveTo(p.x-h,p.y-h,p.x-h+r,p.y-h); ctx.closePath(); ctx.fillStyle=color; ctx.fill();
+    }
+    function taperedTip(cell,neighbor,color,width,extension,seed,scale) {
+        const p=center(cell), n=center(neighbor), dx=Math.sign(p.x-n.x), dy=Math.sign(p.y-n.y), px=-dy, py=dx;
+        const baseX=p.x-dx*size*.10*scale, baseY=p.y-dy*size*.10*scale, half=width*.39;
+        const wave=Math.sin(frame*.23+seed)*size*.012;
+        const tipX=p.x+dx*extension*scale+px*wave, tipY=p.y+dy*extension*scale+py*wave;
+        const cx=p.x+dx*extension*scale*.52, cy=p.y+dy*extension*scale*.52;
+        ctx.beginPath();
+        ctx.moveTo(baseX+px*half,baseY+py*half);
+        ctx.quadraticCurveTo(cx+px*half,cy+py*half,tipX,tipY);
+        ctx.quadraticCurveTo(cx-px*half*.72,cy-py*half*.72,baseX-px*half,baseY-py*half);
+        ctx.quadraticCurveTo(baseX-dx*size*.02*scale,baseY-dy*size*.02*scale,baseX+px*half,baseY+py*half);
+        ctx.closePath(); ctx.fillStyle=color; ctx.fill();
+    }
+    function drawLayer(component,paths,neighbors,channel,width,extension,layerAlpha,scale,licks,outer) {
+        const colorFor=cell=>colorAt(cell,channel);
+        for (const path of paths) {
+            for (let i=1;i<path.points.length;i++) {
+                const a=path.points[i-1], b=path.points[i], pa=center(a), pb=center(b);
+                const gradient=ctx.createLinearGradient(pa.x,pa.y,pb.x,pb.y);
+                gradient.addColorStop(0,colorFor(a)); gradient.addColorStop(1,colorFor(b));
+                ctx.beginPath(); ctx.moveTo(pa.x,pa.y); ctx.lineTo(pb.x,pb.y);
+                ctx.strokeStyle=gradient; ctx.lineWidth=width*scale; ctx.lineCap='butt'; ctx.lineJoin='round';
+                if (outer) { ctx.shadowColor=colorFor(a); ctx.shadowBlur=Math.min(12,size*.22); }
+                ctx.stroke(); ctx.shadowBlur=0;
+            }
+        }
+        for (const cell of component) {
+            const around=neighbors.get(keyOfCell(cell))||[];
+            let turn=false;
+            if (around.length===2) turn=(around[0].x!==around[1].x && around[0].y!==around[1].y);
+            if (around.length>=3||turn) softJunction(cell,colorFor(cell),width*scale);
+        }
+        for (const path of paths) {
+            const pts=path.points;
+            if (pts.length<2||path.closed) continue;
+            const first=pts[0], second=pts[1], last=pts[pts.length-1], before=pts[pts.length-2];
+            if ((neighbors.get(keyOfCell(first))||[]).length===1) taperedTip(first,second,colorFor(first),width*scale,extension*scale,first.x*7+first.y*13,1);
+            if ((neighbors.get(keyOfCell(last))||[]).length===1) taperedTip(last,before,colorFor(last),width*scale,extension*scale,last.x*11+last.y*5,1);
+            if (!licks) continue;
+            for (let i=1;i<pts.length-1;i++) {
+                const cell=pts[i], around=neighbors.get(keyOfCell(cell))||[];
+                if (around.length!==2) continue;
+                const horizontal=pts[i-1].y===cell.y&&pts[i+1].y===cell.y;
+                const vertical=pts[i-1].x===cell.x&&pts[i+1].x===cell.x;
+                if ((!horizontal&&!vertical)||Math.abs(cell.x*7+cell.y*11)%3!==0) continue;
+                const p=center(cell), tangent=horizontal?{x:1,y:0}:{x:0,y:1}, side=((cell.x*5+cell.y*3)&1)?1:-1;
+                const nx=-tangent.y*side, ny=tangent.x*side, base=width*scale*.37, half=size*.065;
+                const bx=p.x+nx*base, by=p.y+ny*base, wave=Math.sin(frame*.19+cell.x*3.1+cell.y*8.7)*size*.018;
+                const tx=bx+nx*(size*.17+wave)+tangent.x*Math.cos(frame*.16+cell.y)*size*.04;
+                const ty=by+ny*(size*.17+wave)+tangent.y*Math.cos(frame*.16+cell.y)*size*.04;
+                ctx.beginPath(); ctx.moveTo(bx-tangent.x*half,by-tangent.y*half);
+                ctx.quadraticCurveTo(bx+nx*size*.07-tangent.x*half*.4,by+ny*size*.07-tangent.y*half*.4,tx,ty);
+                ctx.quadraticCurveTo(bx+nx*size*.12+tangent.x*half*.4,by+ny*size*.12+tangent.y*half*.4,bx+tangent.x*half,by+tangent.y*half);
+                ctx.closePath(); ctx.fillStyle=colorFor(cell); ctx.fill();
+            }
+        }
+        if (component.length===1) {
+            const cell=component[0], color=colorFor(cell);
+            softJunction(cell,color,width*scale*.86);
+            for (let i=0;i<4;i++) {
+                const neighbor=[{x:cell.x,y:cell.y+1},{x:cell.x,y:cell.y-1},{x:cell.x+1,y:cell.y},{x:cell.x-1,y:cell.y}][i];
+                taperedTip(cell,neighbor,color,width*scale*.68,extension*scale*.72,cell.x*9+cell.y*7+i,1);
+            }
+        }
+    }
+
+    ctx.save(); ctx.globalCompositeOperation='source-over'; ctx.lineCap='butt'; ctx.lineJoin='round';
+    for (const component of components) {
+        const {paths,neighbors}=explosionGraphPathsV6308(component);
+        const age=component.reduce((sum,cell)=>sum+(Number.isFinite(cell.ageMs)?cell.ageMs:0),0)/component.length;
+        const visibility=component.reduce((sum,cell)=>sum+cell.alpha,0)/component.length;
+        const ease=age<80?Math.max(0,Math.min(1,age/80)):1;
+        const scale=age<80?0.70+0.30*ease:age<250?1+Math.sin(frame*.9+component[0].x)*.012:1-.18*Math.max(0,Math.min(1,(age-250)/100));
+        const fadeCore=age<250?1:Math.max(0,1-(age-250)/30);
+        const fadeMiddle=age<265?1:Math.max(0,1-(age-265)/50);
+        const fadeOuter=age<270?1:Math.max(0,1-(age-270)/80);
+        const expansionLicks=age>=80&&age<250;
+        ctx.globalAlpha=visibility*fadeOuter;
+        drawLayer(component,paths,neighbors,'outer',size*.82,size*.14,fadeOuter,scale,expansionLicks,true);
+        ctx.globalAlpha=visibility*fadeMiddle;
+        drawLayer(component,paths,neighbors,'middle',size*.57,size*.115,fadeMiddle,scale,expansionLicks,false);
+        ctx.globalAlpha=visibility*fadeCore;
+        drawLayer(component,paths,neighbors,'core',size*.285,size*.075,fadeCore,scale,expansionLicks,false);
+    }
+    ctx.restore(); ctx.globalAlpha=1; ctx.shadowBlur=0;
+    return [...cellMap.values()].filter(cell=>isWorldTileVisibleV329(cell.x,cell.y,1)).length;
+}
+
+window.registerBombBlastVisualV6308 = registerBombBlastVisualV6308;
+window.updateBombBlastVisualsV6308 = updateBombBlastVisualsV6308;
+window.resetBombBlastVisualsV6308 = resetBombBlastVisualsV6308;
+window.drawElementalResiduesV6308 = drawElementalResiduesV6308;
 
 function getRenderProfileV65() {
     return typeof getBomberRenderProfileV65 === 'function'
@@ -1295,6 +1350,8 @@ function draw() {
 
             // v6.0: residuos materiales persistentes; quedan por debajo de items, bombas y personajes.
             if (typeof drawMaterialResiduesV60 === 'function') drawMaterialResiduesV60(ctx);
+            // v6.30.9: residuos elementales tenues, unidos y dibujados bajo entidades.
+            if (typeof drawElementalResiduesV6308 === 'function') drawElementalResiduesV6308(ctx, gameState.bombEffectFieldsV64);
 
             // V3.3: las trampas aparecen visualmente solo después de activarse.
             drawHazards();
@@ -1318,12 +1375,9 @@ function draw() {
                 drawBombSprite(bombPos.x, bombPos.y, b);
             }
             drawBombChainLinks();
-            // v6.30.7: una única composición fusiona explosiones y campos persistentes con color local por elemento.
-            // El renderer antiguo de campos por tile queda fuera de la ruta de dibujo.
-            renderStatsV329.explosions += drawExplosionClustersV6307(
-                gameState.explosions,
-                gameState.bombEffectFieldsV64
-            );
+            // v6.30.9: solo la animación estética de 350 ms.
+            // gameState.explosions conserva en exclusiva la hitbox y el daño lógico.
+            renderStatsV329.explosions += drawExplosionClustersV6308(gameState.bombBlastVisualsV6308);
 
             // Draw Enemies
             for(let i=0;i<gameState.enemies.length;i++){

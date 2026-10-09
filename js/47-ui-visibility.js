@@ -1,8 +1,8 @@
-// v6.31.1 — Visibilidad del sidebar y de los controles táctiles.
+// v6.31.2 — Visibilidad del sidebar y de los controles táctiles.
 (() => {
     'use strict';
 
-    function initUIVisibilityV6311() {
+    function initUIVisibilityV6312() {
         const mainMenu = document.getElementById('main-menu');
         const layout = document.getElementById('game-layout');
         const panel = document.getElementById('game-info-panel');
@@ -55,8 +55,8 @@
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initUIVisibilityV6311, { once: true });
+        document.addEventListener('DOMContentLoaded', initUIVisibilityV6312, { once: true });
     } else {
-        initUIVisibilityV6311();
+        initUIVisibilityV6312();
     }
 })();

@@ -1068,9 +1068,13 @@ function getEnemyMovementSpeedV610(e) {
     const gameplaySpeedMultiplier = typeof getGameplayPowerupEnemySpeedMultiplierV676 === 'function'
         ? Math.max(0.1, Number(getGameplayPowerupEnemySpeedMultiplierV676(e)) || 1)
         : 1;
+    const elementalEffectMultiplier = typeof getBombEffectEnemyMovementMultiplierV6306 === 'function'
+        ? Math.max(0.28, Number(getBombEffectEnemyMovementMultiplierV6306(e)) || 1)
+        : 1;
     return Math.max(0.1, Number(e.baseSpeed) || 1)
         * Number(profile.speedMultiplier || 1)
-        * gameplaySpeedMultiplier;
+        * gameplaySpeedMultiplier
+        * elementalEffectMultiplier;
 }
 
 function moveEnemyV312(e, dt) {

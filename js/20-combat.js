@@ -22,7 +22,9 @@
                 detonatedCount++;
                 triggerScreenShake(detonatedCount === 1 ? 7 : 5, detonatedCount === 1 ? 300 : 220);
                 if (typeof feedbackExplosion === 'function') feedbackExplosion(bomb.x, bomb.y);
-                addParticles((bomb.x + 0.5) * TILE_SIZE, (bomb.y + 0.5) * TILE_SIZE, 'particleFire', detonatedCount === 1 ? 15 : 12);
+                // v6.30.6: la explosión continua de 07-render.js es la única
+                // silueta. El estallido radial particleFire anterior creaba el
+                // círculo/mota marrón superpuesto sobre la llama.
                 if (gameState.relics.some(r => r.id === 'ember_core')) gameState.score += 25;
 
                 const blastId = ++gameState.blastSerial;

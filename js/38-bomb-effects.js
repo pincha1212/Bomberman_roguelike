@@ -36,12 +36,15 @@
             color: '#ffb347',
             core: '#fff7ed',
             defaultDurationMs: 3000,
-            tickMs: 250,
+            // El rastro de fuego quema a enemigos que permanecen en la zona.
+            // Tres pulsos a lo largo del campo evitan daño explosivo por frame.
+            tickMs: 750,
             damage: 0,
+            enemyDamage: 1,
             sourceKinds: Object.freeze(['bomb']),
             warmingPerSecond: 2400,
             movementMultiplier: 1.05,
-            tags: Object.freeze(['bomb', 'winter', 'support'])
+            tags: Object.freeze(['bomb', 'fire', 'damage', 'winter', 'support'])
         }),
         [EFFECTS.COLD]: Object.freeze({
             id: EFFECTS.COLD,
@@ -60,11 +63,11 @@
             extraSlipAtMs: 20000,
             tags: Object.freeze(['hazard', 'winter', 'damage', 'status'])
         }),
-        [EFFECTS.FROST]: Object.freeze({ id:EFFECTS.FROST, label:'Escarcha', color:'#7dd3fc', core:'#e0f2fe', defaultDurationMs:2800, tickMs:250, damage:0, movementMultiplier:0.62, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','ice','slow']) }),
-        [EFFECTS.SHOCK]: Object.freeze({ id:EFFECTS.SHOCK, label:'Descarga', color:'#facc15', core:'#fef9c3', defaultDurationMs:1800, tickMs:600, damage:1, movementMultiplier:0.86, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','electric','damage']) }),
-        [EFFECTS.STEAM]: Object.freeze({ id:EFFECTS.STEAM, label:'Vapor', color:'#e2e8f0', core:'#ffffff', defaultDurationMs:2200, tickMs:300, damage:0, movementMultiplier:0.58, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','combo','steam','slow']), materialType: global.MATERIALS_V60?.STEAM || 'steam' }),
-        [EFFECTS.PLASMA]: Object.freeze({ id:EFFECTS.PLASMA, label:'Plasma', color:'#c084fc', core:'#f5d0fe', defaultDurationMs:1500, tickMs:300, damage:1, movementMultiplier:0.92, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','combo','plasma','damage']) }),
-        [EFFECTS.ARC]: Object.freeze({ id:EFFECTS.ARC, label:'Rayo extendido', color:'#fde047', core:'#ffffff', defaultDurationMs:900, tickMs:250, damage:1, movementMultiplier:0.90, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','combo','electric','extended','damage']) })
+        [EFFECTS.FROST]: Object.freeze({ id:EFFECTS.FROST, label:'Escarcha', color:'#7dd3fc', core:'#e0f2fe', defaultDurationMs:2800, tickMs:250, damage:0, movementMultiplier:0.62, enemyMovementMultiplier:0.62, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','ice','slow']) }),
+        [EFFECTS.SHOCK]: Object.freeze({ id:EFFECTS.SHOCK, label:'Descarga', color:'#facc15', core:'#fef9c3', defaultDurationMs:1800, tickMs:600, damage:1, movementMultiplier:0.86, enemyMovementMultiplier:0.86, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','electric','damage']) }),
+        [EFFECTS.STEAM]: Object.freeze({ id:EFFECTS.STEAM, label:'Vapor', color:'#e2e8f0', core:'#ffffff', defaultDurationMs:2200, tickMs:300, damage:0, movementMultiplier:0.58, enemyMovementMultiplier:0.58, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','combo','steam','slow']), materialType: global.MATERIALS_V60?.STEAM || 'steam' }),
+        [EFFECTS.PLASMA]: Object.freeze({ id:EFFECTS.PLASMA, label:'Plasma', color:'#c084fc', core:'#f5d0fe', defaultDurationMs:1500, tickMs:300, damage:1, movementMultiplier:0.92, enemyMovementMultiplier:0.92, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','combo','plasma','damage']) }),
+        [EFFECTS.ARC]: Object.freeze({ id:EFFECTS.ARC, label:'Rayo extendido', color:'#fde047', core:'#ffffff', defaultDurationMs:900, tickMs:250, damage:1, movementMultiplier:0.90, enemyMovementMultiplier:0.90, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','combo','electric','extended','damage']) })
     });
 
     // Una tabla de combinaciones. Se puede ampliar con pares nuevos sin tocar
@@ -248,6 +251,22 @@
             }
         }
         return Object.freeze({ speedMultiplier, inputBufferMultiplier, brakingMultiplier, turnCarryMultiplier });
+    }
+
+    // Multiplicador separado para IA enemiga: el calor no acelera enemigos,
+    // pero escarcha/vapor/descarga y combos sí ralentizan mientras el estado viva.
+    function getBombEffectEnemyMovementMultiplierV6306(entity) {
+        const statuses = entity?.__bombEffectStatusesV64;
+        if (!statuses || typeof statuses !== 'object') return 1;
+        let multiplier = 1;
+        for (const [effectId, status] of Object.entries(statuses)) {
+            if (!status || status.sourceBombId == null) continue;
+            const config = getEffectConfigV64(effectId);
+            const effectMultiplier = Number(config?.enemyMovementMultiplier);
+            if (!Number.isFinite(effectMultiplier) || effectMultiplier <= 0 || effectMultiplier >= 1) continue;
+            multiplier *= clamp(effectMultiplier, 0.3, 1);
+        }
+        return clamp(multiplier, 0.28, 1);
     }
 
     function getBombEffectVisualStateV64(entity) {
@@ -659,8 +678,12 @@
                 continue;
             }
 
-            if (config.damage > 0) {
-                damageTarget(target, Math.max(1, Math.round(config.damage * status.intensity)), `effect:${status.effectId}`);
+            const isHostile = target?.kind === 'enemy' || target?.kind === 'boss' || target?.kind === 'death_echo';
+            const configuredDamage = isHostile && Number.isFinite(Number(config.enemyDamage))
+                ? Math.max(0, Number(config.enemyDamage))
+                : Math.max(0, Number(config.damage) || 0);
+            if (configuredDamage > 0) {
+                damageTarget(target, Math.max(1, Math.round(configuredDamage * status.intensity)), `effect:${status.effectId}`);
             }
         }
     }
@@ -910,6 +933,7 @@
     global.getBombEffectConfigV64 = getEffectConfigV64;
     global.getBombEffectStatusV64 = getEffectStatusV64;
     global.getBombEffectMovementModifiersV64 = getBombEffectMovementModifiersV64;
+    global.getBombEffectEnemyMovementMultiplierV6306 = getBombEffectEnemyMovementMultiplierV6306;
     global.getBombEffectVisualStateV64 = getBombEffectVisualStateV64;
     global.forcePlayerColdDeathV64 = forcePlayerColdDeathV64;
     global.applyBombEffectToAllEntitiesV64 = applyEffectToAllEntitiesV64;

@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOMBERMAN ROGUELIKE — v6.30.3</title>
+    <title>BOMBERMAN ROGUELIKE — v6.31.2</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/09-game-information.css?v=6.30.3">
     <link rel="stylesheet" href="css/10-biome-switch.css?v=6.12.25">
-    <link rel="stylesheet" href="css/11-viewport-layout.css?v=6.12.24">
+    <link rel="stylesheet" href="css/11-viewport-layout.css?v=6.31.2">
     <link rel="stylesheet" href="css/12-run-save.css">
     <link rel="stylesheet" href="css/13-mobile-performance.css">
-    <link rel="stylesheet" href="css/14-mobile-controls.css?v=6.31.1">
+    <link rel="stylesheet" href="css/14-mobile-controls.css?v=6.31.2">
     <link rel="stylesheet" href="css/16-runtime-feedback.css?v=6.30.3">
 </head>
 <body class="game-body v4-theme">
@@ -21,7 +21,7 @@
             <aside class="menu-rail menu-rail-left" aria-label="Resumen de la aventura">
                 <div class="menu-rail-top">
                     <span class="menu-kicker">BOMBERMAN ROGUELIKE</span>
-                    <span class="menu-version">v6.30.3</span>
+                    <span class="menu-version">v6.31.2</span>
                 </div>
                 <div class="menu-rail-content">
                     <div class="menu-mark">💣</div>
@@ -94,8 +94,7 @@
                 </section>
                 </div>
 
-                <button id="btn-toggle-game-info" class="game-info-toggle" type="button"
-                    aria-controls="game-info-panel" aria-expanded="false" aria-label="Mostrar información de la partida">INFO +</button>
+                <button id="btn-toggle-game-info" class="game-info-toggle" type="button" aria-controls="game-info-panel" aria-expanded="false" aria-label="Mostrar información de la partida">INFO +</button>
                 <aside id="game-info-panel" class="game-info-panel" aria-label="Información de la partida" aria-hidden="true">
                     <div class="game-info-header">
                         <div class="game-info-kicker">ESTADO DE LA PARTIDA</div>
@@ -227,15 +226,16 @@
             </aside>
         </main>
 
-    <!-- Mobile D-pad & Bomb controls -->
+    <!-- v6.31.0: controles táctiles divididos en movimiento y acciones. -->
         <div id="mobile-controls" aria-label="Controles táctiles">
-            <div id="mobile-dpad" aria-label="Direcciones">
-                <button type="button" data-mobile-dir="up" aria-label="Arriba">▲</button>
-                <button type="button" data-mobile-dir="left" aria-label="Izquierda">◀</button>
-                <button type="button" data-mobile-dir="down" aria-label="Abajo">▼</button>
-                <button type="button" data-mobile-dir="right" aria-label="Derecha">▶</button>
+            <div id="mobile-gesture-zone" aria-label="Movimiento: deslizar en cuatro direcciones">
+                <span class="mobile-zone-hint">DESLIZAR PARA MOVER</span><span class="mobile-gesture-arrow" aria-hidden="true">↕</span>
             </div>
-            <button type="button" class="bomb-btn" id="btn-bomb-mobile" aria-label="Poner bomba">💣</button>
+            <div id="mobile-action-zone" aria-label="Acciones">
+                <button type="button" class="mobile-action-btn mobile-bomb-action" id="btn-bomb-mobile" aria-label="Colocar bomba">💣<span>BOMBA</span></button>
+                <button type="button" class="mobile-action-btn" id="btn-grab-mobile" aria-label="Agarrar o soltar bomba">AGARRAR<span>/ SOLTAR</span></button>
+                <button type="button" class="mobile-action-btn" id="btn-throw-mobile" aria-label="Lanzar bomba transportada">LANZAR</button>
+            </div>
         </div>
     </div>
 <!-- v3.28 modular JavaScript. Feedback is layered over the existing combat/runtime systems. -->
@@ -245,7 +245,7 @@
     <script src="js/04-theme.js?v=6.18.0"></script>
     <script src="js/05-mechanics-registry.js?v=6.18.0"></script>
     <script src="js/06-relics.js?v=6.13.0"></script>
-    <script src="js/07-input.js?v=6.9.7"></script>
+    <script src="js/07-input.js?v=6.31.0"></script>
     <script src="js/08-dungeon-generator.js?v=6.13.0"></script>
     <script src="js/09-difficulty.js?v=6.27.0"></script>
     <script src="js/10-world.js?v=6.29.0"></script>
@@ -285,6 +285,6 @@
     <script src="js/44-god-mode.js?v=6.30.3"></script>
     <script src="js/45-enemy-spawn.js?v=6.30.0"></script>
     <script src="js/46-rastreros.js?v=6.30.2"></script>
-    <script src="js/47-ui-visibility.js?v=6.31.1"></script>
+    <script src="js/47-ui-visibility.js?v=6.31.2"></script>
 </body>
 </html>

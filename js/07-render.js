@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.6 — Canvas rendering and theme-backed sprite drawing
+// Bomberman Roguelike v6.30.7 — Canvas renderer con fusión cromática elemental
 // V6.25.0: Canvas conserva skins/especies de enemigos por bioma. Cache procedural preservado.
 // V3.17: cache de terreno estático para evitar reconstruir la cuadrícula completa
 // en cada frame. El mapa se regenera solo cuando cambia la referencia/revisión.
@@ -809,7 +809,7 @@ function isWorldTileVisibleV329(tileX, tileY, margin = 1){
     return isWorldRectVisibleV329(tileX*TILE_SIZE, tileY*TILE_SIZE, TILE_SIZE, TILE_SIZE, margin*TILE_SIZE);
 }
 
-function drawExplosionClustersV6305(explosions, effectFields = []) {
+function drawExplosionClustersV6307(explosions, effectFields = []) {
     const activeExplosions = Array.isArray(explosions) ? explosions : [];
     const activeFields = Array.isArray(effectFields) ? effectFields : [];
     if (!activeExplosions.length && !activeFields.length) return 0;
@@ -1110,52 +1110,69 @@ function drawExplosionClustersV6305(explosions, effectFields = []) {
         ctx.fill();
     }
 
-    function drawLayer(component, paths, neighbors, color, width, tipExtension, lickExtension, isOuter) {
-        ctx.beginPath();
+    function drawLayer(component, paths, neighbors, layerName, strokeWidth, extension, lickExtension, isOuter) {
+        const colorFor = cell => (paletteForCell(cell)[layerName] || baseFirePalette[layerName]);
+        const gradientFor = (a, b) => {
+            const from = cellCenter(a), to = cellCenter(b);
+            const gradient = ctx.createLinearGradient(from.x, from.y, to.x, to.y);
+            gradient.addColorStop(0, colorFor(a));
+            gradient.addColorStop(1, colorFor(b));
+            return gradient;
+        };
+
+        // Cada tramo mantiene los colores de las dos celdas que une. La ruta
+        // sigue siendo continua; el gradiente cambia suavemente sin promediar
+        // toda la componente y borrar la identidad del elemento.
         for (const path of paths) {
             const points = path.points;
-            if (!points.length) continue;
-            const first = cellCenter(points[0]);
-            ctx.moveTo(first.x, first.y);
             for (let i = 1; i < points.length; i++) {
-                const point = cellCenter(points[i]);
-                ctx.lineTo(point.x, point.y);
+                const a = points[i - 1], b = points[i];
+                const from = cellCenter(a), to = cellCenter(b);
+                ctx.beginPath();
+                ctx.moveTo(from.x, from.y);
+                ctx.lineTo(to.x, to.y);
+                ctx.strokeStyle = gradientFor(a, b);
+                ctx.lineWidth = strokeWidth;
+                ctx.lineCap = 'butt';
+                ctx.lineJoin = 'round';
+                if (isOuter) {
+                    ctx.shadowColor = colorFor(a);
+                    ctx.shadowBlur = Math.min(12, size * 0.22);
+                }
+                ctx.stroke();
+                ctx.shadowBlur = 0;
             }
-            if (path.closed) ctx.closePath();
         }
-        ctx.strokeStyle = color;
-        ctx.lineWidth = width;
-        ctx.lineCap = 'butt';
-        ctx.lineJoin = 'round';
-        if (isOuter) {
-            ctx.shadowColor = color;
-            ctx.shadowBlur = Math.min(12, size * 0.22);
-        }
-        ctx.stroke();
-        ctx.shadowBlur = 0;
 
-        // Rellenar solo nodos de bifurcación para sellar la unión de las ramas.
+        // Sellar bifurcaciones y giros usando el color local de la celda, no
+        // un promedio global. Los tramos rectos no reciben una tapa por tile.
         for (const cell of component) {
-            const degree = (neighbors.get(coordKey(cell)) || []).length;
-            if (degree >= 3) drawSoftJunction(cell, color, width);
+            const around = neighbors.get(coordKey(cell)) || [];
+            let isTurn = false;
+            if (around.length === 2) {
+                const a = around[0], b = around[1];
+                isTurn = (a.x !== b.x && a.y !== b.y);
+            }
+            if (around.length >= 3 || isTurn) {
+                drawSoftJunction(cell, colorFor(cell), strokeWidth);
+            }
         }
 
-        // Extremos afilados/curvos, nunca una burbuja circular por casilla.
+        // Puntas afiladas con el color del efecto de esa casilla.
         for (const path of paths) {
             const points = path.points;
             if (points.length < 2 || path.closed) continue;
             const first = points[0], second = points[1];
             const last = points[points.length - 1], beforeLast = points[points.length - 2];
             if ((neighbors.get(coordKey(first)) || []).length === 1) {
-                drawTaperedTip(first, second, color, width, tipExtension, first.x * 7 + first.y * 13);
+                drawTaperedTip(first, second, colorFor(first), strokeWidth, extension, first.x * 7 + first.y * 13);
             }
             if ((neighbors.get(coordKey(last)) || []).length === 1) {
-                drawTaperedTip(last, beforeLast, color, width, tipExtension, last.x * 11 + last.y * 5);
+                drawTaperedTip(last, beforeLast, colorFor(last), strokeWidth, extension, last.x * 11 + last.y * 5);
             }
         }
 
-        // Variaciones orgánicas esporádicas sobre tramos rectos. No hay una llamarada
-        // repetida por tile: se añade una lengua lateral solo cada varias casillas.
+        // Lenguas laterales poco frecuentes, tintadas con el elemento local.
         for (const path of paths) {
             const points = path.points;
             for (let i = 1; i < points.length - 1; i++) {
@@ -1170,21 +1187,21 @@ function drawExplosionClustersV6305(explosions, effectFields = []) {
                 if (hash % 3 !== 0) continue;
                 const tangent = horizontal ? { x: 1, y: 0 } : { x: 0, y: 1 };
                 const side = ((cell.x * 5 + cell.y * 3) & 1) ? 1 : -1;
-                drawSideFlameLick(cell, tangent, side, color, width, lickExtension, cell.x * 3.1 + cell.y * 8.7);
+                drawSideFlameLick(cell, tangent, side, colorFor(cell), strokeWidth, lickExtension, cell.x * 3.1 + cell.y * 8.7);
             }
         }
 
-        // El caso de una única celda no se dibuja como un círculo: es una llamarada en cruz.
+        // Una sola casilla usa una llama en cruz, nunca un círculo.
         if (component.length === 1) {
             const cell = component[0];
-            const center = cellCenter(cell);
-            drawSoftJunction(cell, color, width * 0.88);
+            const color = colorFor(cell);
+            drawSoftJunction(cell, color, strokeWidth * 0.88);
             const fakeNeighbors = [
                 { x: cell.x, y: cell.y + 1 }, { x: cell.x, y: cell.y - 1 },
                 { x: cell.x + 1, y: cell.y }, { x: cell.x - 1, y: cell.y }
             ];
             for (let i = 0; i < fakeNeighbors.length; i++) {
-                drawTaperedTip(cell, fakeNeighbors[i], color, width * 0.68, tipExtension * 0.72, cell.x * 9 + cell.y * 7 + i);
+                drawTaperedTip(cell, fakeNeighbors[i], color, strokeWidth * 0.68, extension * 0.72, cell.x * 9 + cell.y * 7 + i);
             }
         }
     }
@@ -1198,26 +1215,17 @@ function drawExplosionClustersV6305(explosions, effectFields = []) {
         const { neighbors } = buildGraph(component);
         const paths = buildContinuousPaths(component, neighbors);
         const intensity = Math.max(0.08, Math.min(1, component.reduce((sum, cell) => sum + cell.alpha, 0) / component.length));
-        const palette = (() => {
-            const cells = component.map(cell => paletteForCell(cell));
-            const channel = name => {
-                const sum = [0, 0, 0];
-                for (const p of cells) { const rgb = rgbOf(p[name]); for (let i = 0; i < 3; i++) sum[i] += rgb[i]; }
-                return hexOf(sum.map(value => value / Math.max(1, cells.length)));
-            };
-            return { outer: channel('outer'), middle: channel('middle'), core: channel('core') };
-        })();
         const phase = frame * 0.31 + component[0].x * 0.77 + component[0].y * 1.13;
         const pulse = Math.sin(phase) * size * 0.018;
         ctx.globalAlpha = 0.97 * intensity;
 
-        // Tres capas de fuego con punta: silueta roja, llama naranja y núcleo amarillo.
-        // La geometría es única; la paleta se fusiona por componente conectado.
-        drawLayer(component, paths, neighbors, palette.outer, size * 0.82 + pulse, size * 0.14, size * 0.17, true);
+        // Tres capas continuas, cada una con gradientes locales por segmento.
+        // La conectividad no depende del elemento; el color sí depende de cada celda.
+        drawLayer(component, paths, neighbors, 'outer', size * 0.82 + pulse, size * 0.14, size * 0.17, true);
         ctx.globalAlpha = 0.97 * intensity;
-        drawLayer(component, paths, neighbors, palette.middle, size * 0.57 + pulse * 0.55, size * 0.115, size * 0.105, false);
+        drawLayer(component, paths, neighbors, 'middle', size * 0.57 + pulse * 0.55, size * 0.115, size * 0.105, false);
         ctx.globalAlpha = Math.min(1, intensity);
-        drawLayer(component, paths, neighbors, palette.core, size * 0.285 + pulse * 0.22, size * 0.075, size * 0.045, false);
+        drawLayer(component, paths, neighbors, 'core', size * 0.285 + pulse * 0.22, size * 0.075, size * 0.045, false);
 
         // Reflejo caliente fino en el centro: continuo a lo largo de toda la onda.
         if (paths.some(path => path.points.length > 1)) {
@@ -1310,9 +1318,9 @@ function draw() {
                 drawBombSprite(bombPos.x, bombPos.y, b);
             }
             drawBombChainLinks();
-            // v6.30.5: una única composición fusiona explosiones y campos persistentes.
+            // v6.30.7: una única composición fusiona explosiones y campos persistentes con color local por elemento.
             // El renderer antiguo de campos por tile queda fuera de la ruta de dibujo.
-            renderStatsV329.explosions += drawExplosionClustersV6305(
+            renderStatsV329.explosions += drawExplosionClustersV6307(
                 gameState.explosions,
                 gameState.bombEffectFieldsV64
             );

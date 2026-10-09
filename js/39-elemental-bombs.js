@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.12.9 — Bombas elementales + combos
+// Bomberman Roguelike v6.30.7 — Bombas elementales; depósito delegado al registro único
 // Vertical slice: FIRE / ICE / ELECTRIC. La bomba conserva su elemento
 // al ser colocada, agarrada, lanzada o encadenada.
 (function installElementalBombsV612(global) {
@@ -49,21 +49,9 @@
     function getPowerupDefinitionV612(type){ return POWERUP_DEFS[String(type||'')] || null; }
     function getPowerupIdsV612(){ return Object.freeze(Object.keys(POWERUP_DEFS)); }
 
-    function handleExplosion(payload){
-        const bomb=payload?.bomb; const cells=Array.isArray(payload?.cells)?payload.cells:[];
-        if(!bomb || !cells.length) return;
-        const def=getBombElementDefV612(bomb);
-        if(!def.effectIds.length) return;
-        if(typeof global.depositBombEffectFieldV64!=='function') return;
-        for(const effectId of def.effectIds){
-            for(const cell of cells){
-                global.depositBombEffectFieldV64(effectId, cell.x, cell.y, {
-                    durationMs: effectId==='frost' ? 2800 : effectId==='shock' ? 1800 : 2200,
-                    intensity:1, source:'elemental-bomb', owner:bomb.owner||'player', sourceBombId:bomb.id
-                });
-            }
-        }
-    }
+    // v6.30.7: este módulo solo asigna el elemento y effectIds a las bombas.
+    // El depósito de campos y la aplicación de estados pertenecen exclusivamente
+    // a 38-bomb-effects.js, que escucha BOMBA_EXPLOTO y aplica sus combinaciones.
 
     function update(dt){ if(typeof global.bombEffectUpdateV64==='function') global.bombEffectUpdateV64(dt); }
     function draw(ctx){ if(typeof global.drawBombEffectsV64==='function') global.drawBombEffectsV64(ctx); }
@@ -77,13 +65,8 @@
         };
     }
 
-    if(global.gameEventBus){
-        const event=global.GAME_EVENTS_V60?.BOMBA_EXPLOTO || global.GAME_EVENTS_V59?.BOMBA_EXPLOTO;
-        if(event && !global.__ELEMENTAL_BOMBS_V612_LISTENER__) {
-            global.gameEventBus.on(event, handleExplosion, { key:'bomb-explosion:elemental-v612' });
-            global.__ELEMENTAL_BOMBS_V612_LISTENER__=true;
-        }
-    }
+    // No registrar un segundo listener de BOMBA_EXPLOTO aquí. La autoridad
+    // única es bomb-explosion:effects en 38-bomb-effects.js.
 
     global.ELEMENTAL_BOMBS_V612=ELEMENTS;
     global.ELEMENTAL_BOMB_POWERUPS_V612=POWERUPS;

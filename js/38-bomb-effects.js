@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.12.32 — Bomb Effect Registry
+// Bomberman Roguelike v6.30.7 — Bomb Effect Registry / single explosion-field authority
 // Base simple y extensible para rastros/efectos de bombas.
 //
 // PRINCIPIOS
@@ -137,12 +137,12 @@
     }
 
     const ELEMENTAL_FEEDBACK_V61210 = Object.freeze({
-        heat: Object.freeze({ label: 'BRASA', color: '#fb923c', count: 12 }),
-        frost: Object.freeze({ label: 'ESCARCHA', color: '#7dd3fc', count: 12 }),
-        shock: Object.freeze({ label: 'CHISPA', color: '#facc15', count: 14 }),
-        steam: Object.freeze({ label: 'VAPOR', color: '#e2e8f0', count: 16 }),
-        plasma: Object.freeze({ label: 'PLASMA', color: '#c084fc', count: 18 }),
-        arc: Object.freeze({ label: 'RAYO', color: '#fde047', count: 16 })
+        heat: Object.freeze({ label: 'BRASA', color: '#fb923c' }),
+        frost: Object.freeze({ label: 'ESCARCHA', color: '#7dd3fc' }),
+        shock: Object.freeze({ label: 'CHISPA', color: '#facc15' }),
+        steam: Object.freeze({ label: 'VAPOR', color: '#e2e8f0' }),
+        plasma: Object.freeze({ label: 'PLASMA', color: '#c084fc' }),
+        arc: Object.freeze({ label: 'RAYO', color: '#fde047' })
     });
 
     function triggerElementalFeedbackV61210(effectId, x, y, options = {}) {
@@ -150,10 +150,8 @@
         if (!meta) return false;
         const worldX = (finite(x) + 0.5) * TILE_SIZE;
         const worldY = (finite(y) + 0.5) * TILE_SIZE;
-        const intensity = clamp(finite(options.intensity, 1), 0.5, 1.5);
-        if (typeof global.addParticles === 'function') {
-            global.addParticles(worldX, worldY, meta.color, Math.max(4, Math.round(meta.count * intensity)));
-        }
+        // La explosión ya se representa con la llama continua del renderer.
+        // No generar discos/partículas radiales superpuestos en el origen.
         if (typeof global.addFloatingText === 'function') {
             global.addFloatingText(meta.label, worldX, worldY - TILE_SIZE * 0.24, meta.color);
         }

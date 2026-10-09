@@ -1,4 +1,4 @@
-// Bomberman Roguelike v4.1 — Bombs, explosions, damage and gameplay simulation
+// Bomberman Roguelike v6.30.7 — Bombs, explosions, damage and gameplay simulation
         function explodeBomb(bombIndex) {
             const first = gameState.bombs[bombIndex];
             if (!first) return;
@@ -74,8 +74,9 @@
             }
 
             if (detonatedCount > 1) {
+                // Mantener la información de cadena; la explosión continua ya
+                // es la única silueta y no debe recibir un segundo burst circular.
                 addFloatingText(`CADENA ×${detonatedCount}`, (first.x + 0.5) * TILE_SIZE, (first.y - 0.15) * TILE_SIZE, '#fbbf24');
-                addParticles((first.x + 0.5) * TILE_SIZE, (first.y + 0.5) * TILE_SIZE, 'particleImpact', 8 + detonatedCount * 2);
             }
             updateUI(true);
         }

@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.12.10 — Combat & Feedback
+// Bomberman Roguelike v6.30.7 — Combat & Feedback
 // Feedback visual/audio aislado para facilitar futuras iteraciones.
 const combatFeedback = {
     hitStop: 0,
@@ -351,19 +351,41 @@ function feedbackPoolImpact(x, y, color = null, scale = 1) {
     feedbackPoolPlaySound('impact', scale);
 }
 
+function feedbackPoolClearExplosionResidue(x, y, radius = TILE_SIZE * 1.1) {
+    const radiusSq = Math.max(0, radius) ** 2;
+    for (const particle of feedbackPool.particles) {
+        if (!particle.active) continue;
+        const dx = particle.x - x, dy = particle.y - y;
+        if (dx * dx + dy * dy <= radiusSq) particle.active = false;
+    }
+    for (const ring of feedbackPool.rings) {
+        if (!ring.active) continue;
+        const dx = ring.x - x, dy = ring.y - y;
+        if (dx * dx + dy * dy <= radiusSq) ring.active = false;
+    }
+    // También existen partículas del sistema histórico gameState.particles.
+    // Limpiar las que quedaron en el centro del estallido; de lo contrario,
+    // esas motas antiguas se siguen dibujando por encima de la llama continua.
+    if (typeof gameState !== 'undefined' && Array.isArray(gameState.particles)) {
+        for (let i = gameState.particles.length - 1; i >= 0; i--) {
+            const particle = gameState.particles[i];
+            if (!particle) { gameState.particles.splice(i, 1); continue; }
+            const dx = Number(particle.x) - x, dy = Number(particle.y) - y;
+            if (Number.isFinite(dx) && Number.isFinite(dy) && dx * dx + dy * dy <= radiusSq) {
+                gameState.particles.splice(i, 1);
+            }
+        }
+    }
+}
+
 function feedbackPoolExplosion(x, y, color = null, scale = 1) {
     color = color || (typeof themeColorV46 === 'function' ? themeColorV46('particleFire', '#fb923c') : '#fb923c');
     feedbackPool.explosionCount += 1;
 
-    // v6.30.6: al detonar, cancelar cualquier anillo de feedback heredado que
-    // coincida con el centro de la bomba. La única silueta de explosión es la
-    // llama conectada de 07-render.js; no dibujar círculos ni una segunda capa.
-    const tileSize = typeof TILE_SIZE === 'number' && TILE_SIZE > 0 ? TILE_SIZE : 48;
-    const clearRadius = tileSize * 1.15;
-    for (const ring of feedbackPool.rings) {
-        if (!ring.active) continue;
-        if (Math.hypot(Number(ring.x) - x, Number(ring.y) - y) <= clearRadius) ring.active = false;
-    }
+    // La llama continua es la única silueta. Limpiar marcas circulares heredadas
+    // del depósito/colocación de la bomba en el punto que acaba de detonar.
+    feedbackPoolClearExplosionResidue(x, y);
+    // No generar anillos circulares ni partículas radiales alrededor de la bomba.
     feedbackPoolFlash(typeof deviceQualityV45FeedbackFlash === 'function' ? deviceQualityV45FeedbackFlash(0.18 * scale) : 0.18 * scale, FEEDBACK_POOL_CONFIG.explosionFlashMs);
     feedbackPoolKickCamera(typeof deviceQualityV45CameraKick === 'function' ? deviceQualityV45CameraKick(FEEDBACK_POOL_CONFIG.cameraKickExplosion * scale) : FEEDBACK_POOL_CONFIG.cameraKickExplosion * scale);
     feedbackPoolPlaySound('explosion', scale);
@@ -612,6 +634,7 @@ window.FEEDBACK_POOL_CONFIG = FEEDBACK_POOL_CONFIG;
 window.feedbackPool = feedbackPool;
 window.feedbackPoolImpact = feedbackPoolImpact;
 window.feedbackPoolExplosion = feedbackPoolExplosion;
+window.feedbackPoolClearExplosionResidue = feedbackPoolClearExplosionResidue;
 window.feedbackPoolDamage = feedbackPoolDamage;
 window.resetfeedbackPool = function resetfeedbackPool() {
     for (let i = 0; i < feedbackPool.particles.length; i++) feedbackPool.particles[i].active = false;

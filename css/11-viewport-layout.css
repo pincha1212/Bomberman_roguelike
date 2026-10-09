@@ -125,3 +125,52 @@ html, body{
         padding:8px;
     }
 }
+
+
+/* v6.31.1 — Panel lateral de información plegable. */
+.main-menu.run-active .game-layout.info-panel-collapsed{
+    grid-template-columns:minmax(0,1fr);
+    grid-template-rows:minmax(0,1fr);
+}
+.main-menu.run-active .game-layout.info-panel-collapsed .game-info-panel{
+    display:none;
+}
+.main-menu.run-active .game-layout.info-panel-collapsed #game-container{
+    width:min(100%, calc(100dvh - 16px));
+    max-width:100%;
+    max-height:100%;
+}
+.game-info-toggle{
+    display:none;
+    position:fixed;
+    z-index:10020;
+    top:50%;
+    right:max(6px, env(safe-area-inset-right));
+    transform:translateY(-50%);
+    min-width:58px;
+    min-height:42px;
+    padding:8px 9px;
+    border:1px solid rgba(103,232,249,.5);
+    border-right:0;
+    border-radius:7px 0 0 7px;
+    background:rgba(8,15,28,.95);
+    color:#a5f3fc;
+    font:700 9px Inter,system-ui,sans-serif;
+    letter-spacing:.04em;
+    cursor:pointer;
+    touch-action:manipulation;
+    box-shadow:0 4px 18px rgba(0,0,0,.35);
+}
+.main-menu.run-active .game-info-toggle{display:block;}
+.game-info-toggle:focus-visible{outline:2px solid #67e8f9;outline-offset:2px;}
+@media (orientation:portrait), (max-width:900px){
+    .main-menu.run-active .game-layout.info-panel-collapsed{
+        grid-template-columns:minmax(0,1fr);
+        grid-template-rows:minmax(0,1fr);
+    }
+    .main-menu.run-active .game-layout.info-panel-collapsed #game-container{
+        width:min(100%, 100dvh);
+        max-width:100%;
+        max-height:100%;
+    }
+}

@@ -354,9 +354,10 @@ function feedbackPoolImpact(x, y, color = null, scale = 1) {
 function feedbackPoolExplosion(x, y, color = null, scale = 1) {
     color = color || (typeof themeColorV46 === 'function' ? themeColorV46('particleFire', '#fb923c') : '#fb923c');
     feedbackPool.explosionCount += 1;
-    feedbackPoolSpawnParticles(x, y, color, Math.round(14 * scale), 1.15 * scale);
-    feedbackPoolSpawnRing(x, y, typeof themeColorV46 === 'function' ? themeColorV46('feedbackRingSoft', '#fed7aa') : '#fed7aa', 1.25 * scale);
-    feedbackPoolSpawnRing(x, y, color, 0.8 * scale);
+
+    // v6.30.5: la silueta visual pertenece al compositor continuo de explosiones.
+    // No generar anillos circulares ni partículas radiales alrededor de cada bomba:
+    // eran una segunda representación superpuesta y dejaban el rastro circular antiguo.
     feedbackPoolFlash(typeof deviceQualityV45FeedbackFlash === 'function' ? deviceQualityV45FeedbackFlash(0.18 * scale) : 0.18 * scale, FEEDBACK_POOL_CONFIG.explosionFlashMs);
     feedbackPoolKickCamera(typeof deviceQualityV45CameraKick === 'function' ? deviceQualityV45CameraKick(FEEDBACK_POOL_CONFIG.cameraKickExplosion * scale) : FEEDBACK_POOL_CONFIG.cameraKickExplosion * scale);
     feedbackPoolPlaySound('explosion', scale);

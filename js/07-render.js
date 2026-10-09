@@ -809,37 +809,148 @@ function isWorldTileVisibleV329(tileX, tileY, margin = 1){
     return isWorldRectVisibleV329(tileX*TILE_SIZE, tileY*TILE_SIZE, TILE_SIZE, TILE_SIZE, margin*TILE_SIZE);
 }
 
-function drawExplosionClustersV6303(explosions) {
-    if (!Array.isArray(explosions) || !explosions.length) return 0;
+function drawExplosionClustersV6305(explosions, effectFields = []) {
+    const activeExplosions = Array.isArray(explosions) ? explosions : [];
+    const activeFields = Array.isArray(effectFields) ? effectFields : [];
+    if (!activeExplosions.length && !activeFields.length) return 0;
+
+    // Las casillas lógicas y los residuos elementales entran en UNA sola matriz
+    // visual. La clave es solo x,y: el elemento/color no crea componentes paralelos.
     const cellMap = new Map();
     const keyOf = (x, y) => `${x},${y}`;
+    const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
-    // Fusionar duplicados producidos por ondas que se solapan.
-    for (const exp of explosions) {
+    const baseFirePalette = {
+        outer: typeof themeColorV46 === 'function' ? themeColorV46('fireOuter') : '#dc2626',
+        middle: typeof themeColorV46 === 'function' ? themeColorV46('fireMiddle') : '#f97316',
+        core: typeof themeColorV46 === 'function' ? themeColorV46('fireCore') : '#fef08a'
+    };
+    const fixedPalettes = {
+        fire: baseFirePalette,
+        normal: baseFirePalette,
+        heat: baseFirePalette,
+        ice: { outer: '#0369a1', middle: '#38bdf8', core: '#e0f2fe' },
+        frost: { outer: '#0369a1', middle: '#38bdf8', core: '#e0f2fe' },
+        cold: { outer: '#1d4ed8', middle: '#60a5fa', core: '#eff6ff' },
+        electric: { outer: '#854d0e', middle: '#facc15', core: '#fffde4' },
+        shock: { outer: '#854d0e', middle: '#facc15', core: '#fffde4' },
+        arc: { outer: '#a16207', middle: '#fde047', core: '#ffffff' },
+        steam: { outer: '#64748b', middle: '#cbd5e1', core: '#ffffff' },
+        plasma: { outer: '#7e22ce', middle: '#c084fc', core: '#f5d0fe' }
+    };
+
+    function clamp01(value) { return Math.max(0, Math.min(1, Number(value) || 0)); }
+    function rgbOf(value) {
+        const color = String(value || '').trim();
+        let m = color.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+        if (m) {
+            let hex = m[1];
+            if (hex.length === 3) hex = hex.split('').map(ch => ch + ch).join('');
+            return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+        }
+        m = color.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
+        if (m) return [Math.round(Number(m[1])), Math.round(Number(m[2])), Math.round(Number(m[3]))];
+        return [249, 115, 22];
+    }
+    function hexOf(rgb) {
+        return '#' + rgb.map(channel => Math.max(0, Math.min(255, Math.round(channel))).toString(16).padStart(2, '0')).join('');
+    }
+    function mixColor(a, b, amount) {
+        const aa = rgbOf(a), bb = rgbOf(b), t = clamp01(amount);
+        return hexOf(aa.map((v, i) => v * (1 - t) + bb[i] * t));
+    }
+    function paletteForEffect(effectId) {
+        const key = String(effectId || 'normal').toLowerCase();
+        if (fixedPalettes[key]) return fixedPalettes[key];
+        const def = window.BOMB_EFFECT_DEFS_V64?.[key];
+        if (def?.color) {
+            const middle = String(def.color);
+            return { outer: mixColor(middle, '#111827', 0.48), middle, core: String(def.core || '#fff7ed') };
+        }
+        return baseFirePalette;
+    }
+    function paletteForElement(element) {
+        const key = String(element || 'normal').toLowerCase();
+        if (key === 'fire') return paletteForEffect('heat');
+        if (key === 'ice') return paletteForEffect('frost');
+        if (key === 'electric') return paletteForEffect('shock');
+        return paletteForEffect('normal');
+    }
+    function addPaletteOnce(list, palette, sourceKey, weight = 1) {
+        if (!list.some(item => item.key === sourceKey)) list.push({ key: sourceKey, palette, weight: Math.max(0.1, Number(weight) || 1) });
+    }
+    function ensureCell(x, y) {
+        const key = keyOf(x, y);
+        let cell = cellMap.get(key);
+        if (!cell) {
+            cell = { x, y, timer: 0, alpha: 0, blastPalettes: [], fieldPalettes: [] };
+            cellMap.set(key, cell);
+        }
+        return cell;
+    }
+
+    // Explosión activa: se conserva el color elemental para que la transición
+    // al rastro persistente no cambie de estilo de manera arbitraria.
+    for (const exp of activeExplosions) {
         if (!exp || !(Number(exp.timer) > 0)) continue;
         const rawX = Number(exp.x), rawY = Number(exp.y);
         if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) continue;
         const x = Math.trunc(rawX), y = Math.trunc(rawY);
-        const key = keyOf(x, y);
-        const existing = cellMap.get(key);
-        if (!existing || Number(exp.timer) > existing.timer) {
-            cellMap.set(key, { x, y, timer: Number(exp.timer) || 0 });
-        }
+        const cell = ensureCell(x, y);
+        const timer = Number(exp.timer) || 0;
+        cell.timer = Math.max(cell.timer, timer);
+        cell.alpha = Math.max(cell.alpha, clamp01(timer / 100));
+        addPaletteOnce(cell.blastPalettes, paletteForElement(exp.elementV612), String(exp.elementV612 || 'normal').toLowerCase());
+    }
+
+    // Residuo de fuego/electricidad/hielo/combinaciones. Ya no se dibuja en
+    // rectángulos independientes desde drawBombEffectsV64; comparte la misma
+    // conectividad y el mismo trazo que la explosión principal.
+    for (const field of activeFields) {
+        if (!field || !(Number(field.remainingMs) > 0)) continue;
+        const rawX = Number(field.x), rawY = Number(field.y);
+        if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) continue;
+        const x = Math.trunc(rawX), y = Math.trunc(rawY);
+        const effectId = String(field.effectId || 'normal').toLowerCase();
+        const remainingMs = Number(field.remainingMs) || 0;
+        const fieldAlpha = remainingMs < 360 ? clamp01(remainingMs / 360) : 1;
+        const cell = ensureCell(x, y);
+        cell.timer = Math.max(cell.timer, remainingMs);
+        cell.alpha = Math.max(cell.alpha, fieldAlpha);
+        addPaletteOnce(cell.fieldPalettes, paletteForEffect(effectId), effectId, field.intensity);
     }
     if (!cellMap.size) return 0;
 
+    // Campo dominante por celda; si hay varios efectos en la misma celda, sus
+    // colores se promedian. Los campos tienen prioridad sobre la celda de la
+    // explosión original para que combinaciones como PLASMA no vuelvan a naranja.
+    function paletteForCell(cell) {
+        const sources = cell.fieldPalettes.length ? cell.fieldPalettes : cell.blastPalettes;
+        if (!sources.length) return baseFirePalette;
+        const totalWeight = sources.reduce((sum, item) => sum + item.weight, 0) || 1;
+        const blend = channel => {
+            const sums = [0, 0, 0];
+            for (const item of sources) {
+                const rgb = rgbOf(item.palette[channel]);
+                for (let i = 0; i < 3; i++) sums[i] += rgb[i] * item.weight;
+            }
+            return hexOf(sums.map(value => value / totalWeight));
+        };
+        return { outer: blend('outer'), middle: blend('middle'), core: blend('core') };
+    }
+
+    // Componentes conectados: explosiones superpuestas de cualquier tipo se dibujan juntas.
     const unvisited = new Set(cellMap.keys());
     const components = [];
-    const offsets = [[1,0],[-1,0],[0,1],[0,-1]];
     while (unvisited.size) {
-        const firstKey = unvisited.values().next().value;
-        unvisited.delete(firstKey);
-        const queue = [cellMap.get(firstKey)];
+        const seedKey = unvisited.values().next().value;
+        unvisited.delete(seedKey);
+        const queue = [cellMap.get(seedKey)];
         const component = [];
         while (queue.length) {
             const cell = queue.pop();
             component.push(cell);
-            for (const [dx, dy] of offsets) {
+            for (const [dx, dy] of directions) {
                 const nextKey = keyOf(cell.x + dx, cell.y + dy);
                 if (!unvisited.has(nextKey)) continue;
                 unvisited.delete(nextKey);
@@ -849,67 +960,291 @@ function drawExplosionClustersV6303(explosions) {
         if (component.some(cell => isWorldTileVisibleV329(cell.x, cell.y, 1))) components.push(component);
     }
 
-    const countVisible = Array.from(cellMap.values()).filter(cell => isWorldTileVisibleV329(cell.x, cell.y, 1)).length;
-    const size = TILE_SIZE;
-    const pulse = Math.sin((Number(gameState.animFrame) || 0) * 0.5) * Math.min(1.8, size * 0.035);
-    const outer = typeof themeColorV46 === 'function' ? themeColorV46('fireOuter') : '#dc2626';
-    const middle = typeof themeColorV46 === 'function' ? themeColorV46('fireMiddle') : '#f97316';
-    const core = typeof themeColorV46 === 'function' ? themeColorV46('fireCore') : '#fef08a';
+    const visibleCount = Array.from(cellMap.values()).filter(cell => isWorldTileVisibleV329(cell.x, cell.y, 1)).length;
+    if (!components.length) return 0;
 
-    function drawConnectedLayer(component, color, width) {
-        const componentKeys = new Set(component.map(cell => keyOf(cell.x, cell.y)));
-        ctx.strokeStyle = color;
-        ctx.fillStyle = color;
-        ctx.lineWidth = width;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.beginPath();
+    const size = TILE_SIZE;
+    const frame = Number(gameState.animFrame) || 0;
+    const highlight = '#fff8d7';
+    const cellCenter = cell => ({ x: (cell.x + 0.5) * size, y: (cell.y + 0.5) * size });
+    const coordKey = cell => keyOf(cell.x, cell.y);
+    const edgeKey = (a, b) => {
+        const ka = coordKey(a), kb = coordKey(b);
+        return ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
+    };
+
+    function buildGraph(component) {
+        const cellsByKey = new Map(component.map(cell => [coordKey(cell), cell]));
+        const neighbors = new Map();
         for (const cell of component) {
-            const cx = (cell.x + 0.5) * size;
-            const cy = (cell.y + 0.5) * size;
-            const rightKey = keyOf(cell.x + 1, cell.y);
-            const downKey = keyOf(cell.x, cell.y + 1);
-            if (componentKeys.has(rightKey)) {
-                ctx.moveTo(cx, cy);
-                ctx.lineTo(cx + size, cy);
+            const next = [];
+            for (const [dx, dy] of directions) {
+                const candidate = cellsByKey.get(keyOf(cell.x + dx, cell.y + dy));
+                if (candidate) next.push(candidate);
             }
-            if (componentKeys.has(downKey)) {
-                ctx.moveTo(cx, cy);
-                ctx.lineTo(cx, cy + size);
+            neighbors.set(coordKey(cell), next);
+        }
+        return { neighbors, cellsByKey };
+    }
+
+    // Trazar una rama como una sola polilínea. Las casillas rectas intermedias no
+    // reciben tapas redondas: así desaparece el aspecto de cuentas/círculos por tile.
+    function buildContinuousPaths(component, neighbors) {
+        const visitedEdges = new Set();
+        const paths = [];
+        function walk(start, next) {
+            const path = [start];
+            let previous = start;
+            let current = next;
+            let closed = false;
+            for (let guard = 0; guard <= component.length + 2; guard++) {
+                visitedEdges.add(edgeKey(previous, current));
+                path.push(current);
+                const around = neighbors.get(coordKey(current)) || [];
+                if (around.length !== 2) break;
+                const following = around.find(candidate => coordKey(candidate) !== coordKey(previous));
+                if (!following) break;
+                if (visitedEdges.has(edgeKey(current, following))) {
+                    if (coordKey(following) === coordKey(start)) {
+                        path.push(start);
+                        closed = true;
+                    }
+                    break;
+                }
+                previous = current;
+                current = following;
             }
+            return { points: path, closed };
+        }
+
+        // Las puntas y las uniones son anclas; cada tramo entre ellas se dibuja una vez.
+        for (const cell of component) {
+            const around = neighbors.get(coordKey(cell)) || [];
+            if (around.length === 2) continue;
+            for (const neighbor of around) {
+                if (!visitedEdges.has(edgeKey(cell, neighbor))) paths.push(walk(cell, neighbor));
+            }
+        }
+        // Respaldo para una componente cíclica sin extremos ni uniones.
+        for (const cell of component) {
+            for (const neighbor of neighbors.get(coordKey(cell)) || []) {
+                if (!visitedEdges.has(edgeKey(cell, neighbor))) paths.push(walk(cell, neighbor));
+            }
+        }
+        return paths;
+    }
+
+    function drawSoftJunction(cell, color, strokeWidth) {
+        const { x, y } = cellCenter(cell);
+        const half = strokeWidth * 0.49;
+        const radius = strokeWidth * 0.17;
+        // Cuadrado suavizado, no un disco por casilla: rellena solo las intersecciones.
+        ctx.beginPath();
+        ctx.moveTo(x - half + radius, y - half);
+        ctx.lineTo(x + half - radius, y - half);
+        ctx.quadraticCurveTo(x + half, y - half, x + half, y - half + radius);
+        ctx.lineTo(x + half, y + half - radius);
+        ctx.quadraticCurveTo(x + half, y + half, x + half - radius, y + half);
+        ctx.lineTo(x - half + radius, y + half);
+        ctx.quadraticCurveTo(x - half, y + half, x - half, y + half - radius);
+        ctx.lineTo(x - half, y - half + radius);
+        ctx.quadraticCurveTo(x - half, y - half, x - half + radius, y - half);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+    }
+
+    function drawTaperedTip(cell, neighbor, color, strokeWidth, extension, seed) {
+        const center = cellCenter(cell);
+        const adjacent = cellCenter(neighbor);
+        const dx = Math.sign(center.x - adjacent.x);
+        const dy = Math.sign(center.y - adjacent.y);
+        const px = -dy, py = dx;
+        const baseX = center.x - dx * size * 0.10;
+        const baseY = center.y - dy * size * 0.10;
+        const half = strokeWidth * 0.39;
+        const flicker = Math.sin(frame * 0.23 + seed) * size * 0.018;
+        const tipX = center.x + dx * extension + px * flicker;
+        const tipY = center.y + dy * extension + py * flicker;
+        const controlX = center.x + dx * extension * 0.52;
+        const controlY = center.y + dy * extension * 0.52;
+
+        ctx.beginPath();
+        ctx.moveTo(baseX + px * half, baseY + py * half);
+        ctx.quadraticCurveTo(controlX + px * half * 1.08, controlY + py * half * 1.08, tipX, tipY);
+        ctx.quadraticCurveTo(controlX - px * half * 0.72, controlY - py * half * 0.72, baseX - px * half, baseY - py * half);
+        ctx.quadraticCurveTo(baseX - dx * size * 0.02, baseY - dy * size * 0.02, baseX + px * half, baseY + py * half);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+    }
+
+    function drawSideFlameLick(cell, tangent, side, color, strokeWidth, extension, seed) {
+        const center = cellCenter(cell);
+        const tx = tangent.x, ty = tangent.y;
+        const nx = -ty * side, ny = tx * side;
+        const baseOffset = strokeWidth * 0.37;
+        const baseX = center.x + nx * baseOffset;
+        const baseY = center.y + ny * baseOffset;
+        const half = size * 0.065;
+        const wave = Math.sin(frame * 0.19 + seed) * size * 0.018;
+        const lean = Math.cos(frame * 0.16 + seed * 1.7) * size * 0.045;
+        const tipX = baseX + nx * (extension + wave) + tx * lean;
+        const tipY = baseY + ny * (extension + wave) + ty * lean;
+
+        ctx.beginPath();
+        ctx.moveTo(baseX - tx * half, baseY - ty * half);
+        ctx.quadraticCurveTo(
+            baseX + nx * (extension + wave) * 0.42 - tx * half * 0.48,
+            baseY + ny * (extension + wave) * 0.42 - ty * half * 0.48,
+            tipX, tipY
+        );
+        ctx.quadraticCurveTo(
+            baseX + nx * (extension + wave) * 0.72 + tx * half * 0.45,
+            baseY + ny * (extension + wave) * 0.72 + ty * half * 0.45,
+            baseX + tx * half, baseY + ty * half
+        );
+        ctx.quadraticCurveTo(baseX + nx * (extension + wave) * 0.18, baseY + ny * (extension + wave) * 0.18, baseX - tx * half, baseY - ty * half);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+    }
+
+    function drawLayer(component, paths, neighbors, color, width, tipExtension, lickExtension, isOuter) {
+        ctx.beginPath();
+        for (const path of paths) {
+            const points = path.points;
+            if (!points.length) continue;
+            const first = cellCenter(points[0]);
+            ctx.moveTo(first.x, first.y);
+            for (let i = 1; i < points.length; i++) {
+                const point = cellCenter(points[i]);
+                ctx.lineTo(point.x, point.y);
+            }
+            if (path.closed) ctx.closePath();
+        }
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineCap = 'butt';
+        ctx.lineJoin = 'round';
+        if (isOuter) {
+            ctx.shadowColor = color;
+            ctx.shadowBlur = Math.min(12, size * 0.22);
         }
         ctx.stroke();
-        // Los discos centrales conectan intersecciones, extremos y ramificaciones.
-        const radius = width / 2;
-        ctx.beginPath();
+        ctx.shadowBlur = 0;
+
+        // Rellenar solo nodos de bifurcación para sellar la unión de las ramas.
         for (const cell of component) {
-            ctx.moveTo((cell.x + 0.5) * size + radius, (cell.y + 0.5) * size);
-            ctx.arc((cell.x + 0.5) * size, (cell.y + 0.5) * size, radius, 0, Math.PI * 2);
+            const degree = (neighbors.get(coordKey(cell)) || []).length;
+            if (degree >= 3) drawSoftJunction(cell, color, width);
         }
-        ctx.fill();
+
+        // Extremos afilados/curvos, nunca una burbuja circular por casilla.
+        for (const path of paths) {
+            const points = path.points;
+            if (points.length < 2 || path.closed) continue;
+            const first = points[0], second = points[1];
+            const last = points[points.length - 1], beforeLast = points[points.length - 2];
+            if ((neighbors.get(coordKey(first)) || []).length === 1) {
+                drawTaperedTip(first, second, color, width, tipExtension, first.x * 7 + first.y * 13);
+            }
+            if ((neighbors.get(coordKey(last)) || []).length === 1) {
+                drawTaperedTip(last, beforeLast, color, width, tipExtension, last.x * 11 + last.y * 5);
+            }
+        }
+
+        // Variaciones orgánicas esporádicas sobre tramos rectos. No hay una llamarada
+        // repetida por tile: se añade una lengua lateral solo cada varias casillas.
+        for (const path of paths) {
+            const points = path.points;
+            for (let i = 1; i < points.length - 1; i++) {
+                const cell = points[i];
+                const around = neighbors.get(coordKey(cell)) || [];
+                if (around.length !== 2) continue;
+                const a = points[i - 1], b = points[i + 1];
+                const horizontal = a.y === cell.y && b.y === cell.y;
+                const vertical = a.x === cell.x && b.x === cell.x;
+                if (!horizontal && !vertical) continue;
+                const hash = Math.abs(cell.x * 7 + cell.y * 11);
+                if (hash % 3 !== 0) continue;
+                const tangent = horizontal ? { x: 1, y: 0 } : { x: 0, y: 1 };
+                const side = ((cell.x * 5 + cell.y * 3) & 1) ? 1 : -1;
+                drawSideFlameLick(cell, tangent, side, color, width, lickExtension, cell.x * 3.1 + cell.y * 8.7);
+            }
+        }
+
+        // El caso de una única celda no se dibuja como un círculo: es una llamarada en cruz.
+        if (component.length === 1) {
+            const cell = component[0];
+            const center = cellCenter(cell);
+            drawSoftJunction(cell, color, width * 0.88);
+            const fakeNeighbors = [
+                { x: cell.x, y: cell.y + 1 }, { x: cell.x, y: cell.y - 1 },
+                { x: cell.x + 1, y: cell.y }, { x: cell.x - 1, y: cell.y }
+            ];
+            for (let i = 0; i < fakeNeighbors.length; i++) {
+                drawTaperedTip(cell, fakeNeighbors[i], color, width * 0.68, tipExtension * 0.72, cell.x * 9 + cell.y * 7 + i);
+            }
+        }
     }
 
     ctx.save();
     ctx.globalCompositeOperation = 'source-over';
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'round';
+
     for (const component of components) {
-        const intensity = Math.max(0.72, Math.min(1, Math.max(...component.map(cell => cell.timer)) / 100));
-        ctx.globalAlpha = 0.88 * intensity;
-        ctx.fillStyle = outer;
-        // La base llena toda la matriz sin inset ni separaciones entre tiles.
-        for (const cell of component) {
-            ctx.fillRect(cell.x * size - 0.35, cell.y * size - 0.35, size + 0.7, size + 0.7);
-        }
-        // Capas conectadas: una sola banda continua para cruces y segmentos adyacentes.
-        ctx.globalAlpha = 0.94 * intensity;
-        drawConnectedLayer(component, middle, Math.max(2, size * 0.70 + pulse * 0.35));
+        const { neighbors } = buildGraph(component);
+        const paths = buildContinuousPaths(component, neighbors);
+        const intensity = Math.max(0.08, Math.min(1, component.reduce((sum, cell) => sum + cell.alpha, 0) / component.length));
+        const palette = (() => {
+            const cells = component.map(cell => paletteForCell(cell));
+            const channel = name => {
+                const sum = [0, 0, 0];
+                for (const p of cells) { const rgb = rgbOf(p[name]); for (let i = 0; i < 3; i++) sum[i] += rgb[i]; }
+                return hexOf(sum.map(value => value / Math.max(1, cells.length)));
+            };
+            return { outer: channel('outer'), middle: channel('middle'), core: channel('core') };
+        })();
+        const phase = frame * 0.31 + component[0].x * 0.77 + component[0].y * 1.13;
+        const pulse = Math.sin(phase) * size * 0.018;
+        ctx.globalAlpha = 0.97 * intensity;
+
+        // Tres capas de fuego con punta: silueta roja, llama naranja y núcleo amarillo.
+        // La geometría es única; la paleta se fusiona por componente conectado.
+        drawLayer(component, paths, neighbors, palette.outer, size * 0.82 + pulse, size * 0.14, size * 0.17, true);
+        ctx.globalAlpha = 0.97 * intensity;
+        drawLayer(component, paths, neighbors, palette.middle, size * 0.57 + pulse * 0.55, size * 0.115, size * 0.105, false);
         ctx.globalAlpha = Math.min(1, intensity);
-        drawConnectedLayer(component, core, Math.max(2, size * 0.34 + pulse * 0.18));
+        drawLayer(component, paths, neighbors, palette.core, size * 0.285 + pulse * 0.22, size * 0.075, size * 0.045, false);
+
+        // Reflejo caliente fino en el centro: continuo a lo largo de toda la onda.
+        if (paths.some(path => path.points.length > 1)) {
+            ctx.globalAlpha = 0.44 * intensity;
+            ctx.beginPath();
+            for (const path of paths) {
+                if (path.points.length < 2) continue;
+                const start = cellCenter(path.points[0]);
+                ctx.moveTo(start.x, start.y);
+                for (let i = 1; i < path.points.length; i++) {
+                    const point = cellCenter(path.points[i]);
+                    ctx.lineTo(point.x, point.y);
+                }
+                if (path.closed) ctx.closePath();
+            }
+            ctx.strokeStyle = highlight;
+            ctx.lineWidth = Math.max(1.2, size * (0.045 + (Math.sin(phase * 1.3) + 1) * 0.008));
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+        }
     }
     ctx.restore();
     ctx.globalAlpha = 1;
-    return countVisible;
+    ctx.shadowBlur = 0;
+    return visibleCount;
 }
-
 
 function getRenderProfileV65() {
     return typeof getBomberRenderProfileV65 === 'function'
@@ -975,11 +1310,12 @@ function draw() {
                 drawBombSprite(bombPos.x, bombPos.y, b);
             }
             drawBombChainLinks();
-            if (typeof drawElementalBombFieldsV612 === 'function') drawElementalBombFieldsV612(ctx);
-
-            // v6.30.3: una única pasada estética agrupa las casillas conectadas.
-            // La lógica de daño sigue usando gameState.explosions por tile; solo cambia el dibujo.
-            renderStatsV329.explosions += drawExplosionClustersV6303(gameState.explosions);
+            // v6.30.5: una única composición fusiona explosiones y campos persistentes.
+            // El renderer antiguo de campos por tile queda fuera de la ruta de dibujo.
+            renderStatsV329.explosions += drawExplosionClustersV6305(
+                gameState.explosions,
+                gameState.bombEffectFieldsV64
+            );
 
             // Draw Enemies
             for(let i=0;i<gameState.enemies.length;i++){

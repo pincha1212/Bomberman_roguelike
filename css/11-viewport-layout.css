@@ -127,7 +127,7 @@ html, body{
 }
 
 
-/* v6.31.1 — Panel lateral de información plegable. */
+/* v6.31.2 — Panel lateral de información plegable. */
 .main-menu.run-active .game-layout.info-panel-collapsed{
     grid-template-columns:minmax(0,1fr);
     grid-template-rows:minmax(0,1fr);

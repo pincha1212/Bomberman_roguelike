@@ -1,6 +1,6 @@
 /*
- * BOMBERMAN ROGUELIKE v6.26.0
- * Roguelike Update
+ * BOMBERMAN ROGUELIKE — actualización de interfaz v6.30.1
+ * Construcción y sinergias: estado real, progreso y previsualización
  *
  * Adds a lightweight meta layer over the existing run:
  * - Better in-run coin economy with clear/resource sinks.
@@ -87,39 +87,48 @@ const ROGUELIKE_SYNERGIES_V327 = Object.freeze([
         id: 'double_burn',
         name: 'DOBLE COMBUSTIÓN',
         req: { combustion: 2 },
-        desc: '+1 rango.'
+        desc: '+1 al límite máximo de alcance. El alcance actual no cambia hasta que consigas otra mejora de alcance de bomba.'
     },
     {
         id: 'chain_crew',
         name: 'CUADRILLA DE DEMOLICIÓN',
         req: { demolition: 2 },
-        desc: '+1 bomba máxima.'
+        desc: '+1 al límite máximo de bombas. La capacidad actual no aumenta hasta que consigas otra mejora de capacidad de bombas.'
     },
     {
         id: 'merchant_route',
         name: 'RUTA DE COMERCIANTES',
         req: { economy: 2 },
-        desc: '+25% monedas.'
+        desc: '+25 % de monedas obtenidas mediante la economía de esta run.'
     },
     {
         id: 'overclock',
         name: 'SOBRECARGA',
         req: { mobility: 2 },
-        desc: '+0.2 velocidad.'
+        desc: '+0,2 a la velocidad de movimiento actual.'
     },
     {
         id: 'fortress',
         name: 'FORTALEZA',
         req: { survival: 2 },
-        desc: '+1 vida máxima.'
+        desc: '+1 a la vida máxima. No recupera vida actual al activarse.'
     },
     {
         id: 'volatile_chain',
         name: 'CADENA VOLÁTIL',
         req: { risk: 1, demolition: 1 },
-        desc: '+1 rango.'
+        desc: '+1 al límite máximo de alcance. Se acumula con Doble combustión; el alcance actual no cambia hasta conseguir otra mejora de alcance de bomba.'
     }
 ]);
+
+const ROGUELIKE_SYNERGY_TAG_META_V327 = Object.freeze({
+    combustion: { label: 'Combustión' },
+    demolition: { label: 'Demolición' },
+    economy: { label: 'Economía' },
+    mobility: { label: 'Movilidad' },
+    survival: { label: 'Supervivencia' },
+    risk: { label: 'Riesgo' }
+});
 
 const ROGUELIKE_V327 = {
     installed: false,
@@ -598,38 +607,92 @@ function rogueV327CommitRewardChoice() {
     rogueV327RefreshGameStateMirror();
 }
 
+function rogueV327GetSynergyProgressText(synergy, counts) {
+    return Object.entries(synergy.req).map(([tag, needed]) => {
+        const label = ROGUELIKE_SYNERGY_TAG_META_V327[tag]?.label || tag;
+        const have = Math.min(Math.max(0, Number(counts[tag]) || 0), needed);
+        return `${label} ${have}/${needed}`;
+    }).join(' · ');
+}
+
+function rogueV327GetPreviewTagCounts(relicId) {
+    const counts = { ...rogueV327GetTagCounts() };
+    const relic = relicId ? rogueV327GetRelic(relicId) : null;
+    if (!relic) return counts;
+
+    const alreadyOwned = Array.isArray(gameState?.relics)
+        && gameState.relics.some(item => item?.id === relic.id);
+    if (!alreadyOwned) {
+        for (const tag of relic.tags || []) counts[tag] = (counts[tag] || 0) + 1;
+    }
+    return counts;
+}
+
+function rogueV327EscapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[char]);
+}
+
 function rogueV327RenderStrategyPanel() {
-    if (!document) return;
+    if (typeof document === 'undefined') return;
     const panel = document.getElementById('rogue-v327-strategy');
     if (!panel) return;
 
+    const previousScrollTop = Number(panel.scrollTop) || 0;
     const coins = rogueV327GetCoins();
     const pending = rogueV327GetPlan(ROGUELIKE_V327.pendingRoomPlan);
+    const currentCounts = rogueV327GetTagCounts();
     const activeSynergies = rogueV327GetActiveSynergies();
+    const activeIds = new Set(activeSynergies.map(synergy => synergy.id));
+    const pendingSynergies = ROGUELIKE_SYNERGIES_V327.filter(synergy => !activeIds.has(synergy.id));
+    const selectedRelic = ROGUELIKE_V327.selectedRelic
+        ? rogueV327GetRelic(ROGUELIKE_V327.selectedRelic)
+        : null;
+    const previewCounts = selectedRelic ? rogueV327GetPreviewTagCounts(selectedRelic.id) : null;
+    const previewActive = previewCounts
+        ? ROGUELIKE_SYNERGIES_V327.filter(synergy => rogueV327ReqMet(previewCounts, synergy.req))
+        : [];
+    const previewActiveIds = new Set(previewActive.map(synergy => synergy.id));
+    const newlyActivated = previewActive.filter(synergy => !activeIds.has(synergy.id));
+    const selectedTags = new Set(selectedRelic?.tags || []);
+    const affectedSynergies = selectedRelic
+        ? ROGUELIKE_SYNERGIES_V327.filter(synergy => Object.keys(synergy.req).some(tag => selectedTags.has(tag)))
+        : [];
+
+    const synergyCard = (synergy, isActive, counts, statusText) => `
+        <article class="rogue-v327-synergy-card ${isActive ? 'is-active' : 'is-pending'}">
+            <div class="rogue-v327-synergy-card-head">
+                <strong class="rogue-v327-synergy-name">${rogueV327EscapeHtml(synergy.name)}</strong>
+                <span class="rogue-v327-synergy-status">${rogueV327EscapeHtml(statusText)}</span>
+            </div>
+            <p class="rogue-v327-synergy-effect">${rogueV327EscapeHtml(synergy.desc)}</p>
+            <div class="rogue-v327-synergy-reqs">${rogueV327EscapeHtml(rogueV327GetSynergyProgressText(synergy, counts))}</div>
+        </article>`;
 
     panel.innerHTML = `
         <div class="rogue-v327-head">
             <div>
                 <div class="rogue-v327-kicker">DECISIONES DE RUN</div>
-                <div class="rogue-v327-sub">Ruta + reliquia + mejora</div>
+                <div class="rogue-v327-sub">Ruta, reliquia y progreso de construcción</div>
             </div>
             <div class="rogue-v327-wallet">¢ ${coins}</div>
         </div>
         <div class="rogue-v327-section-title">RUTA SIGUIENTE</div>
         <div class="rogue-v327-room-grid">
             ${ROGUELIKE_V327.roomOffers.map(plan => `
-                <button type="button" class="rogue-v327-room-card ${plan.id === pending.id ? 'is-selected' : ''}" data-room-v327="${plan.id}">
-                    <span class="rogue-v327-card-icon">${plan.icon}</span>
-                    <span class="rogue-v327-card-title">${plan.name}</span>
-                    <span class="rogue-v327-card-desc">${plan.desc}</span>
-                    <span class="rogue-v327-risk risk-${plan.risk}">${plan.risk}</span>
+                <button type="button" class="rogue-v327-room-card ${plan.id === pending.id ? 'is-selected' : ''}" data-room-v327="${rogueV327EscapeHtml(plan.id)}">
+                    <span class="rogue-v327-card-icon">${rogueV327EscapeHtml(plan.icon)}</span>
+                    <span class="rogue-v327-card-title">${rogueV327EscapeHtml(plan.name)}</span>
+                    <span class="rogue-v327-card-desc">${rogueV327EscapeHtml(plan.desc)}</span>
+                    <span class="rogue-v327-risk risk-${rogueV327EscapeHtml(plan.risk)}">Riesgo ${rogueV327EscapeHtml(plan.risk)}</span>
                 </button>
             `).join('')}
         </div>
         <div class="rogue-v327-section-row">
             <div class="rogue-v327-section-title">RELIQUIA · ELEGÍ 1</div>
             <button type="button" id="rogue-v327-reroll" class="rogue-v327-reroll" ${ROGUELIKE_V327.rerollsUsed > 0 || coins < ROGUELIKE_V327_CONFIG.rerollCost ? 'disabled' : ''}>
-                ${ROGUELIKE_V327.rerollsUsed > 0 ? 'REROLL USADO' : `REROLL · ${ROGUELIKE_V327_CONFIG.rerollCost}¢`}
+                ${ROGUELIKE_V327.rerollsUsed > 0 ? 'CAMBIO USADO' : `CAMBIAR · ${ROGUELIKE_V327_CONFIG.rerollCost}¢`}
             </button>
         </div>
         <div class="rogue-v327-relic-grid">
@@ -638,27 +701,71 @@ function rogueV327RenderStrategyPanel() {
                 if (!relic) return '';
                 const selected = ROGUELIKE_V327.selectedRelic === relic.id;
                 return `
-                    <button type="button" class="rogue-v327-relic-card rarity-${relic.rarity} ${selected ? 'is-selected' : ''}" data-relic-v327="${relic.id}">
-                        <span class="rogue-v327-card-icon">${relic.icon}</span>
-                        <span class="rogue-v327-card-title">${relic.name}</span>
-                        <span class="rogue-v327-rarity">${relic.rarity}</span>
-                        <span class="rogue-v327-card-desc">${relic.desc}</span>
+                    <button type="button" class="rogue-v327-relic-card rarity-${rogueV327EscapeHtml(String(relic.rarity).toLowerCase())} ${selected ? 'is-selected' : ''}" data-relic-v327="${rogueV327EscapeHtml(relic.id)}" aria-pressed="${selected ? 'true' : 'false'}">
+                        <span class="rogue-v327-card-icon">${rogueV327EscapeHtml(relic.icon)}</span>
+                        <span class="rogue-v327-card-title">${rogueV327EscapeHtml(relic.name)}</span>
+                        <span class="rogue-v327-rarity">${rogueV327EscapeHtml(relic.rarity)}</span>
+                        <span class="rogue-v327-card-desc">${rogueV327EscapeHtml(relic.desc)}</span>
+                        <span class="rogue-v327-select-hint">${selected ? 'SELECCIONADA · VISTA PREVIA' : 'VER SINERGIAS'}</span>
                     </button>
                 `;
             }).join('')}
         </div>
-        <div class="rogue-v327-synergy-line">
-            <span class="rogue-v327-section-title">CONSTRUCCIÓN</span>
-            <div class="rogue-v327-synergy-list">
-                ${Object.entries(rogueV327GetTagCounts()).map(([tag, count]) => `<span class="rogue-v327-synergy-chip">${tag} ×${count}</span>`).join('') || '<span class="rogue-v327-empty">Todavía no hay una construcción marcada.</span>'}
+
+        ${selectedRelic ? `
+            <section class="rogue-v327-preview" aria-live="polite">
+                <div class="rogue-v327-section-title">PREVISUALIZACIÓN · ${rogueV327EscapeHtml(selectedRelic.name)}</div>
+                <p class="rogue-v327-help">Todavía no se adquirió. Esto muestra cómo cambiaría tu construcción si confirmás esta reliquia.</p>
+                ${newlyActivated.length
+                    ? `<div class="rogue-v327-preview-gains"><strong>Activaría ${newlyActivated.length === 1 ? 'una sinergia nueva' : `${newlyActivated.length} sinergias nuevas`}:</strong>${newlyActivated.map(synergy => `<div class="rogue-v327-preview-gain"><strong>${rogueV327EscapeHtml(synergy.name)}</strong><span>${rogueV327EscapeHtml(synergy.desc)}</span></div>`).join('')}</div>`
+                    : '<div class="rogue-v327-empty-box">Esta reliquia no activaría una sinergia nueva todavía.</div>'}
+                ${affectedSynergies.length
+                    ? `<div class="rogue-v327-preview-progress"><strong>Progreso con esta reliquia</strong>${affectedSynergies.map(synergy => {
+                        const isActiveNow = activeIds.has(synergy.id);
+                        const isActiveAfter = previewActiveIds.has(synergy.id);
+                        const before = rogueV327GetSynergyProgressText(synergy, currentCounts);
+                        const after = rogueV327GetSynergyProgressText(synergy, previewCounts);
+                        const line = isActiveNow ? `Ya activa · ${after}` : isActiveAfter ? `Se activaría · ${after}` : `${before} → ${after}`;
+                        return `<div class="rogue-v327-preview-progress-line"><span>${rogueV327EscapeHtml(synergy.name)}</span><small>${rogueV327EscapeHtml(line)}</small></div>`;
+                    }).join('')}</div>`
+                    : '<div class="rogue-v327-help">Esta reliquia no participa en las seis sinergias disponibles.</div>'}
+            </section>
+        ` : '<div class="rogue-v327-note">Seleccioná una reliquia para previsualizar el progreso de las sinergias antes de confirmar.</div>'}
+
+        <section class="rogue-v327-build-section" aria-label="Construcción actual">
+            <div class="rogue-v327-section-title">CONSTRUCCIÓN ACTUAL</div>
+            <p class="rogue-v327-help">Etiquetas de las reliquias que llevás. Los contadores muestran el progreso hacia las combinaciones.</p>
+            <div class="rogue-v327-tag-grid">
+                ${Object.entries(ROGUELIKE_SYNERGY_TAG_META_V327).map(([tag, meta]) => {
+                    const count = Number(currentCounts[tag]) || 0;
+                    return `<span class="rogue-v327-tag-chip ${count ? 'has-count' : 'no-count'}"><span>${rogueV327EscapeHtml(meta.label)}</span><strong>×${count}</strong></span>`;
+                }).join('')}
             </div>
-            <span class="rogue-v327-section-title">SINERGIAS ACTIVAS</span>
-            <div class="rogue-v327-synergy-list">
-                ${activeSynergies.length ? activeSynergies.map(s => `<span class="rogue-v327-synergy-chip">${s.name} · ${s.desc}</span>`).join('') : '<span class="rogue-v327-empty">Todavía no hay sinergias activas.</span>'}
+        </section>
+
+        <section class="rogue-v327-build-section" aria-label="Sinergias activas">
+            <div class="rogue-v327-section-title">SINERGIAS ACTIVAS <span class="rogue-v327-count">${activeSynergies.length}</span></div>
+            <p class="rogue-v327-help">Bonificaciones que ya están activadas por tus reliquias.</p>
+            ${activeSynergies.length
+                ? `<div class="rogue-v327-synergy-grid">${activeSynergies.map(synergy => synergyCard(synergy, true, currentCounts, 'ACTIVA')).join('')}</div>`
+                : '<div class="rogue-v327-empty-box">Todavía no hay sinergias activas. Revisá el progreso de abajo para ver qué reliquias combinar.</div>'}
+        </section>
+
+        <section class="rogue-v327-build-section" aria-label="Sinergias en progreso">
+            <div class="rogue-v327-section-title">PRÓXIMAS SINERGIAS</div>
+            <div class="rogue-v327-synergy-grid">
+                ${pendingSynergies.map(synergy => {
+                    const hasProgress = Object.keys(synergy.req).some(tag => (Number(currentCounts[tag]) || 0) > 0);
+                    return synergyCard(synergy, false, currentCounts, hasProgress ? 'EN PROGRESO' : 'SIN INICIAR');
+                }).join('')}
             </div>
-        </div>
-        <div class="rogue-v327-note">La ruta se aplica al entrar a la próxima sala. El reroll consume monedas, no reliquias.</div>
+        </section>
+
+
+
+        <div class="rogue-v327-note">La ruta se aplica al entrar a la próxima sala. Cambiar la oferta consume monedas; la previsualización no consume ni adquiere reliquias.</div>
     `;
+    panel.scrollTop = previousScrollTop;
 
     panel.querySelectorAll('[data-room-v327]').forEach(button => {
         button.addEventListener('click', () => rogueV327ChooseRoomPlan(button.dataset.roomV327));
@@ -838,7 +945,7 @@ function rogueV327InstallStyles() {
     style.id = 'rogue-v327-styles';
     style.textContent = `
         #level-complete-screen { gap: 7px; }
-        .rogue-v327-strategy { width: min(100%, 540px); max-height: 420px; overflow: hidden; text-align: left; }
+        .rogue-v327-strategy { width: min(100%, 540px); max-height: 420px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; text-align: left; scrollbar-width: thin; }
         .rogue-v327-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 8px; border:1px solid rgba(255,255,255,.10); background:rgba(15,23,42,.62); border-radius:8px; }
         .rogue-v327-kicker { font: 9px 'Press Start 2P', cursive; color:#c4b5fd; letter-spacing:.04em; }
         .rogue-v327-sub { margin-top:4px; font: 9px Inter, sans-serif; color:#94a3b8; }
@@ -862,12 +969,36 @@ function rogueV327InstallStyles() {
         .rogue-v327-rarity { font: 8px 'Press Start 2P', cursive; text-transform:uppercase; color:#94a3b8; }
         .rarity-uncommon .rogue-v327-rarity { color:#93c5fd; }
         .rarity-rare .rogue-v327-rarity { color:#fca5a5; }
-        .rogue-v327-synergy-line { margin-top:5px; padding:5px 7px; border:1px solid rgba(167,139,250,.18); border-radius:7px; background:rgba(91,33,182,.10); }
-        .rogue-v327-synergy-line .rogue-v327-section-title { margin:0 0 4px; }
-        .rogue-v327-synergy-list { display:flex; flex-wrap:wrap; gap:4px; }
-        .rogue-v327-synergy-chip { padding:3px 5px; border-radius:999px; background:rgba(139,92,246,.16); border:1px solid rgba(167,139,250,.25); color:#ddd6fe; font:8px Inter, sans-serif; }
+        .rogue-v327-build-section { margin-top:7px; padding:7px; border:1px solid rgba(148,163,184,.16); border-radius:8px; background:rgba(15,23,42,.45); }
+        .rogue-v327-build-section > .rogue-v327-section-title { margin:0 0 4px; }
+        .rogue-v327-help { margin:0 0 6px; color:#94a3b8; font:9px Inter, sans-serif; line-height:1.35; }
+        .rogue-v327-tag-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }
+        .rogue-v327-tag-chip { min-width:0; display:flex; align-items:center; justify-content:space-between; gap:5px; padding:5px 6px; border-radius:6px; background:rgba(30,41,59,.74); border:1px solid rgba(148,163,184,.13); color:#cbd5e1; font:9px Inter,sans-serif; }
+        .rogue-v327-tag-chip strong { color:#f8fafc; font:9px Inter,sans-serif; }
+        .rogue-v327-tag-chip.no-count { color:#64748b; background:rgba(15,23,42,.45); }
+        .rogue-v327-tag-chip.no-count strong { color:#64748b; }
+        .rogue-v327-synergy-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; }
+        .rogue-v327-synergy-card { min-width:0; padding:7px; border:1px solid rgba(148,163,184,.18); border-radius:7px; background:rgba(30,41,59,.55); }
+        .rogue-v327-synergy-card.is-active { border-color:rgba(74,222,128,.42); background:rgba(20,83,45,.19); }
+        .rogue-v327-synergy-card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:5px; }
+        .rogue-v327-synergy-name { color:#e2e8f0; font:8px 'Press Start 2P',cursive; line-height:1.5; }
+        .rogue-v327-synergy-status { flex-shrink:0; padding:2px 4px; border-radius:4px; background:rgba(148,163,184,.12); color:#94a3b8; font:7px Inter,sans-serif; }
+        .is-active .rogue-v327-synergy-status { background:rgba(34,197,94,.13); color:#86efac; }
+        .rogue-v327-synergy-effect { margin:5px 0; color:#cbd5e1; font:9px Inter,sans-serif; line-height:1.35; }
+        .rogue-v327-synergy-reqs { color:#94a3b8; font:8px Inter,sans-serif; line-height:1.35; }
+        .rogue-v327-count { display:inline-flex; align-items:center; justify-content:center; min-width:15px; padding:2px 4px; border-radius:9px; background:rgba(34,197,94,.14); color:#86efac; font:8px Inter,sans-serif; }
+        .rogue-v327-empty-box { padding:7px; border-radius:6px; background:rgba(15,23,42,.55); color:#94a3b8; font:9px Inter,sans-serif; line-height:1.4; }
+        .rogue-v327-preview { margin-top:7px; padding:8px; border:1px solid rgba(250,204,21,.28); border-radius:8px; background:rgba(120,53,15,.12); }
+        .rogue-v327-preview > .rogue-v327-section-title { margin:0 0 5px; color:#fde68a; }
+        .rogue-v327-preview-gains { display:flex; flex-direction:column; gap:4px; margin-bottom:6px; color:#fde68a; font:9px Inter,sans-serif; }
+        .rogue-v327-preview-gain { display:flex; flex-direction:column; gap:2px; padding:5px 6px; border-radius:5px; background:rgba(15,23,42,.45); }
+        .rogue-v327-preview-gain span { color:#cbd5e1; line-height:1.35; }
+        .rogue-v327-preview-progress { display:flex; flex-direction:column; gap:4px; margin-top:6px; color:#cbd5e1; font:9px Inter,sans-serif; }
+        .rogue-v327-preview-progress-line { display:flex; flex-direction:column; gap:2px; padding-top:4px; border-top:1px solid rgba(255,255,255,.06); }
+        .rogue-v327-preview-progress-line small { color:#94a3b8; font-size:8px; line-height:1.35; }
+        .rogue-v327-select-hint { margin-top:2px; color:#93c5fd; font:7px Inter,sans-serif; line-height:1.3; }
         .rogue-v327-empty { color:#94a3b8; font:9px Inter, sans-serif; }
-        .rogue-v327-note { margin-top:5px; color:#64748b; font:8px Inter, sans-serif; }
+        .rogue-v327-note { display:block; margin-top:6px; color:#64748b; font:8px Inter, sans-serif; line-height:1.35; }
         .death-relic-item { display:grid; grid-template-columns:auto 1fr; column-gap:7px; row-gap:1px; padding:5px 0; border-bottom:1px solid rgba(255,255,255,.06); }
         .death-relic-item span { grid-row:span 2; }
         .death-relic-item strong { font-size:9px; }
@@ -875,7 +1006,9 @@ function rogueV327InstallStyles() {
         @media (max-width: 520px) {
             .rogue-v327-room-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
             .rogue-v327-relic-grid { grid-template-columns: 1fr; }
-            .rogue-v327-strategy { max-height: 360px; }
+            .rogue-v327-strategy { max-height: 360px; overflow-y: auto; }
+            .rogue-v327-synergy-grid { grid-template-columns: 1fr; }
+            .rogue-v327-tag-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
         }
     `;
     document.head.appendChild(style);

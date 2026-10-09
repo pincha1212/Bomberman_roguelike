@@ -578,6 +578,8 @@ const UI = {};
 
         let gameState = {
             isPlaying: false,
+            // v6.30.3: God Mode de desarrollo, reflejado también en player.
+            godModeEnabled: false,
             level: 1,
             score: 0,
             gridWidth: 17,
@@ -639,6 +641,7 @@ const UI = {};
             maxHealth: 5,
             firstRelicFlags: { bomb: false, range: false, health: false },
             hasShield: false,
+            godModeEnabled: false,
             isInvincible: false,
             invincibleTimer: 0,
             dir: 'down',

@@ -51,11 +51,6 @@
 .info-relic-row strong{display:block;font:5px 'Press Start 2P',monospace;color:#e2e8f0;line-height:1.45;}
 .info-relic-row small{display:block;margin-top:3px;color:#94a3b8;font:6px Inter,sans-serif;line-height:1.3;}
 .info-empty{padding:7px 6px;color:#64748b;font:6px Inter,sans-serif;border:1px dashed rgba(148,163,184,.13);border-radius:3px;}
-.info-feed{display:grid;gap:4px;}
-.info-feed-row{display:grid;grid-template-columns:4px 1fr;gap:7px;align-items:start;padding:4px 5px;border-radius:3px;background:rgba(15,23,42,.50);animation:infoFeedIn .16s ease both;}
-.info-feed-row > span{width:4px;min-height:13px;border-radius:4px;background:var(--info-color,#facc15);box-shadow:0 0 7px var(--info-color,#facc15);}
-.info-feed-row strong{font:6px Inter,sans-serif;color:#cbd5e1;line-height:1.3;word-break:break-word;}
-@keyframes infoFeedIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 @media(max-width:900px){
     .main-menu.run-active .game-layout{width:min(94vw,760px);flex-direction:column;align-items:center;gap:8px;}
     .main-menu.run-active #game-container{width:min(94vw,62dvh);max-width:none;max-height:62dvh;flex:0 0 auto;}

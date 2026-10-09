@@ -139,6 +139,9 @@
                 } else {
                     player.vx = 0;
                     player.vy = 0;
+                    if (typeof globalThis.rastreroPlayerIceMoveBlockedV630 === 'function') {
+                        globalThis.rastreroPlayerIceMoveBlockedV630(player);
+                    }
                 }
             }
 
@@ -154,6 +157,9 @@
                 // La posición final es siempre exactamente el centro del tile.
                 player.vx = 0;
                 player.vy = 0;
+                if (typeof globalThis.rastreroPlayerTileArrivedV630 === 'function') {
+                    globalThis.rastreroPlayerTileArrivedV630(player);
+                }
                 if (typeof globalThis.gameplayPowerupAfterPlayerMovementV676 === 'function') {
                     globalThis.gameplayPowerupAfterPlayerMovementV676(player, beforeMoveX, beforeMoveY);
                 }

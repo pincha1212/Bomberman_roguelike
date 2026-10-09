@@ -4,6 +4,19 @@
 (function installRastreroAbilitiesV630(global) {
     'use strict';
 
+    // Los efectos de suelo son overlays temporales: no sustituyen gameState.grid.
+    // Se expone el tipo para que otros sistemas puedan identificar la casilla.
+    const TILE_TYPES = Object.freeze({
+        ...(global.TILE_TYPES && typeof global.TILE_TYPES === 'object' ? global.TILE_TYPES : {}),
+        ICE_TRAIL: 'ICE_TRAIL'
+    });
+    global.TILE_TYPES = TILE_TYPES;
+
+    const ICE_TRAIL_DURATION_MS = 2500;
+    const FRICTION_ICE = 0.88;
+    const ICE_MOMENTUM_STOP_THRESHOLD = 0.12;
+    const ICE_COUNTER_STRENGTH = 0.55;
+
     const SPECIES_ABILITIES = Object.freeze({
         winter_ice_wolf: 'ice_trail',
         autumn_boar: 'boar_charge',
@@ -27,6 +40,7 @@
 
     const runtime = {
         clock: 0,
+        frameScale: 1,
         roomKey: '',
         ice: new Map(),
         acid: new Map(),
@@ -107,8 +121,9 @@
         if (p) {
             p.__rastreroSlowTimerV630 = 0;
             p.__rastreroAcidLastTileV630 = null;
-            p.__rastreroIceSlipSourceV630 = null;
-            p.__rastreroIceSlipPendingV630 = false;
+            p.__rastreroIceMomentumV630 = null;
+            p.__rastreroIceCoastingV630 = false;
+            p.__rastreroIceSurfaceActiveV630 = false;
         }
     }
 
@@ -154,9 +169,9 @@
         if (p) {
             p.__rastreroSlowTimerV630 = 0;
             p.__rastreroAcidLastTileV630 = null;
-            p.__rastreroIceSlipSourceV630 = null;
-            p.__rastreroIceSlipPendingV630 = false;
-            p.__rastreroIceSlipDirV630 = null;
+            p.__rastreroIceMomentumV630 = null;
+            p.__rastreroIceCoastingV630 = false;
+            p.__rastreroIceSurfaceActiveV630 = false;
         }
     }
 
@@ -298,8 +313,14 @@
         const p = entity || getPlayer();
         if (!p) return 1;
         let factor = Number(p.__rastreroSlowTimerV630 || 0) > 0 ? 0.50 : 1;
-        const tile = tileOf(p, 'player');
-        if (effectAt(runtime.ice, tile.x, tile.y)) factor *= 0.86;
+        // Al soltar controles sobre hielo, la fuerza de inercia cae con FRICTION_ICE.
+        // El límite inferior solo se aplica al tramo entre centros; nunca permite
+        // atravesar paredes ni deja al jugador detenido en mitad de una casilla.
+        if (p.__rastreroIceCoastingV630 && p.__rastreroIceSurfaceActiveV630) {
+            const momentum = p.__rastreroIceMomentumV630;
+            const strength = Math.max(0, Math.min(1, Number(momentum?.strength) || 0));
+            factor *= Math.max(0.35, strength);
+        }
         return Math.max(0.35, factor);
     }
 
@@ -313,47 +334,145 @@
         return DIRS.find(dir => dir.name === String(name || '').toLowerCase()) || null;
     }
 
-    function canBeginPlayerTileMove(dir) {
-        const p = getPlayer();
-        if (!p || !dir || typeof global.gridCanOccupy !== 'function' || typeof global.gridGetEntityTileCenterPosition !== 'function') return false;
-        const tile = tileOf(p, 'player');
-        const x = tile.x + dir.x, y = tile.y + dir.y;
-        if (!isInside(x, y)) return false;
-        const pos = global.gridGetEntityTileCenterPosition(p, x, y, 'player');
-        return global.gridCanOccupy(p, pos.x, pos.y, { kind: 'player', allowCurrentBombTile: true });
+    function directionFromInput(input) {
+        if (!input?.axis || !Number(input.dir)) return null;
+        return { axis: input.axis, dir: Number(input.dir) < 0 ? -1 : 1 };
     }
 
-    function installPlayerIceTraction() {
+    function isIceTrailAt(x, y) {
+        return !!effectAt(runtime.ice, x, y);
+    }
+
+    function isPlayerOnIceSurface(p) {
+        if (!p) return false;
+        const current = tileOf(p, 'player');
+        if (isIceTrailAt(current.x, current.y)) return true;
+        // Mantener la física durante el paso ya comprometido que sale de hielo,
+        // pero no extenderla a la siguiente casilla una vez completado el paso.
+        if (p._tileMoveActive && p.__rastreroIceSurfaceActiveV630) return true;
+        if (p._tileMoveActive && Number.isInteger(p._tileMoveTargetGX) && Number.isInteger(p._tileMoveTargetGY)) {
+            return isIceTrailAt(p._tileMoveTargetGX, p._tileMoveTargetGY);
+        }
+        return false;
+    }
+
+    function clearPlayerIceState(p, keepSurface = false) {
+        if (!p) return;
+        p.__rastreroIceMomentumV630 = null;
+        p.__rastreroIceCoastingV630 = false;
+        if (!keepSurface) p.__rastreroIceSurfaceActiveV630 = false;
+    }
+
+    function startPlayerIceMomentum(p, direction, strength = 1) {
+        if (!p || !direction) return null;
+        const momentum = {
+            axis: direction.axis,
+            dir: direction.dir < 0 ? -1 : 1,
+            strength: Math.max(0, Math.min(1, Number(strength) || 0))
+        };
+        p.__rastreroIceMomentumV630 = momentum;
+        return momentum;
+    }
+
+    function getFrameScale() {
+        const value = Number(runtime.frameScale);
+        return Number.isFinite(value) ? Math.max(0, Math.min(2, value)) : 1;
+    }
+
+    function installPlayerIceInertia() {
         const baseInput = global.getCardinalInput;
-        if (typeof baseInput !== 'function' || baseInput.__rastreroV630Wrapped) return;
-        const wrapped = function getCardinalInputWithIceV630() {
+        if (typeof baseInput !== 'function' || baseInput.__rastreroV630InertiaWrapped) return;
+        const wrapped = function getCardinalInputWithIceInertiaV630() {
             const input = baseInput();
             const p = getPlayer();
-            if (!p || p._tileMoveActive) return input;
-            const tile = tileOf(p, 'player');
-            const key = tileKey(tile.x, tile.y);
-            if (!effectAt(runtime.ice, tile.x, tile.y)) {
-                p.__rastreroIceSlipSourceV630 = null;
-                p.__rastreroIceSlipPendingV630 = false;
+            if (!p) return input;
+
+            const wasSurfaceActive = !!p.__rastreroIceSurfaceActiveV630;
+            const onIce = isPlayerOnIceSurface(p);
+            if (!onIce) {
+                if (!p._tileMoveActive) clearPlayerIceState(p);
                 return input;
             }
-            if (p.__rastreroIceSlipSourceV630 !== key) {
-                p.__rastreroIceSlipSourceV630 = key;
-                p.__rastreroIceSlipPendingV630 = true;
-                p.__rastreroIceSlipDirV630 = directionByName(p.dir || p.lastDirection);
-            }
-            if (!p.__rastreroIceSlipPendingV630 || !input?.axis || !p.__rastreroIceSlipDirV630) return input;
-            const dir = p.__rastreroIceSlipDirV630;
-            if (!canBeginPlayerTileMove(dir)) {
-                // Una pared o bomba corta el deslizamiento: nunca bloqueamos al jugador.
-                p.__rastreroIceSlipPendingV630 = false;
+            p.__rastreroIceSurfaceActiveV630 = true;
+
+            const requested = directionFromInput(input);
+            let momentum = p.__rastreroIceMomentumV630;
+            const frameScale = getFrameScale();
+
+            if (requested) {
+                if (!momentum || Number(momentum.strength) <= 0) {
+                    momentum = startPlayerIceMomentum(p, requested, 1);
+                } else {
+                    const sameDirection = momentum.axis === requested.axis && momentum.dir === requested.dir;
+                    if (sameDirection) {
+                        momentum.strength = Math.min(1, Math.max(0, Number(momentum.strength) || 0) + 0.16 * frameScale);
+                    } else {
+                        // El nuevo input sí puede girar o invertir la marcha. La fuerza
+                        // de control reduce el impulso previo en vez de bloquear el eje.
+                        const redirectedStrength = Math.max(0.30, Math.min(0.72,
+                            Math.max(0, Number(momentum.strength) || 0) * ICE_COUNTER_STRENGTH));
+                        momentum = startPlayerIceMomentum(p, requested, redirectedStrength);
+                    }
+                }
+                p.__rastreroIceCoastingV630 = false;
                 return input;
             }
-            p.__rastreroIceSlipPendingV630 = false;
-            return { axis: dir.axis, dir: dir.dir };
+
+            // Sin input, el impulso conserva la última dirección y pierde un 12 %
+            // por frame (ajustado por dt). Al caer bajo el umbral, no se inicia otro
+            // tile; el tramo ya iniciado siempre termina en un centro de casilla.
+            if (!momentum) {
+                // Solo la primera entrada a hielo infiere la dirección anterior. Si la
+                // inercia ya se agotó, el estado de fuerza 0 evita reiniciar el impulso.
+                const previousDirection = directionByName(p.dir || p.lastDirection);
+                if (onIce && !wasSurfaceActive && previousDirection) {
+                    momentum = startPlayerIceMomentum(p, previousDirection, 1);
+                } else {
+                    p.__rastreroIceCoastingV630 = true;
+                    return { axis: null, dir: 0 };
+                }
+            }
+
+            momentum.strength = Math.max(0, Math.min(1, Number(momentum.strength) || 0))
+                * Math.pow(FRICTION_ICE, frameScale);
+            p.__rastreroIceCoastingV630 = true;
+            if (momentum.strength <= ICE_MOMENTUM_STOP_THRESHOLD) {
+                momentum.strength = 0;
+                return { axis: null, dir: 0 };
+            }
+            return { axis: momentum.axis, dir: momentum.dir };
         };
-        wrapped.__rastreroV630Wrapped = true;
+        wrapped.__rastreroV630InertiaWrapped = true;
         global.getCardinalInput = wrapped;
+    }
+
+    function onPlayerTileArrivedV630(p) {
+        if (!p) return;
+        const tile = tileOf(p, 'player');
+        if (isIceTrailAt(tile.x, tile.y)) {
+            p.__rastreroIceSurfaceActiveV630 = true;
+            if (!p.__rastreroIceMomentumV630) {
+                const direction = directionByName(p.dir || p.lastDirection);
+                if (direction) startPlayerIceMomentum(p, direction, 1);
+            }
+            return;
+        }
+        clearPlayerIceState(p);
+    }
+
+    function onPlayerIceMoveBlockedV630(p) {
+        if (!p) return;
+        const tile = tileOf(p, 'player');
+        // Si una pared o bomba corta el deslizamiento, se cancela el impulso para
+        // no insistir en una casilla bloqueada cada frame. El control activo puede
+        // iniciar un nuevo movimiento de manera normal.
+        const stillOnIce = isIceTrailAt(tile.x, tile.y);
+        clearPlayerIceState(p, stillOnIce);
+        if (stillOnIce) {
+            p.__rastreroIceSurfaceActiveV630 = true;
+            p.__rastreroIceMomentumV630 = { axis: 'x', dir: 1, strength: 0 };
+            p.__rastreroIceCoastingV630 = true;
+        }
     }
 
     function startBoarCharge(enemy, a, direction, playerDistance) {
@@ -694,7 +813,7 @@
             const previous = a.lastTile || current;
             if (previous.x !== current.x || previous.y !== current.y) {
                 if (getAbilityId(enemy) === 'ice_trail') {
-                    addTimedTile(runtime.ice, previous.x, previous.y, 2500, 'ice');
+                    addTimedTile(runtime.ice, previous.x, previous.y, ICE_TRAIL_DURATION_MS, TILE_TYPES.ICE_TRAIL);
                 }
                 if (getAbilityId(enemy) === 'hellhound_ember' && effectAt(runtime.fire, current.x, current.y)) {
                     a.hellhoundBoostMs = 3000;
@@ -903,6 +1022,7 @@
             const s = getState();
             const active = !!s?.isPlaying && !s?.paused;
             const delta = Math.max(0, Number(dt) || 0);
+            runtime.frameScale = Math.max(0, Math.min(2, delta / 16.6667));
             if (active) {
                 ensureRoomState();
                 runtime.clock += delta;
@@ -1085,6 +1205,9 @@
         version: '6.30.0',
         species: Object.freeze({ ...SPECIES_ABILITIES }),
         getAbilityId,
+        tileTypes: Object.freeze({ ICE_TRAIL: TILE_TYPES.ICE_TRAIL }),
+        iceTrailLifetimeMs: ICE_TRAIL_DURATION_MS,
+        frictionIce: FRICTION_ICE,
         inspectRuntime: () => ({
             roomKey: runtime.roomKey,
             iceTiles: runtime.ice.size,
@@ -1094,7 +1217,9 @@
         })
     });
 
-    installPlayerIceTraction();
+    global.rastreroPlayerTileArrivedV630 = onPlayerTileArrivedV630;
+    global.rastreroPlayerIceMoveBlockedV630 = onPlayerIceMoveBlockedV630;
+    installPlayerIceInertia();
     installAIHooks();
     registerBlastMeta();
     installLevelResetHook();

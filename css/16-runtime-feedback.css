@@ -1,0 +1,82 @@
+/* v6.30.3 — Feedback fuera del mundo Canvas: toasts transitorios y estado God Mode. */
+.ui-floating-toasts {
+    position: absolute;
+    z-index: 32;
+    top: clamp(12px, 4.5%, 34px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: min(78%, 430px);
+    max-height: 46%;
+    overflow: hidden;
+    pointer-events: none;
+    contain: layout paint;
+}
+.runtime-toast {
+    --toast-accent: #facc15;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: fit-content;
+    max-width: 100%;
+    padding: 8px 12px;
+    border: 1px solid color-mix(in srgb, var(--toast-accent) 58%, rgba(255,255,255,.14));
+    border-radius: 7px;
+    background: linear-gradient(110deg, rgba(2,6,23,.94), rgba(15,23,42,.88));
+    box-shadow: 0 7px 22px rgba(0,0,0,.34), 0 0 14px color-mix(in srgb, var(--toast-accent) 14%, transparent);
+    color: #f8fafc;
+    font: 700 clamp(10px, 1.55cqw, 13px)/1.35 Inter, sans-serif;
+    text-align: center;
+    overflow-wrap: anywhere;
+    animation: runtimeToast1500 1500ms ease both;
+    will-change: opacity, transform;
+}
+.runtime-toast-accent {
+    display: block;
+    flex: 0 0 5px;
+    width: 5px;
+    height: 18px;
+    border-radius: 5px;
+    background: var(--toast-accent);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--toast-accent) 65%, transparent);
+}
+.runtime-toast-text { min-width: 0; }
+@keyframes runtimeToast1500 {
+    0% { opacity: 0; transform: translateY(-7px) scale(.985); }
+    12% { opacity: 1; transform: translateY(0) scale(1); }
+    68% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-5px) scale(.99); }
+}
+.god-mode-indicator {
+    position: absolute;
+    z-index: 34;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 88%;
+    padding: 6px 9px;
+    border: 1px solid rgba(134,239,172,.72);
+    border-radius: 5px;
+    background: rgba(5,46,22,.84);
+    box-shadow: 0 0 16px rgba(34,197,94,.18), inset 0 0 10px rgba(134,239,172,.06);
+    color: #bbf7d0;
+    font: 700 clamp(7px, 1.1cqw, 9px)/1.3 'Press Start 2P', monospace;
+    letter-spacing: .05em;
+    white-space: nowrap;
+    pointer-events: none;
+    animation: godModeSoftPulse 2.8s ease-in-out infinite;
+}
+.god-mode-indicator.hidden { display: none !important; }
+@keyframes godModeSoftPulse { 0%,100% { opacity: .78; } 50% { opacity: 1; } }
+@media (max-width: 560px) {
+    .ui-floating-toasts { top: 14%; width: 88%; }
+    .runtime-toast { padding: 6px 8px; font-size: 10px; }
+    .god-mode-indicator { top: 5px; font-size: 6px; padding: 5px 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .runtime-toast, .god-mode-indicator { animation-duration: 1ms; }
+}

@@ -809,6 +809,108 @@ function isWorldTileVisibleV329(tileX, tileY, margin = 1){
     return isWorldRectVisibleV329(tileX*TILE_SIZE, tileY*TILE_SIZE, TILE_SIZE, TILE_SIZE, margin*TILE_SIZE);
 }
 
+function drawExplosionClustersV6303(explosions) {
+    if (!Array.isArray(explosions) || !explosions.length) return 0;
+    const cellMap = new Map();
+    const keyOf = (x, y) => `${x},${y}`;
+
+    // Fusionar duplicados producidos por ondas que se solapan.
+    for (const exp of explosions) {
+        if (!exp || !(Number(exp.timer) > 0)) continue;
+        const rawX = Number(exp.x), rawY = Number(exp.y);
+        if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) continue;
+        const x = Math.trunc(rawX), y = Math.trunc(rawY);
+        const key = keyOf(x, y);
+        const existing = cellMap.get(key);
+        if (!existing || Number(exp.timer) > existing.timer) {
+            cellMap.set(key, { x, y, timer: Number(exp.timer) || 0 });
+        }
+    }
+    if (!cellMap.size) return 0;
+
+    const unvisited = new Set(cellMap.keys());
+    const components = [];
+    const offsets = [[1,0],[-1,0],[0,1],[0,-1]];
+    while (unvisited.size) {
+        const firstKey = unvisited.values().next().value;
+        unvisited.delete(firstKey);
+        const queue = [cellMap.get(firstKey)];
+        const component = [];
+        while (queue.length) {
+            const cell = queue.pop();
+            component.push(cell);
+            for (const [dx, dy] of offsets) {
+                const nextKey = keyOf(cell.x + dx, cell.y + dy);
+                if (!unvisited.has(nextKey)) continue;
+                unvisited.delete(nextKey);
+                queue.push(cellMap.get(nextKey));
+            }
+        }
+        if (component.some(cell => isWorldTileVisibleV329(cell.x, cell.y, 1))) components.push(component);
+    }
+
+    const countVisible = Array.from(cellMap.values()).filter(cell => isWorldTileVisibleV329(cell.x, cell.y, 1)).length;
+    const size = TILE_SIZE;
+    const pulse = Math.sin((Number(gameState.animFrame) || 0) * 0.5) * Math.min(1.8, size * 0.035);
+    const outer = typeof themeColorV46 === 'function' ? themeColorV46('fireOuter') : '#dc2626';
+    const middle = typeof themeColorV46 === 'function' ? themeColorV46('fireMiddle') : '#f97316';
+    const core = typeof themeColorV46 === 'function' ? themeColorV46('fireCore') : '#fef08a';
+
+    function drawConnectedLayer(component, color, width) {
+        const componentKeys = new Set(component.map(cell => keyOf(cell.x, cell.y)));
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        for (const cell of component) {
+            const cx = (cell.x + 0.5) * size;
+            const cy = (cell.y + 0.5) * size;
+            const rightKey = keyOf(cell.x + 1, cell.y);
+            const downKey = keyOf(cell.x, cell.y + 1);
+            if (componentKeys.has(rightKey)) {
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(cx + size, cy);
+            }
+            if (componentKeys.has(downKey)) {
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(cx, cy + size);
+            }
+        }
+        ctx.stroke();
+        // Los discos centrales conectan intersecciones, extremos y ramificaciones.
+        const radius = width / 2;
+        ctx.beginPath();
+        for (const cell of component) {
+            ctx.moveTo((cell.x + 0.5) * size + radius, (cell.y + 0.5) * size);
+            ctx.arc((cell.x + 0.5) * size, (cell.y + 0.5) * size, radius, 0, Math.PI * 2);
+        }
+        ctx.fill();
+    }
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    for (const component of components) {
+        const intensity = Math.max(0.72, Math.min(1, Math.max(...component.map(cell => cell.timer)) / 100));
+        ctx.globalAlpha = 0.88 * intensity;
+        ctx.fillStyle = outer;
+        // La base llena toda la matriz sin inset ni separaciones entre tiles.
+        for (const cell of component) {
+            ctx.fillRect(cell.x * size - 0.35, cell.y * size - 0.35, size + 0.7, size + 0.7);
+        }
+        // Capas conectadas: una sola banda continua para cruces y segmentos adyacentes.
+        ctx.globalAlpha = 0.94 * intensity;
+        drawConnectedLayer(component, middle, Math.max(2, size * 0.70 + pulse * 0.35));
+        ctx.globalAlpha = Math.min(1, intensity);
+        drawConnectedLayer(component, core, Math.max(2, size * 0.34 + pulse * 0.18));
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+    return countVisible;
+}
+
+
 function getRenderProfileV65() {
     return typeof getBomberRenderProfileV65 === 'function'
         ? getBomberRenderProfileV65()
@@ -875,11 +977,9 @@ function draw() {
             drawBombChainLinks();
             if (typeof drawElementalBombFieldsV612 === 'function') drawElementalBombFieldsV612(ctx);
 
-            // Draw Explosions
-            for(let i=0;i<gameState.explosions.length;i++){
-                const exp=gameState.explosions[i];
-                if(exp && isWorldTileVisibleV329(exp.x, exp.y, 1)){ renderStatsV329.explosions++; drawExplosionSprite(exp.x * TILE_SIZE, exp.y * TILE_SIZE); }
-            }
+            // v6.30.3: una única pasada estética agrupa las casillas conectadas.
+            // La lógica de daño sigue usando gameState.explosions por tile; solo cambia el dibujo.
+            renderStatsV329.explosions += drawExplosionClustersV6303(gameState.explosions);
 
             // Draw Enemies
             for(let i=0;i<gameState.enemies.length;i++){
@@ -1375,19 +1475,6 @@ function draw() {
             ctx.restore();
         }
 
-        function drawExplosionSprite(x, y) {
-            let size = TILE_SIZE;
-            let pulse = Math.sin(gameState.animFrame * 0.5) * 4;
-            
-            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('fireOuter') : 'rgba(220, 38, 38, 0.8)'; // Fuego exterior
-            ctx.fillRect(x + 2 - pulse/2, y + 2 - pulse/2, size - 4 + pulse, size - 4 + pulse);
-            
-            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('fireMiddle') : '#f97316'; // Fuego medio
-            ctx.fillRect(x + 6 - pulse/2, y + 6 - pulse/2, size - 12 + pulse, size - 12 + pulse);
-            
-            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('fireCore') : '#fef08a'; // Núcleo
-            ctx.fillRect(x + 12 - pulse/2, y + 12 - pulse/2, size - 24 + pulse, size - 24 + pulse);
-        }
 
         function drawPowerupSprite(item) {
             const x = item.x * TILE_SIZE;

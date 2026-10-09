@@ -281,13 +281,10 @@
 
         function updatePlayerInvulnerability(dt) {
             const p = window.BOMBER_ENGINE?.getPlayer?.() || player;
-            if (!p.isInvincible) return;
-
-            p.invincibleTimer = Math.max(0, p.invincibleTimer - dt);
-            if (p.invincibleTimer <= 0) {
-                p.invincibleTimer = 0;
-                p.isInvincible = false;
-            }
+            const godMode = typeof window.isGodModeActiveV616 === 'function' && window.isGodModeActiveV616();
+            if (Number(p.invincibleTimer) > 0) p.invincibleTimer = Math.max(0, p.invincibleTimer - Math.max(0, Number(dt) || 0));
+            else p.invincibleTimer = 0;
+            p.isInvincible = !!godMode || p.invincibleTimer > 0;
         }
 
         function takeDamage(source='unknown', sourceX=null, sourceY=null) {
@@ -295,6 +292,11 @@
             const gs = window.BOMBER_ENGINE?.getState?.() || gameState;
             const sx = sourceX == null ? p.x : sourceX;
             const sy = sourceY == null ? p.y : sourceY;
+            // Bloqueo antes de consumir escudo, restar vida o disparar efectos de daño/muerte.
+            if ((typeof window.isGodModeActiveV616 === 'function' && window.isGodModeActiveV616()) || gs.godModeEnabled === true || p.godModeEnabled === true) {
+                p.isInvincible = true;
+                return false;
+            }
             if (!canApplyPlayerDamage()) {
                 return false;
             }

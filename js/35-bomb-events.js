@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.0 — Bomb explosion event listeners
+// Bomberman Roguelike v6.30.10 — Bomb explosion event listeners
 //
 // These listeners intentionally know nothing about explodeBomb().
 // The bomb system only publishes BOMBA_EXPLOTO.
@@ -13,10 +13,15 @@
         throw new Error('v5.9: Event Bus no disponible para BOMBA_EXPLOTO');
     }
 
+    // Contrato completo del evento. El listener elemental se registra desde
+    // 38-bomb-effects.js; no debe contarse como duplicado ni omitirse del audit.
     const LISTENER_KEYS = Object.freeze({
         SOUND: 'bomb-explosion:sound',
-        BLOCKS: 'bomb-explosion:destroy-blocks'
+        BLOCKS: 'bomb-explosion:destroy-blocks',
+        EFFECTS: 'bomb-explosion:effects'
     });
+
+    const BASE_LISTENER_KEYS = Object.freeze([LISTENER_KEYS.SOUND, LISTENER_KEYS.BLOCKS]);
 
     function handleBombExplosionSound(payload) {
         if (!payload?.bomb) return;
@@ -122,17 +127,23 @@
         const base = bus.audit();
         const actual = bus.getListenerKeys(EVENT).slice().sort();
         const expected = Object.values(LISTENER_KEYS).slice().sort();
+        const actualSet = new Set(actual);
         const errors = base.errors.slice();
+        const missing = expected.filter(key => !actualSet.has(key));
+        const unexpected = actual.filter(key => !expected.includes(key));
 
-        if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
-            errors.push(`BOMBA_EXPLOTO debe tener exactamente ${expected.length} listeners base`);
-        }
+        if (missing.length) errors.push(`BOMBA_EXPLOTO sin listeners requeridos: ${missing.join(', ')}`);
+        if (unexpected.length) errors.push(`BOMBA_EXPLOTO con listeners no registrados en el contrato: ${unexpected.join(', ')}`);
+        if (actual.length !== actualSet.size) errors.push('BOMBA_EXPLOTO contiene claves de listener repetidas');
 
         return {
             ...base,
             event: EVENT,
+            baseListenerKeys: BASE_LISTENER_KEYS.slice().sort(),
             expectedListenerKeys: expected,
             actualListenerKeys: actual,
+            missingListenerKeys: missing,
+            unexpectedListenerKeys: unexpected,
             valid: errors.length === 0,
             errors
         };

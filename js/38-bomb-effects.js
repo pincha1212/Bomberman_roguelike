@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.30.9 — Independent bomb effects / one field authority
+// Bomberman Roguelike v6.30.10 — Independent bomb effects / one field authority
 // Base simple y extensible para rastros/efectos de bombas.
 //
 // PRINCIPIOS
@@ -14,7 +14,7 @@
 (function installBombEffectSystemV64(global) {
     'use strict';
 
-    const VERSION = '6.30.9';
+    const VERSION = '6.30.10';
     const EVENT = global.GAME_EVENTS_V60?.BOMBA_EXPLOTO || global.GAME_EVENTS_V59?.BOMBA_EXPLOTO;
     const LISTENER_KEY = 'bomb-explosion:effects';
     const MAX_FIELDS = 420;
@@ -121,6 +121,19 @@
         // La vibración es breve y limitada; no se acumula como un temblor largo.
         const duration = clamp(50 + range * 1.5 + chain * 4, 50, 100);
         if (typeof global.triggerScreenShake === 'function') global.triggerScreenShake(intensity, duration);
+
+        // Un solo emisor de chispas por evento. El color identifica al elemento;
+        // el pool limita la cantidad y cada partícula vive entre 50 y 100 ms.
+        const effectIds = resolveBombEffectIds(bomb);
+        const element = String(effectIds[0] || bomb.elementV612 || 'fire').toLowerCase();
+        const sparkColors = {
+            heat: '#ffd08a', fire: '#ffd08a', frost: '#b9efff', ice: '#b9efff', cold: '#dbeafe',
+            shock: '#fef08a', electric: '#fef08a', arc: '#fef08a', steam: '#f1f5f9', plasma: '#f0abfc'
+        };
+        const sparkColor = sparkColors[element] || '#fff1a8';
+        if (typeof global.feedbackPoolExplosionSparks === 'function') {
+            global.feedbackPoolExplosionSparks(originX, originY, sparkColor, clamp(7 + chain, 7, 12));
+        }
         return true;
     }
 

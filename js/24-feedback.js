@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.30.7 — Combat & Feedback
+// Bomberman Roguelike v6.30.10 — Combat & Feedback
 // Feedback visual/audio aislado para facilitar futuras iteraciones.
 const combatFeedback = {
     hitStop: 0,
@@ -243,7 +243,8 @@ function feedbackPoolPoolInit() {
             maxLife: 1,
             alpha: 1,
             gravity: 0,
-            color: '#fff'
+            color: '#fff',
+            spark: false
         }));
     }
 
@@ -303,8 +304,40 @@ function feedbackPoolSpawnParticles(x, y, color, count, scale = 1) {
         p.alpha = 0.8 + Math.random() * 0.2;
         p.gravity = 0.012 + Math.random() * 0.02;
         p.color = color;
+        p.spark = false;
         feedbackPool.particlesSpawned += 1;
     }
+}
+
+function feedbackPoolExplosionSparks(x, y, color = '#fff1a8', count = 9) {
+    if (!FEEDBACK_POOL_CONFIG.enabled) return 0;
+    if (feedbackPool.particles.length !== FEEDBACK_POOL_CONFIG.maxParticles) feedbackPoolPoolInit();
+    const requested = Math.max(0, Math.trunc(Number(count) || 0));
+    const scaled = typeof deviceQualityV45FeedbackCount === 'function'
+        ? deviceQualityV45FeedbackCount(requested, 'particles')
+        : requested;
+    let spawned = 0;
+    for (let i = 0; i < Math.min(scaled, FEEDBACK_POOL_CONFIG.maxParticles); i++) {
+        const p = feedbackPoolFindParticle();
+        if (!p) break;
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 2.0 + Math.random() * 3.6;
+        p.active = true;
+        p.x = x;
+        p.y = y;
+        p.vx = Math.cos(angle) * speed;
+        p.vy = Math.sin(angle) * speed;
+        p.size = 0.8 + Math.random() * 1.1;
+        p.maxLife = 50 + Math.random() * 50;
+        p.life = p.maxLife;
+        p.alpha = 0.85 + Math.random() * 0.15;
+        p.gravity = 0.002 + Math.random() * 0.006;
+        p.color = color;
+        p.spark = true;
+        feedbackPool.particlesSpawned += 1;
+        spawned++;
+    }
+    return spawned;
 }
 
 function feedbackPoolSpawnRing(x, y, color, scale = 1) {
@@ -536,8 +569,18 @@ function drawfeedbackPool() {
             const p = feedbackPool.particles[i];
             if (!p.active) continue;
             ctx.globalAlpha = feedbackPoolClamp(p.life / p.maxLife, 0, 1) * p.alpha;
+            ctx.strokeStyle = p.color;
             ctx.fillStyle = p.color;
-            ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+            if (p.spark) {
+                // Chispa lineal y efímera; no crea una segunda silueta de explosión.
+                ctx.lineWidth = Math.max(0.7, p.size * 0.7);
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(p.x - p.vx * 2.2, p.y - p.vy * 2.2);
+                ctx.stroke();
+            } else {
+                ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+            }
         }
 
         ctx.globalAlpha = 1;
@@ -634,6 +677,7 @@ window.FEEDBACK_POOL_CONFIG = FEEDBACK_POOL_CONFIG;
 window.feedbackPool = feedbackPool;
 window.feedbackPoolImpact = feedbackPoolImpact;
 window.feedbackPoolExplosion = feedbackPoolExplosion;
+window.feedbackPoolExplosionSparks = feedbackPoolExplosionSparks;
 window.feedbackPoolClearExplosionResidue = feedbackPoolClearExplosionResidue;
 window.feedbackPoolDamage = feedbackPoolDamage;
 window.resetfeedbackPool = function resetfeedbackPool() {

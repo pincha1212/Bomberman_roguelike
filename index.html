@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="css/11-viewport-layout.css?v=6.12.24">
     <link rel="stylesheet" href="css/12-run-save.css">
     <link rel="stylesheet" href="css/13-mobile-performance.css">
-    <link rel="stylesheet" href="css/14-mobile-controls.css?v=6.31.0">
+    <link rel="stylesheet" href="css/14-mobile-controls.css?v=6.31.1">
     <link rel="stylesheet" href="css/16-runtime-feedback.css?v=6.30.3">
 </head>
 <body class="game-body v4-theme">
@@ -36,7 +36,7 @@
                 </div>
             </aside>
 
-            <div id="game-layout" class="game-layout" aria-label="Partida e información">
+            <div id="game-layout" class="game-layout info-panel-collapsed" aria-label="Partida e información">
                 <div id="game-stage" class="game-stage" aria-label="Área de juego">
                 <section id="game-container" aria-label="Área de juego">
                     <canvas id="gameCanvas" width="600" height="600"></canvas>
@@ -94,7 +94,9 @@
                 </section>
                 </div>
 
-                <aside id="game-info-panel" class="game-info-panel" aria-label="Información de la partida">
+                <button id="btn-toggle-game-info" class="game-info-toggle" type="button"
+                    aria-controls="game-info-panel" aria-expanded="false" aria-label="Mostrar información de la partida">INFO +</button>
+                <aside id="game-info-panel" class="game-info-panel" aria-label="Información de la partida" aria-hidden="true">
                     <div class="game-info-header">
                         <div class="game-info-kicker">ESTADO DE LA PARTIDA</div>
                         <div id="run-banner">PARTIDA 01 · DEPTH 01</div>
@@ -225,16 +227,15 @@
             </aside>
         </main>
 
-    <!-- v6.31.0: controles táctiles divididos en movimiento y acciones. -->
+    <!-- Mobile D-pad & Bomb controls -->
         <div id="mobile-controls" aria-label="Controles táctiles">
-            <div id="mobile-gesture-zone" aria-label="Movimiento: deslizar en cuatro direcciones">
-                <span class="mobile-zone-hint">DESLIZAR PARA MOVER</span><span class="mobile-gesture-arrow" aria-hidden="true">↕</span>
+            <div id="mobile-dpad" aria-label="Direcciones">
+                <button type="button" data-mobile-dir="up" aria-label="Arriba">▲</button>
+                <button type="button" data-mobile-dir="left" aria-label="Izquierda">◀</button>
+                <button type="button" data-mobile-dir="down" aria-label="Abajo">▼</button>
+                <button type="button" data-mobile-dir="right" aria-label="Derecha">▶</button>
             </div>
-            <div id="mobile-action-zone" aria-label="Acciones">
-                <button type="button" class="mobile-action-btn mobile-bomb-action" id="btn-bomb-mobile" aria-label="Colocar bomba">💣<span>BOMBA</span></button>
-                <button type="button" class="mobile-action-btn" id="btn-grab-mobile" aria-label="Agarrar o soltar bomba">AGARRAR<span>/ SOLTAR</span></button>
-                <button type="button" class="mobile-action-btn" id="btn-throw-mobile" aria-label="Lanzar bomba transportada">LANZAR</button>
-            </div>
+            <button type="button" class="bomb-btn" id="btn-bomb-mobile" aria-label="Poner bomba">💣</button>
         </div>
     </div>
 <!-- v3.28 modular JavaScript. Feedback is layered over the existing combat/runtime systems. -->
@@ -244,7 +245,7 @@
     <script src="js/04-theme.js?v=6.18.0"></script>
     <script src="js/05-mechanics-registry.js?v=6.18.0"></script>
     <script src="js/06-relics.js?v=6.13.0"></script>
-    <script src="js/07-input.js?v=6.31.0"></script>
+    <script src="js/07-input.js?v=6.9.7"></script>
     <script src="js/08-dungeon-generator.js?v=6.13.0"></script>
     <script src="js/09-difficulty.js?v=6.27.0"></script>
     <script src="js/10-world.js?v=6.29.0"></script>
@@ -284,5 +285,6 @@
     <script src="js/44-god-mode.js?v=6.30.3"></script>
     <script src="js/45-enemy-spawn.js?v=6.30.0"></script>
     <script src="js/46-rastreros.js?v=6.30.2"></script>
+    <script src="js/47-ui-visibility.js?v=6.31.1"></script>
 </body>
 </html>

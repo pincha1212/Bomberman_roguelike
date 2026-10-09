@@ -29,57 +29,57 @@
     // el contrato físico/base que consume el resto del gameplay.
     const SPECIES_SEED = Object.freeze({
         winter: {
-            RASTRERO: { id: 'winter_ice_wolf', name: 'Lobo de hielo', ruleId: 'ice_resistance', preferredAi: 'chaser' },
+            RASTRERO: { id: 'winter_ice_wolf', name: 'Lobo de hielo', ruleId: 'ice_resistance', preferredAi: 'chaser', abilityId: 'ice_trail' },
             VOLADOR: { id: 'winter_arctic_owl', name: 'Búho ártico', ruleId: 'ice_resistance', preferredAi: 'flyer' },
             ESPECIAL: { id: 'winter_snow_bear', name: 'Oso de nieve', ruleId: 'ice_resistance', preferredAi: 'aggressive' }
         },
         autumn: {
-            RASTRERO: { id: 'autumn_boar', name: 'Jabalí', ruleId: 'leaf_camouflage', preferredAi: 'patroller' },
+            RASTRERO: { id: 'autumn_boar', name: 'Jabalí', ruleId: 'leaf_camouflage', preferredAi: 'patroller', abilityId: 'boar_charge' },
             VOLADOR: { id: 'autumn_crow', name: 'Cuervo', ruleId: 'leaf_camouflage', preferredAi: 'flyer' },
             ESPECIAL: { id: 'autumn_scarecrow', name: 'Espantapájaros', ruleId: 'leaf_camouflage', preferredAi: 'aggressive' }
         },
         spring: {
-            RASTRERO: { id: 'spring_frog', name: 'Rana', ruleId: 'vegetation_regen', preferredAi: 'evasive' },
+            RASTRERO: { id: 'spring_frog', name: 'Rana', ruleId: 'vegetation_regen', preferredAi: 'evasive', abilityId: 'frog_leap' },
             VOLADOR: { id: 'spring_bee', name: 'Abeja', ruleId: 'vegetation_regen', preferredAi: 'flyer' },
             ESPECIAL: { id: 'spring_carnivorous_plant', name: 'Planta carnívora', ruleId: 'vegetation_regen', preferredAi: 'aggressive' }
         },
         summer: {
-            RASTRERO: { id: 'summer_lizard', name: 'Lagarto', ruleId: 'heat_resistance', preferredAi: 'chaser' },
+            RASTRERO: { id: 'summer_lizard', name: 'Lagarto', ruleId: 'heat_resistance', preferredAi: 'chaser', abilityId: 'lizard_camouflage' },
             VOLADOR: { id: 'summer_seagull', name: 'Gaviota', ruleId: 'heat_resistance', preferredAi: 'flyer' },
             ESPECIAL: { id: 'summer_giant_beetle', name: 'Escarabajo gigante', ruleId: 'heat_resistance', preferredAi: 'aggressive' }
         },
         underground: {
-            RASTRERO: { id: 'underground_mole', name: 'Topo', ruleId: 'dark_vision', preferredAi: 'patroller' },
+            RASTRERO: { id: 'underground_mole', name: 'Topo', ruleId: 'dark_vision', preferredAi: 'patroller', abilityId: 'mole_burrow' },
             VOLADOR: { id: 'underground_bat', name: 'Murciélago', ruleId: 'dark_vision', preferredAi: 'flyer' },
             ESPECIAL: { id: 'underground_cave_worm', name: 'Gusano cavernario', ruleId: 'dark_vision', preferredAi: 'aggressive' }
         },
         clouds: {
-            RASTRERO: { id: 'clouds_cloud_creature', name: 'Criatura de nube', ruleId: 'floatation', preferredAi: 'evasive' },
+            RASTRERO: { id: 'clouds_cloud_creature', name: 'Criatura de nube', ruleId: 'floatation', preferredAi: 'evasive', abilityId: 'cloud_ethereal' },
             VOLADOR: { id: 'clouds_celestial_bird', name: 'Ave celestial', ruleId: 'floatation', preferredAi: 'flyer' },
             ESPECIAL: { id: 'clouds_storm_elemental', name: 'Elemental de tormenta', ruleId: 'floatation', preferredAi: 'aggressive' }
         },
         mountains: {
-            RASTRERO: { id: 'mountains_mountain_goat', name: 'Cabra montés', ruleId: 'stability', preferredAi: 'chaser' },
+            RASTRERO: { id: 'mountains_mountain_goat', name: 'Cabra montés', ruleId: 'stability', preferredAi: 'chaser', abilityId: 'goat_stomp' },
             VOLADOR: { id: 'mountains_eagle', name: 'Águila', ruleId: 'stability', preferredAi: 'flyer' },
             ESPECIAL: { id: 'mountains_stone_golem', name: 'Golem de piedra', ruleId: 'stability', preferredAi: 'aggressive' }
         },
         beach: {
-            RASTRERO: { id: 'beach_crab', name: 'Cangrejo', ruleId: 'terrain_mobility', preferredAi: 'patroller' },
+            RASTRERO: { id: 'beach_crab', name: 'Cangrejo', ruleId: 'terrain_mobility', preferredAi: 'patroller', abilityId: 'crab_shell' },
             VOLADOR: { id: 'beach_coastal_gull', name: 'Gaviota costera', ruleId: 'terrain_mobility', preferredAi: 'flyer' },
             ESPECIAL: { id: 'beach_octopus', name: 'Pulpo', ruleId: 'terrain_mobility', preferredAi: 'aggressive' }
         },
         space: {
-            RASTRERO: { id: 'space_alien_insect', name: 'Insecto alienígena', ruleId: 'environment_immunity', preferredAi: 'evasive' },
+            RASTRERO: { id: 'space_alien_insect', name: 'Insecto alienígena', ruleId: 'environment_immunity', preferredAi: 'evasive', abilityId: 'alien_acid' },
             VOLADOR: { id: 'space_organic_drone', name: 'Dron orgánico', ruleId: 'environment_immunity', preferredAi: 'flyer' },
             ESPECIAL: { id: 'space_alien_creature', name: 'Criatura extraterrestre', ruleId: 'environment_immunity', preferredAi: 'aggressive' }
         },
         sky: {
-            RASTRERO: { id: 'sky_celestial_being', name: 'Querubín', ruleId: 'high_altitude_speed', preferredAi: 'chaser' },
+            RASTRERO: { id: 'sky_celestial_being', name: 'Querubín', ruleId: 'high_altitude_speed', preferredAi: 'chaser', abilityId: 'cherub_aura' },
             VOLADOR: { id: 'sky_luminous_bird', name: 'Ave luminosa', ruleId: 'high_altitude_speed', preferredAi: 'flyer' },
             ESPECIAL: { id: 'sky_guardian', name: 'Guardián celeste', ruleId: 'high_altitude_speed', preferredAi: 'aggressive' }
         },
         inferno: {
-            RASTRERO: { id: 'inferno_hellhound', name: 'Sabueso infernal', ruleId: 'lava_immunity', preferredAi: 'chaser' },
+            RASTRERO: { id: 'inferno_hellhound', name: 'Sabueso infernal', ruleId: 'lava_immunity', preferredAi: 'chaser', abilityId: 'hellhound_ember' },
             VOLADOR: { id: 'inferno_flying_demon', name: 'Demonio alado', ruleId: 'lava_immunity', preferredAi: 'flyer' },
             ESPECIAL: { id: 'inferno_imp', name: 'Diablillo', ruleId: 'lava_immunity', preferredAi: 'aggressive' }
         }

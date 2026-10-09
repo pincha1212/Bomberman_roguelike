@@ -173,7 +173,12 @@ function enemyCenterV312(x, y) {
     return gridTileCenter(x, y);
 }
 
-function enemyDangerV312(x, y) {
+function enemyDangerV312(x, y, e = null) {
+    // La Criatura de Nube atraviesa bombas y sus zonas proyectadas; las llamas
+    // que ya están activas siguen siendo peligrosas.
+    if (e && typeof enemyIgnoresBombsV630 === 'function' && enemyIgnoresBombsV630(e)) {
+        return !!gameState.explosions?.some(exp => exp && exp.x === x && exp.y === y);
+    }
     return enemyAI_V312.danger.has(enemyTileKeyV312(x, y));
 }
 
@@ -380,6 +385,7 @@ function enemyImmediateDirectionPassableV312(e, dir, avoidDanger = false, probe 
     return gridCanOccupy(e, nx, ny, {
         kind: 'enemy',
         canFly: !!e.type.canFly,
+        ignoreBombs: typeof enemyIgnoresBombsV630 === 'function' && enemyIgnoresBombsV630(e),
         avoidDanger,
         allowCurrentBombTile: true
     });
@@ -425,6 +431,7 @@ function enemyRecoveryDirectionByPathV312(e) {
             if (!gridCanOccupy(e, center.x, center.y, {
                 kind: 'enemy',
                 canFly: !!e.type.canFly,
+                ignoreBombs: typeof enemyIgnoresBombsV630 === 'function' && enemyIgnoresBombsV630(e),
                 avoidDanger,
                 allowCurrentBombTile: true
             })) continue;
@@ -466,6 +473,7 @@ function enemyDirectionPassableV312(e, dir, avoidDanger = false) {
     return gridCanOccupy(e, center.x, center.y, {
         kind: 'enemy',
         canFly: !!e.type.canFly,
+        ignoreBombs: typeof enemyIgnoresBombsV630 === 'function' && enemyIgnoresBombsV630(e),
         avoidDanger,
         allowCurrentBombTile: true
     });
@@ -498,7 +506,7 @@ function enemyDirectionDangerDistanceV312(e, dir) {
         const tx = start.x + dir.x * i;
         const ty = start.y + dir.y * i;
         if (!gridIsInside(tx, ty)) break;
-        if (enemyDangerV312(tx, ty)) break;
+        if (enemyDangerV312(tx, ty, e)) break;
         if (!gridTileIsBlocked(tx, ty, { canFly: !!e.type.canFly })) safeSteps++;
         else break;
     }
@@ -515,6 +523,7 @@ function enemyCountOpenNeighborsV312(e, x, y) {
         if (gridCanOccupy(e, center.x, center.y, {
             kind: 'enemy',
             canFly: !!e.type.canFly,
+            ignoreBombs: typeof enemyIgnoresBombsV630 === 'function' && enemyIgnoresBombsV630(e),
             avoidDanger: false,
             allowCurrentBombTile: true
         })) count++;
@@ -529,7 +538,8 @@ function enemyChoosePatrolTargetV312(e) {
         const x = 1 + Math.floor(Math.random() * Math.max(1, gameState.gridWidth - 2));
         const y = 1 + Math.floor(Math.random() * Math.max(1, gameState.gridHeight - 2));
         const center = enemyCenterV312(x, y);
-        if (!gridCanOccupy(e, center.x, center.y, { kind: 'enemy', canFly: !!e.type.canFly, avoidDanger: true })) continue;
+        if (!gridCanOccupy(e, center.x, center.y, { kind: 'enemy', canFly: !!e.type.canFly,
+            ignoreBombs: typeof enemyIgnoresBombsV630 === 'function' && enemyIgnoresBombsV630(e), avoidDanger: true })) continue;
         const d = enemyDistanceToV312(x, y, start.x, start.y);
         const options = enemyCountOpenNeighborsV312(e, x, y);
         if (d >= 3 && options >= 2) candidates.push({ x, y, d, options });
@@ -556,7 +566,8 @@ function enemyChooseSurroundTargetV312(e) {
     const et = enemyTileV312(e);
     for (const c of candidates) {
         const center = enemyCenterV312(c.x, c.y);
-        if (!gridCanOccupy(e, center.x, center.y, { kind: 'enemy', canFly: !!e.type.canFly, avoidDanger: true })) continue;
+        if (!gridCanOccupy(e, center.x, center.y, { kind: 'enemy', canFly: !!e.type.canFly,
+            ignoreBombs: typeof enemyIgnoresBombsV630 === 'function' && enemyIgnoresBombsV630(e), avoidDanger: true })) continue;
         const distance = enemyDistanceToV312(c.x, c.y, et.x, et.y);
         const slotPenalty = c.slot === e.ai.slot ? 0 : 0.45;
         const playerEdgePenalty = c.x === et.x && c.y === et.y ? 100 : 0;
@@ -612,8 +623,8 @@ function enemyDirectionScoreV312(e, dir, target, options = {}) {
     const currentDir = e.ai.direction;
     const reverse = ENEMY_OPPOSITE_V312[currentDir] === dir.dir;
     const same = currentDir === dir.dir;
-    const danger = enemyDangerV312(next.x, next.y) ? 1 : 0;
-    const danger2 = enemyDangerV312(next2.x, next2.y) ? 1 : 0;
+    const danger = enemyDangerV312(next.x, next.y, e) ? 1 : 0;
+    const danger2 = enemyDangerV312(next2.x, next2.y, e) ? 1 : 0;
     const distance = enemyDistanceToV312(next.x, next.y, target.x, target.y);
     const distance2 = enemyDistanceToV312(next2.x, next2.y, target.x, target.y);
     const openAhead = enemyDirectionDangerDistanceV312(e, dir);
@@ -663,8 +674,8 @@ function enemyChooseFleeDirectionV312(e) {
     for (const dir of possible) {
         const next = enemyProjectedTileV312(e, dir, 1);
         const next2 = enemyProjectedTileV312(e, dir, 2);
-        const dangerNow = enemyDangerV312(next.x, next.y) ? 1 : 0;
-        const dangerSoon = enemyDangerV312(next2.x, next2.y) ? 1 : 0;
+        const dangerNow = enemyDangerV312(next.x, next.y, e) ? 1 : 0;
+        const dangerSoon = enemyDangerV312(next2.x, next2.y, e) ? 1 : 0;
         const safety = enemyDirectionDangerDistanceV312(e, dir);
         const playerTile = enemyPlayerTileV312();
         const awayFromPlayer = enemyDistanceToV312(next.x, next.y, playerTile.x, playerTile.y);
@@ -779,7 +790,7 @@ function enemyChooseDirectionAtIntersectionV312(e) {
     const ai = e.ai;
     const profile = enemyBehaviorProfileV324(e);
     const tile = enemyTileV312(e);
-    const dangerHere = enemyDangerV312(tile.x, tile.y);
+    const dangerHere = enemyDangerV312(tile.x, tile.y, e);
     const physicalChoices = enemyPhysicalDirectionChoicesV312(e, ai.alert === 'flee');
     const possible = physicalChoices.length && ai.physicalBlocked
         ? physicalChoices
@@ -940,7 +951,7 @@ function updateEnemyIntentV312(e, index, dt) {
     }
 
     const tile = enemyTileV312(e);
-    const dangerHere = enemyDangerV312(tile.x, tile.y);
+    const dangerHere = enemyDangerV312(tile.x, tile.y, e);
     if (!Number.isFinite(ai.dangerCheckTimer)) ai.dangerCheckTimer = 0;
     ai.dangerCheckTimer -= dt;
     let imminentDanger = false;
@@ -948,7 +959,7 @@ function updateEnemyIntentV312(e, index, dt) {
         ai.dangerCheckTimer = 75 + (index % 3) * 12;
         imminentDanger = enemyAvailableDirectionsV312(e, false).some(dir => {
             const next = enemyProjectedTileV312(e, dir, 1);
-            return enemyDangerV312(next.x, next.y);
+            return enemyDangerV312(next.x, next.y, e);
         });
         ai.imminentDanger = imminentDanger;
     } else {
@@ -1074,7 +1085,7 @@ function moveEnemyV312(e, dt) {
     }
 
     if (e._tileMoveActive) {
-        const result = gridAdvanceTileMove(e, speed, dt, { kind:'enemy', canFly:!!e.type.canFly, allowCurrentBombTile:false });
+        const result = gridAdvanceTileMove(e, speed, dt, { kind:'enemy', canFly:!!e.type.canFly, ignoreBombs: typeof enemyIgnoresBombsV630 === 'function' && enemyIgnoresBombsV630(e), allowCurrentBombTile:false });
         if (result.arrived) {
             e.vx = 0;
             e.vy = 0;
@@ -1143,9 +1154,10 @@ function moveEnemyV312(e, dt) {
     const gx = tile.x + dir.x;
     const gy = tile.y + dir.y;
     const started = gridBeginTileMove(e, gx, gy, {
-        kind:'enemy',
-        canFly:!!e.type.canFly,
-        allowCurrentBombTile:false
+        kind: 'enemy',
+        canFly: !!e.type.canFly,
+        ignoreBombs: typeof enemyIgnoresBombsV630 === 'function' && enemyIgnoresBombsV630(e),
+        allowCurrentBombTile: false
     });
     if (!started) {
         // El giro no es instantáneo: 2 s de pausa visible antes de cambiar de

@@ -108,7 +108,8 @@
                 * Number(liquidMods?.playerSpeed || 1)
                 * Number(gameplayMods.speedMultiplier || 1)
                 * (1 + (windBias * 0.045))
-                * (typeof getHazardSpeedFactor === 'function' ? getHazardSpeedFactor() : 1));
+                * (typeof getHazardSpeedFactor === 'function' ? getHazardSpeedFactor() : 1)
+                * (typeof getRastreroPlayerSpeedFactorV630 === 'function' ? getRastreroPlayerSpeedFactorV630(player) : 1));
 
             const playerTile = gridCurrentTile(player, 'player');
             const playerTilePos = gridGetEntityTileCenterPosition(player, playerTile.x, playerTile.y, 'player');

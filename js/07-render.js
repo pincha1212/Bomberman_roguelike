@@ -853,6 +853,8 @@ function draw() {
 
             // V3.3: las trampas aparecen visualmente solo después de activarse.
             drawHazards();
+            // v6.30.0: campos temporales de habilidades RASTRERO, dibujados en el Canvas único.
+            if (typeof drawRastreroAbilityEffectsV630 === 'function') drawRastreroAbilityEffectsV630(ctx);
 
             // Draw Items / Powerups
             for(let i=0;i<gameState.items.length;i++){
@@ -882,7 +884,7 @@ function draw() {
             // Draw Enemies
             for(let i=0;i<gameState.enemies.length;i++){
                 const e=gameState.enemies[i];
-                if(e && isWorldRectVisibleV329(e.x-e.width/2, e.y-e.height/2, e.width, e.height, TILE_SIZE)){ renderStatsV329.enemies++; drawEnemySprite(e); }
+                if(e && isWorldRectVisibleV329(e.x-e.width/2, e.y-e.height/2, e.width, e.height, TILE_SIZE)){ renderStatsV329.enemies++; if (typeof drawRastreroEnemySpriteV630 === 'function') drawRastreroEnemySpriteV630(e, drawEnemySprite); else drawEnemySprite(e); }
             }
             if (getRenderProfileV65().showEnemyAISignals && typeof drawEnemyAISignals === 'function') drawEnemyAISignals();
 
@@ -1159,6 +1161,7 @@ function draw() {
 
         function drawEnemySprite(e) {
             ctx.save();
+            const inheritedAlpha = ctx.globalAlpha;
             const enemySpecies = typeof getEnemyBiomeSpeciesProfileV615 === 'function' ? getEnemyBiomeSpeciesProfileV615(e) : null;
             const enemySkin = enemySpecies || (typeof getEnemySkinV614 === 'function' ? getEnemySkinV614(e) : null);
             const skinBody = enemySkin?.body || e.type.color;
@@ -1167,12 +1170,12 @@ function draw() {
             const skinMotif = enemySkin?.motif || 'classic';
             if (e.elite) {
                 ctx.strokeStyle = gameState.roomType.color;
-                ctx.globalAlpha = 0.45 + Math.sin(gameState.animFrame * 0.15) * 0.1;
+                ctx.globalAlpha = inheritedAlpha * (0.45 + Math.sin(gameState.animFrame * 0.15) * 0.1);
                 ctx.lineWidth = 2;
                 ctx.beginPath();
                 ctx.arc(e.x, e.y, TILE_SIZE * 0.48, 0, Math.PI * 2);
                 ctx.stroke();
-                ctx.globalAlpha = 1;
+                ctx.globalAlpha = inheritedAlpha;
             }
             let floaty = e.type.canFly ? Math.sin((gameState.animFrame + e.x) * 0.1) * 4 : Math.sin((gameState.animFrame + e.x) * 0.3) * 2;
             
@@ -1235,7 +1238,7 @@ function draw() {
             } else if (skinMotif === 'fin') {
                 ctx.beginPath(); ctx.moveTo(e.x, motifY - 16); ctx.lineTo(e.x + 6, motifY - 7); ctx.lineTo(e.x - 2, motifY - 8); ctx.closePath(); ctx.fill();
             } else if (skinMotif === 'visor' || skinMotif === 'drone') {
-                ctx.fillStyle = skinAccent; ctx.globalAlpha = 0.9; ctx.fillRect(e.x - 8, motifY - 5, 16, 5); ctx.globalAlpha = 1;
+                ctx.fillStyle = skinAccent; ctx.globalAlpha = inheritedAlpha * 0.9; ctx.fillRect(e.x - 8, motifY - 5, 16, 5); ctx.globalAlpha = inheritedAlpha;
                 ctx.strokeStyle = skinShade; ctx.beginPath(); ctx.moveTo(e.x, motifY - 12); ctx.lineTo(e.x, motifY - 19); ctx.stroke();
             } else if (skinMotif === 'tech') {
                 ctx.strokeStyle = skinAccent; ctx.strokeRect(e.x - 8, motifY - 14, 16, 20);
@@ -1279,12 +1282,12 @@ function draw() {
 
             if (e.hunterMarkedV676) {
                 ctx.strokeStyle = '#facc15';
-                ctx.globalAlpha = 0.8;
+                ctx.globalAlpha = inheritedAlpha * 0.8;
                 ctx.lineWidth = 2;
                 ctx.beginPath();
                 ctx.arc(e.x, e.y + floaty, TILE_SIZE * 0.50, 0, Math.PI * 2);
                 ctx.stroke();
-                ctx.globalAlpha = 1;
+                ctx.globalAlpha = inheritedAlpha;
             }
 
             ctx.restore();

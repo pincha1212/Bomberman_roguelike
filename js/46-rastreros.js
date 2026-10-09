@@ -1,0 +1,1102 @@
+// BOMBERMAN ROGUELIKE v6.30.0 — Habilidades únicas de los once RASTRERO.
+// Este módulo amplía las autoridades existentes de IA, movimiento, combate y Canvas.
+// No crea una IA paralela ni utiliza gameState.grid para almacenar efectos temporales.
+(function installRastreroAbilitiesV630(global) {
+    'use strict';
+
+    const SPECIES_ABILITIES = Object.freeze({
+        winter_ice_wolf: 'ice_trail',
+        autumn_boar: 'boar_charge',
+        spring_frog: 'frog_leap',
+        summer_lizard: 'lizard_camouflage',
+        underground_mole: 'mole_burrow',
+        clouds_cloud_creature: 'cloud_ethereal',
+        mountains_mountain_goat: 'goat_stomp',
+        beach_crab: 'crab_shell',
+        space_alien_insect: 'alien_acid',
+        sky_celestial_being: 'cherub_aura',
+        inferno_hellhound: 'hellhound_ember'
+    });
+
+    const DIRS = Object.freeze([
+        Object.freeze({ x: 0, y: -1, name: 'up', axis: 'y', dir: -1 }),
+        Object.freeze({ x: 0, y: 1, name: 'down', axis: 'y', dir: 1 }),
+        Object.freeze({ x: -1, y: 0, name: 'left', axis: 'x', dir: -1 }),
+        Object.freeze({ x: 1, y: 0, name: 'right', axis: 'x', dir: 1 })
+    ]);
+
+    const runtime = {
+        clock: 0,
+        roomKey: '',
+        ice: new Map(),
+        acid: new Map(),
+        fire: new Map(),
+        seenExplosions: new Map(),
+        blastMeta: new Map(),
+        pulseSerial: 0
+    };
+
+    function getState() {
+        return global.BOMBER_ENGINE?.getState?.()
+            || global.gameState
+            || (typeof gameState !== 'undefined' ? gameState : null);
+    }
+
+    function getPlayer() {
+        return global.BOMBER_ENGINE?.getPlayer?.()
+            || global.player
+            || (typeof player !== 'undefined' ? player : null);
+    }
+
+    function getTileSize() {
+        return Number(global.BOMBER_ENGINE?.getTileSize?.() || global.TILE_SIZE || (typeof TILE_SIZE !== 'undefined' ? TILE_SIZE : 48)) || 48;
+    }
+
+    function getTypes() {
+        return global.BOMBER_ENGINE?.getWorldTypes?.()
+            || global.TYPES
+            || (typeof TYPES !== 'undefined' ? TYPES : {});
+    }
+
+    function getAbilityId(enemy) {
+        if (!enemy) return null;
+        return enemy.abilityIdV630 || SPECIES_ABILITIES[enemy.speciesIdV626] || null;
+    }
+
+    function isRastrero(enemy) {
+        return !!getAbilityId(enemy);
+    }
+
+    function tileOf(entity, kind = null) {
+        if (!entity) return { x: -1, y: -1 };
+        const s = getState();
+        const tile = getTileSize();
+        const resolvedKind = kind || (entity.__gridAnchor === 'center' ? 'enemy' : 'player');
+        if (typeof global.gridCurrentTile === 'function') {
+            try { return global.gridCurrentTile(entity, resolvedKind); } catch (_) {}
+        }
+        if (resolvedKind === 'player') {
+            return { x: Math.floor((entity.x + entity.width / 2) / tile), y: Math.floor((entity.y + entity.height / 2) / tile) };
+        }
+        return { x: Math.floor(entity.x / tile), y: Math.floor(entity.y / tile) };
+    }
+
+    function tileKey(x, y) { return `${Math.floor(x)},${Math.floor(y)}`; }
+    function isInside(x, y) {
+        const s = getState();
+        return !!s && Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < s.gridWidth && y < s.gridHeight;
+    }
+
+    function roomKeyForState() {
+        const s = getState();
+        if (!s) return 'no-state';
+        const biome = s.biomeOverrideV49 || s.biomeV49?.id || global.getBiomeForDepthV49?.(s.level || 1)?.id || 'unknown';
+        return `${s.level || 1}:${s.roomType?.id || 'unknown'}:${biome}:${s.gridWidth || 0}x${s.gridHeight || 0}`;
+    }
+
+    function ensureRoomState() {
+        const key = roomKeyForState();
+        if (runtime.roomKey === key) return;
+        runtime.roomKey = key;
+        runtime.ice.clear();
+        runtime.acid.clear();
+        runtime.fire.clear();
+        runtime.seenExplosions.clear();
+        runtime.blastMeta.clear();
+        const p = getPlayer();
+        if (p) {
+            p.__rastreroSlowTimerV630 = 0;
+            p.__rastreroAcidLastTileV630 = null;
+            p.__rastreroIceSlipSourceV630 = null;
+            p.__rastreroIceSlipPendingV630 = false;
+        }
+    }
+
+    function addTimedTile(map, x, y, durationMs, kind) {
+        const s = getState();
+        if (!s || !isInside(x, y)) return;
+        const key = tileKey(x, y);
+        map.set(key, {
+            x, y,
+            kind,
+            createdAt: runtime.clock,
+            durationMs,
+            expiresAt: runtime.clock + durationMs
+        });
+    }
+
+    function effectAt(map, x, y) {
+        const effect = map.get(tileKey(x, y));
+        return effect && effect.expiresAt > runtime.clock ? effect : null;
+    }
+
+    function cleanupEffects() {
+        for (const map of [runtime.ice, runtime.acid, runtime.fire]) {
+            for (const [key, effect] of map) {
+                if (!effect || effect.expiresAt <= runtime.clock) map.delete(key);
+            }
+        }
+        for (const [id, meta] of runtime.blastMeta) {
+            if (runtime.clock - meta.createdAt > 8000) runtime.blastMeta.delete(id);
+        }
+    }
+
+    function resetTransientStateV630() {
+        runtime.roomKey = '';
+        runtime.clock = 0;
+        runtime.pulseSerial = 0;
+        runtime.ice.clear();
+        runtime.acid.clear();
+        runtime.fire.clear();
+        runtime.seenExplosions.clear();
+        runtime.blastMeta.clear();
+        const p = getPlayer();
+        if (p) {
+            p.__rastreroSlowTimerV630 = 0;
+            p.__rastreroAcidLastTileV630 = null;
+            p.__rastreroIceSlipSourceV630 = null;
+            p.__rastreroIceSlipPendingV630 = false;
+            p.__rastreroIceSlipDirV630 = null;
+        }
+    }
+
+    function installLevelResetHook() {
+        const baseInitLevel = global.initLevel;
+        if (typeof baseInitLevel !== 'function' || baseInitLevel.__rastreroV630ResetWrapped) return;
+        const wrappedInitLevel = function initLevelWithRastreroResetV630(...args) {
+            // Los efectos del nivel anterior nunca se arrastran a otro mapa/run,
+            // incluso si la nueva sala reutiliza profundidad y dimensiones.
+            resetTransientStateV630();
+            const result = baseInitLevel.apply(this, args);
+            runtime.roomKey = '';
+            return result;
+        };
+        wrappedInitLevel.__rastreroV630ResetWrapped = true;
+        global.initLevel = wrappedInitLevel;
+    }
+
+    function ensureEnemyState(enemy) {
+        if (!enemy || !isRastrero(enemy)) return null;
+        if (!enemy.__rastreroV630) {
+            enemy.__rastreroV630 = {
+                lastTile: null,
+                lastBlastId: null,
+                shellIntact: getAbilityId(enemy) === 'crab_shell',
+                chargeState: 'idle',
+                chargeCooldownMs: 1400 + Math.random() * 1000,
+                chargeTelegraphMs: 0,
+                chargeTravelTiles: 0,
+                chargeDirection: null,
+                chargeRecoverMs: 0,
+                chargeStepOrigin: null,
+                frogJumpCooldownMs: 2100 + Math.random() * 1200,
+                frogJumpMs: 0,
+                frogJumpDurationMs: 280,
+                frogJumpFrom: null,
+                frogJumpTo: null,
+                moleBuriedMs: 0,
+                moleSavedBlastId: null,
+                goatCooldownMs: 2000 + Math.random() * 1100,
+                goatTelegraphMs: 0,
+                goatEffectMs: 0,
+                cherubCooldownMs: 4350,
+                cherubTelegraphMs: 0,
+                cherubPulseMs: 0,
+                hellhoundBoostMs: 0
+            };
+        }
+        const a = enemy.__rastreroV630;
+        if (!a.lastTile) a.lastTile = tileOf(enemy, 'enemy');
+        return a;
+    }
+
+    function isEnemyBuried(enemy) {
+        return Number(enemy?.__rastreroV630?.moleBuriedMs || 0) > 0;
+    }
+
+    function isTileSolid(x, y) {
+        if (!isInside(x, y)) return true;
+        const s = getState();
+        const types = getTypes();
+        const value = s.grid?.[y]?.[x];
+        return value === types.WALL || value === types.BLOCK;
+    }
+
+    function bombAt(x, y, ignoredBomb = null) {
+        const s = getState();
+        return s?.bombs?.find(b => b && b !== ignoredBomb && b.x === x && b.y === y && b.state !== 'moving' && b.state !== 'carried') || null;
+    }
+
+    function explosionAt(x, y) {
+        const s = getState();
+        return !!s?.explosions?.some(exp => exp && exp.x === x && exp.y === y);
+    }
+
+    function entityAt(x, y, ignoredEntity = null) {
+        const s = getState();
+        const p = getPlayer();
+        if (p && p !== ignoredEntity) {
+            const pt = tileOf(p, 'player');
+            if (pt.x === x && pt.y === y) return true;
+        }
+        for (const enemy of s?.enemies || []) {
+            if (!enemy || enemy === ignoredEntity || isEnemyBuried(enemy)) continue;
+            const et = tileOf(enemy, 'enemy');
+            if (et.x === x && et.y === y) return true;
+        }
+        return false;
+    }
+
+    function isSafeTile(x, y, ignoredEntity = null, ignoredBomb = null) {
+        const s = getState();
+        if (!s || !isInside(x, y) || isTileSolid(x, y)) return false;
+        const types = getTypes();
+        const tileValue = s.grid?.[y]?.[x];
+        if (tileValue === types.EXIT_LOCKED) return false;
+        if (bombAt(x, y, ignoredBomb) || explosionAt(x, y) || entityAt(x, y, ignoredEntity)) return false;
+        return true;
+    }
+
+    function isCenteredOnTile(entity) {
+        if (!entity || entity._tileMoveActive) return false;
+        if (typeof global.gridIsNearTileCenter === 'function') return global.gridIsNearTileCenter(entity, 1.5);
+        const t = tileOf(entity, 'enemy');
+        const size = getTileSize();
+        return Math.abs(entity.x - (t.x + 0.5) * size) < 1.5 && Math.abs(entity.y - (t.y + 0.5) * size) < 1.5;
+    }
+
+    function tileDistance(a, b) {
+        return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    }
+
+    function lineClear(a, b) {
+        if (a.x !== b.x && a.y !== b.y) return false;
+        const dx = Math.sign(b.x - a.x), dy = Math.sign(b.y - a.y);
+        let x = a.x + dx, y = a.y + dy;
+        while (x !== b.x || y !== b.y) {
+            if (isTileSolid(x, y)) return false;
+            x += dx; y += dy;
+        }
+        return true;
+    }
+
+    function tileHasCover(enemy) {
+        const tile = tileOf(enemy, 'enemy');
+        return DIRS.some(dir => isTileSolid(tile.x + dir.x, tile.y + dir.y));
+    }
+
+    function isLizardCamouflaged(enemy) {
+        if (getAbilityId(enemy) !== 'lizard_camouflage' || !tileHasCover(enemy)) return false;
+        const eTile = tileOf(enemy, 'enemy');
+        const pTile = tileOf(getPlayer(), 'player');
+        if (tileDistance(eTile, pTile) <= 2) return false;
+        const sharesOpenCorridor = (eTile.x === pTile.x || eTile.y === pTile.y) && lineClear(eTile, pTile);
+        return !sharesOpenCorridor;
+    }
+
+    function getPlayerSpeedFactor(entity) {
+        const p = entity || getPlayer();
+        if (!p) return 1;
+        let factor = Number(p.__rastreroSlowTimerV630 || 0) > 0 ? 0.50 : 1;
+        const tile = tileOf(p, 'player');
+        if (effectAt(runtime.ice, tile.x, tile.y)) factor *= 0.86;
+        return Math.max(0.35, factor);
+    }
+
+    function applyPlayerSlow(durationMs = 800) {
+        const p = getPlayer();
+        if (!p) return;
+        p.__rastreroSlowTimerV630 = Math.max(Number(p.__rastreroSlowTimerV630 || 0), durationMs);
+    }
+
+    function directionByName(name) {
+        return DIRS.find(dir => dir.name === String(name || '').toLowerCase()) || null;
+    }
+
+    function canBeginPlayerTileMove(dir) {
+        const p = getPlayer();
+        if (!p || !dir || typeof global.gridCanOccupy !== 'function' || typeof global.gridGetEntityTileCenterPosition !== 'function') return false;
+        const tile = tileOf(p, 'player');
+        const x = tile.x + dir.x, y = tile.y + dir.y;
+        if (!isInside(x, y)) return false;
+        const pos = global.gridGetEntityTileCenterPosition(p, x, y, 'player');
+        return global.gridCanOccupy(p, pos.x, pos.y, { kind: 'player', allowCurrentBombTile: true });
+    }
+
+    function installPlayerIceTraction() {
+        const baseInput = global.getCardinalInput;
+        if (typeof baseInput !== 'function' || baseInput.__rastreroV630Wrapped) return;
+        const wrapped = function getCardinalInputWithIceV630() {
+            const input = baseInput();
+            const p = getPlayer();
+            if (!p || p._tileMoveActive) return input;
+            const tile = tileOf(p, 'player');
+            const key = tileKey(tile.x, tile.y);
+            if (!effectAt(runtime.ice, tile.x, tile.y)) {
+                p.__rastreroIceSlipSourceV630 = null;
+                p.__rastreroIceSlipPendingV630 = false;
+                return input;
+            }
+            if (p.__rastreroIceSlipSourceV630 !== key) {
+                p.__rastreroIceSlipSourceV630 = key;
+                p.__rastreroIceSlipPendingV630 = true;
+                p.__rastreroIceSlipDirV630 = directionByName(p.dir || p.lastDirection);
+            }
+            if (!p.__rastreroIceSlipPendingV630 || !input?.axis || !p.__rastreroIceSlipDirV630) return input;
+            const dir = p.__rastreroIceSlipDirV630;
+            if (!canBeginPlayerTileMove(dir)) {
+                // Una pared o bomba corta el deslizamiento: nunca bloqueamos al jugador.
+                p.__rastreroIceSlipPendingV630 = false;
+                return input;
+            }
+            p.__rastreroIceSlipPendingV630 = false;
+            return { axis: dir.axis, dir: dir.dir };
+        };
+        wrapped.__rastreroV630Wrapped = true;
+        global.getCardinalInput = wrapped;
+    }
+
+    function startBoarCharge(enemy, a, direction, playerDistance) {
+        a.chargeState = 'telegraph';
+        a.chargeDirection = { x: direction.x, y: direction.y, name: direction.name };
+        a.chargeTelegraphMs = 650;
+        a.chargeTravelTiles = 0;
+        a.chargeCooldownMs = Math.max(a.chargeCooldownMs, 4000);
+        enemy.__rastreroBoarTelegraphV630 = true;
+        if (typeof global.addFloatingText === 'function') {
+            global.addFloatingText('¡CARGA!', enemy.x, enemy.y - enemy.height * 0.65, '#fb923c');
+        }
+    }
+
+    function findBoarChargeDirection(enemy) {
+        const p = getPlayer();
+        if (!p) return null;
+        const et = tileOf(enemy, 'enemy');
+        const pt = tileOf(p, 'player');
+        const distance = tileDistance(et, pt);
+        if (distance < 2 || distance > 6) return null;
+        if (et.x === pt.x && et.y !== pt.y && lineClear(et, pt)) {
+            return { x: 0, y: Math.sign(pt.y - et.y), name: pt.y < et.y ? 'up' : 'down' };
+        }
+        if (et.y === pt.y && et.x !== pt.x && lineClear(et, pt)) {
+            return { x: Math.sign(pt.x - et.x), y: 0, name: pt.x < et.x ? 'left' : 'right' };
+        }
+        return null;
+    }
+
+    function finishBoarCharge(enemy, a, recoverMs = 450) {
+        a.chargeState = 'recover';
+        a.chargeRecoverMs = recoverMs;
+        a.chargeTelegraphMs = 0;
+        a.chargeTravelTiles = 0;
+        enemy.__rastreroBoarTelegraphV630 = false;
+        enemy.vx = 0;
+        enemy.vy = 0;
+        if (enemy._tileMoveActive && a.chargeStepOrigin && typeof global.gridSnapEntityToTile === 'function') {
+            global.gridSnapEntityToTile(enemy, a.chargeStepOrigin.x, a.chargeStepOrigin.y, 'enemy');
+        }
+        a.chargeStepOrigin = null;
+        if (typeof global.gridResetTileMove === 'function') global.gridResetTileMove(enemy, true);
+    }
+
+    function canPlacePushedBombAt(x, y, bomb, boar) {
+        if (!isInside(x, y) || isTileSolid(x, y) || bombAt(x, y, bomb) || explosionAt(x, y)) return false;
+        return !entityAt(x, y, boar);
+    }
+
+    function pushPlayerBombTwoTiles(bomb, dir, boar) {
+        const s = getState();
+        const states = global.BOMB_V4_STATES || {};
+        if (!bomb || bomb.owner !== 'player' || bomb.state !== states.ARMED || bomb.carriedBy) return false;
+        if (typeof global.startBombV4Motion !== 'function') return false;
+        const x1 = bomb.x + dir.x, y1 = bomb.y + dir.y;
+        const x2 = bomb.x + dir.x * 2, y2 = bomb.y + dir.y * 2;
+        if (!canPlacePushedBombAt(x1, y1, bomb, boar) || !canPlacePushedBombAt(x2, y2, bomb, boar)) return false;
+        const tile = getTileSize();
+        const oldQueue = Array.isArray(bomb.motionQueue) ? bomb.motionQueue.slice() : [];
+        bomb.motionQueue = [{ x: x2, y: y2, durationMs: 190, arc: 1 }];
+        const started = global.startBombV4Motion(bomb, (x1 + 0.5) * tile, (y1 + 0.5) * tile, 190, 1);
+        if (!started) {
+            bomb.motionQueue = oldQueue;
+            return false;
+        }
+        bomb.interactionMotionV682 = 'boar-shove';
+        bomb.interactionActorV682 = boar;
+        bomb.playerPassThrough = true;
+        if (typeof global.addParticles === 'function') global.addParticles((x1 + 0.5) * tile, (y1 + 0.5) * tile, '#fb923c', 5);
+        return true;
+    }
+
+    function runBoarCharge(enemy, a, dt) {
+        const s = getState();
+        if (a.chargeState === 'telegraph' || a.chargeState === 'recover') {
+            enemy.vx = 0;
+            enemy.vy = 0;
+            return true;
+        }
+        if (a.chargeState !== 'charging' || !s) return false;
+        const dir = a.chargeDirection;
+        if (!dir || typeof global.gridBeginTileMove !== 'function' || typeof global.gridAdvanceTileMove !== 'function') {
+            finishBoarCharge(enemy, a);
+            return true;
+        }
+        const tileNow = tileOf(enemy, 'enemy');
+        if (!enemy._tileMoveActive) {
+            const nx = tileNow.x + dir.x, ny = tileNow.y + dir.y;
+            const bomb = bombAt(nx, ny);
+            if (bomb) {
+                pushPlayerBombTwoTiles(bomb, dir, enemy);
+                finishBoarCharge(enemy, a, 600);
+                return true;
+            }
+            if (isTileSolid(nx, ny) || !isInside(nx, ny)) {
+                finishBoarCharge(enemy, a, 600);
+                return true;
+            }
+            const started = global.gridBeginTileMove(enemy, nx, ny, {
+                kind: 'enemy', canFly: false, ignoreBombs: false, allowCurrentBombTile: false
+            });
+            if (!started) {
+                const blockerBomb = bombAt(nx, ny);
+                if (blockerBomb) pushPlayerBombTwoTiles(blockerBomb, dir, enemy);
+                finishBoarCharge(enemy, a, 600);
+                return true;
+            }
+            a.chargeStepOrigin = { x: tileNow.x, y: tileNow.y };
+            enemy.lastDirection = dir.name;
+            enemy.vx = dir.x;
+            enemy.vy = dir.y;
+        }
+        const baseSpeed = typeof global.getEnemyMovementSpeedV610 === 'function'
+            ? global.getEnemyMovementSpeedV610(enemy)
+            : Math.max(1, Number(enemy.baseSpeed || enemy.speed || 1));
+        const result = global.gridAdvanceTileMove(enemy, Math.max(2, baseSpeed * 2.65), dt, {
+            kind: 'enemy', canFly: false, ignoreBombs: false, allowCurrentBombTile: false
+        });
+        if (result.arrived) {
+            a.chargeStepOrigin = null;
+            a.chargeTravelTiles += 1;
+            if (a.chargeTravelTiles >= 3) finishBoarCharge(enemy, a, 500);
+        } else if (result.blocked) {
+            finishBoarCharge(enemy, a, 600);
+        }
+        return true;
+    }
+
+    function tryStartFrogLeap(enemy, a) {
+        if (a.frogJumpMs > 0 || a.frogJumpCooldownMs > 0 || !isCenteredOnTile(enemy)) return false;
+        const tile = tileOf(enemy, 'enemy');
+        const preferred = directionByName(enemy.ai?.direction || enemy.lastDirection);
+        const ordered = preferred ? [preferred, ...DIRS.filter(dir => dir.name !== preferred.name)] : DIRS;
+        const size = getTileSize();
+        for (const dir of ordered) {
+            const bx = tile.x + dir.x, by = tile.y + dir.y;
+            const lx = tile.x + dir.x * 2, ly = tile.y + dir.y * 2;
+            const types = getTypes();
+            if (!isInside(bx, by) || getState().grid?.[by]?.[bx] !== types.BLOCK) continue;
+            if (!isSafeTile(lx, ly, enemy)) continue;
+            a.frogJumpFrom = { x: (tile.x + 0.5) * size, y: (tile.y + 0.5) * size };
+            a.frogJumpTo = { x: (lx + 0.5) * size, y: (ly + 0.5) * size };
+            a.frogJumpMs = a.frogJumpDurationMs;
+            a.frogJumpCooldownMs = 4500;
+            if (typeof global.gridResetTileMove === 'function') global.gridResetTileMove(enemy, true);
+            enemy.vx = 0;
+            enemy.vy = 0;
+            enemy.__rastreroFrogJumpStartedV630 = runtime.clock;
+            return true;
+        }
+        return false;
+    }
+
+    function advanceFrogLeap(enemy, a, dt) {
+        if (!a.frogJumpFrom || !a.frogJumpTo || a.frogJumpMs <= 0) return false;
+        a.frogJumpMs = Math.max(0, a.frogJumpMs - Math.max(0, Number(dt) || 0));
+        const progress = 1 - a.frogJumpMs / Math.max(1, a.frogJumpDurationMs);
+        enemy.x = a.frogJumpFrom.x + (a.frogJumpTo.x - a.frogJumpFrom.x) * progress;
+        enemy.y = a.frogJumpFrom.y + (a.frogJumpTo.y - a.frogJumpFrom.y) * progress;
+        enemy.vx = 0;
+        enemy.vy = 0;
+        if (a.frogJumpMs <= 0) {
+            enemy.x = a.frogJumpTo.x;
+            enemy.y = a.frogJumpTo.y;
+            a.frogJumpFrom = null;
+            a.frogJumpTo = null;
+            enemy.__rastreroLastTileV630 = tileOf(enemy, 'enemy');
+            if (typeof global.gridResetTileMove === 'function') global.gridResetTileMove(enemy, true);
+        }
+        return true;
+    }
+
+    function playerIsCorneredNear(enemy) {
+        const p = getPlayer();
+        if (!p) return false;
+        const pt = tileOf(p, 'player');
+        const et = tileOf(enemy, 'enemy');
+        if (tileDistance(pt, et) > 2) return false;
+        let blocked = 0;
+        for (const dir of DIRS) {
+            const x = pt.x + dir.x, y = pt.y + dir.y;
+            if (!isInside(x, y) || isTileSolid(x, y) || bombAt(x, y)) blocked++;
+        }
+        return blocked >= 3;
+    }
+
+    function startGoatStomp(enemy, a) {
+        if (a.goatCooldownMs > 0 || a.goatTelegraphMs > 0 || a.goatEffectMs > 0) return false;
+        a.goatTelegraphMs = 600;
+        a.goatCooldownMs = 7000;
+        enemy.__rastreroGoatTelegraphV630 = true;
+        return true;
+    }
+
+    function performGoatStomp(enemy, a) {
+        a.goatEffectMs = 240;
+        enemy.__rastreroGoatTelegraphV630 = false;
+        const pt = tileOf(getPlayer(), 'player');
+        const et = tileOf(enemy, 'enemy');
+        if (Math.abs(pt.x - et.x) <= 1 && Math.abs(pt.y - et.y) <= 1) applyPlayerSlow(800);
+        if (typeof global.addParticles === 'function') global.addParticles(enemy.x, enemy.y, '#c4b5a5', 9);
+        if (typeof global.triggerScreenShake === 'function') global.triggerScreenShake(3, 130);
+    }
+
+    function triggerGoatStompOnHit(enemy, a) {
+        // El impacto puede activarlo, pero siempre conserva el aviso previo.
+        if (a.goatCooldownMs > 0 || a.goatTelegraphMs > 0) return;
+        startGoatStomp(enemy, a);
+    }
+
+    function updateEnemyAbilityTimers(enemy, a, dt) {
+        const delta = Math.max(0, Number(dt) || 0);
+        if (a.chargeCooldownMs > 0) a.chargeCooldownMs = Math.max(0, a.chargeCooldownMs - delta);
+        if (a.chargeRecoverMs > 0) {
+            a.chargeRecoverMs = Math.max(0, a.chargeRecoverMs - delta);
+            if (a.chargeRecoverMs <= 0 && a.chargeState === 'recover') a.chargeState = 'idle';
+        }
+        if (a.chargeState === 'telegraph') {
+            a.chargeTelegraphMs = Math.max(0, a.chargeTelegraphMs - delta);
+            if (a.chargeTelegraphMs <= 0) a.chargeState = 'charging';
+        }
+        if (a.frogJumpCooldownMs > 0) a.frogJumpCooldownMs = Math.max(0, a.frogJumpCooldownMs - delta);
+        if (a.goatCooldownMs > 0) a.goatCooldownMs = Math.max(0, a.goatCooldownMs - delta);
+        if (a.goatEffectMs > 0) a.goatEffectMs = Math.max(0, a.goatEffectMs - delta);
+        if (a.goatTelegraphMs > 0) {
+            a.goatTelegraphMs = Math.max(0, a.goatTelegraphMs - delta);
+            if (a.goatTelegraphMs <= 0) performGoatStomp(enemy, a);
+        }
+        if (a.cherubPulseMs > 0) a.cherubPulseMs = Math.max(0, a.cherubPulseMs - delta);
+        if (a.cherubTelegraphMs > 0) {
+            a.cherubTelegraphMs = Math.max(0, a.cherubTelegraphMs - delta);
+            if (a.cherubTelegraphMs <= 0) fireCherubPulse(enemy, a);
+        } else {
+            a.cherubCooldownMs = Math.max(0, a.cherubCooldownMs - delta);
+            if (a.cherubCooldownMs <= 0) {
+                a.cherubCooldownMs = 4350;
+                a.cherubTelegraphMs = 650;
+            }
+        }
+        if (a.hellhoundBoostMs > 0) a.hellhoundBoostMs = Math.max(0, a.hellhoundBoostMs - delta);
+
+        if (a.moleBuriedMs > 0) {
+            a.moleBuriedMs = Math.max(0, a.moleBuriedMs - delta);
+            if (a.moleBuriedMs <= 0) emergeMole(enemy, a);
+        }
+
+        if (getAbilityId(enemy) === 'boar_charge' && a.chargeState === 'idle' && a.chargeCooldownMs <= 0 && isCenteredOnTile(enemy)) {
+            const direction = findBoarChargeDirection(enemy);
+            if (direction) startBoarCharge(enemy, a, direction, 0);
+        }
+        if (getAbilityId(enemy) === 'frog_leap') tryStartFrogLeap(enemy, a);
+        if (getAbilityId(enemy) === 'goat_stomp' && a.goatCooldownMs <= 0 && a.goatTelegraphMs <= 0 && playerIsCorneredNear(enemy)) {
+            startGoatStomp(enemy, a);
+        }
+    }
+
+    function fireCherubPulse(enemy, a) {
+        const s = getState();
+        if (!s) return;
+        a.cherubPulseMs = 300;
+        runtime.pulseSerial++;
+        const et = tileOf(enemy, 'enemy');
+        const tile = getTileSize();
+        let affected = 0;
+        for (const bomb of s.bombs || []) {
+            if (!bomb || bomb.owner !== 'player' || bomb.state === 'moving' || bomb.state === 'carried') continue;
+            if (tileDistance(et, { x: bomb.x, y: bomb.y }) > 2) continue;
+            const oldTimer = Number(bomb.timer);
+            if (!Number.isFinite(oldTimer) || oldTimer <= 800) continue;
+            bomb.timer = Math.max(800, oldTimer - 500);
+            bomb.warnBucket = Math.ceil(bomb.timer / 300);
+            bomb.__cherubLastPulseV630 = runtime.pulseSerial;
+            affected++;
+        }
+        if (affected && typeof global.addFloatingText === 'function') {
+            global.addFloatingText('AURA: MECHA ACELERADA', enemy.x, enemy.y - tile * 0.6, '#e9d5ff');
+        }
+        if (typeof global.addParticles === 'function') global.addParticles(enemy.x, enemy.y, '#c4b5fd', 5);
+    }
+
+    function emergeMole(enemy, a) {
+        const tile = tileOf(enemy, 'enemy');
+        const candidates = DIRS
+            .map(dir => ({ x: tile.x + dir.x, y: tile.y + dir.y }))
+            .filter(pos => isSafeTile(pos.x, pos.y, enemy));
+        if (!candidates.length) {
+            a.moleBuriedMs = 250;
+            return false;
+        }
+        candidates.sort((one, two) => {
+            const pTile = tileOf(getPlayer(), 'player');
+            return tileDistance(two, pTile) - tileDistance(one, pTile);
+        });
+        const dest = candidates[0];
+        if (typeof global.gridSnapEntityToTile === 'function') global.gridSnapEntityToTile(enemy, dest.x, dest.y, 'enemy');
+        else {
+            const size = getTileSize();
+            enemy.x = (dest.x + 0.5) * size;
+            enemy.y = (dest.y + 0.5) * size;
+        }
+        a.moleBuriedMs = 0;
+        a.moleSavedBlastId = null;
+        enemy.__rastreroLastTileV630 = dest;
+        enemy._tileMoveActive = false;
+        enemy.vx = 0;
+        enemy.vy = 0;
+        if (enemy.ai) {
+            enemy.ai.wallPauseMs = 0;
+            enemy.ai.wallPauseExpired = false;
+            enemy.ai.stuckTimer = 0;
+        }
+        if (typeof global.addParticles === 'function') global.addParticles(enemy.x, enemy.y, '#b58a57', 6);
+        return true;
+    }
+
+    function updateEnemyAIAbilities(dt) {
+        const s = getState();
+        if (!s || !s.isPlaying || s.paused) return;
+        ensureRoomState();
+        for (const enemy of s.enemies || []) {
+            if (!enemy || !isRastrero(enemy)) continue;
+            const a = ensureEnemyState(enemy);
+            updateEnemyAbilityTimers(enemy, a, dt);
+        }
+    }
+
+    function postEnemyAIMovement() {
+        const s = getState();
+        if (!s) return;
+        for (const enemy of s.enemies || []) {
+            if (!enemy || !isRastrero(enemy) || isEnemyBuried(enemy)) continue;
+            const a = ensureEnemyState(enemy);
+            // Los efectos se registran solo en centros de tile, nunca a mitad
+            // de una interpolación entre casillas.
+            if (enemy._tileMoveActive || !isCenteredOnTile(enemy)) continue;
+            const current = tileOf(enemy, 'enemy');
+            const previous = a.lastTile || current;
+            if (previous.x !== current.x || previous.y !== current.y) {
+                if (getAbilityId(enemy) === 'ice_trail') {
+                    addTimedTile(runtime.ice, previous.x, previous.y, 2500, 'ice');
+                }
+                if (getAbilityId(enemy) === 'hellhound_ember' && effectAt(runtime.fire, current.x, current.y)) {
+                    a.hellhoundBoostMs = 3000;
+                    if (typeof global.addParticles === 'function') global.addParticles(enemy.x, enemy.y, '#fb923c', 4);
+                }
+                a.lastTile = current;
+            } else {
+                a.lastTile = current;
+            }
+        }
+    }
+
+    function installAIHooks() {
+        const baseUpdateAI = global.updateEnemyAI;
+        if (typeof baseUpdateAI === 'function' && !baseUpdateAI.__rastreroV630Wrapped) {
+            const wrappedUpdateAI = function updateEnemyAIWithRastrerosV630(dt) {
+                const s = getState();
+                if (!s || !s.isPlaying || s.paused) return baseUpdateAI(dt);
+                ensureRoomState();
+                for (const enemy of s.enemies || []) {
+                    if (enemy && isRastrero(enemy)) ensureEnemyState(enemy);
+                }
+                updateEnemyAIAbilities(dt);
+                const result = baseUpdateAI(dt);
+                postEnemyAIMovement();
+                return result;
+            };
+            wrappedUpdateAI.__rastreroV630Wrapped = true;
+            global.updateEnemyAI = wrappedUpdateAI;
+        }
+
+        const baseMoveEnemy = global.moveEnemyV312;
+        if (typeof baseMoveEnemy === 'function' && !baseMoveEnemy.__rastreroV630Wrapped) {
+            const wrappedMoveEnemy = function moveEnemyWithRastreroAbilitiesV630(enemy, dt) {
+                const ability = getAbilityId(enemy);
+                if (!ability) return baseMoveEnemy(enemy, dt);
+                const a = ensureEnemyState(enemy);
+                if (a.moleBuriedMs > 0) {
+                    enemy.vx = 0;
+                    enemy.vy = 0;
+                    return;
+                }
+                if (ability === 'boar_charge' && a.chargeState !== 'idle') {
+                    return runBoarCharge(enemy, a, dt);
+                }
+                if (ability === 'frog_leap' && a.frogJumpMs > 0) {
+                    return advanceFrogLeap(enemy, a, dt);
+                }
+                return baseMoveEnemy(enemy, dt);
+            };
+            wrappedMoveEnemy.__rastreroV630Wrapped = true;
+            global.moveEnemyV312 = wrappedMoveEnemy;
+        }
+
+        const baseMoveSpeed = global.getEnemyMovementSpeedV610;
+        if (typeof baseMoveSpeed === 'function' && !baseMoveSpeed.__rastreroV630Wrapped) {
+            const wrappedMoveSpeed = function getEnemyMovementSpeedWithRastrerosV630(enemy) {
+                let speed = baseMoveSpeed(enemy);
+                const ability = getAbilityId(enemy);
+                const a = enemy?.__rastreroV630;
+                if (ability === 'crab_shell') {
+                    const targetGX = Number.isFinite(enemy._tileMoveTargetGX) ? enemy._tileMoveTargetGX : null;
+                    const targetGY = Number.isFinite(enemy._tileMoveTargetGY) ? enemy._tileMoveTargetGY : null;
+                    const tile = tileOf(enemy, 'enemy');
+                    const horizontal = targetGX !== null ? targetGX !== tile.x : ['left', 'right'].includes(String(enemy.ai?.direction || enemy.lastDirection));
+                    if (horizontal) speed *= 1.4;
+                }
+                if (ability === 'hellhound_ember' && Number(a?.hellhoundBoostMs || 0) > 0) speed *= 1.3;
+                return speed;
+            };
+            wrappedMoveSpeed.__rastreroV630Wrapped = true;
+            global.getEnemyMovementSpeedV610 = wrappedMoveSpeed;
+        }
+
+    }
+
+    function enemyIgnoresBombs(enemy) {
+        return getAbilityId(enemy) === 'cloud_ethereal';
+    }
+
+    function handleEnemyBlast(enemy, explosion) {
+        if (!enemy || !explosion) return false;
+        const ability = getAbilityId(enemy);
+        if (!ability) return false;
+        const a = ensureEnemyState(enemy);
+        const blastId = Number(explosion.blastId);
+        if (isEnemyBuried(enemy)) return true;
+
+        if (ability === 'crab_shell') {
+            if (Number.isFinite(blastId) && a.lastBlastId === blastId) return true;
+            if (a.shellIntact) {
+                a.shellIntact = false;
+                a.lastBlastId = Number.isFinite(blastId) ? blastId : `frame-${getState()?.animFrame || 0}`;
+                if (typeof global.addFloatingText === 'function') global.addFloatingText('¡CAPARAZÓN ROTO!', enemy.x, enemy.y - enemy.height * 0.6, '#fdba74');
+                if (typeof global.addParticles === 'function') global.addParticles(enemy.x, enemy.y, '#f5d0a0', 10);
+                return true;
+            }
+            return Number.isFinite(blastId) && a.lastBlastId === blastId;
+        }
+
+        if (ability === 'mole_burrow') {
+            const meta = runtime.blastMeta.get(blastId);
+            const enemyTile = tileOf(enemy, 'enemy');
+            if (!meta || meta.owner !== 'player' || !Number.isFinite(blastId)) return false;
+            if (a.moleSavedBlastId === blastId) return true;
+            if (enemyTile.x !== explosion.x || enemyTile.y !== explosion.y) return false;
+            const dx = enemyTile.x - meta.x, dy = enemyTile.y - meta.y;
+            if (dx !== 0 && dy !== 0) return false;
+            const edgeDistance = Math.abs(dx) + Math.abs(dy);
+            if (edgeDistance === 0) return false;
+            const direction = dx === 0 ? (dy < 0 ? 'up' : 'down') : (dx < 0 ? 'left' : 'right');
+            const effectiveReach = Number(meta.directionReach?.[direction] || 0);
+            if (effectiveReach <= 0 || edgeDistance < effectiveReach) return false;
+            a.moleBuriedMs = 1500;
+            a.moleSavedBlastId = blastId;
+            enemy._tileMoveActive = false;
+            enemy.vx = 0;
+            enemy.vy = 0;
+            if (typeof global.addParticles === 'function') global.addParticles(enemy.x, enemy.y, '#b58a57', 7);
+            if (typeof global.addFloatingText === 'function') global.addFloatingText('¡SE ENTERRÓ!', enemy.x, enemy.y - enemy.height * 0.55, '#d6b48c');
+            return true;
+        }
+
+        if (ability === 'goat_stomp') triggerGoatStompOnHit(enemy, a);
+        return false;
+    }
+
+    function onEnemyDefeated(enemy, explosion) {
+        if (getAbilityId(enemy) !== 'alien_acid' || !explosion || explosion.owner === 'boss') return false;
+        const tile = tileOf(enemy, 'enemy');
+        addTimedTile(runtime.acid, tile.x, tile.y, 4000, 'acid');
+        if (typeof global.addFloatingText === 'function') global.addFloatingText('ÁCIDO', (tile.x + 0.5) * getTileSize(), (tile.y + 0.35) * getTileSize(), '#86efac');
+        if (typeof global.addParticles === 'function') global.addParticles(enemy.x, enemy.y, '#84cc16', 10);
+        return true;
+    }
+
+    function registerBlastMeta() {
+        const bus = global.gameEventBus;
+        const eventName = global.GAME_EVENTS_V60?.BOMBA_EXPLOTO || global.GAME_EVENTS_V59?.BOMBA_EXPLOTO;
+        if (!bus || !eventName || typeof bus.on !== 'function' || global.__RASTRERO_BLAST_LISTENER_V630__) return;
+        bus.on(eventName, payload => {
+            const bomb = payload?.bomb;
+            const blastId = Number(payload?.blastId);
+            if (!bomb || !Number.isFinite(blastId)) return;
+            const bx = Number(bomb.x), by = Number(bomb.y);
+            const directionReach = { up: 0, down: 0, left: 0, right: 0 };
+            for (const cell of payload.cells || []) {
+                const dx = Number(cell.x) - bx, dy = Number(cell.y) - by;
+                if (dx === 0 && dy < 0) directionReach.up = Math.max(directionReach.up, -dy);
+                else if (dx === 0 && dy > 0) directionReach.down = Math.max(directionReach.down, dy);
+                else if (dy === 0 && dx < 0) directionReach.left = Math.max(directionReach.left, -dx);
+                else if (dy === 0 && dx > 0) directionReach.right = Math.max(directionReach.right, dx);
+            }
+            runtime.blastMeta.set(blastId, {
+                x: bx, y: by,
+                range: Math.max(1, Number(bomb.range) || 1),
+                directionReach,
+                owner: String(bomb.owner || 'player'),
+                createdAt: runtime.clock
+            });
+        }, { key: 'rastrero-abilities-v630:blast-meta' });
+        global.__RASTRERO_BLAST_LISTENER_V630__ = true;
+    }
+
+    function scanExplosionResidues() {
+        const s = getState();
+        if (!s) return;
+        const current = new Set();
+        for (const exp of s.explosions || []) {
+            if (!exp || exp.blastId == null) continue;
+            const key = `${exp.blastId}:${exp.x},${exp.y}`;
+            current.add(key);
+        }
+        for (const [key, prev] of runtime.seenExplosions) {
+            if (current.has(key)) continue;
+            if (runtime.clock - prev.lastSeen <= 260) addTimedTile(runtime.fire, prev.x, prev.y, 1000, 'ember');
+            runtime.seenExplosions.delete(key);
+        }
+        for (const exp of s.explosions || []) {
+            if (!exp || exp.blastId == null) continue;
+            const key = `${exp.blastId}:${exp.x},${exp.y}`;
+            runtime.seenExplosions.set(key, { x: exp.x, y: exp.y, blastId: exp.blastId, lastSeen: runtime.clock });
+        }
+    }
+
+    function updatePlayerAcidContact() {
+        const s = getState();
+        const p = getPlayer();
+        if (!s || !p || !s.isPlaying || s.paused) return;
+        const tile = tileOf(p, 'player');
+        const key = tileKey(tile.x, tile.y);
+        if (!effectAt(runtime.acid, tile.x, tile.y)) {
+            p.__rastreroAcidLastTileV630 = null;
+            return;
+        }
+        if (p.__rastreroAcidLastTileV630 === key) return;
+        p.__rastreroAcidLastTileV630 = key;
+        if (typeof global.takeDamage === 'function') global.takeDamage('acid', (tile.x + 0.5) * getTileSize(), (tile.y + 0.5) * getTileSize());
+        else applyPlayerSlow(700);
+    }
+
+    function installUpdateHook() {
+        const baseUpdate = global.update;
+        if (typeof baseUpdate !== 'function' || baseUpdate.__rastreroV630Wrapped) return;
+        const wrappedUpdate = function updateWithRastreroAbilitiesV630(dt) {
+            const s = getState();
+            const active = !!s?.isPlaying && !s?.paused;
+            const delta = Math.max(0, Number(dt) || 0);
+            if (active) {
+                ensureRoomState();
+                runtime.clock += delta;
+                if (getPlayer()) getPlayer().__rastreroSlowTimerV630 = Math.max(0, Number(getPlayer().__rastreroSlowTimerV630 || 0) - delta);
+                cleanupEffects();
+                scanExplosionResidues();
+            }
+            const result = baseUpdate(dt);
+            if (active && s?.isPlaying && !s?.paused) {
+                cleanupEffects();
+                updatePlayerAcidContact();
+            }
+            return result;
+        };
+        wrappedUpdate.__rastreroV630Wrapped = true;
+        global.update = wrappedUpdate;
+    }
+
+    function drawRastreroAbilityEffectsV630(targetCtx) {
+        const context = targetCtx || global.ctx || (typeof ctx !== 'undefined' ? ctx : null);
+        if (!context) return;
+        const size = getTileSize();
+        context.save();
+        for (const effect of runtime.ice.values()) {
+            const remaining = Math.max(0, effect.expiresAt - runtime.clock);
+            const alpha = Math.min(0.48, 0.12 + 0.36 * remaining / Math.max(1, effect.durationMs));
+            context.globalAlpha = alpha;
+            context.fillStyle = '#8be9ff';
+            context.fillRect(effect.x * size + size * 0.09, effect.y * size + size * 0.09, size * 0.82, size * 0.82);
+            context.strokeStyle = '#dffaff';
+            context.lineWidth = Math.max(1, size * 0.035);
+            context.beginPath();
+            context.moveTo(effect.x * size + size * 0.2, effect.y * size + size * 0.68);
+            context.lineTo(effect.x * size + size * 0.42, effect.y * size + size * 0.44);
+            context.lineTo(effect.x * size + size * 0.63, effect.y * size + size * 0.55);
+            context.lineTo(effect.x * size + size * 0.8, effect.y * size + size * 0.28);
+            context.stroke();
+        }
+        for (const effect of runtime.acid.values()) {
+            const remaining = Math.max(0, effect.expiresAt - runtime.clock);
+            const alpha = Math.min(0.8, 0.32 + 0.45 * remaining / Math.max(1, effect.durationMs));
+            context.globalAlpha = alpha;
+            context.fillStyle = '#65a30d';
+            context.beginPath();
+            context.ellipse((effect.x + 0.5) * size, (effect.y + 0.56) * size, size * 0.36, size * 0.24, 0, 0, Math.PI * 2);
+            context.fill();
+            context.strokeStyle = '#bef264';
+            context.lineWidth = Math.max(1, size * 0.035);
+            context.stroke();
+            context.fillStyle = '#d9f99d';
+            context.beginPath();
+            context.arc((effect.x + 0.36) * size, (effect.y + 0.45) * size, size * 0.045, 0, Math.PI * 2);
+            context.arc((effect.x + 0.62) * size, (effect.y + 0.62) * size, size * 0.035, 0, Math.PI * 2);
+            context.fill();
+        }
+        for (const effect of runtime.fire.values()) {
+            const remaining = Math.max(0, effect.expiresAt - runtime.clock);
+            context.globalAlpha = Math.min(0.58, 0.12 + 0.45 * remaining / Math.max(1, effect.durationMs));
+            context.fillStyle = '#f97316';
+            context.beginPath();
+            context.ellipse((effect.x + 0.5) * size, (effect.y + 0.58) * size, size * 0.29, size * 0.15, 0, 0, Math.PI * 2);
+            context.fill();
+            context.fillStyle = '#fef3c7';
+            context.fillRect((effect.x + 0.45) * size, (effect.y + 0.43) * size, size * 0.1, size * 0.13);
+        }
+        context.restore();
+    }
+
+    function drawEnemyAbilityMarker(enemy, a, ability) {
+        const context = global.ctx || (typeof ctx !== 'undefined' ? ctx : null);
+        if (!context || !a) return;
+        const size = getTileSize();
+        context.save();
+        if (ability === 'crab_shell') {
+            if (a.shellIntact) {
+                context.strokeStyle = '#fed7aa';
+                context.lineWidth = 3;
+                context.beginPath();
+                context.arc(enemy.x, enemy.y, enemy.width * 0.52, 0, Math.PI * 2);
+                context.stroke();
+            } else {
+                context.strokeStyle = '#fef3c7';
+                context.lineWidth = 2;
+                context.beginPath();
+                context.moveTo(enemy.x - 5, enemy.y - 5);
+                context.lineTo(enemy.x + 2, enemy.y + 1);
+                context.lineTo(enemy.x - 1, enemy.y + 8);
+                context.stroke();
+            }
+        } else if (ability === 'boar_charge' && (a.chargeState === 'telegraph' || a.chargeState === 'charging')) {
+            const dir = a.chargeDirection;
+            if (dir) {
+                context.strokeStyle = a.chargeState === 'telegraph' ? '#fdba74' : '#ef4444';
+                context.lineWidth = a.chargeState === 'telegraph' ? 3 : 4;
+                context.setLineDash(a.chargeState === 'telegraph' ? [5, 4] : []);
+                context.beginPath();
+                context.moveTo(enemy.x + dir.x * enemy.width * 0.4, enemy.y + dir.y * enemy.height * 0.4);
+                context.lineTo(enemy.x + dir.x * size * 1.4, enemy.y + dir.y * size * 1.4);
+                context.stroke();
+                context.setLineDash([]);
+            }
+        } else if (ability === 'goat_stomp' && (a.goatTelegraphMs > 0 || a.goatEffectMs > 0)) {
+            context.strokeStyle = a.goatEffectMs > 0 ? 'rgba(226,232,240,.85)' : 'rgba(203,213,225,.62)';
+            context.lineWidth = 3;
+            context.beginPath();
+            context.arc(enemy.x, enemy.y, size * (a.goatEffectMs > 0 ? 1.45 : 1.1), 0, Math.PI * 2);
+            context.stroke();
+        } else if (ability === 'cherub_aura' && (a.cherubTelegraphMs > 0 || a.cherubPulseMs > 0)) {
+            context.strokeStyle = a.cherubPulseMs > 0 ? '#f5d0fe' : 'rgba(216,180,254,.7)';
+            context.lineWidth = 2.5;
+            context.beginPath();
+            context.arc(enemy.x, enemy.y, size * (a.cherubPulseMs > 0 ? 1.65 : 1.25), 0, Math.PI * 2);
+            context.stroke();
+        } else if (ability === 'hellhound_ember' && a.hellhoundBoostMs > 0) {
+            context.fillStyle = '#fb923c';
+            context.globalAlpha = 0.82;
+            context.beginPath();
+            context.moveTo(enemy.x - size * 0.22, enemy.y + size * 0.28);
+            context.lineTo(enemy.x - size * 0.1, enemy.y + size * 0.02);
+            context.lineTo(enemy.x + size * 0.01, enemy.y + size * 0.22);
+            context.lineTo(enemy.x + size * 0.17, enemy.y - size * 0.05);
+            context.lineTo(enemy.x + size * 0.24, enemy.y + size * 0.28);
+            context.closePath();
+            context.fill();
+        }
+        context.restore();
+    }
+
+    function drawEnemyWithRastreroAbilities(enemy, drawBase) {
+        if (typeof drawBase !== 'function') return;
+        const ability = getAbilityId(enemy);
+        if (!ability) {
+            drawBase(enemy);
+            return;
+        }
+        const a = ensureEnemyState(enemy);
+        const context = global.ctx || (typeof ctx !== 'undefined' ? ctx : null);
+        if (a.moleBuriedMs > 0) {
+            if (context) {
+                context.save();
+                context.fillStyle = '#8b6b45';
+                context.globalAlpha = 0.85;
+                context.beginPath();
+                context.ellipse(enemy.x, enemy.y + enemy.height * 0.22, enemy.width * 0.48, enemy.height * 0.22, 0, 0, Math.PI * 2);
+                context.fill();
+                context.strokeStyle = '#d6b48c';
+                context.lineWidth = 2;
+                context.stroke();
+                context.restore();
+            }
+            return;
+        }
+        if (!context) {
+            drawBase(enemy);
+            return;
+        }
+        context.save();
+        try {
+            if (isLizardCamouflaged(enemy)) context.globalAlpha *= 0.45;
+            if (ability === 'frog_leap' && a.frogJumpMs > 0) {
+                const progress = 1 - a.frogJumpMs / Math.max(1, a.frogJumpDurationMs);
+                context.translate(0, -Math.sin(progress * Math.PI) * getTileSize() * 0.38);
+            }
+            drawBase(enemy);
+        } finally {
+            context.restore();
+        }
+        drawEnemyAbilityMarker(enemy, a, ability);
+    }
+
+    // Public hooks consumed by the existing simulation and renderer.
+    global.enemyIgnoresBombsV630 = enemyIgnoresBombs;
+    global.isEnemyBuriedV630 = isEnemyBuried;
+    global.enemyBlastInteractionV630 = handleEnemyBlast;
+    global.enemyOnDefeatedV630 = onEnemyDefeated;
+    global.getRastreroPlayerSpeedFactorV630 = getPlayerSpeedFactor;
+    global.drawRastreroAbilityEffectsV630 = drawRastreroAbilityEffectsV630;
+    global.drawRastreroEnemySpriteV630 = drawEnemyWithRastreroAbilities;
+    global.RASTRERO_ABILITIES_V630 = Object.freeze({
+        version: '6.30.0',
+        species: Object.freeze({ ...SPECIES_ABILITIES }),
+        getAbilityId,
+        inspectRuntime: () => ({
+            roomKey: runtime.roomKey,
+            iceTiles: runtime.ice.size,
+            acidTiles: runtime.acid.size,
+            fireTiles: runtime.fire.size,
+            blastMetadata: runtime.blastMeta.size
+        })
+    });
+
+    installPlayerIceTraction();
+    installAIHooks();
+    registerBlastMeta();
+    installLevelResetHook();
+    installUpdateHook();
+})(window);

@@ -152,6 +152,7 @@
             speciesId: species?.id || `${biomeId}_${typeKey.toLowerCase()}`,
             speciesName: species?.name || type?.name || typeKey,
             speciesRuleId: species?.ruleId || 'none',
+            abilityId: species?.abilityId || null,
             preferredAi: species?.preferredAi || behavior?.id || null,
             behaviorId: behavior?.id || null,
             behaviorLabel: behavior?.label || null
@@ -226,6 +227,7 @@
             speciesIdV626: spec.speciesId,
             speciesNameV626: speciesProfile?.name || spec.speciesName || type.name,
             speciesRuleIdV626: speciesProfile?.ruleId || spec.speciesRuleId || 'none',
+            abilityIdV630: spec.abilityId || speciesProfile?.abilityId || null,
             preferredAiV626: spec.preferredAi || spec.behaviorId || null,
             spawnedByV626: String(options.source || 'room')
         };

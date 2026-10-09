@@ -162,6 +162,8 @@
                     // El enemigo tiene hitbox completo para que sea fácil matarlo con bombas
                     let eFullRect = { left: e.x - e.width/2, right: e.x + e.width/2, top: e.y - e.height/2, bottom: e.y + e.height/2 };
                     if (explosionOverlapsRect(eFullRect, exp, 5)) {
+                        if (typeof enemyBlastInteractionV630 === 'function' && enemyBlastInteractionV630(e, exp)) continue;
+                        if (typeof enemyOnDefeatedV630 === 'function') enemyOnDefeatedV630(e, exp);
                         triggerEnemyDefeatFeedback(e);
                         gameState.enemies.splice(j, 1);
                         const fireScoreMult = gameState.fireScoreMult || 1;
@@ -189,7 +191,7 @@
             // no pueda romper accidentalmente el sistema de daño.
             for (let j = gameState.enemies.length - 1; j >= 0; j--) {
                 const e = gameState.enemies[j];
-                if (!e) continue;
+                if (!e || (typeof isEnemyBuriedV630 === 'function' && isEnemyBuriedV630(e))) continue;
                 const eHitbox = {
                     left: e.x - e.width * 0.3,
                     right: e.x + e.width * 0.3,

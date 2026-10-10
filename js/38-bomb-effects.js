@@ -441,6 +441,16 @@
 
         const index = state.enemies.indexOf(enemy);
         if (index < 0) return false;
+        // Todos los caminos de muerte deben notificar las habilidades de especie.
+        // El combate por bomba ya lo hace desde 20-combat.js; este camino cubre
+        // muertes causadas por residuos/estados elementales (calor, descarga, etc.).
+        if (typeof global.enemyOnDefeatedV630 === 'function') {
+            global.enemyOnDefeatedV630(enemy, {
+                cause: 'effect',
+                source: String(source || 'effect'),
+                effectId: String(source || '').replace(/^effect:/, '')
+            });
+        }
         if (typeof global.triggerEnemyDefeatFeedback === 'function') global.triggerEnemyDefeatFeedback(enemy);
         state.enemies.splice(index, 1);
         state.totalKills = (Number(state.totalKills) || 0) + 1;

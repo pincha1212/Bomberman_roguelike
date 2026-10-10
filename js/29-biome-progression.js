@@ -99,7 +99,8 @@
         return meta;
     }
     function setBiomeOverrideV49(id,showTransition=true){
-        if(typeof gameState==='undefined'||!gameState.isPlaying)return false;
+        // Permite elegir el bioma también entre salas o antes de reanudar la partida.
+        if(typeof gameState==='undefined')return false;
         const meta=getBiomeMetadataForIdV49(id,gameState.level);
         if(!meta)return false;
         gameState.biomeOverrideV49=meta.id;

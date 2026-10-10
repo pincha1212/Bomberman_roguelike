@@ -6,9 +6,10 @@
     function getSelect(){return global.document?.getElementById?.('biome-switch-select')||null;}
     function sync(){
         const select=getSelect();
-        if(!select||typeof gameState==='undefined')return;
-        const playing=Boolean(gameState.isPlaying);
-        select.disabled=!playing;
+        if(!select)return;
+        // El selector debe seguir disponible durante recompensas, pausa y transiciones.
+        select.disabled=false;
+        if(typeof gameState==='undefined')return;
         const current=gameState.biomeOverrideV49||gameState.biomeV49?.id||(typeof getBiomeForDepthV49==='function'?getBiomeForDepthV49(gameState.level)?.id:'winter');
         if(current&&select.value!==current)select.value=current;
         const status=global.document.getElementById('biome-switch-status');
@@ -16,7 +17,7 @@
         runtime.lastPlaying=playing;
     }
     function change(id){
-        if(typeof gameState==='undefined'||!gameState.isPlaying)return;
+        if(typeof gameState==='undefined')return;
         if(typeof global.setBiomeOverrideV49==='function'){
             if(global.setBiomeOverrideV49(id,true)){
                 sync();

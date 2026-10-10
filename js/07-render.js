@@ -219,9 +219,8 @@ function draw() {
 
             // v6.0: residuos materiales persistentes; quedan por debajo de items, bombas y personajes.
             if (typeof drawMaterialResiduesV60 === 'function') drawMaterialResiduesV60(ctx);
-            // Residuo visual pos-explosion desactivado: se conserva el haz principal.
-
-            // V3.3: las trampas aparecen visualmente solo después de activarse.
+            // v6.30.9: residuos elementales tenues, unidos y dibujados bajo entidades.
+// V3.3: las trampas aparecen visualmente solo después de activarse.
             drawHazards();
             // v6.30.0: campos temporales de habilidades RASTRERO, dibujados en el Canvas único.
             if (typeof drawRastreroAbilityEffectsV630 === 'function') drawRastreroAbilityEffectsV630(ctx);

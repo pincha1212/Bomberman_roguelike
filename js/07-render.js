@@ -233,6 +233,10 @@ function draw() {
             if (typeof drawElementalResiduesV6308 === 'function') {
                 renderStatsV329.explosions += drawElementalResiduesV6308(ctx, gameState.bombEffectFieldsV64);
             }
+            // v6.33.0: nube tóxica y vórtices gravitatorios persistentes.
+            if (typeof drawAdvancedBombFieldsV6330 === 'function') {
+                renderStatsV329.explosions += drawAdvancedBombFieldsV6330(gameState.bombEffectFieldsV64);
+            }
             // V3.3: las trampas aparecen visualmente solo después de activarse.
             drawHazards();
             // v6.30.0: campos temporales de habilidades RASTRERO, dibujados en el Canvas único.
@@ -726,23 +730,61 @@ function draw() {
                 return;
             }
             const rarityColor = gameplayMeta ? (globalThis.GAMEPLAY_POWERUP_RARITY_COLORS_V676?.[gameplayMeta.rarity] || '#94a3b8') : null;
+            const elementalTag = ({
+                BOMB_FIRE: { label:'FUEGO', color:'#fb923c' },
+                BOMB_ICE: { label:'HIELO', color:'#38bdf8' },
+                BOMB_ELECTRIC: { label:'ELÉC.', color:'#facc15' },
+                BOMB_TOXIC: { label:'TÓXICA', color:'#84cc16' },
+                BOMB_GRAVITY: { label:'GRAV.', color:'#c084fc' },
+                BOMB_FRAGMENT: { label:'FRAG.', color:'#fb7185' },
+                BOMB_PIERCE: { label:'PERFOR.', color:'#fbbf24' }
+            })[type] || null;
             ctx.fillStyle = gameplayMeta ? 'rgba(15,23,42,.90)' : (typeof themeColorV46 === 'function' ? themeColorV46('powerupBase') : '#0284c7');
             ctx.fillRect(x + 8, y + 8 + floaty, TILE_SIZE - 16, TILE_SIZE - 16);
-            ctx.strokeStyle = rarityColor || (typeof themeColorV46 === 'function' ? themeColorV46('powerupAccent') : '#38bdf8');
+            ctx.strokeStyle = elementalTag?.color || rarityColor || (typeof themeColorV46 === 'function' ? themeColorV46('powerupAccent') : '#38bdf8');
+            ctx.lineWidth = elementalTag ? 1.5 : 1;
             ctx.strokeRect(x + 8, y + 8 + floaty, TILE_SIZE - 16, TILE_SIZE - 16);
 
             ctx.font = '14px "Press Start 2P"';
             let icon = gameplayMeta?.icon || '💣';
+            // El color de fondo no debe heredarse como color del glifo: eso volvía
+            // casi invisibles algunos iconos contra la placa oscura del objeto.
+            ctx.fillStyle = elementalTag?.color || '#f8fafc';
             if (type === POWERUPS.FIRE_UP) icon = '🔥';
             if (type === POWERUPS.SPEED_UP) icon = '👟';
             if (type === POWERUPS.HEALTH_UP) icon = '❤️';
             if (type === POWERUPS.SHIELD_UP) icon = '🛡️';
-            ctx.fillText(icon, x + 10, y + 30 + floaty);
-            if (gameplayMeta) {
-                ctx.font = '7px Inter, sans-serif';
-                ctx.fillStyle = rarityColor || '#cbd5e1';
+            if (elementalTag) {
+                // Elementos centrados y con una etiqueta propia en el suelo:
+                // se puede identificar la bomba antes de recogerla.
                 ctx.textAlign = 'center';
-                ctx.fillText(gameplayMeta.rarity, x + TILE_SIZE / 2, y + TILE_SIZE - 7 + floaty);
+                ctx.font = '15px "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
+                ctx.fillText(icon, x + TILE_SIZE / 2, y + TILE_SIZE * 0.66 + floaty);
                 ctx.textAlign = 'start';
+                const tagHeight = Math.max(7, TILE_SIZE * 0.18);
+                const tagY = y + TILE_SIZE - tagHeight - 1 + floaty * 0.18;
+                ctx.globalAlpha = 0.96;
+                ctx.fillStyle = 'rgba(2,6,23,0.96)';
+                ctx.fillRect(x + 3, tagY, TILE_SIZE - 6, tagHeight);
+                ctx.strokeStyle = elementalTag.color;
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x + 3.5, tagY + 0.5, TILE_SIZE - 7, tagHeight - 1);
+                ctx.font = `600 ${Math.max(6, Math.min(7.5, TILE_SIZE * 0.16))}px Inter, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#f8fafc';
+                ctx.fillText(elementalTag.label, x + TILE_SIZE / 2, tagY + tagHeight / 2, TILE_SIZE - 9);
+                ctx.textAlign = 'start';
+                ctx.textBaseline = 'alphabetic';
+                ctx.globalAlpha = 1;
+            } else {
+                ctx.fillText(icon, x + 10, y + 30 + floaty);
+                if (gameplayMeta) {
+                    ctx.font = '7px Inter, sans-serif';
+                    ctx.fillStyle = rarityColor || '#cbd5e1';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(gameplayMeta.rarity, x + TILE_SIZE / 2, y + TILE_SIZE - 7 + floaty);
+                    ctx.textAlign = 'start';
+                }
             }
         }

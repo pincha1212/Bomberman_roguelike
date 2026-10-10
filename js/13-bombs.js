@@ -443,20 +443,58 @@ function explosionOverlapsRect(rect, exp, inset=5){
 
 function calculateBombBlastCells(bomb){
     if (!bomb) return [];
-    const cells = [{x:bomb.x, y:bomb.y, block:false}];
+    const cellsByKey = new Map();
+    const addCell = (x, y, block, fragment = false) => {
+        const key = `${x},${y}`;
+        const previous = cellsByKey.get(key);
+        if (previous) {
+            previous.block = !!previous.block || !!block;
+            previous.fragment = !!previous.fragment || !!fragment;
+            return;
+        }
+        cellsByKey.set(key, { x, y, block:!!block, ...(fragment ? { fragment:true } : {}) });
+    };
+    addCell(bomb.x, bomb.y, false);
     const dirs = [{dx:0,dy:-1},{dx:0,dy:1},{dx:-1,dy:0},{dx:1,dy:0}];
+    const pierceLimit = bomb.elementV612 === 'pierce' ? 2 : 0;
     for (const dir of dirs){
+        let blocksPierced = 0;
         for (let r=1; r<=bomb.range; r++){
             const x=bomb.x+dir.dx*r, y=bomb.y+dir.dy*r;
             if(x<0 || x>=gameState.gridWidth || y<0 || y>=gameState.gridHeight) break;
             const type=gameState.grid[y]?.[x];
             if(type===TYPES.WALL) break;
             const block=type===TYPES.BLOCK;
-            cells.push({x,y,block});
-            if(block) break;
+            addCell(x,y,block);
+            if (block) {
+                if (blocksPierced < pierceLimit) { blocksPierced++; continue; }
+                break;
+            }
         }
     }
-    return cells;
+
+    // Cuatro esquirlas diagonales. Comprueban las dos casillas ortogonales
+    // contiguas para no atravesar esquinas cerradas; los bloques paran la esquirla.
+    if (bomb.elementV612 === 'fragment') {
+        const diagonalDirs = [{dx:1,dy:1},{dx:-1,dy:1},{dx:1,dy:-1},{dx:-1,dy:-1}];
+        const fragmentRange = Math.max(1, Math.min(3, Math.floor(Number(bomb.range) || 1)));
+        for (const dir of diagonalDirs) {
+            for (let r=1; r<=fragmentRange; r++) {
+                const x=bomb.x+dir.dx*r, y=bomb.y+dir.dy*r;
+                if(x<0 || x>=gameState.gridWidth || y<0 || y>=gameState.gridHeight) break;
+                const previousX=x-dir.dx, previousY=y-dir.dy;
+                const sideA=gameState.grid?.[previousY]?.[x];
+                const sideB=gameState.grid?.[y]?.[previousX];
+                if (sideA===TYPES.WALL || sideA===TYPES.BLOCK || sideB===TYPES.WALL || sideB===TYPES.BLOCK) break;
+                const type=gameState.grid[y]?.[x];
+                if(type===TYPES.WALL) break;
+                const block=type===TYPES.BLOCK;
+                addCell(x,y,block,true);
+                if(block) break;
+            }
+        }
+    }
+    return [...cellsByKey.values()];
 }
 
 

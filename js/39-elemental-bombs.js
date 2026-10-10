@@ -1,21 +1,32 @@
 // Bomberman Roguelike v6.30.9 — Identidad elemental de cada bomba
-// Vertical slice: FIRE / ICE / ELECTRIC. La bomba conserva su elemento
+// Arsenal elemental: FIRE / ICE / ELECTRIC / TOXIC / GRAVITY / FRAGMENT / PIERCE. La bomba conserva su elemento
 // al ser colocada, agarrada, lanzada o encadenada.
 (function installElementalBombsV612(global) {
     'use strict';
 
-    const ELEMENTS = Object.freeze({ NORMAL:'normal', FIRE:'fire', ICE:'ice', ELECTRIC:'electric' });
-    const POWERUPS = Object.freeze({ FIRE:'BOMB_FIRE', ICE:'BOMB_ICE', ELECTRIC:'BOMB_ELECTRIC' });
+    const ELEMENTS = Object.freeze({ NORMAL:'normal', FIRE:'fire', ICE:'ice', ELECTRIC:'electric', TOXIC:'toxic', GRAVITY:'gravity', FRAGMENT:'fragment', PIERCE:'pierce' });
+    const POWERUPS = Object.freeze({
+        FIRE:'BOMB_FIRE', ICE:'BOMB_ICE', ELECTRIC:'BOMB_ELECTRIC',
+        TOXIC:'BOMB_TOXIC', GRAVITY:'BOMB_GRAVITY', FRAGMENT:'BOMB_FRAGMENT', PIERCE:'BOMB_PIERCE'
+    });
     const DEFINITIONS = Object.freeze({
         [ELEMENTS.NORMAL]: Object.freeze({ id:'normal', label:'NORMAL', color:'#94a3b8', effectIds:[] }),
         [ELEMENTS.FIRE]: Object.freeze({ id:'fire', label:'FUEGO', color:'#fb923c', effectIds:['heat'] }),
         [ELEMENTS.ICE]: Object.freeze({ id:'ice', label:'HIELO', color:'#7dd3fc', effectIds:['frost'] }),
-        [ELEMENTS.ELECTRIC]: Object.freeze({ id:'electric', label:'ELÉCTRICA', color:'#facc15', effectIds:['shock'] })
+        [ELEMENTS.ELECTRIC]: Object.freeze({ id:'electric', label:'ELÉCTRICA', color:'#facc15', effectIds:['shock'] }),
+        [ELEMENTS.TOXIC]: Object.freeze({ id:'toxic', label:'TÓXICA', color:'#84cc16', effectIds:['toxin'] }),
+        [ELEMENTS.GRAVITY]: Object.freeze({ id:'gravity', label:'GRAVITATORIA', color:'#c084fc', effectIds:['gravity'] }),
+        [ELEMENTS.FRAGMENT]: Object.freeze({ id:'fragment', label:'FRAGMENTACIÓN', color:'#fb7185', effectIds:[] }),
+        [ELEMENTS.PIERCE]: Object.freeze({ id:'pierce', label:'PERFORANTE', color:'#fbbf24', effectIds:[] })
     });
     const POWERUP_DEFS = Object.freeze({
         [POWERUPS.FIRE]: Object.freeze({ id:POWERUPS.FIRE, name:'BOMBA FUEGO', icon:'🔥', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Cambia el elemento de las próximas bombas a FUEGO.', implemented:true }),
         [POWERUPS.ICE]: Object.freeze({ id:POWERUPS.ICE, name:'BOMBA HIELO', icon:'❄️', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Cambia el elemento de las próximas bombas a HIELO. Deja una zona que ralentiza.', implemented:true }),
-        [POWERUPS.ELECTRIC]: Object.freeze({ id:POWERUPS.ELECTRIC, name:'BOMBA ELÉCTRICA', icon:'⚡', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Cambia el elemento de las próximas bombas a ELÉCTRICA. Deja una zona dañina.', implemented:true })
+        [POWERUPS.ELECTRIC]: Object.freeze({ id:POWERUPS.ELECTRIC, name:'BOMBA ELÉCTRICA', icon:'⚡', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Cambia el elemento de las próximas bombas a ELÉCTRICA. Deja una zona dañina.', implemented:true }),
+        [POWERUPS.TOXIC]: Object.freeze({ id:POWERUPS.TOXIC, name:'BOMBA TÓXICA', icon:'☣', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Deja una nube venenosa que daña a enemigos durante varios segundos.', implemented:true }),
+        [POWERUPS.GRAVITY]: Object.freeze({ id:POWERUPS.GRAVITY, name:'BOMBA GRAVITATORIA', icon:'🌀', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Atrae enemigos cercanos hacia el origen incluso fuera de la línea de explosión.', implemented:true }),
+        [POWERUPS.FRAGMENT]: Object.freeze({ id:POWERUPS.FRAGMENT, name:'BOMBA DE FRAGMENTACIÓN', icon:'💥', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Extiende la explosión en cuatro brazos diagonales, bloqueados por obstáculos y esquinas cerradas.', implemented:true }),
+        [POWERUPS.PIERCE]: Object.freeze({ id:POWERUPS.PIERCE, name:'BOMBA PERFORANTE', icon:'➤', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Atraviesa hasta dos bloques destructibles por dirección, pero nunca muros sólidos.', implemented:true })
     });
 
     function getPlayer(){ return global.BOMBER_ENGINE?.getPlayer?.() || global.player || null; }
@@ -31,7 +42,11 @@
         return true;
     }
     function applyElementalPowerupV612(type){
-        const map={ [POWERUPS.FIRE]:ELEMENTS.FIRE, [POWERUPS.ICE]:ELEMENTS.ICE, [POWERUPS.ELECTRIC]:ELEMENTS.ELECTRIC };
+        const map={
+            [POWERUPS.FIRE]:ELEMENTS.FIRE, [POWERUPS.ICE]:ELEMENTS.ICE, [POWERUPS.ELECTRIC]:ELEMENTS.ELECTRIC,
+            [POWERUPS.TOXIC]:ELEMENTS.TOXIC, [POWERUPS.GRAVITY]:ELEMENTS.GRAVITY,
+            [POWERUPS.FRAGMENT]:ELEMENTS.FRAGMENT, [POWERUPS.PIERCE]:ELEMENTS.PIERCE
+        };
         return Object.prototype.hasOwnProperty.call(map,type) ? setPlayerBombElementV612(map[type]) : false;
     }
     function getBombElementV612(bomb){ return normalize(bomb?.elementV612); }

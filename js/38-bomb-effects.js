@@ -27,7 +27,9 @@
         SHOCK: 'shock',
         STEAM: 'steam',
         PLASMA: 'plasma',
-        ARC: 'arc'
+        ARC: 'arc',
+        TOXIN: 'toxin',
+        GRAVITY: 'gravity'
     });
 
     const EFFECT_DEFS = Object.freeze({
@@ -68,7 +70,9 @@
         [EFFECTS.SHOCK]: Object.freeze({ id:EFFECTS.SHOCK, label:'Descarga', color:'#facc15', core:'#fef9c3', defaultDurationMs:1800, tickMs:600, damage:1, movementMultiplier:0.86, enemyMovementMultiplier:0.86, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','electric','damage']) }),
         [EFFECTS.STEAM]: Object.freeze({ id:EFFECTS.STEAM, label:'Vapor', color:'#e2e8f0', core:'#ffffff', defaultDurationMs:2200, tickMs:300, damage:0, movementMultiplier:0.58, enemyMovementMultiplier:0.58, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','steam','slow']), materialType: global.MATERIALS_V60?.STEAM || 'steam' }),
         [EFFECTS.PLASMA]: Object.freeze({ id:EFFECTS.PLASMA, label:'Plasma', color:'#c084fc', core:'#f5d0fe', defaultDurationMs:1500, tickMs:300, damage:1, movementMultiplier:0.92, enemyMovementMultiplier:0.92, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','plasma','damage']) }),
-        [EFFECTS.ARC]: Object.freeze({ id:EFFECTS.ARC, label:'Rayo extendido', color:'#fde047', core:'#ffffff', defaultDurationMs:900, tickMs:250, damage:1, movementMultiplier:0.90, enemyMovementMultiplier:0.90, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','electric','extended','damage']) })
+        [EFFECTS.ARC]: Object.freeze({ id:EFFECTS.ARC, label:'Rayo extendido', color:'#fde047', core:'#ffffff', defaultDurationMs:900, tickMs:250, damage:1, movementMultiplier:0.90, enemyMovementMultiplier:0.90, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','electric','extended','damage']) }),
+        [EFFECTS.TOXIN]: Object.freeze({ id:EFFECTS.TOXIN, label:'Toxina', color:'#84cc16', core:'#d9f99d', defaultDurationMs:3600, tickMs:850, damage:0, enemyDamage:1, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','toxic','damage','area']) }),
+        [EFFECTS.GRAVITY]: Object.freeze({ id:EFFECTS.GRAVITY, label:'Gravedad', color:'#c084fc', core:'#f5d0fe', defaultDurationMs:1250, tickMs:350, damage:0, movementMultiplier:1, enemyMovementMultiplier:0.82, sourceKinds:Object.freeze(['bomb']), tags:Object.freeze(['bomb','gravity','pull','control']) })
     });
 
     const runtime = {
@@ -128,7 +132,8 @@
         const element = String(effectIds[0] || bomb.elementV612 || 'fire').toLowerCase();
         const sparkColors = {
             heat: '#ffd08a', fire: '#ffd08a', frost: '#b9efff', ice: '#b9efff', cold: '#dbeafe',
-            shock: '#fef08a', electric: '#fef08a', arc: '#fef08a', steam: '#f1f5f9', plasma: '#f0abfc'
+            shock: '#fef08a', electric: '#fef08a', arc: '#fef08a', steam: '#f1f5f9', plasma: '#f0abfc',
+            toxin: '#d9f99d', toxic: '#d9f99d', gravity: '#f5d0fe', fragment: '#fda4af', pierce: '#fde68a'
         };
         const sparkColor = sparkColors[element] || '#fff1a8';
         if (typeof global.feedbackPoolExplosionSparks === 'function') {
@@ -171,7 +176,11 @@
             normal: [],
             fire: [EFFECTS.HEAT],
             ice: [EFFECTS.FROST],
-            electric: [EFFECTS.SHOCK]
+            electric: [EFFECTS.SHOCK],
+            toxic: [EFFECTS.TOXIN],
+            gravity: [EFFECTS.GRAVITY],
+            fragment: [],
+            pierce: []
         };
         return normalizeEffectIds(elementalMap[element] || []);
     }
@@ -279,12 +288,20 @@
         };
     }
 
-    function entityCell(entity) {
-        const center = entityCenter(entity);
-        if (!center) return null;
+    // La posición del jugador es la esquina superior izquierda; enemigos,
+    // jefes y Echo usan coordenadas de centro (igual que sus renderizadores).
+    // No aplicar la misma conversión a ambos tipos: desplaza los campos una casilla.
+    function entityCell(entity, kind = null) {
+        if (!entity) return null;
+        const inferredKind = kind || (entity === getPlayer() ? 'player' : 'entity');
+        const width = finite(entity.width, TILE_SIZE);
+        const height = finite(entity.height, TILE_SIZE);
+        const isTopLeftPosition = inferredKind === 'player';
+        const centerX = finite(entity.x) + (isTopLeftPosition ? width / 2 : 0);
+        const centerY = finite(entity.y) + (isTopLeftPosition ? height / 2 : 0);
         return {
-            x: Math.floor(center.x / TILE_SIZE),
-            y: Math.floor(center.y / TILE_SIZE)
+            x: Math.floor(centerX / TILE_SIZE),
+            y: Math.floor(centerY / TILE_SIZE)
         };
     }
 
@@ -334,6 +351,8 @@
             existing.source = String(options.source || existing.source || 'system');
             existing.owner = String(options.owner || existing.owner || 'system');
             if (options.sourceBombId != null) existing.sourceBombId = String(options.sourceBombId);
+            if (Number.isFinite(Number(options.originX))) existing.originX = Math.trunc(Number(options.originX));
+            if (Number.isFinite(Number(options.originY))) existing.originY = Math.trunc(Number(options.originY));
             existing.lastEventId = runtime.lastEventId;
             existing.createdEventId = runtime.lastEventId;
             return true;
@@ -353,6 +372,8 @@
             source: String(options.source || 'system'),
             owner: String(options.owner || 'system'),
             sourceBombId: options.sourceBombId == null ? null : String(options.sourceBombId),
+            originX: Number.isFinite(Number(options.originX)) ? Math.trunc(Number(options.originX)) : null,
+            originY: Number.isFinite(Number(options.originY)) ? Math.trunc(Number(options.originY)) : null,
             createdEventId: runtime.lastEventId
         });
         return true;
@@ -394,6 +415,13 @@
                 );
             }
             existing.lastSource = String(options.source || existing.lastSource || 'system');
+            if (effectId === EFFECTS.GRAVITY) {
+                const incomingBombId = options.sourceBombId == null ? null : String(options.sourceBombId);
+                if (incomingBombId != null && existing.sourceBombId !== incomingBombId) existing.gravityPulls = 0;
+                if (Number.isFinite(Number(options.originX))) existing.originX = Math.trunc(Number(options.originX));
+                if (Number.isFinite(Number(options.originY))) existing.originY = Math.trunc(Number(options.originY));
+                if (incomingBombId != null) existing.sourceBombId = incomingBombId;
+            }
             return true;
         }
 
@@ -407,6 +435,9 @@
             source: String(options.source || 'system'),
             sourceBombId: options.sourceBombId == null ? null : String(options.sourceBombId),
             kind,
+            originX: Number.isFinite(Number(options.originX)) ? Math.trunc(Number(options.originX)) : null,
+            originY: Number.isFinite(Number(options.originY)) ? Math.trunc(Number(options.originY)) : null,
+            gravityPulls: 0,
             exposureMs: effectId === EFFECTS.COLD
                 ? clamp(Math.max(0, finite(options.exposureBoostMs, 0)), 0, config.maxExposureMs)
                 : 0,
@@ -453,8 +484,19 @@
         }
         if (typeof global.triggerEnemyDefeatFeedback === 'function') global.triggerEnemyDefeatFeedback(enemy);
         state.enemies.splice(index, 1);
+
+        // Las muertes por daño persistente usan las mismas recompensas y hooks
+        // de progreso que una muerte por explosión directa.
+        const scoreMultiplier = finite(state.killScoreMult, 1) * finite(state.fireScoreMult, 1);
+        const killScore = Math.round(100 * scoreMultiplier * (enemy.elite ? 1.25 : 1));
+        const roomCoinMultiplier = finite(state.roomType?.coinMult, 1);
+        const coinBonus = finite(state.coinBonus, 0);
+        const killCoins = Math.max(2, Math.round((2 + Math.random() * 3) * (1 + coinBonus) * roomCoinMultiplier));
+        state.score = finite(state.score, 0) + killScore;
+        state.coins = finite(state.coins, 0) + killCoins;
         state.totalKills = (Number(state.totalKills) || 0) + 1;
-        if (typeof global.addFloatingText === 'function') global.addFloatingText('EFECTO', enemy.x, enemy.y, '#93c5fd');
+        if (typeof global.gameplayPowerupOnEnemyDefeatedV676 === 'function') global.gameplayPowerupOnEnemyDefeatedV676(enemy);
+        if (typeof global.addFloatingText === 'function') global.addFloatingText(`+${killScore}  +${killCoins}¢`, enemy.x, enemy.y, enemy.elite ? '#fb7185' : '#84cc16');
         if (typeof global.tryUnlockExitCurrentRoom === 'function') global.tryUnlockExitCurrentRoom();
         return true;
     }
@@ -477,7 +519,7 @@
         const entity = target?.entity || target;
         const kind = target?.kind || 'generic';
         if (!entity || amount <= 0) return false;
-        const cell = entityCell(entity);
+        const cell = entityCell(entity, kind);
         const sx = cell ? (cell.x + 0.5) * TILE_SIZE : finite(entity.x);
         const sy = cell ? (cell.y + 0.5) * TILE_SIZE : finite(entity.y);
 
@@ -497,6 +539,47 @@
         }
         if (Number.isFinite(Number(entity.health))) {
             entity.health = Math.max(0, Number(entity.health) - amount);
+            return true;
+        }
+        return false;
+    }
+
+    function pullEnemyTowardGravityOriginV6330(target, status) {
+        const enemy = target?.entity || target;
+        const state = getState();
+        if (target?.kind !== 'enemy' || !enemy || !state || !Array.isArray(state.grid)) return false;
+        if (Number(status.gravityPulls) >= 2) return false;
+        const originX = Number(status.originX), originY = Number(status.originY);
+        if (!Number.isInteger(originX) || !Number.isInteger(originY)) return false;
+        const current = entityCell(enemy, 'enemy');
+        if (!current || (current.x === originX && current.y === originY)) return false;
+
+        const dx = originX - current.x, dy = originY - current.y;
+        const preferred = Math.abs(dx) >= Math.abs(dy)
+            ? [{ x: Math.sign(dx), y: 0 }, { x: 0, y: Math.sign(dy) }]
+            : [{ x: 0, y: Math.sign(dy) }, { x: Math.sign(dx), y: 0 }];
+        const isOccupiedByEnemy = (x, y) => (Array.isArray(state.enemies) ? state.enemies : []).some(other => {
+            if (!other || other === enemy) return false;
+            const cell = entityCell(other, 'enemy');
+            return !!cell && cell.x === x && cell.y === y;
+        });
+        const gridHeight = Math.trunc(finite(state.gridHeight, state.grid.length));
+        const gridWidth = Math.trunc(finite(state.gridWidth, state.grid[0]?.length || 0));
+        const isBlocked = (x, y) => {
+            if (y < 0 || y >= gridHeight || x < 0 || x >= gridWidth) return true;
+            const tile = state.grid[y]?.[x];
+            const types = global.BOMBER_ENGINE?.getWorldTypes?.() || (typeof TYPES !== 'undefined' ? TYPES : {});
+            return tile === types.WALL || tile === types.BLOCK || isOccupiedByEnemy(x, y);
+        };
+
+        for (const step of preferred) {
+            if (!step.x && !step.y) continue;
+            const nx = current.x + step.x, ny = current.y + step.y;
+            if (isBlocked(nx, ny)) continue;
+            enemy.x = finite(enemy.x) + step.x * TILE_SIZE;
+            enemy.y = finite(enemy.y) + step.y * TILE_SIZE;
+            status.gravityPulls = Math.max(0, Number(status.gravityPulls) || 0) + 1;
+            if (typeof global.addParticles === 'function') global.addParticles(finite(enemy.x) + finite(enemy.width, TILE_SIZE) / 2, finite(enemy.y) + finite(enemy.height, TILE_SIZE) / 2, 'particleEnergy', 3);
             return true;
         }
         return false;
@@ -532,6 +615,11 @@
                 continue;
             }
 
+            if (status.effectId === EFFECTS.GRAVITY) {
+                pullEnemyTowardGravityOriginV6330(target, status);
+                continue;
+            }
+
             const isHostile = target?.kind === 'enemy' || target?.kind === 'boss' || target?.kind === 'death_echo';
             const configuredDamage = isHostile && Number.isFinite(Number(config.enemyDamage))
                 ? Math.max(0, Number(config.enemyDamage))
@@ -559,7 +647,7 @@
             // de una explosión elemental.
             if (isBombEffectFieldV61232(field) && !isBombEffectTargetV61232(target)) continue;
 
-            const cell = entityCell(target.entity);
+            const cell = entityCell(target.entity, target.kind);
             if (!cell || cell.x !== field.x || cell.y !== field.y) continue;
             const config = getEffectConfigV64(field.effectId);
             if (!config) continue;
@@ -575,11 +663,17 @@
                 continue;
             }
 
+            if (field.effectId === EFFECTS.GRAVITY && target?.kind !== 'enemy') continue;
+            const statusDurationMs = field.effectId === EFFECTS.TOXIN
+                ? Math.min(config.durationMs, Math.max(250, config.tickMs + 100))
+                : config.durationMs;
             applyEntityStatus(target, field.effectId, {
-                durationMs: config.durationMs,
+                durationMs: statusDurationMs,
                 intensity: field.intensity,
                 source: field.source,
-                sourceBombId: field.sourceBombId
+                sourceBombId: field.sourceBombId,
+                originX: field.originX,
+                originY: field.originY
             });
         }
     }
@@ -669,16 +763,43 @@
             if (Number.isInteger(x) && Number.isInteger(y)) uniqueCells.set(tileKey(x, y), { x, y });
         }
 
+        const originX = Math.trunc(finite(bomb.x, 0));
+        const originY = Math.trunc(finite(bomb.y, 0));
+        const state = getState();
         for (const effectId of effectIds) {
             const config = getEffectConfigV64(effectId);
             if (!config) continue;
-            for (const cell of uniqueCells.values()) {
+
+            let effectCells = [...uniqueCells.values()];
+            if (effectId === EFFECTS.GRAVITY && state && Array.isArray(state.grid)) {
+                // La atracción necesita afectar enemigos cercanos aunque no estén
+                // sobre la cruz que normalmente los elimina al instante.
+                const blastRange = Math.max(1, finite(bomb.range, 1));
+                const radius = clamp(Math.ceil(blastRange / 2) + 1, 2, 4);
+                const width = Math.max(0, Math.trunc(finite(state.gridWidth, state.grid[0]?.length || 0)));
+                const height = Math.max(0, Math.trunc(finite(state.gridHeight, state.grid.length || 0)));
+                effectCells = [];
+                for (let y = originY - radius; y <= originY + radius; y++) {
+                    for (let x = originX - radius; x <= originX + radius; x++) {
+                        if (Math.abs(x - originX) + Math.abs(y - originY) > radius) continue;
+                        if (x < 0 || y < 0 || x >= width || y >= height) continue;
+                        const tile = state.grid[y]?.[x];
+                        const types = global.BOMBER_ENGINE?.getWorldTypes?.() || (typeof TYPES !== 'undefined' ? TYPES : {});
+                        if (tile === types.WALL || tile === types.BLOCK) continue;
+                        effectCells.push({ x, y });
+                    }
+                }
+            }
+
+            for (const cell of effectCells) {
                 depositField(effectId, cell.x, cell.y, {
                     durationMs: config.durationMs,
                     intensity: 1,
                     source: 'bomb',
                     owner: bomb.owner || 'player',
-                    sourceBombId
+                    sourceBombId,
+                    originX,
+                    originY
                 });
             }
         }

@@ -9,7 +9,7 @@ function getExplosionEffectKeyV6308(effectId) {
         normal: 'fire', fire: 'fire', heat: 'fire',
         ice: 'ice', frost: 'ice', cold: 'ice',
         electric: 'electric', shock: 'electric', arc: 'arc',
-        steam: 'steam', plasma: 'plasma', acid: 'acid'
+        steam: 'steam', plasma: 'plasma', acid: 'acid', poison: 'toxic', toxin: 'toxic'
     };
     return aliases[key] || key;
 }
@@ -40,7 +40,11 @@ function explosionPaletteV6308(effectId) {
         arc: { outer:'#1e40af', middle:'#06b6d4', core:'#ffffff' },
         steam: { outer:'#475569', middle:'#cbd5e1', core:'#ffffff' },
         plasma: { outer:'#6b21a8', middle:'#d946ef', core:'#fae8ff' },
-        acid: { outer:'#365314', middle:'#84cc16', core:'#ecfccb' }
+        acid: { outer:'#365314', middle:'#84cc16', core:'#ecfccb' },
+        toxic: { outer:'#14532d', middle:'#65a30d', core:'#d9f99d' },
+        gravity: { outer:'#3b0764', middle:'#a855f7', core:'#f5d0fe' },
+        fragment: { outer:'#881337', middle:'#fb7185', core:'#ffe4e6' },
+        pierce: { outer:'#713f12', middle:'#fbbf24', core:'#fef3c7' }
     };
     if (palettes[key]) return palettes[key];
     const def = window.BOMB_EFFECT_DEFS_V64?.[String(effectId || '').toLowerCase()];
@@ -52,7 +56,7 @@ function explosionPaletteV6308(effectId) {
     return fire;
 }
 
-// La paleta antigua de residuos de suelo fue retirada: solo se dibuja el efecto de explosión animado.
+// Los campos elementales persistentes se dibujan en capas independientes al final del archivo; la silueta de fuego aprobada permanece intacta.
 
 function registerBombBlastVisualV6308(payload) {
     const state = window.BOMBER_ENGINE?.getState?.() || window.gameState;
@@ -77,15 +81,15 @@ function registerBombBlastVisualV6308(payload) {
         const x = Number(cell?.x), y = Number(cell?.y);
         if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
         const tx = Math.trunc(x), ty = Math.trunc(y);
-        uniqueCells.set(`${tx},${ty}`, { x: tx, y: ty, element });
+        uniqueCells.set(`${tx},${ty}`, { x: tx, y: ty, element, fragment: !!cell.fragment, block: !!cell.block });
     }
     if (!uniqueCells.size) return false;
 
     const fallback = uniqueCells.values().next().value;
     const originX = Number.isFinite(Number(bomb.x)) ? Math.trunc(Number(bomb.x)) : fallback.x;
     const originY = Number.isFinite(Number(bomb.y)) ? Math.trunc(Number(bomb.y)) : fallback.y;
-    const cells = [...uniqueCells.values()];
-    const maxDistance = Math.max(1, ...cells.map(cell => Math.abs(cell.x-originX)+Math.abs(cell.y-originY)));
+    const cells = [...uniqueCells.values()].map(cell => ({ ...cell, origin: cell.x === originX && cell.y === originY }));
+    const maxDistance = Math.max(1, ...cells.map(cell => element === 'fragment' ? Math.max(Math.abs(cell.x-originX), Math.abs(cell.y-originY)) : Math.abs(cell.x-originX)+Math.abs(cell.y-originY)));
 
     state.bombBlastVisualsV6308.push({
         visualId: incomingId || `visual-${++blastVisualSerialV6308}`,
@@ -120,8 +124,21 @@ function resetBombBlastVisualsV6308() {
     if (state && Array.isArray(state.bombBlastVisualsV6308)) state.bombBlastVisualsV6308.length = 0;
 }
 
-function explosionComponentsV6308(cellMap) {
-    const directions = [[1,0],[-1,0],[0,1],[0,-1]];
+function explosionCanConnectV6331(a, b, dx, dy, allowDiagonals) {
+    if (!allowDiagonals) return dx === 0 || dy === 0;
+    const aRoot = !!a?.origin, bRoot = !!b?.origin;
+    const diagonal = dx !== 0 && dy !== 0;
+    if (diagonal) return (aRoot && b?.fragment) || (bRoot && a?.fragment) || (a?.fragment && b?.fragment);
+    // Evitar que cada esquirla diagonal se una accidentalmente al brazo cardinal
+    // que pasa al costado: la rama solo entra en la cruz en el origen.
+    if (aRoot || bRoot) return true;
+    return !!a?.fragment === !!b?.fragment;
+}
+
+function explosionComponentsV6308(cellMap, allowDiagonals = false) {
+    const directions = allowDiagonals
+        ? [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]
+        : [[1,0],[-1,0],[0,1],[0,-1]];
     const keyOf = (x,y) => `${x},${y}`;
     const unvisited = new Set(cellMap.keys());
     const components = [];
@@ -136,8 +153,10 @@ function explosionComponentsV6308(cellMap) {
             for (const [dx,dy] of directions) {
                 const key = keyOf(cell.x+dx, cell.y+dy);
                 if (!unvisited.has(key)) continue;
+                const next = cellMap.get(key);
+                if (!explosionCanConnectV6331(cell, next, dx, dy, allowDiagonals)) continue;
                 unvisited.delete(key);
-                queue.push(cellMap.get(key));
+                queue.push(next);
             }
         }
         if (component.some(cell => isWorldTileVisibleV329(cell.x, cell.y, 1))) components.push(component);
@@ -145,16 +164,16 @@ function explosionComponentsV6308(cellMap) {
     return components;
 }
 
-function explosionGraphPathsV6308(component) {
+function explosionGraphPathsV6308(component, allowDiagonals = false) {
     const keyOf = cell => `${cell.x},${cell.y}`;
     const edgeKey = (a,b) => [keyOf(a),keyOf(b)].sort().join('|');
     const cells = new Map(component.map(cell => [keyOf(cell),cell]));
     const neighbors = new Map();
     for (const cell of component) {
         const around = [];
-        for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+        for (const [dx,dy] of (allowDiagonals ? [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]] : [[1,0],[-1,0],[0,1],[0,-1]])) {
             const next = cells.get(`${cell.x+dx},${cell.y+dy}`);
-            if (next) around.push(next);
+            if (next && explosionCanConnectV6331(cell, next, dx, dy, allowDiagonals)) around.push(next);
         }
         neighbors.set(keyOf(cell), around);
     }
@@ -362,14 +381,19 @@ function drawExplosionClustersV6308(blastVisuals = []) {
         for (const raw of sourceCells) {
             const x = Math.trunc(Number(raw?.x)), y = Math.trunc(Number(raw?.y));
             if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-            const distance = Math.abs(x - originX) + Math.abs(y - originY);
+            const distance = element === 'fragment'
+                ? Math.max(Math.abs(x - originX), Math.abs(y - originY))
+                : Math.abs(x - originX) + Math.abs(y - originY);
             if (age < 80 && distance > maxDistance * expansion + 0.0001) continue;
             const key = keyOf(x, y);
             let cell = group.cellMap.get(key);
             if (!cell) {
-                cell = { x, y, alpha: 0, ageMs: Infinity };
+                cell = { x, y, alpha: 0, ageMs: Infinity, fragment: false, block: false, origin: false };
                 group.cellMap.set(key, cell);
             }
+            cell.fragment = cell.fragment || !!raw.fragment;
+            cell.block = cell.block || !!raw.block;
+            cell.origin = cell.origin || !!raw.origin;
             cell.alpha = Math.max(cell.alpha, age < 80 ? 0.55 + 0.45 * expansion : 1);
             cell.ageMs = Math.min(cell.ageMs, age);
         }
@@ -468,11 +492,12 @@ function drawExplosionClustersV6308(blastVisuals = []) {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     for (const group of groups) {
-        const { components } = { components: explosionComponentsV6308(group.cellMap) };
+        const allowDiagonals = group.element === 'fragment';
+        const { components } = { components: explosionComponentsV6308(group.cellMap, allowDiagonals) };
         if (!components.length) continue;
         visibleCellCount += components.reduce((sum, component) => sum + component.length, 0);
         for (const component of components) {
-            const { paths, neighbors } = explosionGraphPathsV6308(component);
+            const { paths, neighbors } = explosionGraphPathsV6308(component, allowDiagonals);
             const age = component.reduce((sum, cell) => sum + (Number.isFinite(cell.ageMs) ? cell.ageMs : 0), 0) / component.length;
             const visibility = component.reduce((sum, cell) => sum + cell.alpha, 0) / component.length;
             const ease = age < 80 ? Math.max(0, Math.min(1, age / 80)) : 1;
@@ -607,7 +632,7 @@ function drawBombEffectFieldsV6323(fields = []) {
         for (const component of components) {
             if (!component.length) continue;
             drawnCells += component.length;
-            const { paths, neighbors } = explosionGraphPathsV6308(component);
+            const { paths, neighbors } = explosionGraphPathsV6308(component, allowDiagonals);
             const remainingRatio = Math.max(0, Math.min(1, group.remainingMs / Math.max(1, group.totalMs)));
             // El campo permanece legible mientras daña; solo se desvanece al final.
             const fadeOut = Math.min(1, group.remainingMs / 300);
@@ -916,9 +941,69 @@ function drawPersistentFireFieldsV6324(fields = []) {
     return drawnCells;
 }
 
+// v6.33.0: campos persistentes para las nuevas bombas tóxica y gravitatoria.
+// Esta capa solo representa campos ya creados por 38-bomb-effects.js; no decide
+// alcance, duración, daño ni desplazamiento. Las llamas existentes quedan intactas.
+function drawAdvancedBombFieldsV6330(fields = []) {
+    const target = typeof ctx !== 'undefined' ? ctx : null;
+    const state = window.BOMBER_ENGINE?.getState?.() || window.gameState || null;
+    if (!target || !state || !Array.isArray(fields) || !fields.length || typeof TILE_SIZE !== 'number') return 0;
+    const frame = Number(state.animFrame) || 0, size = TILE_SIZE, groups = new Map();
+    for (const field of fields) {
+        const effectId = String(field?.effectId || '');
+        if (!field || !['toxin','gravity'].includes(effectId) || field.sourceBombId == null) continue;
+        const x = Math.trunc(Number(field.x)), y = Math.trunc(Number(field.y)), remaining = Number(field.remainingMs) || 0;
+        if (!Number.isInteger(x) || !Number.isInteger(y) || remaining <= 0) continue;
+        const tile = state.grid?.[y]?.[x];
+        if (typeof TYPES !== 'undefined' && (tile === TYPES.WALL || tile === TYPES.BLOCK)) continue;
+        if (typeof isWorldTileVisibleV329 === 'function' && !isWorldTileVisibleV329(x, y, 1)) continue;
+        const groupKey = `${effectId}:${field.sourceBombId}`;
+        let group = groups.get(groupKey);
+        if (!group) group = { effectId, originX:Number.isFinite(Number(field.originX)) ? Number(field.originX) : x, originY:Number.isFinite(Number(field.originY)) ? Number(field.originY) : y, cells:new Map() };
+        groups.set(groupKey, group);
+        const key = `${x},${y}`, total = Math.max(1, Number(field.visualTotalMs) || remaining);
+        const life = Math.max(0, Math.min(1, remaining / total)), fade = life < 0.24 ? life / 0.24 : 1;
+        const previous = group.cells.get(key);
+        if (!previous || remaining > previous.remaining) group.cells.set(key, { x, y, remaining, alpha:fade * (0.85 + 0.15 * life) });
+    }
+    if (!groups.size) return 0;
+    const hash = (x,y,salt=0) => { const n = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453; return n - Math.floor(n); };
+    let drawn = 0;
+    target.save(); target.globalCompositeOperation = 'source-over'; target.lineCap = 'round'; target.lineJoin = 'round';
+    for (const group of groups.values()) for (const cell of group.cells.values()) {
+        const px = (cell.x + 0.5) * size, py = (cell.y + 0.5) * size;
+        const pulse = 0.88 + 0.12 * Math.sin(frame * 0.13 + cell.x * 1.7 + cell.y * 2.3), alpha = Math.max(0, Math.min(1, cell.alpha * pulse));
+        if (group.effectId === 'toxin') {
+            target.globalAlpha = alpha * 0.34; target.fillStyle = '#166534';
+            target.beginPath(); target.ellipse(px, py + size * 0.05, size * (0.46 + pulse * 0.04), size * 0.31, Math.sin(frame * 0.035 + cell.x) * 0.12, 0, Math.PI * 2); target.fill();
+            target.globalAlpha = alpha * 0.32; target.fillStyle = '#65a30d';
+            for (let puff = 0; puff < 3; puff++) {
+                const phase = frame * 0.045 + cell.x * 2.3 + cell.y * 1.9 + puff * 2.1;
+                const bx = px + Math.sin(phase) * size * 0.17, by = py - size * 0.05 + Math.cos(phase * 0.83) * size * 0.12;
+                target.beginPath(); target.ellipse(bx, by, size * (0.14 + hash(cell.x,cell.y,puff) * 0.055), size * 0.12, phase * 0.2, 0, Math.PI * 2); target.fill();
+            }
+            target.globalAlpha = alpha * 0.72; target.strokeStyle = '#d9f99d'; target.lineWidth = Math.max(0.8, size * 0.018);
+            const bubblePhase = frame * 0.06 + cell.x * 3.2 + cell.y * 7.1;
+            target.beginPath(); target.arc(px + Math.sin(bubblePhase) * size * 0.19, py - size * (0.12 + 0.05 * Math.sin(bubblePhase)), size * 0.035, 0, Math.PI * 2); target.stroke();
+        } else {
+            target.globalAlpha = alpha * 0.24; target.fillStyle = '#6b21a8';
+            target.beginPath(); target.ellipse(px, py, size * 0.44, size * 0.30, frame * 0.018, 0, Math.PI * 2); target.fill();
+            target.globalAlpha = alpha * 0.82; target.strokeStyle = '#c084fc'; target.lineWidth = Math.max(1, size * 0.025);
+            for (let arc = 0; arc < 2; arc++) { const rotation = -frame * 0.035 + arc * Math.PI; target.beginPath(); target.arc(px, py, size * (0.15 + arc * 0.095), rotation, rotation + Math.PI * 1.25); target.stroke(); }
+            target.globalAlpha = alpha * 0.88; target.fillStyle = '#f5d0fe';
+            const angle = Math.atan2(group.originY - cell.y, group.originX - cell.x), ax = px + Math.cos(angle) * size * 0.21, ay = py + Math.sin(angle) * size * 0.21;
+            target.save(); target.translate(ax, ay); target.rotate(angle); target.beginPath(); target.moveTo(size * 0.09, 0); target.lineTo(-size * 0.035, -size * 0.055); target.lineTo(-size * 0.015, 0); target.lineTo(-size * 0.035, size * 0.055); target.closePath(); target.fill(); target.restore();
+        }
+        drawn++;
+    }
+    target.restore(); target.globalAlpha = 1; target.shadowBlur = 0; target.globalCompositeOperation = 'source-over';
+    return drawn;
+}
+
 window.registerBombBlastVisualV6308 = registerBombBlastVisualV6308;
 window.updateBombBlastVisualsV6308 = updateBombBlastVisualsV6308;
 window.resetBombBlastVisualsV6308 = resetBombBlastVisualsV6308;
 window.drawElementalResiduesV6308 = drawElementalResiduesV6308;
 window.drawBombEffectFieldsV6323 = drawBombEffectFieldsV6323;
 window.drawPersistentFireFieldsV6324 = drawPersistentFireFieldsV6324;
+window.drawAdvancedBombFieldsV6330 = drawAdvancedBombFieldsV6330;

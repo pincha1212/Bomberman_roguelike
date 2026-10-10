@@ -292,12 +292,16 @@ const UI = {};
             SPEED_UP: 'SPEED_UP',
             HEALTH_UP: 'HEALTH_UP',
             SHIELD_UP: 'SHIELD_UP',
-            BOMB_KICK: 'BOMB_KICK'
-            ,BOMB_FIRE: 'BOMB_FIRE'
-            ,BOMB_ICE: 'BOMB_ICE'
-            ,BOMB_ELECTRIC: 'BOMB_ELECTRIC'
-            ,GRAB: 'GRAB'
-            ,THROW: 'THROW'
+            BOMB_KICK: 'BOMB_KICK',
+            BOMB_FIRE: 'BOMB_FIRE',
+            BOMB_ICE: 'BOMB_ICE',
+            BOMB_ELECTRIC: 'BOMB_ELECTRIC',
+            BOMB_TOXIC: 'BOMB_TOXIC',
+            BOMB_GRAVITY: 'BOMB_GRAVITY',
+            BOMB_FRAGMENT: 'BOMB_FRAGMENT',
+            BOMB_PIERCE: 'BOMB_PIERCE',
+            GRAB: 'GRAB',
+            THROW: 'THROW'
         };
 
         const PLAYER_LIMITS_V67 = Object.freeze({
@@ -387,12 +391,16 @@ const UI = {};
             } }),
             [POWERUPS.BOMB_FIRE]: Object.freeze({ id:POWERUPS.BOMB_FIRE, label:'BOMBA FUEGO', icon:'🔥', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Hace que las próximas bombas sean de fuego.' }),
             [POWERUPS.BOMB_ICE]: Object.freeze({ id:POWERUPS.BOMB_ICE, label:'BOMBA HIELO', icon:'❄️', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Hace que las próximas bombas sean de hielo.' }),
-            [POWERUPS.BOMB_ELECTRIC]: Object.freeze({ id:POWERUPS.BOMB_ELECTRIC, label:'BOMBA ELÉCTRICA', icon:'⚡', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Hace que las próximas bombas sean eléctricas.' })
+            [POWERUPS.BOMB_ELECTRIC]: Object.freeze({ id:POWERUPS.BOMB_ELECTRIC, label:'BOMBA ELÉCTRICA', icon:'⚡', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Hace que las próximas bombas sean eléctricas.' }),
+            [POWERUPS.BOMB_TOXIC]: Object.freeze({ id:POWERUPS.BOMB_TOXIC, label:'BOMBA TÓXICA', icon:'☣', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Deja una nube venenosa que daña a los enemigos que permanecen en ella.' }),
+            [POWERUPS.BOMB_GRAVITY]: Object.freeze({ id:POWERUPS.BOMB_GRAVITY, label:'BOMBA GRAVITATORIA', icon:'🌀', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Crea un vórtice que atrae a los enemigos cercanos hacia el origen, incluso fuera de la línea de explosión.' }),
+            [POWERUPS.BOMB_FRAGMENT]: Object.freeze({ id:POWERUPS.BOMB_FRAGMENT, label:'BOMBA DE FRAGMENTACIÓN', icon:'💥', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Extiende la explosión en cuatro brazos diagonales. Bloques y esquinas cerradas detienen los fragmentos.' }),
+            [POWERUPS.BOMB_PIERCE]: Object.freeze({ id:POWERUPS.BOMB_PIERCE, label:'BOMBA PERFORANTE', icon:'➤', rarity:'ELEMENTAL', category:'BOMBAS', desc:'La explosión atraviesa hasta dos bloques destructibles por dirección. Los muros sólidos la detienen.' })
         });
 
         function applyPowerupV67(type){
             const key = String(type || '');
-            if (['BOMB_FIRE','BOMB_ICE','BOMB_ELECTRIC'].includes(key) && typeof applyElementalPowerupV612 === 'function') {
+            if (['BOMB_FIRE','BOMB_ICE','BOMB_ELECTRIC','BOMB_TOXIC','BOMB_GRAVITY','BOMB_FRAGMENT','BOMB_PIERCE'].includes(key) && typeof applyElementalPowerupV612 === 'function') {
                 return !!applyElementalPowerupV612(key);
             }
             if (['KICK','GRAB','THROW'].includes(key) && typeof activateCapabilityPowerupV681 === 'function') {
@@ -428,11 +436,17 @@ const UI = {};
 
             // Las bombas elementales siguen siendo siempre obtenibles: repetir
             // el mismo elemento simplemente vuelve a seleccionarlo.
-            pool.push(POWERUPS.BOMB_FIRE, POWERUPS.BOMB_ICE, POWERUPS.BOMB_ELECTRIC);
+            pool.push(
+                POWERUPS.BOMB_FIRE, POWERUPS.BOMB_ICE, POWERUPS.BOMB_ELECTRIC,
+                POWERUPS.BOMB_TOXIC, POWERUPS.BOMB_GRAVITY, POWERUPS.BOMB_FRAGMENT, POWERUPS.BOMB_PIERCE
+            );
 
             // Nunca devolvemos un pool vacío: al alcanzar todas las mejoras
             // permanentes, queda disponible el sistema elemental.
-            return Object.freeze(pool.length ? pool : [POWERUPS.BOMB_FIRE, POWERUPS.BOMB_ICE, POWERUPS.BOMB_ELECTRIC]);
+            return Object.freeze(pool.length ? pool : [
+                POWERUPS.BOMB_FIRE, POWERUPS.BOMB_ICE, POWERUPS.BOMB_ELECTRIC,
+                POWERUPS.BOMB_TOXIC, POWERUPS.BOMB_GRAVITY, POWERUPS.BOMB_FRAGMENT, POWERUPS.BOMB_PIERCE
+            ]);
         }
 
         window.PLAYER_LIMITS_V67=PLAYER_LIMITS_V67;

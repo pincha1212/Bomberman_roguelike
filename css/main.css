@@ -3,13 +3,13 @@
  * Hoja de estilos principal: solo ordena módulos.
  * El orden de estos imports conserva la cascada histórica de v4.2.
  */
-@import url("01-base.css?v=6.32.0");
-@import url("02-ui-systems.css?v=6.32.0");
-@import url("03-menu-layout.css?v=6.32.0");
-@import url("04-relics-screens.css?v=6.32.0");
-@import url("05-v4-theme.css?v=6.32.0");
-@import url("06-v4-responsive.css?v=6.32.0");
-@import url("07-device-quality.css?v=6.32.0");
+@import url("01-base.css?v=6.32.2");
+@import url("02-ui-systems.css?v=6.32.2");
+@import url("03-menu-layout.css?v=6.32.2");
+@import url("04-relics-screens.css?v=6.32.2");
+@import url("05-v4-theme.css?v=6.32.2");
+@import url("06-v4-responsive.css?v=6.32.2");
+@import url("07-device-quality.css?v=6.32.2");
 
-@import url("08-biome-progression.css?v=6.32.0");
+@import url("08-biome-progression.css?v=6.32.2");
 

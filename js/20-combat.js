@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.30.9 — Bombs, explosions, damage and gameplay simulation
+// Bomberman Roguelike v6.32.2 — Bombs, explosions, damage and gameplay simulation
         function explodeBomb(bombIndex) {
             const first = gameState.bombs[bombIndex];
             if (!first) return;
@@ -233,7 +233,13 @@
                         continue;
                     }
 
-                    addParticles((it.x + 0.5) * TILE_SIZE, (it.y + 0.5) * TILE_SIZE, 'particleLoot', 10);
+                    // El feedback visual específico es estético y no controla la recogida.
+                    // Si el renderer de feedback no está disponible, se conserva el burst histórico.
+                    const pickupFxHandled = typeof feedbackPoolPowerupPickupV6322 === 'function'
+                        && feedbackPoolPowerupPickupV6322(it);
+                    if (!pickupFxHandled) {
+                        addParticles((it.x + 0.5) * TILE_SIZE, (it.y + 0.5) * TILE_SIZE, 'particleLoot', 10);
+                    }
                     gameState.items.splice(i, 1);
                     sfx('pickup');
                     updateUI(true);

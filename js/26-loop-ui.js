@@ -94,6 +94,7 @@ function gameLoop(timestamp) {
             if (descNode) descNode.textContent = applied ? desc : 'Ya está activo, no se consume.';
 
             node.dataset.applied = applied ? 'true' : 'false';
+            node.dataset.powerup = type.toUpperCase();
             node.classList.remove('hidden');
             gameState.powerupFeedbackV688Until = performance.now() + 2600;
         }

@@ -253,6 +253,15 @@ body { background: radial-gradient(circle at center, #111827 0%, #05070c 70%); }
     transition:opacity .12s ease,border-color .12s ease;
 }
 .powerup-toast[data-applied="false"]{border-color:rgba(249,115,22,.50);opacity:.92;}
+.powerup-toast[data-powerup="BOMB_UP"]{border-color:rgba(251,191,36,.82);box-shadow:0 0 13px rgba(251,191,36,.16);}
+.powerup-toast[data-powerup="FIRE_UP"],.powerup-toast[data-powerup="BOMB_FIRE"]{border-color:rgba(251,146,60,.82);box-shadow:0 0 13px rgba(251,146,60,.15);}
+.powerup-toast[data-powerup="SPEED_UP"],.powerup-toast[data-powerup="THROW"]{border-color:rgba(56,189,248,.82);box-shadow:0 0 13px rgba(56,189,248,.15);}
+.powerup-toast[data-powerup="HEALTH_UP"]{border-color:rgba(74,222,128,.82);box-shadow:0 0 13px rgba(74,222,128,.15);}
+.powerup-toast[data-powerup="SHIELD_UP"]{border-color:rgba(96,165,250,.82);box-shadow:0 0 13px rgba(96,165,250,.15);}
+.powerup-toast[data-powerup="BOMB_KICK"],.powerup-toast[data-powerup="KICK"],.powerup-toast[data-powerup="GRAB"]{border-color:rgba(192,132,252,.82);box-shadow:0 0 13px rgba(192,132,252,.15);}
+.powerup-toast[data-powerup="BOMB_ICE"]{border-color:rgba(125,211,252,.86);box-shadow:0 0 13px rgba(125,211,252,.18);}
+.powerup-toast[data-powerup="BOMB_ELECTRIC"]{border-color:rgba(250,204,21,.9);box-shadow:0 0 13px rgba(103,232,249,.20);}
+.powerup-toast[data-powerup="RELIC"]{border-color:rgba(196,181,253,.86);box-shadow:0 0 13px rgba(196,181,253,.18);}
 .powerup-toast-icon{font-size:17px;line-height:1;flex:0 0 auto;}
 .powerup-toast-copy{min-width:0;display:flex;flex-direction:column;gap:2px;}
 .powerup-toast-copy strong{font:6px 'Press Start 2P',monospace;color:#fef3c7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}

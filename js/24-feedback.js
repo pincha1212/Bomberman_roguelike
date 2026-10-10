@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.30.10 — Combat & Feedback
+// Bomberman Roguelike v6.32.2 — Combat & Feedback
 // Feedback visual/audio aislado para facilitar futuras iteraciones.
 const combatFeedback = {
     hitStop: 0,
@@ -223,7 +223,9 @@ const feedbackPool = {
     lastSoundAt: -Infinity,
     soundWindowStart: 0,
     soundWindowCount: 0,
-    audioContext: null
+    audioContext: null,
+    // Efecto efímero dibujado alrededor del jugador al recoger FIRE_UP.
+    fireUpPickupFx: null
 };
 
 function feedbackPoolClamp(value, min, max) {
@@ -424,6 +426,75 @@ function feedbackPoolExplosion(x, y, color = null, scale = 1) {
     // El sonido lo reproduce bomb-explosion:sound en 35-bomb-events.js.
 }
 
+// v6.32.2: efectos visuales específicos al recoger power-ups.
+// Reutiliza los pools existentes para evitar crear objetos de partículas por frame.
+function feedbackPoolPowerupPickupV6322(item) {
+    if (!FEEDBACK_POOL_CONFIG.enabled || !item) return false;
+
+    try {
+        if (
+            feedbackPool.particles.length !== FEEDBACK_POOL_CONFIG.maxParticles ||
+            feedbackPool.rings.length !== FEEDBACK_POOL_CONFIG.maxRings
+        ) {
+            feedbackPoolPoolInit();
+        }
+
+        const type = String(item.type || '').toUpperCase();
+        const effects = {
+            BOMB_UP:       { primary: '#fbbf24', secondary: '#fff7cc', rings: 2, particles: 12, sparks: 7, scale: 1.00 },
+            FIRE_UP:       { primary: '#f97316', secondary: '#fef08a', rings: 2, particles: 13, sparks: 17, scale: 1.08 },
+            SPEED_UP:      { primary: '#38bdf8', secondary: '#cffafe', rings: 1, particles: 8,  sparks: 10, scale: 0.88 },
+            HEALTH_UP:     { primary: '#4ade80', secondary: '#dcfce7', rings: 2, particles: 14, sparks: 2,  scale: 0.92 },
+            SHIELD_UP:     { primary: '#60a5fa', secondary: '#dbeafe', rings: 2, particles: 10, sparks: 5,  scale: 1.00 },
+            BOMB_KICK:     { primary: '#c084fc', secondary: '#f5d0fe', rings: 1, particles: 10, sparks: 7,  scale: 0.92 },
+            KICK:          { primary: '#c084fc', secondary: '#f5d0fe', rings: 1, particles: 10, sparks: 7,  scale: 0.92 },
+            GRAB:          { primary: '#a78bfa', secondary: '#ede9fe', rings: 1, particles: 9,  sparks: 7,  scale: 0.90 },
+            THROW:         { primary: '#22d3ee', secondary: '#cffafe', rings: 1, particles: 9,  sparks: 10, scale: 0.90 },
+            BOMB_FIRE:     { primary: '#f97316', secondary: '#fef08a', rings: 1, particles: 10, sparks: 14, scale: 1.00 },
+            BOMB_ICE:      { primary: '#38bdf8', secondary: '#e0f2fe', rings: 2, particles: 10, sparks: 8,  scale: 0.98 },
+            BOMB_ELECTRIC: { primary: '#facc15', secondary: '#67e8f9', rings: 2, particles: 8,  sparks: 15, scale: 1.00 },
+            RELIC:         { primary: '#c4b5fd', secondary: '#fde68a', rings: 2, particles: 14, sparks: 8,  scale: 1.08 }
+        };
+        const effect = effects[type] || {
+            primary: '#fbbf24', secondary: '#fff7cc', rings: 1,
+            particles: 9, sparks: 5, scale: 0.9
+        };
+
+        const tile = Number(typeof TILE_SIZE !== 'undefined' ? TILE_SIZE : 48) || 48;
+        const px = Number(player?.x);
+        const py = Number(player?.y);
+        const pw = Number(player?.width) || tile * 0.5;
+        const ph = Number(player?.height) || tile * 0.5;
+        const x = Number.isFinite(px) ? px + pw / 2 : (Number(item.x || 0) + 0.5) * tile;
+        const y = Number.isFinite(py) ? py + ph / 2 : (Number(item.y || 0) + 0.5) * tile;
+
+        // FIRE_UP aumenta el rango de la bomba: se representa como una llamarada
+        // breve que envuelve al jugador, sin modificar el estado de la mecánica.
+        if (type === 'FIRE_UP') {
+            feedbackPool.fireUpPickupFx = {
+                x, y, age: 0, duration: 720,
+                tile: tile,
+                playerWidth: pw,
+                playerHeight: ph
+            };
+        }
+
+        // Anillos expansivos alrededor del jugador, con una paleta propia por tipo.
+        if (effect.rings >= 1) feedbackPoolSpawnRing(x, y, effect.primary, effect.scale);
+        if (effect.rings >= 2) feedbackPoolSpawnRing(x, y, effect.secondary, effect.scale * 0.68);
+
+        feedbackPoolSpawnParticles(x, y, effect.primary, effect.particles, effect.scale);
+        if (effect.sparks > 0) {
+            feedbackPoolExplosionSparks(x, y, effect.secondary, effect.sparks);
+        }
+
+        return true;
+    } catch (_) {
+        // Un fallo estético nunca debe interrumpir la recogida ni la simulación.
+        return false;
+    }
+}
+
 function feedbackPoolDamage(x, y) {
     feedbackPool.damageCount += 1;
     const dangerColor = typeof themeColorV46 === 'function' ? themeColorV46('particleDanger', '#f87171') : '#f87171';
@@ -529,6 +600,13 @@ function updatefeedbackPool(dt) {
         if (r.life <= 0) r.active = false;
     }
 
+    if (feedbackPool.fireUpPickupFx) {
+        feedbackPool.fireUpPickupFx.age += safeDt;
+        if (feedbackPool.fireUpPickupFx.age >= feedbackPool.fireUpPickupFx.duration) {
+            feedbackPool.fireUpPickupFx = null;
+        }
+    }
+
     if (feedbackPool.flashTimer > 0) {
         feedbackPool.flashTimer -= safeDt;
         feedbackPool.flashAlpha *= Math.pow(0.82, safeDt / 16.6667);
@@ -545,12 +623,63 @@ function feedbackPoolBeginWorldDraw() {
     ctx.translate(-Math.floor(Number.isFinite(cam.x) ? cam.x : 0), -Math.floor(Number.isFinite(cam.y) ? cam.y : 0));
 }
 
+function feedbackPoolDrawFireUpPickupFx(fx) {
+    if (!fx || !ctx) return;
+
+    const progress = feedbackPoolClamp(fx.age / Math.max(1, fx.duration), 0, 1);
+    const envelope = Math.sin(Math.PI * progress);
+    if (envelope <= 0.015) return;
+
+    const tile = Math.max(16, Number(fx.tile) || 48);
+    const time = fx.age / 1000;
+    const count = 9;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < count; i++) {
+        const phase = time * 2.2 + i * (Math.PI * 2 / count);
+        const wobble = Math.sin(fx.age * 0.018 + i * 1.7);
+        const radiusX = tile * (0.20 + 0.025 * Math.sin(fx.age * 0.012 + i));
+        const radiusY = tile * 0.15;
+        const x = fx.x + Math.cos(phase) * radiusX;
+        const y = fx.y + Math.sin(phase) * radiusY - progress * tile * 0.12;
+        const width = tile * (0.075 + 0.012 * (0.5 + 0.5 * wobble));
+        const height = tile * (0.24 + 0.07 * (0.5 + 0.5 * Math.sin(fx.age * 0.02 + i * 2.1)));
+        const alpha = envelope * (0.55 + 0.16 * (0.5 + 0.5 * wobble));
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(Math.sin(fx.age * 0.009 + i * 1.3) * 0.22);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = i % 3 === 0 ? '#ef4444' : '#f97316';
+        ctx.beginPath();
+        ctx.moveTo(0, -height * 0.55);
+        ctx.bezierCurveTo(width * 0.82, -height * 0.20, width * 0.90, height * 0.05, width * 0.42, height * 0.40);
+        ctx.quadraticCurveTo(0, height * 0.56, -width * 0.42, height * 0.40);
+        ctx.bezierCurveTo(-width * 0.90, height * 0.05, -width * 0.82, -height * 0.20, 0, -height * 0.55);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.globalAlpha = alpha * 0.88;
+        ctx.fillStyle = i % 2 === 0 ? '#fde047' : '#fef3c7';
+        ctx.beginPath();
+        ctx.moveTo(0, -height * 0.22);
+        ctx.bezierCurveTo(width * 0.34, 0, width * 0.38, height * 0.14, 0, height * 0.38);
+        ctx.bezierCurveTo(-width * 0.38, height * 0.14, -width * 0.34, 0, 0, -height * 0.22);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+    ctx.restore();
+}
+
 function drawfeedbackPool() {
     const quality = typeof getDeviceQualityV45 === 'function' ? getDeviceQualityV45() : null;
     const particlesActive = feedbackPool.particles.some(p => p.active);
     const ringsActive = feedbackPool.rings.some(r => r.active);
+    const fireUpActive = !!feedbackPool.fireUpPickupFx;
 
-    if (particlesActive || ringsActive) {
+    if (particlesActive || ringsActive || fireUpActive) {
         feedbackPoolBeginWorldDraw();
         ctx.globalCompositeOperation = 'lighter';
 
@@ -582,6 +711,8 @@ function drawfeedbackPool() {
                 ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
             }
         }
+
+        if (fireUpActive) feedbackPoolDrawFireUpPickupFx(feedbackPool.fireUpPickupFx);
 
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
@@ -680,11 +811,13 @@ window.feedbackPoolExplosion = feedbackPoolExplosion;
 window.feedbackPoolExplosionSparks = feedbackPoolExplosionSparks;
 window.feedbackPoolClearExplosionResidue = feedbackPoolClearExplosionResidue;
 window.feedbackPoolDamage = feedbackPoolDamage;
+window.feedbackPoolPowerupPickupV6322 = feedbackPoolPowerupPickupV6322;
 window.resetfeedbackPool = function resetfeedbackPool() {
     for (let i = 0; i < feedbackPool.particles.length; i++) feedbackPool.particles[i].active = false;
     for (let i = 0; i < feedbackPool.rings.length; i++) feedbackPool.rings[i].active = false;
     feedbackPool.flashAlpha = 0;
     feedbackPool.flashTimer = 0;
+    feedbackPool.fireUpPickupFx = null;
 };
 
 feedbackPoolBootstrap();

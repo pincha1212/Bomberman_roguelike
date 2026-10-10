@@ -219,8 +219,21 @@ function draw() {
 
             // v6.0: residuos materiales persistentes; quedan por debajo de items, bombas y personajes.
             if (typeof drawMaterialResiduesV60 === 'function') drawMaterialResiduesV60(ctx);
-            // v6.30.9: residuos elementales tenues, unidos y dibujados bajo entidades.
-// V3.3: las trampas aparecen visualmente solo después de activarse.
+            // v6.32.2 hotfix: campos eléctricos que siguen activos tras la explosión.
+            // Es solo renderizado: el sistema de campos conserva toda la autoridad del daño.
+            if (typeof drawBombEffectFieldsV6323 === 'function') {
+                renderStatsV329.explosions += drawBombEffectFieldsV6323(gameState.bombEffectFieldsV64);
+            }
+            // v6.32.4: fuego residual visible mientras los campos HEAT hacen daño.
+            if (typeof drawPersistentFireFieldsV6324 === 'function') {
+                renderStatsV329.explosions += drawPersistentFireFieldsV6324(gameState.bombEffectFieldsV64);
+            }
+            // v6.32.6: hielo persistente de BOMB_ICE.
+            // Se suma a los campos eléctricos y de fuego existentes; no los reemplaza.
+            if (typeof drawElementalResiduesV6308 === 'function') {
+                renderStatsV329.explosions += drawElementalResiduesV6308(ctx, gameState.bombEffectFieldsV64);
+            }
+            // V3.3: las trampas aparecen visualmente solo después de activarse.
             drawHazards();
             // v6.30.0: campos temporales de habilidades RASTRERO, dibujados en el Canvas único.
             if (typeof drawRastreroAbilityEffectsV630 === 'function') drawRastreroAbilityEffectsV630(ctx);

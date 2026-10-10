@@ -15,6 +15,8 @@
     flex:0 1 760px;
 }
 .game-info-panel{
+    position:relative;
+    z-index:10010; /* Debe quedar por encima de las zonas táctiles invisibles. */
     flex:0 0 clamp(285px,27vw,340px);
     width:clamp(285px,27vw,340px);
     max-height:min(78dvh,760px);

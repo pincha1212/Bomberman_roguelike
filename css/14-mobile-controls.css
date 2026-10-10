@@ -4,7 +4,7 @@
   body.gameplay-active #mobile-controls {
     position:fixed;
     inset:0;
-    z-index:10000;
+    z-index:10000; /* Por encima del canvas; los paneles interactivos deben quedar por encima. */
     display:block;
     pointer-events:none;
     touch-action:none;
@@ -28,4 +28,11 @@
   }
   #mobile-gesture-zone { left:0; }
   #mobile-action-zone { right:0; }
+}
+
+/* v6.31.9: los controles invisibles no deben tapar paneles ni pantallas de estado. */
+body:has(#game-over-screen:not(.hidden)) #mobile-controls,
+body:has(#level-complete-screen:not(.hidden)) #mobile-controls,
+body:has(#pause-screen:not(.hidden)) #mobile-controls {
+  display:none !important;
 }

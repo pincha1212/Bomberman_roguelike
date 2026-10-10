@@ -1,7 +1,7 @@
-// Bomberman Roguelike v6.12.25 — Cambio de bioma durante la partida
+// Bomberman Roguelike v6.32.1 — Cambio de bioma durante la partida
 (function initBiomeSwitchV61225(global){
     'use strict';
-    const runtime={ready:false,lastPlaying:false};
+    const runtime={ready:false};
 
     function getSelect(){return global.document?.getElementById?.('biome-switch-select')||null;}
     function sync(){
@@ -14,7 +14,6 @@
         if(current&&select.value!==current)select.value=current;
         const status=global.document.getElementById('biome-switch-status');
         if(status)status.textContent=gameState.biomeOverrideV49?'MANUAL':'AUTOMÁTICO';
-        runtime.lastPlaying=playing;
     }
     function change(id){
         if(typeof gameState==='undefined')return;

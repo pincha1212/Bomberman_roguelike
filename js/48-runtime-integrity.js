@@ -1,8 +1,8 @@
-/* BOMBERMAN ROGUELIKE v6.32.0 — diagnóstico del arranque y errores no controlados. */
+/* BOMBERMAN ROGUELIKE v6.32.1 — diagnóstico del arranque y errores no controlados. */
 (function installRuntimeIntegrityV632(global) {
     'use strict';
 
-    const BUILD = '6.32.0';
+    const BUILD = '6.32.1';
     let reportNode = null;
     let reported = false;
 

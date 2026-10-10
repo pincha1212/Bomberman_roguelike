@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="css/11-viewport-layout.css?v=6.31.2">
     <link rel="stylesheet" href="css/12-run-save.css">
     <link rel="stylesheet" href="css/13-mobile-performance.css">
-    <link rel="stylesheet" href="css/14-mobile-controls.css?v=6.31.2">
+    <link rel="stylesheet" href="css/14-mobile-controls.css?v=6.31.4">
     <link rel="stylesheet" href="css/16-runtime-feedback.css?v=6.30.3">
 </head>
 <body class="game-body v4-theme">
@@ -227,15 +227,9 @@
         </main>
 
     <!-- v6.31.0: controles táctiles divididos en movimiento y acciones. -->
-        <div id="mobile-controls" aria-label="Controles táctiles">
-            <div id="mobile-gesture-zone" aria-label="Movimiento: deslizar en cuatro direcciones">
-                <span class="mobile-zone-hint">DESLIZAR PARA MOVER</span><span class="mobile-gesture-arrow" aria-hidden="true">↕</span>
-            </div>
-            <div id="mobile-action-zone" aria-label="Acciones">
-                <button type="button" class="mobile-action-btn mobile-bomb-action" id="btn-bomb-mobile" aria-label="Colocar bomba">💣<span>BOMBA</span></button>
-                <button type="button" class="mobile-action-btn" id="btn-grab-mobile" aria-label="Agarrar o soltar bomba">AGARRAR<span>/ SOLTAR</span></button>
-                <button type="button" class="mobile-action-btn" id="btn-throw-mobile" aria-label="Lanzar bomba transportada">LANZAR</button>
-            </div>
+        <div id="mobile-controls" aria-label="Controles táctiles invisibles">
+            <div id="mobile-gesture-zone" aria-label="Movimiento: deslizar en cualquier dirección en la mitad izquierda"></div>
+            <div id="mobile-action-zone" aria-label="Acciones: toque corto para colocar una bomba; mantener pulsado para agarrar o lanzar"></div>
         </div>
     </div>
 <!-- v3.28 modular JavaScript. Feedback is layered over the existing combat/runtime systems. -->
@@ -245,7 +239,7 @@
     <script src="js/04-theme.js?v=6.18.0"></script>
     <script src="js/05-mechanics-registry.js?v=6.18.0"></script>
     <script src="js/06-relics.js?v=6.13.0"></script>
-    <script src="js/07-input.js?v=6.31.0"></script>
+    <script src="js/07-input.js?v=6.31.4"></script>
     <script src="js/08-dungeon-generator.js?v=6.13.0"></script>
     <script src="js/09-difficulty.js?v=6.27.0"></script>
     <script src="js/10-world.js?v=6.29.0"></script>

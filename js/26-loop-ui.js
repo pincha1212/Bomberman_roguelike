@@ -1,6 +1,40 @@
-// Bomberman Roguelike v5.6 — Game loop, HUD, run flow, rewards, death summary and bootstrap
-        function gameLoop(timestamp) {
-            if (!gameState.isPlaying) { gameState.rafId = 0; return; }
+// Bomberman Roguelike v6.32.0 — ciclo de juego, HUD y flujo de partida.
+// Un único coordinador gestiona los requestAnimationFrame del runtime.
+function scheduleGameLoopV632() {
+    const state = typeof gameState !== 'undefined' ? gameState : null;
+    if (!state || !state.isPlaying || typeof requestAnimationFrame !== 'function') return 0;
+    if (state.__loopPendingV632 && state.rafId) return state.rafId;
+
+    const generation = Number(state.__loopGenerationV632 || 0);
+    state.__loopPendingV632 = true;
+    let scheduledId = 0;
+    scheduledId = requestAnimationFrame((timestamp) => {
+        // Ignora callbacks antiguos si la partida se reinició/cargó durante el intervalo.
+        if (Number(state.__loopGenerationV632 || 0) !== generation || state.rafId !== scheduledId) return;
+        state.rafId = 0;
+        state.__loopPendingV632 = false;
+        gameLoop(timestamp);
+    });
+    state.rafId = scheduledId;
+    return scheduledId;
+}
+
+function cancelScheduledGameLoopV632(targetState) {
+    const state = targetState || (typeof gameState !== 'undefined' ? gameState : null);
+    if (!state) return false;
+    const frameId = Number(state.rafId || 0);
+    if (frameId && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frameId);
+    state.rafId = 0;
+    state.__loopPendingV632 = false;
+    state.__loopGenerationV632 = Number(state.__loopGenerationV632 || 0) + 1;
+    return frameId !== 0;
+}
+
+window.scheduleGameLoopV632 = scheduleGameLoopV632;
+window.cancelScheduledGameLoopV632 = cancelScheduledGameLoopV632;
+
+function gameLoop(timestamp) {
+            if (!gameState.isPlaying) { gameState.rafId = 0; gameState.__loopPendingV632 = false; return; }
             let dt = timestamp - gameState.lastTime;
             gameState.lastTime = timestamp;
 
@@ -31,7 +65,7 @@
             draw();
 
             if (gameState.isPlaying) {
-                gameState.rafId = requestAnimationFrame(gameLoop);
+                scheduleGameLoopV632();
             } else {
                 gameState.rafId = 0;
             }
@@ -142,7 +176,7 @@
             gameState.lastTime = performance.now();
             updateRoguePresentation();
             updateUI(true);
-            gameState.rafId = requestAnimationFrame(gameLoop);
+            scheduleGameLoopV632();
         }
 
         function startDepthForTestV53(targetDepth) {
@@ -158,10 +192,10 @@
             document.getElementById('game-over-screen')?.classList.add('hidden');
             document.getElementById('level-complete-screen')?.classList.add('hidden');
             document.getElementById('pause-screen')?.classList.add('hidden');
+            cancelScheduledGameLoopV632(state);
             state.level = depth;
             state.isPlaying = false;
             state.paused = false;
-            state.rafId = 0;
             currentPlayer.isInvincible = false;
             currentPlayer.invincibleTimer = 0;
             currentPlayer.lastDamageFrame = -1;
@@ -182,8 +216,7 @@
             state.lastTime = performance.now();
             updateRoguePresentation();
             updateUI(true);
-            if (state.rafId) cancelAnimationFrame(state.rafId);
-            state.rafId = requestAnimationFrame(gameLoop);
+            scheduleGameLoopV632();
             return depth;
         }
 
@@ -230,10 +263,7 @@
             gameState.level = maxDepth;
             gameState.isPlaying = false;
             gameState.paused = false;
-            if (typeof gameState.rafId === 'number' && gameState.rafId && typeof cancelAnimationFrame === 'function') {
-                cancelAnimationFrame(gameState.rafId);
-            }
-            gameState.rafId = 0;
+            cancelScheduledGameLoopV632(gameState);
             if (typeof clearRunSaveV55 === 'function') clearRunSaveV55();
             document.getElementById('level-complete-screen')?.classList.add('hidden');
             const summary = typeof finishRun === 'function' ? finishRun('completed') : null;
@@ -275,7 +305,7 @@
             gameState.isPlaying = true;
             gameState.paused = false;
             gameState.lastTime = performance.now();
-            gameState.rafId = requestAnimationFrame(gameLoop);
+            scheduleGameLoopV632();
             if (typeof saveRunV55 === 'function') saveRunV55('level-start');
         }
 

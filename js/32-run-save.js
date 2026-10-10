@@ -284,8 +284,12 @@
 
             state.isPlaying = false;
             state.paused = false;
-            if (state.rafId && global.cancelAnimationFrame) global.cancelAnimationFrame(state.rafId);
-            state.rafId = 0;
+            if (typeof global.cancelScheduledGameLoopV632 === 'function') {
+                global.cancelScheduledGameLoopV632(state);
+            } else {
+                if (state.rafId && global.cancelAnimationFrame) global.cancelAnimationFrame(state.rafId);
+                state.rafId = 0;
+            }
 
             Object.assign(state, {
                 runNumber: save.run.runNumber,
@@ -358,7 +362,10 @@
             state.isPlaying = true;
             state.paused = false;
             state.lastTime = performance.now();
-            state.rafId = requestAnimationFrame(typeof gameLoop === 'function' ? gameLoop : () => {});
+            if (typeof global.scheduleGameLoopV632 !== 'function') {
+                throw new Error('El coordinador del ciclo de juego no está disponible.');
+            }
+            global.scheduleGameLoopV632();
             updateResumeButton();
             return true;
         } catch (_) {

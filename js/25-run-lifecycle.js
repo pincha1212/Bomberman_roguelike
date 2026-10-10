@@ -132,10 +132,14 @@ function resetWorldRuntimeState() {
 
 function beginNewRun() {
     // Si una callback de requestAnimationFrame quedó en cola, la invalida.
-    if (typeof gameState.rafId === 'number' && gameState.rafId && typeof cancelAnimationFrame === 'function') {
-        cancelAnimationFrame(gameState.rafId);
+    if (typeof cancelScheduledGameLoopV632 === 'function') {
+        cancelScheduledGameLoopV632(gameState);
+    } else {
+        if (typeof gameState.rafId === 'number' && gameState.rafId && typeof cancelAnimationFrame === 'function') {
+            cancelAnimationFrame(gameState.rafId);
+        }
+        gameState.rafId = 0;
     }
-    gameState.rafId = 0;
 
     resetWorldRuntimeState();
 
@@ -188,7 +192,9 @@ function finishRun(source = 'unknown') {
     gameState.isPlaying = false;
     gameState.paused = false;
 
-    if (typeof gameState.rafId === 'number' && gameState.rafId && typeof cancelAnimationFrame === 'function') {
+    if (typeof cancelScheduledGameLoopV632 === 'function') {
+        cancelScheduledGameLoopV632(gameState);
+    } else if (typeof gameState.rafId === 'number' && gameState.rafId && typeof cancelAnimationFrame === 'function') {
         cancelAnimationFrame(gameState.rafId);
         gameState.rafId = 0;
     }

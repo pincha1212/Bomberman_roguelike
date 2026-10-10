@@ -315,9 +315,13 @@
         const tile = tileSize();
         const width = Number(carrier.width) || tile * 0.7;
         const height = Number(carrier.height) || tile * 0.7;
+        // El jugador y la mayoría de las entidades usan origen superior izquierdo.
+        // Death Echo declara __gridAnchor='center'; sumar media anchura lo desplazaba
+        // fuera del fantasma y también dejaba mal guardada su posición visual.
+        const centeredAnchor = carrier.__gridAnchor === 'center';
         return {
-            x: Number(carrier.x) + width * 0.5,
-            y: Number(carrier.y) + height * 0.5 - tile * CARRY_HEIGHT
+            x: Number(carrier.x) + (centeredAnchor ? 0 : width * 0.5),
+            y: Number(carrier.y) + (centeredAnchor ? 0 : height * 0.5) - tile * CARRY_HEIGHT
         };
     }
 

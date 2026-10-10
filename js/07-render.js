@@ -317,8 +317,25 @@ function draw() {
             // La diferencia es monocromática + alpha 0.50. No hay aura, ojos,
             // partículas ni una segunda animación superpuesta.
             drawBombermanSprite(ghost.x - ghost.width / 2, ghost.y - ghost.height / 2, ghost, { ghost: true });
+
+<<<<<<< HEAD
+=======
+            // Las bombas CARRIED no se dibujan en el suelo. Renderiza la que lleva
+            // Death Echo sobre su cuerpo, usando la posición real del portador.
+            const carriedEchoBomb = typeof globalThis.getCarriedBombForEntityV682 === 'function'
+                ? globalThis.getCarriedBombForEntityV682(ghost)
+                : null;
+            if (carriedEchoBomb) {
+                const carriedPos = typeof globalThis.getCarriedBombWorldPositionV682 === 'function'
+                    ? globalThis.getCarriedBombWorldPositionV682(carriedEchoBomb)
+                    : { x:ghost.x, y:ghost.y - TILE_SIZE * 0.38 };
+                if (carriedPos && Number.isFinite(carriedPos.x) && Number.isFinite(carriedPos.y)) {
+                    drawBombSprite(carriedPos.x, carriedPos.y, carriedEchoBomb);
+                }
+            }
         }
 
+>>>>>>> 57377fa (feat: Implement enemy AI navigation and pathfinding logic in 19-enemy-ai-navigation.js)
         function drawExitPortal(x, y) {
             let pulse = Math.sin(gameState.animFrame * 0.1) * 3;
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('exit') : '#facc15';

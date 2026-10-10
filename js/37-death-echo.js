@@ -1,12 +1,12 @@
-// Bomberman Roguelike v6.28.0 — Death Echo: grid estable y dificultad reducida
+// Bomberman Roguelike v6.31.20 — Death Echo: bomba visible y transporte prolongado
 // Echo representa al personaje que murió: conserva su build y utiliza los mismos
 // verbos de interacción, pero con una IA autónoma y movimiento estrictamente tile-to-tile.
-(function installDeathEchoV618(global) {
+(function installDeathEchoV620(global) {
     'use strict';
 
-    const VERSION = '6.28.0';
+    const VERSION = '6.31.20';
     const COMPATIBLE_VERSIONS = new Set([
-        '6.3.0','6.3.1','6.5.1','6.7.0','6.7.1','6.7.1.1','6.11.0','6.12.12','6.12.13','6.12.17','6.12.18','6.28.0'
+        '6.3.0','6.3.1','6.5.1','6.7.0','6.7.1','6.7.1.1','6.11.0','6.12.12','6.12.13','6.12.17','6.12.18','6.28.0','6.31.18','6.31.19','6.31.20'
     ]);
     if (global.__DEATH_ECHO_V618_INSTALLED__) return;
     global.__DEATH_ECHO_V618_INSTALLED__ = true;
@@ -24,14 +24,15 @@
         reactionMs: 1250,
         wallPauseMs: 900,
         blockedRetryMs: 300,
-        bombCooldownMs: 5200,
-        grabCooldownMs: 800,
-        throwDelayMs: 1000,
-        carryTimeoutMs: 1800,
+        bombCooldownMs: 3600,
+        carryTimeoutMs: 10000,
+        minimumCarryMs: 4200,
+        carryReplanMs: 850,
+        dangerFuseMs: 950,
         escapeThinkMs: 180,
         bombSpatialRange: 2,
         patrolSideChance: 0.20,
-        attackChance: 0.12,
+        attackChance: 0.48,
         minimumFuseMs: 2600,
         maxBombRange: 2
     });
@@ -357,6 +358,14 @@
         const danger = new Set();
         for (const bomb of (gameState.bombs || [])) {
             if (!bomb || bomb.state === BOMB_V4_STATES?.CARRIED || bomb.carriedBy) continue;
+            const timer = num(bomb.timer, num(bomb.fuseTotal, 0));
+            // Una bomba con mecha larga no convierte toda su línea de explosión
+            // en peligro instantáneo. El Echo puede manipularla y huir cuando
+            // queda poco tiempo; las bombas en movimiento siguen siendo amenaza.
+            const isOwnEchoBomb = bomb.owner === GHOST_OWNER && bomb.echoId === state.active?.echoId;
+            const imminent = isOwnEchoBomb || bomb.pendingDetonation === true ||
+                bomb.state === BOMB_V4_STATES?.MOVING || timer <= ECHO_AI.dangerFuseMs;
+            if (!imminent) continue;
             danger.add(cellKey(Number(bomb.x), Number(bomb.y)));
             if (typeof calculateBombBlastCells === 'function') {
                 for (const cell of calculateBombBlastCells(bomb)) danger.add(cellKey(Number(cell.x), Number(cell.y)));
@@ -401,57 +410,215 @@
         const bomb = global.getAdjacentGrabBombAnyDirectionV687(ghost) || null;
         if (!bomb) return null;
 
-        // El Echo no levanta una bomba automáticamente sólo por rozarla.
-        // La usa como lo haría un jugador: cuando hay un objetivo visible o
-        // cuando esa bomba está bloqueando su avance inmediato.
+        // No recoge bombas por rozarlas: sólo aprovecha una oportunidad actual.
         const tile = tileFromEntity(ghost);
         const target = playerTile();
         const aligned = tile.x === target.x || tile.y === target.y;
         const front = facingVector(ghost.dir);
         const frontBomb = Number(bomb.x) === tile.x + front.x && Number(bomb.y) === tile.y + front.y;
-        if (!visibleToPlayer(ghost) && !frontBomb) return null;
+        // Una bomba adyacente puede tapar la línea de visión al jugador. Eso
+        // no debe impedir que el Echo identifique y manipule esa misma bomba.
         if (aligned || frontBomb) return bomb;
+        if (!visibleToPlayer(ghost)) return null;
         return echoRoll(ghost, 29) > 0.45 ? bomb : null;
     }
 
-    function updateInteraction(ghost, dt) {
+    function isOtherEntityAtTile(x, y, ghost) {
+        const p = playerTile();
+        if (p.x === x && p.y === y) return true;
+        const candidates = [...(gameState.enemies || []), gameState.boss].filter(Boolean);
+        for (const entity of candidates) {
+            if (!entity || entity === ghost || entity.defeated) continue;
+            const tile = tileFromEntity(entity);
+            if (tile.x === x && tile.y === y) return true;
+        }
+        return false;
+    }
+
+    function collectReachableTiles(ghost) {
+        const start = tileFromEntity(ghost);
+        const reachable = new Map();
+        const queue = [{ x:start.x, y:start.y, distance:0, firstDirection:null }];
+        reachable.set(cellKey(start.x, start.y), queue[0]);
+        for (let i = 0; i < queue.length; i++) {
+            const node = queue[i];
+            for (const direction of getDirections()) {
+                const x = node.x + direction.x;
+                const y = node.y + direction.y;
+                const key = cellKey(x, y);
+                if (reachable.has(key) || !passableTile(x, y, ghost)) continue;
+                if (isOtherEntityAtTile(x, y, ghost)) continue;
+                const next = {
+                    x, y,
+                    distance: node.distance + 1,
+                    firstDirection: node.firstDirection || direction
+                };
+                reachable.set(key, next);
+                queue.push(next);
+            }
+        }
+        return reachable;
+    }
+
+    function axisDirectionBetween(from, to) {
+        if (from.x === to.x && from.y !== to.y) return { x:0, y:Math.sign(to.y - from.y), dir:to.y < from.y ? 'up' : 'down' };
+        if (from.y === to.y && from.x !== to.x) return { x:Math.sign(to.x - from.x), y:0, dir:to.x < from.x ? 'left' : 'right' };
+        return null;
+    }
+
+    function clearAxisToPlayer(from, maxDistance = ECHO_AI.visionRange) {
+        const target = playerTile();
+        const direction = axisDirectionBetween(from, target);
+        if (!direction) return false;
+        const distance = Math.abs(target.x - from.x) + Math.abs(target.y - from.y);
+        if (distance < 1 || distance > maxDistance) return false;
+        let x = from.x + direction.x;
+        let y = from.y + direction.y;
+        while (x !== target.x || y !== target.y) {
+            if (!inside(x, y)) return false;
+            const type = gameState.grid?.[y]?.[x];
+            if (type === TYPES.WALL || type === TYPES.BLOCK || bombAt(x, y)) return false;
+            x += direction.x;
+            y += direction.y;
+        }
+        return true;
+    }
+
+    function isValidBombDropTile(x, y, ghost) {
+        if (!passableTile(x, y, ghost)) return false;
+        if (isOtherEntityAtTile(x, y, ghost)) return false;
+        return true;
+    }
+
+    // El plan sólo contiene el objetivo de la acción actual. No se guardan rutas,
+    // movimientos anteriores ni patrones del jugador entre decisiones o partidas.
+    function chooseBombCarryPlan(ghost) {
+        const reachable = collectReachableTiles(ghost);
+        const target = playerTile();
+        const canThrow = hasAbility(ghost, 'THROW');
+        const canKick = hasAbility(ghost, 'KICK');
+        const candidates = [];
+
+        for (const node of reachable.values()) {
+            if (node.distance < 1 || !isValidBombDropTile(node.x, node.y, ghost)) continue;
+            const distanceToPlayer = Math.abs(target.x - node.x) + Math.abs(target.y - node.y);
+            if (distanceToPlayer < 2 || distanceToPlayer > ECHO_AI.visionRange) continue;
+            const directionToPlayer = axisDirectionBetween({ x:node.x, y:node.y }, target);
+            if (!directionToPlayer || !clearAxisToPlayer({ x:node.x, y:node.y }, ECHO_AI.visionRange)) continue;
+
+            let kickPlan = null;
+            if (canKick) {
+                const approach = { x:node.x - directionToPlayer.x, y:node.y - directionToPlayer.y };
+                if (isValidBombDropTile(approach.x, approach.y, ghost) && reachable.has(cellKey(approach.x, approach.y))) {
+                    kickPlan = { approachTile:approach, direction:directionToPlayer };
+                }
+            }
+            const canThrowFromHere = canThrow && distanceToPlayer <= 3;
+            const preferredDistance = canThrowFromHere ? 2 : (kickPlan ? 3 : 2.5);
+            const score = node.distance * 0.85 + Math.abs(distanceToPlayer - preferredDistance) * 1.8;
+            candidates.push({
+                targetTile:{ x:node.x, y:node.y },
+                kickPlan,
+                score
+            });
+        }
+
+        candidates.sort((a, b) => a.score - b.score);
+        if (candidates.length) return candidates[0];
+
+        // En habitaciones cerradas también puede transportar y soltar una bomba;
+        // no queda bloqueado esperando una alineación perfecta.
+        const fallback = [...reachable.values()]
+            .filter(node => node.distance >= 1 && isValidBombDropTile(node.x, node.y, ghost))
+            .sort((a, b) => {
+                const da = Math.abs(target.x - a.x) + Math.abs(target.y - a.y);
+                const db = Math.abs(target.x - b.x) + Math.abs(target.y - b.y);
+                return Math.abs(da - 2.5) + a.distance * 0.35 - (Math.abs(db - 2.5) + b.distance * 0.35);
+            });
+        if (!fallback.length) return null;
+        return { targetTile:{ x:fallback[0].x, y:fallback[0].y }, kickPlan:null, score:Infinity };
+    }
+
+    function chooseRouteDirection(ghost, targetTile) {
+        if (!targetTile) return null;
+        const current = tileFromEntity(ghost);
+        if (current.x === targetTile.x && current.y === targetTile.y) return null;
+        const reachable = collectReachableTiles(ghost);
+        return reachable.get(cellKey(targetTile.x, targetTile.y))?.firstDirection || null;
+    }
+
+    function updateInteraction(ghost) {
         const carried = typeof global.getCarriedBombForEntityV682 === 'function'
             ? global.getCarriedBombForEntityV682(ghost)
             : null;
 
-        ghost.carryTimer = Math.max(0, num(ghost.carryTimer, 0) - num(dt, 16));
-
         if (carried) {
-            if (ghost.interactionTimer > 0) return true;
-
-            const visible = visibleToPlayer(ghost);
-            const target = playerTile();
             const tile = tileFromEntity(ghost);
-            const aligned = tile.x === target.x || tile.y === target.y;
+            const destination = ghost.carryPlan?.targetTile || null;
+            const reachedDestination = destination && tile.x === destination.x && tile.y === destination.y;
+            const timedOut = ghost.carryTimer <= 0;
+            if (ghost.interactionTimer > 0) return true;
+            if (!reachedDestination && !timedOut) return true;
 
-            if (hasAbility(ghost, 'THROW') && visible && aligned && typeof global.throwCarriedBombV683 === 'function') {
+            // No suelta la bomba en cuanto llega al primer destino. La transporta
+            // durante varios segundos y reevalúa otra posición mientras todavía
+            // tenga tiempo; esto usa sólo el tablero actual, sin memoria del jugador.
+            if (reachedDestination && !timedOut && num(ghost.carryElapsedMs, 0) < ECHO_AI.minimumCarryMs) {
+                if (ghost.carryReplanTimerMs <= 0) {
+                    const nextPlan = chooseBombCarryPlan(ghost);
+                    if (nextPlan) {
+                        ghost.carryPlan = nextPlan;
+                    } else {
+                        // Sin una colocación táctica válida, continúa moviéndose
+                        // con la bomba y volverá a evaluarlo al vencer el tiempo.
+                        ghost.carryPlan = null;
+                        ghost.aiTargetTile = null;
+                    }
+                    ghost.carryReplanTimerMs = ECHO_AI.carryReplanMs;
+                }
+                return true;
+            }
+
+            const target = playerTile();
+            const aligned = tile.x === target.x || tile.y === target.y;
+            if (reachedDestination && hasAbility(ghost, 'THROW') && visibleToPlayer(ghost) && aligned && typeof global.throwCarriedBombV683 === 'function') {
                 ghost.dir = tile.x === target.x
                     ? (target.y < tile.y ? 'up' : 'down')
                     : (target.x < tile.x ? 'left' : 'right');
                 ghost.lastDirection = ghost.dir;
                 if (global.throwCarriedBombV683(ghost)) {
-                    ghost.mode = 'ESCAPE';
-                    ghost.interactionTimer = 900;
                     ghost.carryTimer = 0;
+                    ghost.carryPlan = null;
+                    ghost.mode = 'ESCAPE';
+                    ghost.interactionTimer = 650;
+                    ghost.aiTargetTile = null;
                     return true;
                 }
             }
 
-            // No expone al jugador a conocimiento imposible: si pierde la visión
-            // durante un tiempo razonable, deja la bomba en una casilla segura.
-            if (ghost.carryTimer <= 0) {
-                if (typeof global.releaseCarriedBombV682 === 'function') global.releaseCarriedBombV682(ghost, 'drop');
-                ghost.interactionTimer = 260;
+            // Si llegó al sector elegido, conserva una posible maniobra de patada.
+            // Si se agotó el tiempo, deja la bomba donde está y abandona la maniobra.
+            const kickPlan = reachedDestination && !timedOut && hasAbility(ghost, 'KICK')
+                ? ghost.carryPlan?.kickPlan
+                : null;
+            if (typeof global.releaseCarriedBombV682 === 'function' && global.releaseCarriedBombV682(ghost, 'drop')) {
                 ghost.carryTimer = 0;
-                ghost.mode = 'PATROL';
+                ghost.carryPlan = null;
+                ghost.aiTargetTile = null;
+                if (kickPlan) {
+                    ghost.kickPlan = {
+                        bombRef:carried,
+                        approachTile:{ x:kickPlan.approachTile.x, y:kickPlan.approachTile.y },
+                        direction:{ x:kickPlan.direction.x, y:kickPlan.direction.y, dir:kickPlan.direction.dir }
+                    };
+                    ghost.mode = 'KICK_ALIGN';
+                    ghost.interactionTimer = 0;
+                } else {
+                    ghost.mode = 'PATROL';
+                    ghost.interactionTimer = 240;
+                }
                 return true;
             }
-
             return true;
         }
 
@@ -459,9 +626,12 @@
         const bomb = chooseInteractionBomb(ghost);
         if (!bomb || typeof global.grabBombV682 !== 'function') return false;
         if (!global.grabBombV682(ghost, bomb)) return false;
-        ghost.mode = 'CARRY';
+        ghost.carryPlan = chooseBombCarryPlan(ghost);
         ghost.carryTimer = ECHO_AI.carryTimeoutMs;
-        ghost.interactionTimer = hasAbility(ghost, 'THROW') ? ECHO_AI.throwDelayMs : ECHO_AI.grabCooldownMs;
+        ghost.carryElapsedMs = 0;
+        ghost.carryReplanTimerMs = 0;
+        ghost.mode = 'CARRY';
+        ghost.interactionTimer = 180;
         return true;
     }
 
@@ -480,7 +650,11 @@
         const a = tileFromEntity(ghost);
         const b = playerTile();
         if (a.x !== b.x && a.y !== b.y) return null;
-        if (Math.abs(a.x - b.x) + Math.abs(a.y - b.y) !== ECHO_AI.bombSpatialRange) return null;
+        const distance = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+        // El rango de la bomba debe determinar la oportunidad. La condición anterior
+        // exigía SIEMPRE 2 casillas y anulaba todos los ataques con alcance 1.
+        const effectiveRange = Math.max(1, Math.min(ECHO_AI.bombSpatialRange, Math.floor(num(ghost.bombRange, 1))));
+        if (distance < 1 || distance > effectiveRange) return null;
         if (!passableTile(a.x, a.y, ghost) || bombAt(a.x, a.y)) return null;
         if (typeof calculateBombBlastCells !== 'function') return null;
         const cells = calculateBombBlastCells({ x:a.x, y:a.y, range:ghost.bombRange });
@@ -489,83 +663,14 @@
     }
 
     function ghostBombCount(ghost) {
-        return (gameState.bombs || []).filter(b => b && b.owner === GHOST_OWNER && b.echoId === ghost.echoId && !b.carriedBy).length;
-    }
-
-    function createGhostBomb(ghost) {
-        if (!hasAbility(ghost, 'GRAB')) return null;
-        if (typeof global.getAdjacentGrabBombAnyDirectionV687 !== 'function') return null;
-        return global.getAdjacentGrabBombAnyDirectionV687(ghost) || null;
-    }
-
-    function updateInteraction(ghost, dt) {
-        const carried = typeof global.getCarriedBombForEntityV682 === 'function'
-            ? global.getCarriedBombForEntityV682(ghost)
-            : null;
-
-        ghost.interactionTimer = Math.max(0, num(ghost.interactionTimer, 0) - num(dt, 16));
-
-        if (carried) {
-            if (ghost.interactionTimer > 0) return true;
-            if (hasAbility(ghost, 'THROW') && visibleToPlayer(ghost) && typeof global.throwCarriedBombV683 === 'function') {
-                const target = playerTile();
-                const tile = tileFromEntity(ghost);
-                if (tile.x === target.x || tile.y === target.y) {
-                    ghost.dir = tile.x === target.x ? (target.y < tile.y ? 'up' : 'down') : (target.x < tile.x ? 'left' : 'right');
-                    ghost.lastDirection = ghost.dir;
-                    if (global.throwCarriedBombV683(ghost)) {
-                        ghost.mode = 'ESCAPE';
-                        ghost.interactionTimer = 900;
-                        return true;
-                    }
-                }
-            }
-            if (typeof global.releaseCarriedBombV682 === 'function') global.releaseCarriedBombV682(ghost, 'drop');
-            ghost.interactionTimer = 260;
-            ghost.mode = 'PATROL';
-            return true;
-        }
-
-        if (ghost.interactionTimer > 0) return false;
-        const bomb = chooseInteractionBomb(ghost);
-        if (!bomb || typeof global.grabBombV682 !== 'function') return false;
-        if (!global.grabBombV682(ghost, bomb)) return false;
-        ghost.mode = 'CARRY';
-        ghost.interactionTimer = hasAbility(ghost, 'THROW') ? ECHO_AI.throwDelayMs : 650;
-        return true;
-    }
-
-    function tryKickAdjacentBomb(ghost) {
-        if (!hasAbility(ghost, 'KICK')) return false;
-        if (typeof global.startBombKickV682 !== 'function') return false;
-        const tile = tileFromEntity(ghost);
-        const dir = facingVector(ghost.dir);
-        const bomb = (gameState.bombs || []).find(b => b && b.state === BOMB_V4_STATES.ARMED && !b.carriedBy && Number(b.x) === tile.x + dir.x && Number(b.y) === tile.y + dir.y);
-        if (!bomb) return false;
-        return !!global.startBombKickV682(bomb, ghost, { x:dir.x, y:dir.y });
-    }
-
-    function chooseAttack(ghost) {
-        if (!visibleToPlayer(ghost)) return null;
-        const a = tileFromEntity(ghost);
-        const b = playerTile();
-        if (a.x !== b.x && a.y !== b.y) return null;
-        if (Math.abs(a.x - b.x) + Math.abs(a.y - b.y) !== ECHO_AI.bombSpatialRange) return null;
-        if (!passableTile(a.x, a.y, ghost) || bombAt(a.x, a.y)) return null;
-        if (typeof calculateBombBlastCells !== 'function') return null;
-        const cells = calculateBombBlastCells({ x:a.x, y:a.y, range:ghost.bombRange });
-        if (!cells.some(c => Number(c.x) === b.x && Number(c.y) === b.y)) return null;
-        return { x:a.x, y:a.y };
-    }
-
-    function ghostBombCount(ghost) {
-        return (gameState.bombs || []).filter(b => b && b.owner === GHOST_OWNER && b.echoId === ghost.echoId && !b.carriedBy).length;
+        return (gameState.bombs || []).filter(b => b && b.owner === GHOST_OWNER && b.echoId === ghost.echoId).length;
     }
 
     function createGhostBomb(ghost) {
         if (!ghost || ghost._tileMoveActive || !snapEchoToGrid(ghost) || !isCenteredOnTile(ghost)) return false;
         if (ghost.bombCooldown > 0 || ghostBombCount(ghost) >= ghost.maxBombs) return false;
         const tile = tileFromEntity(ghost);
+        if (bombAt(tile.x, tile.y)) return false;
         const baseFuse = gameState.roomType?.id === 'CURSED' ? BOMB_HANDLING.cursedFuse : BOMB_HANDLING.normalFuse;
         const fuseTotal = Math.max(ECHO_AI.minimumFuseMs, Math.round(baseFuse * Math.max(1.2, num(ghost.relicMods?.bombFuseMultiplier, 1))));
         const worldX = (tile.x + 0.5) * TILE_SIZE;
@@ -614,9 +719,56 @@
         ghost.bombCooldown = ECHO_AI.bombCooldownMs;
         ghost.mode = 'ESCAPE';
         ghost.escapeTimer = 0;
+        ghost.aiTargetTile = null;
+        ghost.thinkTimer = 0;
         ghost.attackFlash = 180;
         if (typeof addParticles === 'function') addParticles(worldX, worldY, 'particleDanger', 8);
         if (typeof sfx === 'function') sfx('bomb');
+        return true;
+    }
+
+    function updatePlannedKick(ghost, dt) {
+        const plan = ghost?.kickPlan;
+        if (!plan || ghost.mode !== 'KICK_ALIGN') return false;
+        const bomb = plan.bombRef;
+        if (!bomb || !(gameState.bombs || []).includes(bomb) || bomb.state !== BOMB_V4_STATES.ARMED || bomb.carriedBy) {
+            ghost.kickPlan = null;
+            ghost.mode = 'PATROL';
+            return true;
+        }
+        // La preparación para patear se cancela si ya no hay una mecha segura.
+        // El flujo general de peligro decide la huida en este mismo frame.
+        if (bomb.pendingDetonation === true || num(bomb.timer, num(bomb.fuseTotal, 0)) <= ECHO_AI.dangerFuseMs) {
+            ghost.kickPlan = null;
+            ghost.mode = 'ESCAPE';
+            ghost.aiTargetTile = null;
+            ghost.thinkTimer = 0;
+            return false;
+        }
+
+        const tile = tileFromEntity(ghost);
+        const approach = plan.approachTile;
+        if (tile.x === approach.x && tile.y === approach.y) {
+            ghost.dir = plan.direction.dir;
+            ghost.lastDirection = ghost.dir;
+            const kicked = typeof global.startBombKickV682 === 'function' &&
+                global.startBombKickV682(bomb, ghost, { x:plan.direction.x, y:plan.direction.y });
+            ghost.kickPlan = null;
+            ghost.aiTargetTile = null;
+            ghost.mode = kicked ? 'ESCAPE' : 'PATROL';
+            ghost.thinkTimer = kicked ? 360 : 0;
+            ghost.directionCommitMs = 260;
+            return true;
+        }
+
+        const direction = chooseRouteDirection(ghost, approach);
+        if (!direction) {
+            ghost.kickPlan = null;
+            ghost.mode = 'PATROL';
+            ghost.aiTargetTile = null;
+            return true;
+        }
+        updateEchoMovement(ghost, direction, dt);
         return true;
     }
 
@@ -631,6 +783,7 @@
         ghost.dir = direction.dir;
         ghost.lastDirection = direction.dir;
         ghost.moving = true;
+        ghost.isMoving = true;
         ghost.blockedDirection = null;
         ghost.wallPauseMs = 0;
         ghost.blockedRetryMs = 0;
@@ -641,6 +794,7 @@
         if (ghost._tileMoveActive) {
             const result = gridAdvanceTileMove(ghost, ghost.speed, dt, { kind:'enemy', allowCurrentBombTile:false });
             ghost.moving = !result.arrived;
+            ghost.isMoving = ghost.moving;
             if (result.arrived) {
                 const gx = Number(ghost._tileMoveTargetGX);
                 const gy = Number(ghost._tileMoveTargetGY);
@@ -648,6 +802,7 @@
                     global.gridSnapEntityCenteredV628(ghost, gx, gy);
                 }
                 ghost.moving = false;
+                ghost.isMoving = false;
                 ghost.moveDistance += TILE_SIZE;
             }
             return true;
@@ -657,6 +812,7 @@
         ghost.blockedRetryMs = Math.max(0, num(ghost.blockedRetryMs, 0) - num(dt, 16));
         if (ghost.wallPauseMs > 0 || ghost.blockedRetryMs > 0) {
             ghost.moving = false;
+            ghost.isMoving = false;
             return false;
         }
 
@@ -668,6 +824,7 @@
         ghost.blockedRetryMs = 0;
         ghost.blockedDirection = direction.dir;
         ghost.moving = false;
+        ghost.isMoving = false;
         ghost.wallHits = num(ghost.wallHits, 0) + 1;
         return false;
     }
@@ -701,6 +858,7 @@
                 }
             }
             ghost.moving = false;
+            ghost.isMoving = false;
             return false;
         }
 
@@ -716,6 +874,7 @@
             // cada pocos milisegundos hasta que aparezca una casilla libre.
             ghost.blockedRetryMs = ECHO_AI.blockedRetryMs;
             ghost.moving = false;
+            ghost.isMoving = false;
             return false;
         }
 
@@ -737,6 +896,15 @@
 
         const spawn = chooseSpawnTile(saved.position || {x:1,y:1}, playerTile());
         const build = saved.build || {};
+        const inheritedCapabilities = new Set(
+            (Array.isArray(build.capabilities) ? build.capabilities : [])
+                .map(String).map(id => id.toUpperCase())
+                .filter(id => ['KICK','GRAB','THROW'].includes(id))
+        );
+        // GRAB forma parte del bucle táctico central de Death Echo, aunque el
+        // jugador no haya conseguido GRAB en esa partida. THROW sí se hereda.
+        inheritedCapabilities.add('GRAB');
+
         const ghost = {
             ...clone(saved),
             archetype:'echo',
@@ -752,7 +920,7 @@
             bombElementV612:['normal','fire','ice','electric'].includes(String(build.bombElementV612)) ? String(build.bombElementV612) : 'normal',
             dir:['up','down','left','right'].includes(build.dir) ? build.dir : 'down',
             lastDirection:['up','down','left','right'].includes(build.dir) ? build.dir : 'down',
-            inheritedCapabilities:Array.isArray(build.capabilities) ? build.capabilities.map(String).map(id => id.toUpperCase()).filter(id => ['KICK','GRAB','THROW'].includes(id)) : [],
+            inheritedCapabilities:[...inheritedCapabilities],
             capabilityProfileV681:{
                 permanent:Array.isArray(build.capabilities) ? build.capabilities.map(id => String(id).toLowerCase()).filter(id => ['kick','grab','throw'].includes(id)) : [],
                 byGroup:Object.create(null)
@@ -768,6 +936,7 @@
             visualTime:0,
             moveDistance:0,
             moving:false,
+            isMoving:false,
             mode:'PATROL',
             aiTargetTile:null,
             wallPauseMs:0,
@@ -777,6 +946,8 @@
             bombCooldown:ECHO_AI.bombCooldownMs,
             interactionTimer:0,
             carryTimer:0,
+            carryElapsedMs:0,
+            carryReplanTimerMs:0,
             reactionTimer:ECHO_AI.reactionMs,
             directionCommitMs:ECHO_AI.directionCommitMs,
             wasVisible:false,
@@ -866,6 +1037,14 @@
         ghost.visualTime += Math.max(0, delta);
         ghost.bombCooldown = Math.max(0, num(ghost.bombCooldown, 0) - delta);
         ghost.interactionTimer = Math.max(0, num(ghost.interactionTimer, 0) - delta);
+        ghost.carryTimer = Math.max(0, num(ghost.carryTimer, 0) - delta);
+        ghost.carryReplanTimerMs = Math.max(0, num(ghost.carryReplanTimerMs, 0) - delta);
+        const carriedAtFrameStart = typeof global.getCarriedBombForEntityV682 === 'function'
+            ? global.getCarriedBombForEntityV682(ghost)
+            : null;
+        ghost.carryElapsedMs = carriedAtFrameStart
+            ? num(ghost.carryElapsedMs, 0) + Math.max(0, delta)
+            : 0;
         ghost.thinkTimer = Math.max(0, num(ghost.thinkTimer, 0) - delta);
         ghost.reactionTimer = Math.max(0, num(ghost.reactionTimer, 0) - delta);
         ghost.attackFlash = Math.max(0, num(ghost.attackFlash, 0) - delta);
@@ -880,12 +1059,50 @@
         // casilla. No se replantea una ruta ni se planta una bomba desde media celda.
         if (ghost._tileMoveActive) {
             moveTileByTile(ghost, null, delta);
-            if (ghost._tileMoveActive) {
-                applyEchoContactDamage(ghost, visible);
-                return;
-            }
+            if (ghost._tileMoveActive) return;
         }
         snapEchoToGrid(ghost);
+
+        // Una patada planificada se resuelve antes del detector general de peligro:
+        // la casilla de preparación queda alineada con la bomba por diseño y debe
+        // ejecutar la patada en cuanto llega, en vez de entrar en un bucle de huida.
+        if (ghost.mode === 'KICK_ALIGN' && ghost.kickPlan) {
+            if (updatePlannedKick(ghost, delta)) return;
+        }
+
+        // Interactúa con una bomba cercana antes de decidir huir de su radio potencial.
+        // Sólo inicia la maniobra si la mecha aún da margen; si no, prima escapar.
+        const currentlyCarryingBomb = typeof global.getCarriedBombForEntityV682 === 'function' && !!global.getCarriedBombForEntityV682(ghost);
+        if (!currentlyCarryingBomb && ghost.mode !== 'CARRY' && !ghost._tileMoveActive && isCenteredOnTile(ghost) && ghost.interactionTimer <= 0) {
+            const tile = tileFromEntity(ghost);
+            const facing = facingVector(ghost.dir);
+            const frontBomb = (gameState.bombs || []).find(b => b && b.state === BOMB_V4_STATES.ARMED && !b.carriedBy &&
+                Number(b.x) === tile.x + facing.x && Number(b.y) === tile.y + facing.y);
+            const frontFuse = frontBomb ? num(frontBomb.timer, num(frontBomb.fuseTotal, 0)) : 0;
+
+            const candidate = hasAbility(ghost, 'GRAB') ? chooseInteractionBomb(ghost) : null;
+            const candidateFuse = candidate ? num(candidate.timer, num(candidate.fuseTotal, 0)) : 0;
+            const safeGrab = !!candidate && candidateFuse > ECHO_AI.dangerFuseMs;
+            // Si la bomba es del jugador, suele convenir robarla. Si no está delante,
+            // agarrarla permite trasladarla; si está delante y no es del jugador,
+            // alterna entre agarrar y patear para no repetir siempre la misma acción.
+            const preferGrab = safeGrab && (
+                candidate !== frontBomb ||
+                (candidate.owner === 'player' && echoRoll(ghost, 47) < 0.58) ||
+                echoRoll(ghost, 48) < 0.25
+            );
+            if (preferGrab && updateInteraction(ghost)) return;
+
+            // La patada se intenta después de la decisión de agarre; si está bloqueada,
+            // el intento de agarre inferior sirve como alternativa real de reposición.
+            if (frontBomb && frontFuse > ECHO_AI.dangerFuseMs && tryKickAdjacentBomb(ghost)) {
+                ghost.mode = 'ESCAPE';
+                ghost.thinkTimer = 360;
+                ghost.directionCommitMs = 300;
+                return;
+            }
+            if (safeGrab && updateInteraction(ghost)) return;
+        }
 
         // 1. Primero resuelve peligro real. No intenta atacar mientras está en peligro.
         const danger = dangerCells();
@@ -925,16 +1142,20 @@
         // 3. Interacción física. El jugador muerto conserva sus verbos, no una
         // IA nueva para cada capacidad.
         if (ghost.mode === 'CARRY') {
-            const handled = updateInteraction(ghost, delta);
+            const handled = updateInteraction(ghost);
             const carried = typeof global.getCarriedBombForEntityV682 === 'function'
                 ? global.getCarriedBombForEntityV682(ghost)
                 : null;
             if (carried) {
-                const target = visible ? playerTile() : null;
-                let direction = target && (current.x === target.x || current.y === target.y)
-                    ? chooseChaseDirection(ghost, target)
-                    : (target ? chooseChaseDirection(ghost, target) : choosePatrolDirection(ghost));
-                if (!direction) direction = choosePatrolDirection(ghost);
+                const target = ghost.carryPlan?.targetTile || null;
+                let direction = target ? chooseRouteDirection(ghost, target) : null;
+                if (!direction && !target) {
+                    direction = visible ? chooseChaseDirection(ghost, playerTile()) : choosePatrolDirection(ghost);
+                }
+                if (!direction && target) {
+                    const here = tileFromEntity(ghost);
+                    if (here.x !== target.x || here.y !== target.y) direction = choosePatrolDirection(ghost);
+                }
                 if (direction) updateEchoMovement(ghost, direction, delta);
                 return;
             }
@@ -985,17 +1206,8 @@
             }
         }
 
-        // 7. Daño por contacto, sólo cuando realmente está al alcance del jugador.
-        applyEchoContactDamage(ghost, visible);
-    }
-
-    function applyEchoContactDamage(ghost, visible) {
-        if (!visible || !player || !ghost) return;
-        const pRect = { left:player.x + player.width * 0.25, right:player.x + player.width * 0.75, top:player.y + player.height * 0.20, bottom:player.y + player.height * 0.82 };
-        const gRect = { left:ghost.x - ghost.width * 0.32, right:ghost.x + ghost.width * 0.32, top:ghost.y - ghost.height * 0.38, bottom:ghost.y + ghost.height * 0.38 };
-        if (pRect.right > gRect.left && pRect.left < gRect.right && pRect.bottom > gRect.top && pRect.top < gRect.bottom && typeof takeDamage === 'function') {
-            takeDamage('death-echo', ghost.x, ghost.y);
-        }
+        // Death Echo no causa daño por contacto. Sólo sus bombas y explosiones
+        // pueden amenazar al jugador; el eco sigue recibiendo daño normalmente.
     }
 
     function installInitWrapper() {

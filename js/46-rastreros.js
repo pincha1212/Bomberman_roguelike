@@ -45,7 +45,6 @@
         ice: new Map(),
         acid: new Map(),
         fire: new Map(),
-        seenExplosions: new Map(),
         blastMeta: new Map(),
         pulseSerial: 0
     };
@@ -115,7 +114,6 @@
         runtime.ice.clear();
         runtime.acid.clear();
         runtime.fire.clear();
-        runtime.seenExplosions.clear();
         runtime.blastMeta.clear();
         const p = getPlayer();
         if (p) {
@@ -163,7 +161,6 @@
         runtime.ice.clear();
         runtime.acid.clear();
         runtime.fire.clear();
-        runtime.seenExplosions.clear();
         runtime.blastMeta.clear();
         const p = getPlayer();
         if (p) {
@@ -981,27 +978,6 @@
         global.__RASTRERO_BLAST_LISTENER_V630__ = true;
     }
 
-    function scanExplosionResidues() {
-        const s = getState();
-        if (!s) return;
-        const current = new Set();
-        for (const exp of s.explosions || []) {
-            if (!exp || exp.blastId == null) continue;
-            const key = `${exp.blastId}:${exp.x},${exp.y}`;
-            current.add(key);
-        }
-        for (const [key, prev] of runtime.seenExplosions) {
-            if (current.has(key)) continue;
-            if (runtime.clock - prev.lastSeen <= 260) addTimedTile(runtime.fire, prev.x, prev.y, 1000, 'ember');
-            runtime.seenExplosions.delete(key);
-        }
-        for (const exp of s.explosions || []) {
-            if (!exp || exp.blastId == null) continue;
-            const key = `${exp.blastId}:${exp.x},${exp.y}`;
-            runtime.seenExplosions.set(key, { x: exp.x, y: exp.y, blastId: exp.blastId, lastSeen: runtime.clock });
-        }
-    }
-
     function updatePlayerAcidContact() {
         const s = getState();
         const p = getPlayer();
@@ -1031,7 +1007,6 @@
                 runtime.clock += delta;
                 if (getPlayer()) getPlayer().__rastreroSlowTimerV630 = Math.max(0, Number(getPlayer().__rastreroSlowTimerV630 || 0) - delta);
                 cleanupEffects();
-                scanExplosionResidues();
             }
             const result = baseUpdate(dt);
             if (active && s?.isPlaying && !s?.paused) {

@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Bomberman Roguelike v6.31.14 — Diagnóstico: capa exterior de explosión desactivada
+=======
+// Bomberman Roguelike v6.31.12 — Renderizador: explosiones (residuo de suelo desactivado)
+>>>>>>> 57377fa (feat: Implement enemy AI navigation and pathfinding logic in 19-enemy-ai-navigation.js)
 // Extracción mecánica desde js/07-render.js. Cuerpos conservados sin cambios.
 
 let blastVisualSerialV6308 = 0;
@@ -52,7 +56,23 @@ function explosionPaletteV6308(effectId) {
     return fire;
 }
 
+<<<<<<< HEAD
 // v6.31.14 diagnostic: obsolete brown residue palette removed; no renderer uses it.
+=======
+function residuePaletteV6308(effectId) {
+    const key = getExplosionEffectKeyV6308(effectId);
+    const palettes = {
+        fire: { outer:'#271d20', middle:'#71351f', core:'#c65b26', texture:'#f59e0b', kind:'burn' },
+        ice: { outer:'#122b40', middle:'#1e5b7a', core:'#60bce8', texture:'#dbeafe', kind:'ice' },
+        electric: { outer:'#102944', middle:'#075985', core:'#22d3ee', texture:'#a5f3fc', kind:'electric' },
+        arc: { outer:'#102944', middle:'#075985', core:'#22d3ee', texture:'#a5f3fc', kind:'electric' },
+        steam: { outer:'#232d3a', middle:'#64748b', core:'#94a3b8', texture:'#e2e8f0', kind:'steam' },
+        plasma: { outer:'#251831', middle:'#592a75', core:'#c084fc', texture:'#f0abfc', kind:'plasma' },
+        acid: { outer:'#1f2c16', middle:'#3f6212', core:'#84cc16', texture:'#d9f99d', kind:'acid' }
+    };
+    return palettes[key] || palettes.fire;
+}
+>>>>>>> 57377fa (feat: Implement enemy AI navigation and pathfinding logic in 19-enemy-ai-navigation.js)
 
 function registerBombBlastVisualV6308(payload) {
     const state = window.BOMBER_ENGINE?.getState?.() || window.gameState;
@@ -342,12 +362,19 @@ function drawExplosionClustersV6308(blastVisuals = []) {
             const scale = age < 80 ? 0.70 + 0.30 * ease : age < 250 ? 1 + Math.sin(frame * 0.9 + component[0].x) * 0.012 : 1 - 0.18 * Math.max(0, Math.min(1, (age - 250) / 100));
             const fadeCore = age < 250 ? 1 : Math.max(0, 1 - (age - 250) / 30);
             const fadeMiddle = age < 265 ? 1 : Math.max(0, 1 - (age - 265) / 50);
+<<<<<<< HEAD
             const expansionLicks = age >= 80 && age < 250;
             // v6.31.14 DIAGNOSTIC: temporarily disable the dark outer halo.
             // The continuous blast remains visible through its middle and core layers.
             // If the brown cell marks persist, they are produced by another renderer/system.
             // ctx.globalAlpha = visibility * fadeOuter;
             // drawLayer(component, paths, neighbors, group.palette, 'outer', size * 0.82, size * 0.14, scale, expansionLicks, true);
+=======
+            const fadeOuter = age < 270 ? 1 : Math.max(0, 1 - (age - 270) / 80);
+            const expansionLicks = age >= 80 && age < 250;
+            ctx.globalAlpha = visibility * fadeOuter;
+            drawLayer(component, paths, neighbors, group.palette, 'outer', size * 0.82, size * 0.14, scale, expansionLicks, true);
+>>>>>>> 57377fa (feat: Implement enemy AI navigation and pathfinding logic in 19-enemy-ai-navigation.js)
             ctx.globalAlpha = visibility * fadeMiddle;
             drawLayer(component, paths, neighbors, group.palette, 'middle', size * 0.57, size * 0.115, scale, expansionLicks, false);
             ctx.globalAlpha = visibility * fadeCore;

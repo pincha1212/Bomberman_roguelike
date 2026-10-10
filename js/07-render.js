@@ -219,8 +219,7 @@ function draw() {
 
             // v6.0: residuos materiales persistentes; quedan por debajo de items, bombas y personajes.
             if (typeof drawMaterialResiduesV60 === 'function') drawMaterialResiduesV60(ctx);
-            // v6.30.9: residuos elementales tenues, unidos y dibujados bajo entidades.
-            if (typeof drawElementalResiduesV6308 === 'function') drawElementalResiduesV6308(ctx, gameState.bombEffectFieldsV64);
+            // Residuo visual pos-explosion desactivado: se conserva el haz principal.
 
             // V3.3: las trampas aparecen visualmente solo después de activarse.
             drawHazards();

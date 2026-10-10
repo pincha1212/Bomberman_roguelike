@@ -1,4 +1,4 @@
-// Bomberman Roguelike v6.31.5 — Renderizador: explosiones y residuos elementales
+// Bomberman Roguelike v6.31.12 — Renderizador: explosiones (residuo de suelo desactivado)
 // Extracción mecánica desde js/07-render.js. Cuerpos conservados sin cambios.
 
 let blastVisualSerialV6308 = 0;
@@ -203,151 +203,12 @@ function explosionGraphPathsV6308(component) {
 
 // Residuos discretos de suelo: dibujo tenue, unido y situado antes de las entidades.
 // Nunca reutiliza la silueta flameante de la detonación ni dibuja un cuadrado por tile.
-function drawElementalResiduesV6308(targetCtx, effectFields = []) {
-    const fields = Array.isArray(effectFields) ? effectFields : [];
-    if (!targetCtx || !fields.length) return 0;
-
-    // Cada elemento posee su propio mapa de celdas y, por tanto, sus propios
-    // componentes conectados. Nunca se promedian paletas distintas en una celda.
-    const mapsByElement = new Map();
-    const keyOf = (x, y) => `${x},${y}`;
-    for (const field of fields) {
-        if (!field || !(Number(field.remainingMs) > 0)) continue;
-        if (field.sourceBombId == null && !['bomb', 'combination'].includes(String(field.source || ''))) continue;
-        const x = Math.trunc(Number(field.x)), y = Math.trunc(Number(field.y));
-        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-        const total = Math.max(1, Number(field.visualTotalMs) || Number(window.getBombEffectConfigV64?.(field.effectId)?.durationMs) || Number(field.remainingMs));
-        const age = Math.max(0, Number.isFinite(Number(field.visualAgeMs)) ? Number(field.visualAgeMs) : total - Number(field.remainingMs));
-        const reveal = Math.max(0, Math.min(1, (age - 250) / 100));
-        if (reveal <= 0) continue;
-        const fade = Number(field.remainingMs) < 500 ? Math.max(0, Number(field.remainingMs) / 500) : 1;
-        const alpha = reveal * fade * Math.max(0.1, Math.min(1.5, Number(field.intensity) || 1));
-        if (alpha <= 0) continue;
-
-        const element = getExplosionEffectKeyV6308(String(field.effectId || 'heat').toLowerCase());
-        let elementMap = mapsByElement.get(element);
-        if (!elementMap) {
-            elementMap = new Map();
-            mapsByElement.set(element, elementMap);
-        }
-        const key = keyOf(x, y);
-        let cell = elementMap.get(key);
-        if (!cell) {
-            cell = { x, y, alpha: 0, element, palette: residuePaletteV6308(element) };
-            elementMap.set(key, cell);
-        }
-        // Múltiples fuentes del mismo elemento no promedian intensidad ni color.
-        cell.alpha = Math.max(cell.alpha, alpha);
-    }
-    if (!mapsByElement.size) return 0;
-
-    const componentsForElement = [...mapsByElement.entries()]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([element, cellMap]) => ({ element, cellMap, components: explosionComponentsV6308(cellMap) }));
-    const visibleGroups = componentsForElement.filter(group => group.components.length);
-    if (!visibleGroups.length) return 0;
-
-    const size = TILE_SIZE;
-    const center = cell => ({ x: (cell.x + 0.5) * size, y: (cell.y + 0.5) * size });
-    targetCtx.save();
-    targetCtx.globalCompositeOperation = 'source-over';
-    targetCtx.lineCap = 'round';
-    targetCtx.lineJoin = 'round';
-
-    for (const group of visibleGroups) {
-        const palette = residuePaletteV6308(group.element);
-        for (const component of group.components) {
-            const { paths } = explosionGraphPathsV6308(component);
-            const alpha = Math.min(1, component.reduce((sum, cell) => sum + cell.alpha, 0) / component.length);
-            if (alpha <= 0) continue;
-
-            // Base oscura integrada en el terreno; sin contornos cuadrados.
-            targetCtx.globalAlpha = 0.20 * alpha;
-            targetCtx.strokeStyle = '#171923';
-            targetCtx.lineWidth = size * 0.52;
-            targetCtx.beginPath();
-            for (const path of paths) {
-                if (!path.points.length) continue;
-                let point = center(path.points[0]);
-                targetCtx.moveTo(point.x, point.y);
-                for (let i = 1; i < path.points.length; i++) {
-                    point = center(path.points[i]);
-                    targetCtx.lineTo(point.x, point.y);
-                }
-            }
-            targetCtx.stroke();
-
-            // Cada componente conserva una sola paleta elemental. No hay
-            // gradientes entre casillas ni promedios de colores incompatibles.
-            for (const path of paths) {
-                if (path.points.length < 2) continue;
-                targetCtx.beginPath();
-                let point = center(path.points[0]);
-                targetCtx.moveTo(point.x, point.y);
-                for (let i = 1; i < path.points.length; i++) {
-                    point = center(path.points[i]);
-                    targetCtx.lineTo(point.x, point.y);
-                }
-                targetCtx.globalAlpha = 0.24 * alpha;
-                targetCtx.strokeStyle = palette.middle;
-                targetCtx.lineWidth = size * 0.24;
-                targetCtx.stroke();
-
-                targetCtx.globalAlpha = 0.20 * alpha;
-                targetCtx.strokeStyle = palette.core;
-                targetCtx.lineWidth = Math.max(1, size * 0.028);
-                targetCtx.stroke();
-            }
-
-            // Textura propia del elemento, dibujada dentro del mismo grupo.
-            for (const cell of component) {
-                if (((cell.x * 7 + cell.y * 11) & 1) !== 0) continue;
-                const p = center(cell), kind = palette.kind;
-                targetCtx.save();
-                targetCtx.globalAlpha = 0.26 * alpha;
-                targetCtx.strokeStyle = palette.texture;
-                targetCtx.lineWidth = Math.max(1, size * 0.035);
-                targetCtx.lineCap = 'round';
-                targetCtx.lineJoin = 'round';
-                targetCtx.beginPath();
-                if (kind === 'ice') {
-                    targetCtx.moveTo(p.x - size * 0.16, p.y - size * 0.08);
-                    targetCtx.lineTo(p.x - size * 0.03, p.y + size * 0.01);
-                    targetCtx.lineTo(p.x + size * 0.02, p.y + size * 0.12);
-                    targetCtx.moveTo(p.x - size * 0.03, p.y + size * 0.01);
-                    targetCtx.lineTo(p.x + size * 0.09, p.y - size * 0.08);
-                } else if (kind === 'electric') {
-                    targetCtx.moveTo(p.x - size * 0.12, p.y - size * 0.08);
-                    targetCtx.lineTo(p.x + size * 0.015, p.y - size * 0.015);
-                    targetCtx.lineTo(p.x - size * 0.035, p.y + size * 0.06);
-                    targetCtx.lineTo(p.x + size * 0.12, p.y + size * 0.09);
-                } else if (kind === 'plasma') {
-                    targetCtx.moveTo(p.x - size * 0.13, p.y + size * 0.04);
-                    targetCtx.lineTo(p.x - size * 0.025, p.y - size * 0.07);
-                    targetCtx.lineTo(p.x + size * 0.04, p.y + size * 0.02);
-                    targetCtx.lineTo(p.x + size * 0.14, p.y - size * 0.045);
-                } else if (kind === 'burn') {
-                    targetCtx.moveTo(p.x - size * 0.14, p.y + size * 0.04);
-                    targetCtx.lineTo(p.x - size * 0.035, p.y - size * 0.035);
-                    targetCtx.lineTo(p.x + size * 0.04, p.y + size * 0.07);
-                    targetCtx.lineTo(p.x + size * 0.14, p.y - size * 0.045);
-                } else if (kind === 'acid') {
-                    targetCtx.moveTo(p.x - size * 0.12, p.y - size * 0.04);
-                    targetCtx.lineTo(p.x - size * 0.02, p.y + size * 0.04);
-                    targetCtx.lineTo(p.x + size * 0.1, p.y - size * 0.025);
-                } else {
-                    targetCtx.moveTo(p.x - size * 0.12, p.y + size * 0.035);
-                    targetCtx.quadraticCurveTo(p.x, p.y - size * 0.08, p.x + size * 0.12, p.y - size * 0.015);
-                }
-                targetCtx.stroke();
-                targetCtx.restore();
-            }
-        }
-    }
-
-    targetCtx.restore();
-    targetCtx.globalAlpha = 1;
-    return visibleGroups.reduce((sum, group) => sum + group.cellMap.size, 0);
+// v6.31.12: residuos visuales de suelo desactivados de forma definitiva.
+// Esta función se conserva como API compatible porque el coordinador o versiones
+// anteriores pueden seguir invocándola. No dibuja marcas, textura ni trazos.
+// El haz animado continúa en drawExplosionClustersV6308(), independiente de esto.
+function drawElementalResiduesV6308(_targetCtx, _effectFields = []) {
+    return 0;
 }
 
 function drawExplosionClustersV6308(blastVisuals = []) {

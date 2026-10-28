@@ -1,28 +1,33 @@
-# Bomberman Roguelike
+# Bomberman Roguelike (React + TypeScript + Vite)
 
-## Cómo usar
+A procedural Bomberman roguelike rewritten as a modern React application.
 
-### Abrir localmente
+## Features
 
-Abrí `index.html` directamente en un navegador moderno.
+- **Procedural Dungeon Generation**: Dynamic room layout, obstacles, destructible blocks, traps, and secrets every run.
+- **Roguelike Progression & Builds**: Relics, elemental bombs (Fire, Ice, Electric, Toxic, Gravity, Fragment, Pierce), stackable abilities, and synergies.
+- **Boss Fights & Enemies**: Multi-phase bosses, specialized crawling and flying enemies with tactical AI behaviors.
+- **11 Unique Biomes**: Real-time or depth-based biome progression (Winter, Autumn, Spring, Summer, Underground, Clouds, Mountains, Beach, Space, Sky, Inferno) with dynamic liquid surfaces and environmental weather effects.
+- **Run Persistence**: Automatic run save and resume capabilities via localStorage.
+- **Quality & Dev Tools**: Switchable graphics fidelity (Low, Medium, High) and God Mode toggle for testing.
+- **Responsive & Mobile Ready**: Full keyboard controls (`WASD` / arrows + `Space` for bombs, `Esc`/`P` for pause) plus invisible mobile gesture and action touch zones.
 
-También podés servir la carpeta con cualquier servidor HTTP local si el navegador bloquea recursos al abrir archivos directamente. No necesita Node, backend ni base de datos.
+## Development
 
-### Publicar en GitHub Pages
+```bash
+# Install dependencies
+npm install
 
-Subí la estructura completa del proyecto al repositorio y activá GitHub Pages usando la rama y carpeta donde esté `index.html`. Las rutas del proyecto son relativas para que funcione dentro de una subruta del repositorio.
+# Run development server
+npm run dev
 
-### Controles
+# Build for production
+npm run build
+```
 
-- Movimiento: `WASD` o flechas.
-- Bomba: `ESPACIO`.
-- En dispositivos táctiles: joystick virtual y botón de bomba.
+## Controls
 
-
-### Estructura básica
-
-- `index.html`: entrada de la aplicación.
-- `css/`: estilos separados por sistema.
-- `js/`: lógica del juego separada por módulos.
-
-No hace falta instalar dependencias para ejecutar la versión publicada.
+- **Move**: `W`, `A`, `S`, `D` or Arrow keys
+- **Bomb**: `Space` or `Z` (tap to drop, hold for grab/throw when unlocked)
+- **Pause**: `Esc` or `P`
+- **Mobile**: Left half screen for directional movement, right half screen for bomb actions.

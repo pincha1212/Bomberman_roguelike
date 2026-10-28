@@ -8816,7 +8816,8 @@ function drawBombEffectFieldsV6323(fields = []) {
 
     let totalBranchCount = 0;
     for (const group of groups.values()) {
-        const components = explosionComponentsV6308(group.cellMap);
+        const allowDiagonals = false;
+        const components = explosionComponentsV6308(group.cellMap, allowDiagonals);
         for (const component of components) {
             if (!component.length) continue;
             drawnCells += component.length;
@@ -11079,6 +11080,11 @@ function finishRun(source = 'unknown') {
     };
 
     renderDeathSummary(RUN_LIFECYCLE.lastSummary);
+    try {
+        if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+            window.dispatchEvent(new CustomEvent('bomberman_run_finished', { detail: RUN_LIFECYCLE.lastSummary }));
+        }
+    } catch (_) {}
     return RUN_LIFECYCLE.lastSummary;
 }
 

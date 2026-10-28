@@ -1,12 +1,75 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import './css/main.css';
 import { initGameEngine } from './engine/gameEngine';
+import { testConnection } from './firebase/config';
+import { subscribeToAuth, loginWithGoogle } from './firebase/authService';
+import { submitRunToLeaderboard, RunSubmissionPayload } from './firebase/leaderboardService';
+import { AuthBar } from './components/AuthBar';
+import { LeaderboardView } from './components/LeaderboardView';
+import { User as FirebaseUser } from 'firebase/auth';
 
 export const App: React.FC = () => {
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [activeTab, setActiveTab] = useState<'play' | 'leaderboard'>('play');
+  const [lastFinishedRun, setLastFinishedRun] = useState<RunSubmissionPayload | null>(null);
+  const [submittedStatus, setSubmittedStatus] = useState<boolean>(false);
+
   useEffect(() => {
     document.body.className = 'game-body v4-theme';
     initGameEngine();
+    testConnection().catch(console.error);
+
+    const unsubscribeAuth = subscribeToAuth((user) => {
+      setCurrentUser(user);
+    });
+
+    const handleRunFinished = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const detail = customEvent.detail;
+      if (!detail) return;
+
+      const payload: RunSubmissionPayload = {
+        score: Number(detail.score) || 0,
+        depth: Number(detail.depth) || 1,
+        runTimeFormatted: typeof detail.elapsedMs === 'number'
+          ? `${String(Math.floor(detail.elapsedMs / 60000)).padStart(2, '0')}:${String(Math.floor((detail.elapsedMs % 60000) / 1000)).padStart(2, '0')}`
+          : '00:00',
+        kills: Number(detail.kills) || 0,
+        coins: Number(detail.coins) || 0,
+        relicsCount: Array.isArray(detail.relics) ? detail.relics.length : 0,
+        causeOfDeath: String(detail.cause || 'Partida terminada')
+      };
+
+      setLastFinishedRun(payload);
+      setSubmittedStatus(false);
+
+      // If user is already authenticated, submit immediately
+      submitRunToLeaderboard(payload).then((success) => {
+        if (success) {
+          setSubmittedStatus(true);
+        }
+      });
+    };
+
+    window.addEventListener('bomberman_run_finished', handleRunFinished);
+
+    return () => {
+      unsubscribeAuth();
+      window.removeEventListener('bomberman_run_finished', handleRunFinished);
+    };
   }, []);
+
+  const handleGameOverLoginAndSubmit = async () => {
+    try {
+      const user = await loginWithGoogle();
+      if (user && lastFinishedRun) {
+        const success = await submitRunToLeaderboard(lastFinishedRun);
+        setSubmittedStatus(success);
+      }
+    } catch (err) {
+      console.error('Login & submit error:', err);
+    }
+  };
 
   return (
     <div id="app-wrapper">
@@ -14,28 +77,28 @@ export const App: React.FC = () => {
         <aside className="menu-rail menu-rail-left" aria-label="Resumen de la aventura">
           <div className="menu-rail-top">
             <span className="menu-kicker">BOMBERMAN ROGUELIKE</span>
-            <span className="menu-version">v6.34.0</span>
+            <span className="menu-version">v6.37.0</span>
           </div>
           <div className="menu-rail-content">
             <div className="menu-mark">💣</div>
             <h2 className="menu-rail-title pixel-font">ROGUELIKE</h2>
-            <p className="menu-rail-subtitle">ROGUELIKE POR PARTIDAS</p>
-            <p className="menu-rail-copy">Entrá, rompé el mapa, aprovechá cada apertura y sobreviví a la presión de la sala.</p>
+            <p className="menu-rail-subtitle">MINICOMPETENCIA & CLASIFICACIÓN</p>
+            <p className="menu-rail-copy">Entrá, rompé el mapa, aprovechá cada apertura y superá a otros jugadores en el ranking mundial.</p>
             <div className="menu-feature-list">
               <div className="menu-feature">
                 <span>01</span>
-                <strong>MAPA PROCEDURAL</strong>
-                <small>Cada partida reorganiza el desafío.</small>
+                <strong>PODIO GLOBAL</strong>
+                <small>Competí por la mejor profundidad y puntaje.</small>
               </div>
               <div className="menu-feature">
                 <span>02</span>
-                <strong>LOOT Y RELIQUIAS</strong>
-                <small>Construí una configuración distinta.</small>
+                <strong>PERFIL Y AUTENTICACIÓN</strong>
+                <small>Guardá tu récord seguro con Google.</small>
               </div>
               <div className="menu-feature">
                 <span>03</span>
-                <strong>JEFES Y TRAMPAS</strong>
-                <small>Las decisiones importan en cada sala.</small>
+                <strong>PROCEDURAL & LOOT</strong>
+                <small>Reliquias, bombas elementales y jefes.</small>
               </div>
             </div>
           </div>
@@ -78,6 +141,36 @@ export const App: React.FC = () => {
                   <div><span>MEJOR PROFUNDIDAD</span><strong id="go-best">0</strong></div>
                   <div><span>MEJOR PUNTAJE</span><strong id="go-best-score">0</strong></div>
                 </div>
+
+                {/* Minicompetencia & Sincronización con Leaderboard */}
+                <div className="game-over-competitive-box">
+                  <div className="goc-title">
+                    <span>🏆</span>
+                    <span>CLASIFICACIÓN GLOBAL</span>
+                  </div>
+                  {currentUser ? (
+                    <div className="goc-status">
+                      {submittedStatus
+                        ? `✓ PUNTUACIÓN REGISTRADA PARA ${currentUser.displayName || 'VOS'}`
+                        : 'SINCRONIZANDO CON EL RANKING GLOBAL...'}
+                    </div>
+                  ) : (
+                    <>
+                      <p className="goc-desc">
+                        Iniciá sesión con Google para registrar este puntaje en la tabla mundial y competir por el podio.
+                      </p>
+                      <button
+                        className="btn-auth-google"
+                        type="button"
+                        onClick={handleGameOverLoginAndSubmit}
+                      >
+                        <span>🌐</span>
+                        <span>REGISTRAR CON GOOGLE</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+
                 <div className="death-relics-wrap">
                   <div className="death-section-label">RELIQUIAS CONSEGUIDAS <span id="go-relics">0</span></div>
                   <div id="go-relic-list" className="death-relic-list"></div>
@@ -222,37 +315,72 @@ export const App: React.FC = () => {
             <span className="menu-kicker">NUEVA PARTIDA</span>
             <span className="menu-status-dot"><span></span> READY</span>
           </div>
-          <div className="menu-hero-icon">💣💥</div>
-          <h1 className="menu-title pixel-font">BOMBERMAN</h1>
-          <h2 className="menu-subtitle pixel-font">ROGUELIKE // PARTIDAS</h2>
-          <div className="menu-rules">
-            <div><b>PARTIDAS</b><span>Cada partida genera una progresión distinta.</span></div>
-            <div><b>LOOT</b><span>Monedas, powerups y reliquias para construir tu partida.</span></div>
-            <div><b>RIESGO</b><span>Trampas, presión, refuerzos y jefes te obligan a moverte.</span></div>
+
+          {/* Autenticación & Perfil del Jugador */}
+          <AuthBar currentUser={currentUser} />
+
+          {/* Selector de Pestañas: Partida vs Clasificación */}
+          <div className="menu-tab-nav" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'play'}
+              className={`menu-tab-btn ${activeTab === 'play' ? 'is-active' : ''}`}
+              onClick={() => setActiveTab('play')}
+            >
+              💣 JUGAR
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'leaderboard'}
+              className={`menu-tab-btn ${activeTab === 'leaderboard' ? 'is-active' : ''}`}
+              onClick={() => setActiveTab('leaderboard')}
+            >
+              🏆 CLASIFICACIÓN
+            </button>
           </div>
-          <section className="quality-selector" aria-label="Calidad gráfica">
-            <div className="quality-selector-head">
-              <div>
-                <span className="quality-selector-kicker">CONFIGURACIÓN</span>
-                <strong>DETALLES GRÁFICOS</strong>
+
+          {activeTab === 'leaderboard' ? (
+            <div className="leaderboard-tab-content">
+              <LeaderboardView currentUser={currentUser} />
+            </div>
+          ) : (
+            <>
+              <div className="menu-hero-icon">💣💥</div>
+              <h1 className="menu-title pixel-font">BOMBERMAN</h1>
+              <h2 className="menu-subtitle pixel-font">ROGUELIKE // PARTIDAS</h2>
+              <div className="menu-rules">
+                <div><b>PARTIDAS</b><span>Cada partida genera una progresión distinta.</span></div>
+                <div><b>LOOT</b><span>Monedas, powerups y reliquias para construir tu partida.</span></div>
+                <div><b>PODIO</b><span>Superá a otros jugadores y conquistá la cima mundial.</span></div>
               </div>
-              <span id="quality-selected-summary" className="quality-selected-summary">
-                DETALLES MEDIOS · Gama media
-              </span>
-            </div>
-            <div className="quality-options" role="radiogroup" aria-label="Nivel de detalles">
-              <button className="quality-option" type="button" data-quality-option="low" role="radio" aria-checked="false">
-                <strong>BAJO</strong><span>Gama baja</span>
-              </button>
-              <button className="quality-option" type="button" data-quality-option="medium" role="radio" aria-checked="false">
-                <strong>MEDIO</strong><span>Gama media</span>
-              </button>
-              <button className="quality-option" type="button" data-quality-option="high" role="radio" aria-checked="false">
-                <strong>MÁXIMO</strong><span>Gama alta</span>
-              </button>
-            </div>
-            <p className="quality-selector-note">Elegí el nivel antes de comenzar la partida.</p>
-          </section>
+              <section className="quality-selector" aria-label="Calidad gráfica">
+                <div className="quality-selector-head">
+                  <div>
+                    <span className="quality-selector-kicker">CONFIGURACIÓN</span>
+                    <strong>DETALLES GRÁFICOS</strong>
+                  </div>
+                  <span id="quality-selected-summary" className="quality-selected-summary">
+                    DETALLES MEDIOS · Gama media
+                  </span>
+                </div>
+                <div className="quality-options" role="radiogroup" aria-label="Nivel de detalles">
+                  <button className="quality-option" type="button" data-quality-option="low" role="radio" aria-checked="false">
+                    <strong>BAJO</strong><span>Gama baja</span>
+                  </button>
+                  <button className="quality-option" type="button" data-quality-option="medium" role="radio" aria-checked="false">
+                    <strong>MEDIO</strong><span>Gama media</span>
+                  </button>
+                  <button className="quality-option" type="button" data-quality-option="high" role="radio" aria-checked="false">
+                    <strong>MÁXIMO</strong><span>Gama alta</span>
+                  </button>
+                </div>
+                <p className="quality-selector-note">Elegí el nivel antes de comenzar la partida.</p>
+              </section>
+            </>
+          )}
+
           <div className="menu-actions">
             <button id="btn-resume-run" className="btn-pixel menu-resume-button hidden" type="button">
               CONTINUAR PARTIDA

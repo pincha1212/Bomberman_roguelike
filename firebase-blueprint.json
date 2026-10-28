@@ -1,0 +1,49 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with cumulative roguelike stats and competitive record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Unique user ID matching Auth UID" },
+        "displayName": { "type": "string", "description": "Public display name" },
+        "photoURL": { "type": "string", "description": "User avatar image URL" },
+        "bestScore": { "type": "integer", "description": "Highest score achieved across all runs" },
+        "bestDepth": { "type": "integer", "description": "Deepest floor reached" },
+        "totalRuns": { "type": "integer", "description": "Total runs started" },
+        "totalKills": { "type": "integer", "description": "Total enemy kills accumulated" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp of last update" }
+      },
+      "required": ["userId", "displayName", "bestScore", "bestDepth"]
+    },
+    "LeaderboardEntry": {
+      "title": "LeaderboardEntry",
+      "description": "Competitive score submission for a completed roguelike run",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Author user ID matching Auth UID" },
+        "displayName": { "type": "string", "description": "Player display name" },
+        "photoURL": { "type": "string", "description": "Player photo or avatar" },
+        "score": { "type": "integer", "description": "Final score earned in the run" },
+        "depth": { "type": "integer", "description": "Floor reached" },
+        "runTimeFormatted": { "type": "string", "description": "Formatted run duration MM:SS" },
+        "kills": { "type": "integer", "description": "Enemies defeated in this run" },
+        "coins": { "type": "integer", "description": "Coins collected" },
+        "relicsCount": { "type": "integer", "description": "Relics owned at conclusion" },
+        "causeOfDeath": { "type": "string", "description": "Cause of death or victory label" },
+        "createdAt": { "type": "string", "description": "ISO timestamp when run finished" }
+      },
+      "required": ["userId", "displayName", "score", "depth", "kills"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Stores individual player profile and aggregated stats"
+    },
+    "/leaderboard/{entryId}": {
+      "schema": "LeaderboardEntry",
+      "description": "Public competitive leaderboard entries submitted by players"
+    }
+  }
+}

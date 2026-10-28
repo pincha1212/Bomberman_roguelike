@@ -1,0 +1,277 @@
+/* ================================================================
+   v6.36.0 — Estilos de Minicompetencia, Clasificación y Autenticación
+   ================================================================ */
+
+.auth-header-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    gap: 8px;
+}
+
+.auth-user-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.auth-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1.5px solid #fbbf24;
+    object-fit: cover;
+    background: #1e293b;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+}
+
+.auth-name-wrap {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.auth-name {
+    font: 7px 'Press Start 2P', monospace;
+    color: #f8fafc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 130px;
+}
+
+.auth-badge {
+    font-size: 0.65rem;
+    color: #fbbf24;
+    font-weight: 600;
+}
+
+.btn-auth-google {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: #ffffff;
+    color: #1e293b;
+    font: 6px 'Press Start 2P', monospace;
+    padding: 7px 10px;
+    border-radius: 4px;
+    border: 1px solid #cbd5e1;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.btn-auth-google:hover {
+    background: #f1f5f9;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.btn-auth-logout {
+    background: transparent;
+    color: #94a3b8;
+    font: 6px 'Press Start 2P', monospace;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    padding: 5px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-auth-logout:hover {
+    color: #f87171;
+    border-color: #f87171;
+}
+
+/* Tabs en #start-screen para alternar juego y clasificación */
+.menu-tab-nav {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.menu-tab-btn {
+    flex: 1;
+    padding: 8px 6px;
+    font: 7px 'Press Start 2P', monospace;
+    background: rgba(15, 23, 42, 0.6);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+}
+
+.menu-tab-btn.is-active {
+    background: rgba(251, 191, 36, 0.18);
+    color: #fbbf24;
+    border-color: #fbbf24;
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.2);
+}
+
+/* Tabla de clasificación */
+.leaderboard-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 380px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 4px;
+}
+
+.leaderboard-container::-webkit-scrollbar {
+    width: 4px;
+}
+.leaderboard-container::-webkit-scrollbar-thumb {
+    background: rgba(251, 191, 36, 0.4);
+    border-radius: 2px;
+}
+
+.leaderboard-item {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    border-radius: 6px;
+    transition: all 0.15s ease;
+}
+
+.leaderboard-item:hover {
+    background: rgba(30, 41, 59, 0.8);
+    border-color: rgba(251, 191, 36, 0.4);
+}
+
+.leaderboard-item.is-me {
+    background: rgba(251, 191, 36, 0.12);
+    border: 1.5px solid #fbbf24;
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.15);
+}
+
+.leaderboard-item.rank-1 {
+    border-color: #fbbf24;
+    background: linear-gradient(90deg, rgba(251, 191, 36, 0.15), rgba(15, 23, 42, 0.6));
+}
+.leaderboard-item.rank-2 {
+    border-color: #94a3b8;
+    background: linear-gradient(90deg, rgba(148, 163, 184, 0.15), rgba(15, 23, 42, 0.6));
+}
+.leaderboard-item.rank-3 {
+    border-color: #f97316;
+    background: linear-gradient(90deg, rgba(249, 115, 22, 0.15), rgba(15, 23, 42, 0.6));
+}
+
+.lb-rank {
+    font: 8px 'Press Start 2P', monospace;
+    text-align: center;
+    color: #94a3b8;
+}
+.rank-1 .lb-rank { color: #fbbf24; font-size: 11px; }
+.rank-2 .lb-rank { color: #e2e8f0; font-size: 10px; }
+.rank-3 .lb-rank { color: #f97316; font-size: 10px; }
+
+.lb-player {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+}
+
+.lb-avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #334155;
+    flex-shrink: 0;
+}
+
+.lb-details {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.lb-name {
+    font: 7px 'Press Start 2P', monospace;
+    color: #f8fafc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.lb-meta {
+    font-size: 0.66rem;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+
+.lb-score-wrap {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.lb-score {
+    font: 8px 'Press Start 2P', monospace;
+    color: #fbbf24;
+}
+
+.lb-depth {
+    font-size: 0.64rem;
+    color: #c084fc;
+    margin-top: 2px;
+}
+
+.leaderboard-empty {
+    text-align: center;
+    padding: 24px 12px;
+    color: #64748b;
+    font-size: 0.75rem;
+}
+
+/* Notificación y caja de envío en Game Over */
+.game-over-competitive-box {
+    margin: 12px 0 16px;
+    padding: 10px 14px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    border-radius: 6px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.goc-title {
+    font: 7px 'Press Start 2P', monospace;
+    color: #fbbf24;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.goc-desc {
+    font-size: 0.72rem;
+    color: #cbd5e1;
+    line-height: 1.4;
+}
+
+.goc-status {
+    font: 6px 'Press Start 2P', monospace;
+    color: #86efac;
+}

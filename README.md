@@ -1,6 +1,11 @@
-# Bomberman Roguelike — v6.37.0 (React + TypeScript + Vite)
+# Bomberman Roguelike — v6.38.0 (React + TypeScript + Vite)
 
 A procedural Bomberman roguelike rewritten as a modern React application.
+
+### Versión v6.38.0 — Corrección de Canvas en Tablets/Móviles y Configuración de GitHub Actions
+- **Fix Bug de Canvas Minúsculo en Tablets**: En Google Chrome para Android e iPads, `#game-container` colapsaba a un tamaño ínfimo e injugable debido a una regla `container-type: size;` con altura no definida en el contenedor padre. Se migró a `container-type: inline-size;` y se dotó a `#game-stage` y `#game-container` de un dimensionamiento estricto basado en viewport `min()` bidireccional.
+- **Escalado Responsivo para Tabletas y Móviles**: El canvas y el contenedor del juego ahora ocupan el máximo espacio visible cuadrado en orientación vertical (portrait) y horizontal (landscape), garantizando visibilidad nítida, controles táctiles accesibles y renderizado pixel-perfect.
+- **Auditoría de Acciones de GitHub (GitHub Actions vs Pages Legacy)**: Se aclaró la razón por la que GitHub ejecutaba `pages-build-deployment` (constructor Jekyll por defecto) en lugar del workflow de Vite, indicando cómo activar **GitHub Actions** en los ajustes de Pages del repositorio.
 
 ### Versión v6.37.0 — Corrección de Campos de Rayo y Despliegue en GitHub Pages
 - **Fix Runtime Error (`allowDiagonals`)**: Se solucionó la excepción `ReferenceError: allowDiagonals is not defined` en `drawBombEffectFieldsV6323`, restaurando el renderizado de campos eléctricos (shock) en las explosiones.

@@ -77,7 +77,7 @@ export const App: React.FC = () => {
         <aside className="menu-rail menu-rail-left" aria-label="Resumen de la aventura">
           <div className="menu-rail-top">
             <span className="menu-kicker">BOMBERMAN ROGUELIKE</span>
-            <span className="menu-version">v6.37.0</span>
+            <span className="menu-version">v6.38.0</span>
           </div>
           <div className="menu-rail-content">
             <div className="menu-mark">💣</div>

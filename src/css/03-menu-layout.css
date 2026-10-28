@@ -243,18 +243,9 @@ body{
     letter-spacing:.05em;
 }
 
-/* En run: el menú exterior desaparece y el canvas usa el viewport disponible. */
-.main-menu.run-active{
-    display:block;
-}
 .main-menu.run-active .menu-rail,
 .main-menu.run-active #start-screen{
-    display:none;
-}
-.main-menu.run-active #game-container{
-    width:min(94dvh,94vw,780px);
-    max-height:none;
-    margin:0 auto;
+    display:none !important;
 }
 
 /* El control táctil no ocupa espacio del menú; aparece solamente durante el run. */
@@ -326,11 +317,6 @@ body{
         width:min(94vw, 86dvh);
         max-height:86dvh;
         aspect-ratio:1;
-        margin:0 auto;
-    }
-    .main-menu.run-active #game-container{
-        width:min(94vw, calc(100dvh - 120px));
-        max-height:calc(100dvh - 120px);
     }
 
     /* aside#start-screen superpuesto frontalmente al canvas */

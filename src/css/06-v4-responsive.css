@@ -3,7 +3,7 @@
    Una sola capa de información, sin superposición y adaptada al viewport.
    ================================================================ */
 .v4-theme #game-container{
-    container-type:size;
+    container-type:inline-size;
     isolation:isolate;
     overflow:hidden;
     --v42-edge:clamp(6px,1.15cqw,11px);

@@ -1,176 +1,222 @@
-/* v6.12.22 — Layout proporcional al viewport.
-   El área de juego conserva una relación 1:1 y se adapta por igual al eje
-   horizontal y vertical. La información permanece fuera del canvas. */
+/* ================================================================
+   v6.38.0 — Layout proporcional y responsivo para Tablets, Móviles y Desktop
+   Corrige el bug de Chrome en Tablets donde el canvas colapsaba a tamaño minúsculo.
+   ================================================================ */
 
-html, body{
-    width:100%;
-    min-height:100%;
-    overflow-x:hidden;
+html, body {
+    width: 100%;
+    height: 100%;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
 }
 
-#app-wrapper{
-    width:100%;
-    height:100dvh;
-    min-height:100dvh;
-    max-width:none;
-    padding:8px;
+#app-wrapper {
+    width: 100%;
+    height: 100dvh;
+    min-height: 100dvh;
+    max-width: none;
+    padding: 8px;
+    box-sizing: border-box;
 }
 
-.main-menu.run-active{
-    width:100%;
-    height:100%;
-    min-height:0;
-    display:flex;
-    align-items:center;
-    justify-content:center;
+/* Escenario y área de juego principal: garantiza que el contenedor herede dimensiones reales */
+.game-stage,
+#game-stage {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    flex: 1 1 auto;
 }
 
-.main-menu.run-active .game-layout{
-    width:min(100%, calc(100dvw - 16px));
-    height:min(100%, calc(100dvh - 16px));
-    min-width:0;
-    min-height:0;
-    display:grid;
-    grid-template-columns:minmax(0, 1fr) clamp(270px, 25vw, 330px);
-    grid-template-rows:minmax(0, 1fr);
-    align-items:center;
-    justify-content:center;
-    gap:clamp(8px, 1.25vw, 16px);
+#game-container {
+    position: relative;
+    box-sizing: border-box;
+    container-type: inline-size;
+    isolation: isolate;
+    overflow: hidden;
+    background-color: #050811;
+    border: 3px solid #334155;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 15px rgba(59, 130, 246, 0.3);
+    width: min(94vw, calc(100dvh - 24px), 780px);
+    height: min(94vw, calc(100dvh - 24px), 780px);
+    max-width: 100%;
+    max-height: 100%;
+    aspect-ratio: 1 / 1;
+    margin: auto;
+    flex: 0 0 auto;
 }
 
-.main-menu.run-active #game-container{
-    width:min(100%, calc(100dvh - 16px));
-    height:auto;
-    max-width:none;
-    max-height:none;
-    aspect-ratio:1 / 1;
-    justify-self:center;
-    align-self:center;
-    flex:0 0 auto;
+#gameCanvas,
+canvas#gameCanvas {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    aspect-ratio: 1 / 1 !important;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
 }
 
-.main-menu.run-active .game-info-panel{
-    width:100%;
-    max-width:none;
-    max-height:100%;
-    min-width:0;
-    min-height:0;
-    align-self:stretch;
+/* Layout durante la partida */
+.main-menu.run-active {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-/* Pantallas verticales: juego arriba, información abajo. */
-@media (orientation:portrait), (max-width:900px){
-    #app-wrapper{
-        padding:6px;
+.main-menu.run-active .game-layout {
+    width: min(100%, calc(100dvw - 16px));
+    height: min(100%, calc(100dvh - 16px));
+    min-width: 0;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(270px, 25vw, 330px);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: center;
+    justify-content: center;
+    gap: clamp(8px, 1.25vw, 16px);
+}
+
+.main-menu.run-active #game-container {
+    width: min(calc(100vw - 320px), calc(100dvh - 24px), 780px);
+    height: min(calc(100vw - 320px), calc(100dvh - 24px), 780px);
+    max-width: 100%;
+    max-height: 100%;
+    aspect-ratio: 1 / 1;
+    justify-self: center;
+    align-self: center;
+    flex: 0 0 auto;
+}
+
+.main-menu.run-active .game-layout.info-panel-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+}
+
+.main-menu.run-active .game-layout.info-panel-collapsed .game-info-panel {
+    display: none;
+}
+
+.main-menu.run-active .game-layout.info-panel-collapsed #game-container {
+    width: min(calc(100vw - 24px), calc(100dvh - 24px), 780px);
+    height: min(calc(100vw - 24px), calc(100dvh - 24px), 780px);
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.main-menu.run-active .game-info-panel {
+    width: 100%;
+    max-width: none;
+    max-height: 100%;
+    min-width: 0;
+    min-height: 0;
+    align-self: stretch;
+}
+
+/* Tablet y Móvil en vertical (Portrait) */
+@media (orientation: portrait), (max-width: 900px) {
+    #app-wrapper {
+        padding: 6px;
     }
 
-    .main-menu.run-active .game-layout{
-        width:min(100%, calc(100dvw - 12px));
-        height:100%;
-        grid-template-columns:minmax(0, 1fr);
-        grid-template-rows:minmax(0, 1fr) minmax(118px, 27dvh);
-        gap:8px;
+    .main-menu.run-active .game-layout {
+        width: 100%;
+        height: 100%;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) minmax(118px, 27dvh);
+        gap: 8px;
     }
 
-    .main-menu.run-active #game-container{
-        width:min(100%, 100%);
-        height:auto;
-        max-width:100%;
-        max-height:100%;
-        aspect-ratio:1 / 1;
-        justify-self:center;
-        align-self:center;
+    .main-menu.run-active .game-layout.info-panel-collapsed {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr);
     }
 
-    .main-menu.run-active .game-info-panel{
-        width:100%;
-        height:auto;
-        max-height:none;
-        align-self:stretch;
-        overflow:auto;
+    .main-menu.run-active #game-container,
+    .main-menu.run-active .game-layout.info-panel-collapsed #game-container {
+        width: min(calc(100vw - 12px), calc(100dvh - 120px), 780px);
+        height: min(calc(100vw - 12px), calc(100dvh - 120px), 780px);
+        max-width: 100%;
+        max-height: 100%;
+        aspect-ratio: 1 / 1;
+        justify-self: center;
+        align-self: center;
+    }
+
+    .main-menu.run-active .game-info-panel {
+        width: 100%;
+        height: auto;
+        max-height: none;
+        align-self: stretch;
+        overflow: auto;
     }
 }
 
-/* Móvil estrecho: el panel conserva legibilidad sin comerse el área de juego. */
-@media (max-width:560px){
-    #app-wrapper{
-        padding:4px 4px 6px;
+/* Móvil estrecho */
+@media (max-width: 560px) {
+    #app-wrapper {
+        padding: 4px;
     }
 
-    .main-menu.run-active .game-layout{
-        width:100%;
-        grid-template-rows:minmax(0, 1fr) minmax(110px, 28dvh);
-        gap:6px;
+    .main-menu.run-active .game-layout {
+        width: 100%;
+        grid-template-rows: minmax(0, 1fr) minmax(110px, 28dvh);
+        gap: 6px;
+    }
+
+    .main-menu.run-active #game-container,
+    .main-menu.run-active .game-layout.info-panel-collapsed #game-container {
+        width: min(calc(100vw - 8px), calc(100dvh - 110px));
+        height: min(calc(100vw - 8px), calc(100dvh - 110px));
     }
 }
 
-/* Paisaje bajo: priorizar siempre la altura disponible para el cuadrado. */
-@media (orientation:landscape) and (max-height:700px){
-    #app-wrapper{
-        padding:5px 8px;
-    }
-
-    .main-menu.run-active .game-layout{
-        width:min(100%, calc(100dvw - 16px));
-        height:calc(100dvh - 10px);
-        grid-template-columns:minmax(0, 1fr) clamp(250px, 27vw, 300px);
-        gap:8px;
-    }
-
-    .main-menu.run-active #game-container{
-        width:min(100%, calc(100dvh - 10px));
-    }
-
-    .main-menu.run-active .game-info-panel{
-        padding:8px;
+/* Tablet y Pantallas en horizontal (Landscape) */
+@media (orientation: landscape) {
+    .main-menu.run-active .game-layout.info-panel-collapsed #game-container {
+        width: min(calc(100dvh - 20px), calc(100vw - 20px), 780px);
+        height: min(calc(100dvh - 20px), calc(100vw - 20px), 780px);
     }
 }
 
+.game-info-toggle {
+    display: none;
+    position: fixed;
+    z-index: 10020;
+    top: 50%;
+    right: max(6px, env(safe-area-inset-right));
+    transform: translateY(-50%);
+    min-width: 58px;
+    min-height: 42px;
+    padding: 8px 9px;
+    border: 1px solid rgba(103, 232, 249, 0.5);
+    border-right: 0;
+    border-radius: 7px 0 0 7px;
+    background: rgba(8, 15, 28, 0.95);
+    color: #a5f3fc;
+    font: 700 9px Inter, system-ui, sans-serif;
+    letter-spacing: .04em;
+    cursor: pointer;
+    touch-action: manipulation;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
 
-/* v6.31.2 — Panel lateral de información plegable. */
-.main-menu.run-active .game-layout.info-panel-collapsed{
-    grid-template-columns:minmax(0,1fr);
-    grid-template-rows:minmax(0,1fr);
+.main-menu.run-active .game-info-toggle {
+    display: block;
 }
-.main-menu.run-active .game-layout.info-panel-collapsed .game-info-panel{
-    display:none;
-}
-.main-menu.run-active .game-layout.info-panel-collapsed #game-container{
-    width:min(100%, calc(100dvh - 16px));
-    max-width:100%;
-    max-height:100%;
-}
-.game-info-toggle{
-    display:none;
-    position:fixed;
-    z-index:10020;
-    top:50%;
-    right:max(6px, env(safe-area-inset-right));
-    transform:translateY(-50%);
-    min-width:58px;
-    min-height:42px;
-    padding:8px 9px;
-    border:1px solid rgba(103,232,249,.5);
-    border-right:0;
-    border-radius:7px 0 0 7px;
-    background:rgba(8,15,28,.95);
-    color:#a5f3fc;
-    font:700 9px Inter,system-ui,sans-serif;
-    letter-spacing:.04em;
-    cursor:pointer;
-    touch-action:manipulation;
-    box-shadow:0 4px 18px rgba(0,0,0,.35);
-}
-.main-menu.run-active .game-info-toggle{display:block;}
-.game-info-toggle:focus-visible{outline:2px solid #67e8f9;outline-offset:2px;}
-@media (orientation:portrait), (max-width:900px){
-    .main-menu.run-active .game-layout.info-panel-collapsed{
-        grid-template-columns:minmax(0,1fr);
-        grid-template-rows:minmax(0,1fr);
-    }
-    .main-menu.run-active .game-layout.info-panel-collapsed #game-container{
-        width:min(100%, 100dvh);
-        max-width:100%;
-        max-height:100%;
-    }
+
+.game-info-toggle:focus-visible {
+    outline: 2px solid #67e8f9;
+    outline-offset: 2px;
 }

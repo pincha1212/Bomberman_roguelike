@@ -7,12 +7,9 @@
     gap:16px;
     min-width:0;
 }
-.main-menu.run-active .game-layout{width:min(1180px,96vw);}
-.main-menu.run-active #game-container{
-    width:min(78dvh,68vw,760px);
-    max-width:760px;
-    max-height:78dvh;
-    flex:0 1 760px;
+.main-menu.run-active .game-layout{
+    width: 100%;
+    height: 100%;
 }
 .game-info-panel{
     position:relative;

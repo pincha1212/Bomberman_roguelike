@@ -1,6 +1,12 @@
-# Bomberman Roguelike — v6.38.0 (React + TypeScript + Vite)
+# Bomberman Roguelike — v6.39.0 (React + TypeScript + Vite)
 
 A procedural Bomberman roguelike rewritten as a modern React application.
+
+### Versión v6.39.0 — Hook React Dinámico de Redimensionamiento para Dispositivos Táctiles (`useDynamicCanvasSize`)
+- **Hook de React en Tiempo Real (`src/hooks/useDynamicCanvasSize.ts`)**: Monitorea continuamente las dimensiones de la pantalla (`window.innerWidth/innerHeight`, `visualViewport`, cambios de orientación y `ResizeObserver` en el stage).
+- **Detección Automática de Dispositivos Táctiles**: Detecta capacidades táctiles (`ontouchstart`, `navigator.maxTouchPoints > 0`, media queries `pointer: coarse` y `hover: none`) para tablets, smartphones y emuladores táctiles.
+- **Ajuste Dinámico de Propiedades de Canvas**: Ajusta en tiempo real tanto las propiedades DOM del elemento (`canvas.width` y `canvas.height`) como sus estilos (`style.width`, `style.height`, `aspect-ratio: 1 / 1`) y el contenedor `#game-container`, permitiendo que el lienzo aproveche el 100% del espacio disponible sin deformación ni barras de scroll.
+- **Preservación de Renderizado Pixel-Art**: Al cambiar el tamaño del buffer canvas, restaura automáticamente `ctx.imageSmoothingEnabled = false` para mantener la estética nítida y retro del juego.
 
 ### Versión v6.38.0 — Corrección de Canvas en Tablets/Móviles y Configuración de GitHub Actions
 - **Fix Bug de Canvas Minúsculo en Tablets**: En Google Chrome para Android e iPads, `#game-container` colapsaba a un tamaño ínfimo e injugable debido a una regla `container-type: size;` con altura no definida en el contenedor padre. Se migró a `container-type: inline-size;` y se dotó a `#game-stage` y `#game-container` de un dimensionamiento estricto basado en viewport `min()` bidireccional.

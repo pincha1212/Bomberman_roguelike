@@ -7,12 +7,23 @@ import { submitRunToLeaderboard, RunSubmissionPayload } from './firebase/leaderb
 import { AuthBar } from './components/AuthBar';
 import { LeaderboardView } from './components/LeaderboardView';
 import { User as FirebaseUser } from 'firebase/auth';
+import { useDynamicCanvasSize } from './hooks/useDynamicCanvasSize';
 
 export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [activeTab, setActiveTab] = useState<'play' | 'leaderboard'>('play');
   const [lastFinishedRun, setLastFinishedRun] = useState<RunSubmissionPayload | null>(null);
   const [submittedStatus, setSubmittedStatus] = useState<boolean>(false);
+
+  // Hook de React: detecta el tamaño de la pantalla en tiempo real y ajusta
+  // dinámicamente las propiedades de ancho y alto de gameCanvas para maximizar el espacio en dispositivos táctiles.
+  const { canvasSize, isTouchDevice, orientation } = useDynamicCanvasSize({
+    canvasId: 'gameCanvas',
+    containerId: 'game-container',
+    stageId: 'game-stage',
+    maintainAspectRatio: true,
+    padding: 8
+  });
 
   useEffect(() => {
     document.body.className = 'game-body v4-theme';
@@ -77,7 +88,7 @@ export const App: React.FC = () => {
         <aside className="menu-rail menu-rail-left" aria-label="Resumen de la aventura">
           <div className="menu-rail-top">
             <span className="menu-kicker">BOMBERMAN ROGUELIKE</span>
-            <span className="menu-version">v6.38.0</span>
+            <span className="menu-version">v6.39.0</span>
           </div>
           <div className="menu-rail-content">
             <div className="menu-mark">💣</div>

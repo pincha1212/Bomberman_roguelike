@@ -1,6 +1,38 @@
-# Bomberman Roguelike — v6.39.0 (React + TypeScript + Vite)
+# Bomberman Roguelike — v6.44.0 (React + TypeScript + Vite)
 
 A procedural Bomberman roguelike rewritten as a modern React application.
+
+### Versión v6.44.0 — Panel de Configuración de Audio en el Menú de Pausa
+- **Panel de Audio Integrado en Pausa**: Nuevo panel retro arcade dentro de la pantalla de pausa (`#pause-screen`) que permite regular de forma independiente el volumen de música (BGM) y el de efectos sonoros (SFX).
+- **Controles con `<input type="range">`**: Sliders analógicos retro (`min="0" max="100"`) con indicadores de porcentaje en tiempo real, track con gradiente dinámico y thumbs pixel-art brillantes con respuesta táctil y de ratón.
+- **Controlador de Audio Dedicado (`src/engine/audioController.ts`)**:
+  - Enrutamiento completo de Web Audio API mediante nodos `masterGain`, `musicGainNode` y `sfxGainNode`.
+  - Sintetizador chiptune retro BGM con arpegios y líneas de bajo procedurales de 8-bit inspirados en Bomberman, que se reproducen durante el juego, bajan suavemente al pausar y se detienen al finalizar la partida.
+  - Enrutamiento y escalado dinámico de todos los efectos de sonido (`sfx` y `feedbackPoolPlaySound`) por el volumen configurado.
+  - Feedback sonoro inmediato al deslizar la barra de efectos (preview blip).
+  - Persistencia automática de las preferencias en `localStorage` (`bomberman_music_volume`, `bomberman_sfx_volume`).
+
+### Versión v6.43.0 — Manejo Seguro de ResizeObserver y Desacoplamiento de Ciclos
+- **Desacoplamiento con requestAnimationFrame**: Los callbacks de `ResizeObserver` en `src/hooks/useDynamicCanvasSize.ts` y en el motor del juego ahora se programan mediante `requestAnimationFrame`, evitando mutaciones sincrónicas de layout en el mismo frame de renderizado.
+- **Mutaciones Condicionales de Estilos**: Se valida que las propiedades `style.width` y `style.height` de `#gameCanvas` y `#game-container` solo se modifiquen cuando los valores calculados hayan cambiado efectivamente, suprimiendo disparos recursivos de redimensionamiento.
+- **Filtrado de Notificaciones Benignas del Navegador**: El detector global de errores en `gameEngine.js` ahora ignora los eventos no fatales `ResizeObserver loop completed with undelivered notifications` y `ResizeObserver loop limit exceeded` emitidos de forma informativa por motores Chromium y WebKit, previniendo modales de error espurios durante el juego.
+
+### Versión v6.42.0 — Centrado Dinámico y Seguimiento Fluido de Cámara + Escala Óptima del Mapa
+- **Seguimiento Continuo y Centrado de Cámara**: La cámara ahora se enfoca dinámicamente en Bomberman en cada movimiento (`targetX = playerCenterX - canvas.width / 2`, `targetY = playerCenterY - canvas.height / 2`), eliminando la zona muerta excesiva (de 96px a 20px) y aumentando la suavidad reactiva (`smoothness: 0.28`). El jugador ya no se aleja hacia los bordes sin que la cámara lo acompañe.
+- **Resolución Retro Óptima (Sin Mapa Reducido)**: Se fijó el buffer de renderizado interno en la resolución nativa de 600×600 para que las baldosas de 48px conserven su tamaño y escala visual retro completa. El escalado a pantalla completa y dispositivos táctiles se gestiona vía CSS (`style.width/height`) con filtrado pixel-perfect, permitiendo que el mapa se aprecie grande, claro y sin barras vacías.
+- **Restauración del HUD Superpuesto (`#ui-layer`)**: Se reubicaron los indicadores de salud (❤️), bombas (💣), tiempo (⏱), nivel (🚩) y toasts de mejoras directamente dentro de `#game-container`, superpuestos sobre el canvas tal como se diseñó para la vista de partida.
+
+### Versión v6.41.0 — Modo Pantalla Completa (Fullscreen API) para Escritorio
+- **Botón de Pantalla Completa en el Menú Principal**: Nuevo botón retro arcade `[ ⛶ PANTALLA COMPLETA ]` ubicado en las acciones del menú de inicio (`#start-screen`) y en el riel de información (`menu-rail-top`).
+- **Integración con Fullscreen API Multi-Navegador**: Soporte completo para `requestFullscreen` y `exitFullscreen` con compatibilidad cruzada (Chrome, Firefox, Safari y Edge).
+- **Sincronización de Estado en Tiempo Real**: Detección bidireccional mediante eventos `fullscreenchange`. Al alternar la vista o presionar la tecla `Esc`, el botón actualiza su estado, etiqueta visual e icono dinámicamente (`⛶ PANTALLA COMPLETA` / `🗗 SALIR DE PANTALLA COMPLETA`).
+- **Inmersión Total en Dispositivos de Escritorio**: Elimina las distracciones de la interfaz del navegador, maximizando el lienzo del juego con relación de aspecto pixel-perfect.
+
+### Versión v6.40.0 — Aprovisionamiento y Manejo Robusto de Conexión Firebase / Firestore
+- **Aprovisionamiento Automático (`fax.ProvisionFirebase`)**: Activación de la API de tokens de seguridad (`securetoken.googleapis.com`) y servicios de identidad para el proyecto Firebase (`citric-partition-qsmzh`) y base de datos `ai-studio-bombermanrogueli-1709919d-888a-4b89-be9a-9c5d158f7b63`.
+- **Despliegue y Validación de Reglas (`fax.DeployRules`)**: Sincronización activa de `firestore.rules` con soporte de lectura para la clasificación pública y escritura autenticada con esquema estricto.
+- **Manejador Estandarizado de Errores Firestore (`src/firebase/firestoreErrors.ts`)**: Implementación de `handleFirestoreError` con metadatos de autenticación estructurados (`FirestoreErrorInfo`) para operaciones de consulta, lista y escritura según las directrices de integración.
+- **Tolerancia a Estado Offline y Propagación de Tokens**: `testConnection()` y `LeaderboardView` ahora manejan estados de conexión intermitente sin interrumpir el flujo ni generar errores no controlados.
 
 ### Versión v6.39.0 — Hook React Dinámico de Redimensionamiento para Dispositivos Táctiles (`useDynamicCanvasSize`)
 - **Hook de React en Tiempo Real (`src/hooks/useDynamicCanvasSize.ts`)**: Monitorea continuamente las dimensiones de la pantalla (`window.innerWidth/innerHeight`, `visualViewport`, cambios de orientación y `ResizeObserver` en el stage).

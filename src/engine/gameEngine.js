@@ -21,18 +21,35 @@ let audioCtx = null;
 
 const ambient = { dustTimer: 0, lastFoot: 0, introTimer: 0 };
 function initAudio(){
+    if (window.BOMBER_AUDIO) {
+        audioCtx = window.BOMBER_AUDIO.getAudioContext() || audioCtx;
+    }
     if(audioCtx) return;
     try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { audioCtx = null; }
 }
 function sfx(type){
-    if(!audioCtx) return;
+    if(!audioCtx) {
+        if (window.BOMBER_AUDIO) audioCtx = window.BOMBER_AUDIO.getAudioContext();
+        if(!audioCtx) return;
+    }
+    const sfxVol = window.BOMBER_AUDIO ? (window.BOMBER_AUDIO.getSfxVolume() / 100) : 0.8;
+    if (sfxVol <= 0.001) return;
+
     const now=audioCtx.currentTime, o=audioCtx.createOscillator(), g=audioCtx.createGain();
     const presets={bomb:[70,.08,'square'],boom:[55,.28,'sawtooth'],pickup:[520,.10,'sine'],hurt:[110,.18,'square'],exit:[330,.35,'triangle'],click:[220,.05,'square'],trap:[90,.22,'sawtooth'],alarm:[180,.16,'square'],boss:[62,.5,'sawtooth'],bossHit:[240,.10,'square'],bossRoar:[48,.65,'sawtooth'],bossCharge:[120,.22,'square'],bossWave:[75,.38,'triangle'],damageHit:[135,.12,'square'],enemyKill:[420,.08,'square'],death:[65,.58,'sawtooth'],bombReady:[150,.07,'square']};
     const audioKey = typeof themeAudioV46 === 'function' ? themeAudioV46(type, type) : type;
     const [freq,dur,wave]=presets[audioKey]||presets.click;
     o.type=wave; o.frequency.setValueAtTime(freq,now); o.frequency.exponentialRampToValueAtTime(Math.max(35,freq*.55),now+dur);
-    g.gain.setValueAtTime(.0001,now); g.gain.exponentialRampToValueAtTime(.06,now+.008); g.gain.exponentialRampToValueAtTime(.0001,now+dur);
-    o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now+dur+.02);
+    const peakGain = 0.06 * sfxVol;
+    g.gain.setValueAtTime(.0001,now); g.gain.exponentialRampToValueAtTime(peakGain,now+.008); g.gain.exponentialRampToValueAtTime(.0001,now+dur);
+    o.connect(g);
+    const sfxNode = window.BOMBER_AUDIO?.getSfxGainNode();
+    if (sfxNode) {
+        g.connect(sfxNode);
+    } else {
+        g.connect(audioCtx.destination);
+    }
+    o.start(now); o.stop(now+dur+.02);
 }
 function renderImmersion(){
     const vignette=UI['immersion-vignette'];
@@ -271,7 +288,13 @@ function updateAdaptiveInterface() {
 }
 
 if (typeof ResizeObserver === 'function') {
-    const scheduleAdaptiveResize = () => { markAdaptiveViewportDirty(); };
+    let rAFAdaptive = 0;
+    const scheduleAdaptiveResize = () => {
+        if (rAFAdaptive) cancelAnimationFrame(rAFAdaptive);
+        rAFAdaptive = requestAnimationFrame(() => {
+            markAdaptiveViewportDirty();
+        });
+    };
     window.addEventListener('resize', scheduleAdaptiveResize, { passive: true });
     window.addEventListener('orientationchange', scheduleAdaptiveResize, { passive: true });
     window.addEventListener('fullscreenchange', scheduleAdaptiveResize, { passive: true });
@@ -2090,6 +2113,13 @@ if (!gameState.relicMods) resetRelicModifiers();
             gameState.paused = !gameState.paused;
             const screen = document.getElementById('pause-screen');
             if (screen) screen.classList.toggle('hidden', !gameState.paused);
+            if (window.BOMBER_AUDIO) {
+                if (gameState.paused) {
+                    window.BOMBER_AUDIO.onPause();
+                } else {
+                    window.BOMBER_AUDIO.onResume();
+                }
+            }
         }
 
         window.addEventListener('keydown', (e) => {
@@ -9996,11 +10026,10 @@ function draw() {
 // Responsabilidad única: mantener al jugador visible y acompañarlo al recorrer el mapa.
 
 const CAMERA = {
-    // Zona de seguridad alrededor del centro. La cámara solo empieza a desplazarse
-    // cuando el jugador sale de esta zona, evitando micro-movimientos constantes.
-    deadzoneX: 96,
-    deadzoneY: 96,
-    smoothness: 0.16
+    // v6.42.0: Seguimiento activo y centrado continuo de Bomberman
+    deadzoneX: 20,
+    deadzoneY: 20,
+    smoothness: 0.28
 };
 
 function clampCameraPosition(value, maxValue) {
@@ -10022,26 +10051,9 @@ function getCameraTarget() {
     const playerCenterX = player.x + player.width / 2;
     const playerCenterY = player.y + player.height / 2;
 
-    let targetX = gameState.camera.x;
-    let targetY = gameState.camera.y;
-
-    // Horizontal: solo desplazar cuando el jugador abandona la zona segura.
-    const leftLimit = gameState.camera.x + CAMERA.deadzoneX;
-    const rightLimit = gameState.camera.x + canvas.width - CAMERA.deadzoneX;
-    if (playerCenterX < leftLimit) {
-        targetX = playerCenterX - CAMERA.deadzoneX;
-    } else if (playerCenterX > rightLimit) {
-        targetX = playerCenterX - (canvas.width - CAMERA.deadzoneX);
-    }
-
-    // Vertical: misma lógica para seguir al personaje al bajar o subir por el mapa.
-    const topLimit = gameState.camera.y + CAMERA.deadzoneY;
-    const bottomLimit = gameState.camera.y + canvas.height - CAMERA.deadzoneY;
-    if (playerCenterY < topLimit) {
-        targetY = playerCenterY - CAMERA.deadzoneY;
-    } else if (playerCenterY > bottomLimit) {
-        targetY = playerCenterY - (canvas.height - CAMERA.deadzoneY);
-    }
+    // Centrado fluido y dinámico: la cámara siempre sigue a Bomberman manteniéndolo en foco
+    const targetX = playerCenterX - canvas.width / 2;
+    const targetY = playerCenterY - canvas.height / 2;
 
     return {
         x: clampCameraPosition(targetX, bounds.maxX),
@@ -10633,12 +10645,20 @@ function feedbackPoolPlaySound(kind, scale = 1) {
             osc.frequency.exponentialRampToValueAtTime(140, t + 0.06);
         }
 
+        const sfxVol = window.BOMBER_AUDIO ? (window.BOMBER_AUDIO.getSfxVolume() / 100) : 0.8;
+        if (sfxVol <= 0.001) return;
+
         gain.gain.setValueAtTime(0.0001, t);
-        gain.gain.exponentialRampToValueAtTime(0.05, t + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.05 * sfxVol, t + 0.008);
         gain.gain.exponentialRampToValueAtTime(0.0001, t + (kind === 'explosion' ? 0.16 : 0.08));
 
         osc.connect(gain);
-        gain.connect(audio.destination);
+        const sfxNode = window.BOMBER_AUDIO?.getSfxGainNode();
+        if (sfxNode) {
+            gain.connect(sfxNode);
+        } else {
+            gain.connect(audio.destination);
+        }
         osc.start(t);
         osc.stop(t + (kind === 'explosion' ? 0.17 : 0.09));
 
@@ -11326,6 +11346,7 @@ function gameLoop(timestamp) {
             gameState.lastTime = performance.now();
             updateRoguePresentation();
             updateUI(true);
+            if (window.BOMBER_AUDIO) window.BOMBER_AUDIO.onGameStart();
             scheduleGameLoopV632();
         }
 
@@ -11546,6 +11567,7 @@ function gameLoop(timestamp) {
 
         function gameOver(source = 'unknown') {
             finishRun(source);
+            if (window.BOMBER_AUDIO) window.BOMBER_AUDIO.onGameOver();
             document.getElementById('game-over-screen')?.classList.remove('hidden');
         }
 
@@ -20409,10 +20431,18 @@ window.rogueV327IsBossExamV626 = rogueV327IsBossExamV626;
     });
 
     global.addEventListener('error', (event) => {
+        const msg = String(event?.message || safeMessage(event?.error) || '');
+        // Las advertencias benignas de ciclo de ResizeObserver no representan fallos de simulación
+        if (
+            msg.includes('ResizeObserver loop completed with undelivered notifications') ||
+            msg.includes('ResizeObserver loop limit exceeded')
+        ) {
+            return;
+        }
         // Los errores de recursos externos no deben interrumpir el juego por sí solos.
         if (event?.error || event?.message) {
             const location = event.filename ? `\nArchivo: ${event.filename}${event.lineno ? `:${event.lineno}` : ''}` : '';
-            showDiagnostic('ERROR DE JAVASCRIPT', `${event.message || safeMessage(event.error) || 'Error sin mensaje'}${location}`);
+            showDiagnostic('ERROR DE JAVASCRIPT', `${msg || 'Error sin mensaje'}${location}`);
         }
     });
 

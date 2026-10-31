@@ -15,6 +15,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ currentUser })
     fetchTopLeaderboard(25).then((data) => {
       setEntries(data);
       setLoading(false);
+    }).catch(() => {
+      setLoading(false);
     });
 
     const unsubscribe = subscribeToTopLeaderboard((data) => {

@@ -1,0 +1,195 @@
+/* BOMBERMAN ROGUELIKE v6.44.0 — Pause Menu Audio Settings Panel Styles */
+
+.pause-audio-card {
+    width: min(100%, 360px);
+    margin: 12px auto;
+    padding: 14px 16px;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.96) 0%, rgba(2, 6, 23, 0.98) 100%);
+    border: 2px solid #334155;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), inset 0 0 20px rgba(56, 189, 248, 0.06);
+    text-align: left;
+    box-sizing: border-box;
+}
+
+.pause-audio-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.pause-audio-icon {
+    font-size: 14px;
+    line-height: 1;
+}
+
+.pause-audio-title {
+    font: 8px 'Press Start 2P', monospace;
+    letter-spacing: 0.08em;
+    color: #ffd166;
+    text-shadow: 0 0 10px rgba(255, 209, 102, 0.4);
+}
+
+.pause-audio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.pause-audio-group:last-child {
+    margin-bottom: 4px;
+}
+
+.pause-audio-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pause-audio-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font: 8px 'Press Start 2P', monospace;
+    color: #e2e8f0;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    user-select: none;
+}
+
+.pause-audio-badge {
+    font-size: 13px;
+    line-height: 1;
+}
+
+.pause-audio-percent {
+    font: 9px 'Press Start 2P', monospace;
+    color: #38bdf8;
+    background: rgba(2, 6, 23, 0.85);
+    padding: 3px 7px;
+    border-radius: 4px;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+    min-width: 44px;
+    text-align: right;
+    box-sizing: border-box;
+}
+
+.pause-audio-percent.sfx-val {
+    color: #fbbf24;
+    border-color: rgba(251, 191, 36, 0.35);
+    text-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
+}
+
+.pause-slider-container {
+    width: 100%;
+    position: relative;
+    padding: 4px 0;
+}
+
+/* Retro Cyberpunk Range Slider Input */
+.pause-range-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 10px;
+    border-radius: 5px;
+    outline: none;
+    border: 1px solid #475569;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.pause-range-slider:hover,
+.pause-range-slider:focus-visible {
+    border-color: #ffd166;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6), 0 0 10px rgba(255, 209, 102, 0.25);
+}
+
+/* WebKit Slider Thumb */
+.pause-range-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7), 0 0 10px rgba(255, 255, 255, 0.4);
+    cursor: grab;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.pause-range-slider.music-range-slider::-webkit-slider-thumb {
+    background: radial-gradient(circle at center, #7dd3fc 20%, #0284c7 100%);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7), 0 0 12px rgba(56, 189, 248, 0.8);
+}
+
+.pause-range-slider.sfx-range-slider::-webkit-slider-thumb {
+    background: radial-gradient(circle at center, #fef08a 20%, #d97706 100%);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7), 0 0 12px rgba(251, 191, 36, 0.8);
+}
+
+.pause-range-slider::-webkit-slider-thumb:active {
+    cursor: grabbing;
+    transform: scale(1.15);
+}
+
+/* Firefox Slider Thumb */
+.pause-range-slider::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: 2px solid #ffffff;
+    cursor: grab;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.pause-range-slider.music-range-slider::-moz-range-thumb {
+    background: radial-gradient(circle at center, #7dd3fc 20%, #0284c7 100%);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7), 0 0 12px rgba(56, 189, 248, 0.8);
+}
+
+.pause-range-slider.sfx-range-slider::-moz-range-thumb {
+    background: radial-gradient(circle at center, #fef08a 20%, #d97706 100%);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7), 0 0 12px rgba(251, 191, 36, 0.8);
+}
+
+.pause-range-slider::-moz-range-thumb:active {
+    cursor: grabbing;
+    transform: scale(1.15);
+}
+
+@media (max-width: 600px) {
+    .pause-audio-card {
+        width: 100%;
+        max-width: 310px;
+        padding: 10px 12px;
+        margin: 8px auto;
+    }
+    .pause-audio-title {
+        font-size: 7px;
+    }
+    .pause-audio-label {
+        font-size: 7px;
+    }
+    .pause-audio-percent {
+        font-size: 8px;
+        padding: 2px 5px;
+    }
+    .pause-range-slider {
+        height: 8px;
+    }
+    .pause-range-slider::-webkit-slider-thumb {
+        width: 18px;
+        height: 18px;
+    }
+    .pause-range-slider::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+    }
+}

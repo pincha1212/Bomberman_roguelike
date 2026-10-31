@@ -10,6 +10,7 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import { db, auth } from './config';
+import { handleFirestoreError, OperationType } from './firestoreErrors';
 
 export interface LeaderboardEntry {
   userId: string;
@@ -103,6 +104,9 @@ export async function submitRunToLeaderboard(payload: RunSubmissionPayload): Pro
 
     return true;
   } catch (error) {
+    if (error instanceof Error && (error.message.includes('permission') || error.message.includes('insufficient'))) {
+      handleFirestoreError(error, OperationType.WRITE, 'leaderboard');
+    }
     console.error('Error submitting run to leaderboard:', error);
     return false;
   }
@@ -122,6 +126,9 @@ export async function fetchTopLeaderboard(maxLimit = 20): Promise<LeaderboardEnt
     });
     return entries;
   } catch (error) {
+    if (error instanceof Error && (error.message.includes('permission') || error.message.includes('insufficient'))) {
+      handleFirestoreError(error, OperationType.LIST, 'leaderboard');
+    }
     console.error('Error fetching leaderboard:', error);
     return [];
   }
@@ -147,6 +154,9 @@ export function subscribeToTopLeaderboard(
       callback(entries);
     },
     (error) => {
+      if (error instanceof Error && (error.message.includes('permission') || error.message.includes('insufficient'))) {
+        handleFirestoreError(error, OperationType.LIST, 'leaderboard');
+      }
       console.warn('Leaderboard realtime subscription error:', error);
     }
   );

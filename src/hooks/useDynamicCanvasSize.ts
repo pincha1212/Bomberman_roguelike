@@ -109,38 +109,65 @@ export function useDynamicCanvasSize(options: UseDynamicCanvasSizeOptions = {}):
       targetH = maxSquare;
     }
 
-    // 1. Ajuste de las propiedades DOM directas de HTMLCanvasElement (canvas.width y canvas.height)
-    if (canvas.width !== targetW || canvas.height !== targetH) {
-      canvas.width = targetW;
-      canvas.height = targetH;
+    // 1. Mantenemos el buffer interno en 600x600 (resolución nativa del motor retro).
+    // Si canvas.width superaba los 720px, las baldosas se veían diminutas y la cámara no se movía (maxX = 0).
+    const internalResolution = 600;
+    if (canvas.width !== internalResolution || canvas.height !== internalResolution) {
+      canvas.width = internalResolution;
+      canvas.height = internalResolution;
 
-      // Al cambiar width/height el canvas resetea su contexto 2D. Restauramos suavizado pixelado.
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.imageSmoothingEnabled = false;
       }
     }
 
-    // 2. Ajuste de los estilos CSS inline del canvas
-    canvas.style.setProperty('width', `${targetW}px`, 'important');
-    canvas.style.setProperty('height', `${targetH}px`, 'important');
-    canvas.style.setProperty('aspect-ratio', '1 / 1', 'important');
-    canvas.style.setProperty('display', 'block', 'important');
+    // 2. Ajuste de los estilos CSS inline del canvas solo si cambiaron
+    const targetWStr = `${targetW}px`;
+    const targetHStr = `${targetH}px`;
+
+    if (canvas.style.width !== targetWStr) {
+      canvas.style.setProperty('width', targetWStr, 'important');
+    }
+    if (canvas.style.height !== targetHStr) {
+      canvas.style.setProperty('height', targetHStr, 'important');
+    }
+    if (canvas.style.aspectRatio !== '1 / 1') {
+      canvas.style.setProperty('aspect-ratio', '1 / 1', 'important');
+    }
+    if (canvas.style.display !== 'block') {
+      canvas.style.setProperty('display', 'block', 'important');
+    }
 
     // 3. Ajuste del contenedor padre para que envuelva el canvas exactamente
     if (container) {
-      container.style.width = `${targetW}px`;
-      container.style.height = `${targetH}px`;
-      container.style.maxWidth = `${targetW}px`;
-      container.style.maxHeight = `${targetH}px`;
-      container.style.flex = '0 0 auto';
+      if (container.style.width !== targetWStr) {
+        container.style.width = targetWStr;
+      }
+      if (container.style.height !== targetHStr) {
+        container.style.height = targetHStr;
+      }
+      if (container.style.maxWidth !== targetWStr) {
+        container.style.maxWidth = targetWStr;
+      }
+      if (container.style.maxHeight !== targetHStr) {
+        container.style.maxHeight = targetHStr;
+      }
+      if (container.style.flex !== '0 0 auto') {
+        container.style.flex = '0 0 auto';
+      }
     }
 
-    setState({
-      canvasSize: { width: targetW, height: targetH },
-      viewportSize: { width: vw, height: vh },
-      isTouchDevice: isTouch,
-      orientation
+    setState(prev => {
+      if (prev.canvasSize.width === targetW && prev.canvasSize.height === targetH && prev.viewportSize.width === vw && prev.viewportSize.height === vh && prev.orientation === orientation) {
+        return prev;
+      }
+      return {
+        canvasSize: { width: targetW, height: targetH },
+        viewportSize: { width: vw, height: vh },
+        isTouchDevice: isTouch,
+        orientation
+      };
     });
 
     // Notificamos al motor de juego si escucha eventos personalizados de redimensionamiento
@@ -150,38 +177,42 @@ export function useDynamicCanvasSize(options: UseDynamicCanvasSizeOptions = {}):
   }, [canvasId, containerId, stageId, maintainAspectRatio, minSize, padding, touchOnly, checkIsTouchDevice]);
 
   useEffect(() => {
-    adjustCanvasDimensions();
-
-    const handleResize = () => {
-      adjustCanvasDimensions();
+    let rAFId = 0;
+    const scheduleAdjust = () => {
+      if (rAFId) cancelAnimationFrame(rAFId);
+      rAFId = requestAnimationFrame(() => {
+        adjustCanvasDimensions();
+      });
     };
 
-    window.addEventListener('resize', handleResize, { passive: true });
-    window.addEventListener('orientationchange', handleResize, { passive: true });
+    scheduleAdjust();
+
+    window.addEventListener('resize', scheduleAdjust, { passive: true });
+    window.addEventListener('orientationchange', scheduleAdjust, { passive: true });
 
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleResize, { passive: true });
+      window.visualViewport.addEventListener('resize', scheduleAdjust, { passive: true });
     }
 
-    // ResizeObserver para detectar cambios de dimensiones en el contenedor y layout
+    // ResizeObserver con requestAnimationFrame para evitar loops de ciclo de renderizado
     let stageObserver: ResizeObserver | null = null;
     const stageEl = document.getElementById(stageId);
     if (typeof ResizeObserver !== 'undefined' && stageEl) {
       stageObserver = new ResizeObserver(() => {
-        adjustCanvasDimensions();
+        scheduleAdjust();
       });
       stageObserver.observe(stageEl);
     }
 
-    // También reajustamos con un pequeño retraso al montar para esperar que el DOM se asiente
-    const timer1 = setTimeout(adjustCanvasDimensions, 50);
-    const timer2 = setTimeout(adjustCanvasDimensions, 250);
+    const timer1 = setTimeout(scheduleAdjust, 50);
+    const timer2 = setTimeout(scheduleAdjust, 250);
 
     return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
+      if (rAFId) cancelAnimationFrame(rAFId);
+      window.removeEventListener('resize', scheduleAdjust);
+      window.removeEventListener('orientationchange', scheduleAdjust);
       if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleResize);
+        window.visualViewport.removeEventListener('resize', scheduleAdjust);
       }
       if (stageObserver) {
         stageObserver.disconnect();

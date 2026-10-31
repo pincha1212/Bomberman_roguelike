@@ -8,12 +8,31 @@ import { AuthBar } from './components/AuthBar';
 import { LeaderboardView } from './components/LeaderboardView';
 import { User as FirebaseUser } from 'firebase/auth';
 import { useDynamicCanvasSize } from './hooks/useDynamicCanvasSize';
+import { audioController } from './engine/audioController';
 
 export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [activeTab, setActiveTab] = useState<'play' | 'leaderboard'>('play');
   const [lastFinishedRun, setLastFinishedRun] = useState<RunSubmissionPayload | null>(null);
   const [submittedStatus, setSubmittedStatus] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  // Niveles de volumen de música y efectos sonoros (persisten en localStorage)
+  const [musicVolume, setMusicVolume] = useState<number>(() => audioController.getMusicVolume());
+  const [sfxVolume, setSfxVolume] = useState<number>(() => audioController.getSfxVolume());
+
+  const handleMusicVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = Number(e.target.value);
+    setMusicVolume(val);
+    audioController.setMusicVolume(val);
+  };
+
+  const handleSfxVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = Number(e.target.value);
+    setSfxVolume(val);
+    audioController.setSfxVolume(val);
+    audioController.playPreviewSfx();
+  };
 
   // Hook de React: detecta el tamaño de la pantalla en tiempo real y ajusta
   // dinámicamente las propiedades de ancho y alto de gameCanvas para maximizar el espacio en dispositivos táctiles.
@@ -24,6 +43,55 @@ export const App: React.FC = () => {
     maintainAspectRatio: true,
     padding: 8
   });
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isFull = Boolean(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullscreen(isFull);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+        const root = document.documentElement;
+        if (root.requestFullscreen) {
+          await root.requestFullscreen();
+        } else if ((root as any).webkitRequestFullscreen) {
+          await (root as any).webkitRequestFullscreen();
+        } else if ((root as any).msRequestFullscreen) {
+          await (root as any).msRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        } else if ((document as any).msExitFullscreen) {
+          await (document as any).msExitFullscreen();
+        }
+      }
+    } catch (err) {
+      console.warn('Fullscreen request could not be fulfilled:', err);
+    }
+  };
 
   useEffect(() => {
     document.body.className = 'game-body v4-theme';
@@ -88,7 +156,18 @@ export const App: React.FC = () => {
         <aside className="menu-rail menu-rail-left" aria-label="Resumen de la aventura">
           <div className="menu-rail-top">
             <span className="menu-kicker">BOMBERMAN ROGUELIKE</span>
-            <span className="menu-version">v6.39.0</span>
+            <div className="menu-rail-badge-group">
+              <span className="menu-version">v6.44.0</span>
+              <button
+                type="button"
+                className="btn-rail-fullscreen"
+                onClick={toggleFullscreen}
+                title={isFullscreen ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
+                aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Activar pantalla completa'}
+              >
+                {isFullscreen ? '🗗' : '⛶'}
+              </button>
+            </div>
           </div>
           <div className="menu-rail-content">
             <div className="menu-mark">💣</div>
@@ -130,6 +209,48 @@ export const App: React.FC = () => {
                 aria-relevant="additions"
                 aria-atomic="false"
               ></div>
+
+              {/* HUD Superpuesto directamente sobre el Canvas de juego */}
+              <div id="ui-layer" aria-label="Interfaz de juego">
+                <div className="flex flex-col gap-1.5">
+                  <div className="info-section-title">JUGADOR</div>
+                  <div className="flex gap-1.5 flex-wrap">
+                    <div className="stat-badge text-red-400">❤️ <span id="ui-health">3</span></div>
+                    <div className="stat-badge text-cyan-300 hidden" id="ui-shield-badge">🛡️ <span id="ui-shield">SI</span></div>
+                    <div id="ui-score-badge" className="stat-badge text-yellow-300">⭐ <span id="ui-score">0</span></div>
+                    <div id="ui-coins-badge" className="stat-badge text-amber-300">¢ <span id="ui-coins">0</span></div>
+                  </div>
+                  <div className="flex gap-1.5 flex-wrap">
+                    <div className="stat-badge text-purple-300">🚩 PROFUNDIDAD <span id="ui-level">1</span></div>
+                    <div className="stat-badge text-red-300">⏱ <span id="ui-timer">80s</span></div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-end gap-1.5 info-column-right">
+                  <div className="info-section-title">CAPACIDADES</div>
+                  <div className="flex gap-1.5 flex-wrap justify-end">
+                    <div className="stat-badge bomb-stat text-amber-400" id="bomb-stat">
+                      💣 <span id="ui-bombs">1/1</span>
+                      <span className="bomb-capacity" aria-hidden="true"><span id="ui-bombs-fill"></span></span>
+                    </div>
+                    <div className="stat-badge text-orange-400">🔥 <span id="ui-range">1</span></div>
+                    <div className="stat-badge text-emerald-400">👟 <span id="ui-speed">3</span></div>
+                    <div id="ui-relics-badge" className="stat-badge text-purple-300">✦ <span id="ui-relics">0</span></div>
+                  </div>
+                  <div className="info-element-card">
+                    <span className="info-element-label">ELEMENTO ACTIVO</span>
+                    <strong id="ui-bomb-element">NORMAL</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div id="ui-powerup-toast" className="powerup-toast hidden" aria-live="polite" aria-atomic="true">
+                <span id="ui-powerup-toast-icon" className="powerup-toast-icon" aria-hidden="true">◆</span>
+                <span className="powerup-toast-copy">
+                  <strong id="ui-powerup-toast-name">POWER-UP</strong>
+                  <small id="ui-powerup-toast-desc">—</small>
+                </span>
+              </div>
 
               {/* Death / Run Summary */}
               <div id="game-over-screen" className="screen hidden death-screen">
@@ -209,6 +330,65 @@ export const App: React.FC = () => {
               <div id="pause-screen" className="screen hidden">
                 <div className="reward-kicker">PARTIDA PAUSADA</div>
                 <h1 className="text-xl mb-3 text-cyan-300 pixel-font">PAUSA</h1>
+
+                {/* Panel de configuración de audio */}
+                <div className="pause-audio-card" role="region" aria-label="Configuración de audio">
+                  <div className="pause-audio-head">
+                    <span className="pause-audio-icon">⚙️</span>
+                    <span className="pause-audio-title">CONFIGURACIÓN DE AUDIO</span>
+                  </div>
+
+                  <div className="pause-audio-group">
+                    <div className="pause-audio-meta">
+                      <label htmlFor="range-music-volume" className="pause-audio-label">
+                        <span className="pause-audio-badge">🎵</span> MÚSICA
+                      </label>
+                      <span className="pause-audio-percent" id="val-music-volume">{musicVolume}%</span>
+                    </div>
+                    <div className="pause-slider-container">
+                      <input
+                        id="range-music-volume"
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={musicVolume}
+                        onChange={handleMusicVolumeChange}
+                        className="pause-range-slider music-range-slider"
+                        aria-label="Ajustar volumen de música"
+                        style={{
+                          background: `linear-gradient(to right, #38bdf8 0%, #38bdf8 ${musicVolume}%, rgba(30,41,59,0.95) ${musicVolume}%, rgba(30,41,59,0.95) 100%)`
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pause-audio-group">
+                    <div className="pause-audio-meta">
+                      <label htmlFor="range-sfx-volume" className="pause-audio-label">
+                        <span className="pause-audio-badge">🔊</span> EFECTOS (SFX)
+                      </label>
+                      <span className="pause-audio-percent sfx-val" id="val-sfx-volume">{sfxVolume}%</span>
+                    </div>
+                    <div className="pause-slider-container">
+                      <input
+                        id="range-sfx-volume"
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={sfxVolume}
+                        onChange={handleSfxVolumeChange}
+                        className="pause-range-slider sfx-range-slider"
+                        aria-label="Ajustar volumen de efectos sonoros"
+                        style={{
+                          background: `linear-gradient(to right, #fbbf24 0%, #fbbf24 ${sfxVolume}%, rgba(30,41,59,0.95) ${sfxVolume}%, rgba(30,41,59,0.95) 100%)`
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <button id="btn-resume" className="btn-pixel">CONTINUAR</button>
               </div>
             </section>
@@ -269,47 +449,6 @@ export const App: React.FC = () => {
               </button>
               <p className="dev-tools-note">Invulnerabilidad total: no consume vida, escudo ni reliquias.</p>
             </section>
-
-            <div id="ui-layer" aria-label="Interfaz de juego">
-              <div className="flex flex-col gap-1.5">
-                <div className="info-section-title">JUGADOR</div>
-                <div className="flex gap-1.5 flex-wrap">
-                  <div className="stat-badge text-red-400">❤️ <span id="ui-health">3</span></div>
-                  <div className="stat-badge text-cyan-300 hidden" id="ui-shield-badge">🛡️ <span id="ui-shield">SI</span></div>
-                  <div id="ui-score-badge" className="stat-badge text-yellow-300">⭐ <span id="ui-score">0</span></div>
-                  <div id="ui-coins-badge" className="stat-badge text-amber-300">¢ <span id="ui-coins">0</span></div>
-                </div>
-                <div className="flex gap-1.5 flex-wrap">
-                  <div className="stat-badge text-purple-300">🚩 PROFUNDIDAD <span id="ui-level">1</span></div>
-                  <div className="stat-badge text-red-300">⏱ <span id="ui-timer">80s</span></div>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-end gap-1.5 info-column-right">
-                <div className="info-section-title">CAPACIDADES</div>
-                <div className="flex gap-1.5 flex-wrap justify-end">
-                  <div className="stat-badge bomb-stat text-amber-400" id="bomb-stat">
-                    💣 <span id="ui-bombs">1/1</span>
-                    <span className="bomb-capacity" aria-hidden="true"><span id="ui-bombs-fill"></span></span>
-                  </div>
-                  <div className="stat-badge text-orange-400">🔥 <span id="ui-range">1</span></div>
-                  <div className="stat-badge text-emerald-400">👟 <span id="ui-speed">3</span></div>
-                  <div id="ui-relics-badge" className="stat-badge text-purple-300">✦ <span id="ui-relics">0</span></div>
-                </div>
-                <div className="info-element-card">
-                  <span className="info-element-label">ELEMENTO ACTIVO</span>
-                  <strong id="ui-bomb-element">NORMAL</strong>
-                </div>
-              </div>
-            </div>
-
-            <div id="ui-powerup-toast" className="powerup-toast hidden" aria-live="polite" aria-atomic="true">
-              <span id="ui-powerup-toast-icon" className="powerup-toast-icon" aria-hidden="true">◆</span>
-              <span className="powerup-toast-copy">
-                <strong id="ui-powerup-toast-name">POWER-UP</strong>
-                <small id="ui-powerup-toast-desc">—</small>
-              </span>
-            </div>
 
             <section className="info-card" aria-label="Reliquias activas">
               <div className="info-card-title">RELIQUIAS ACTIVAS <span id="ui-relic-count-label">0</span></div>
@@ -398,6 +537,17 @@ export const App: React.FC = () => {
             </button>
             <button id="btn-start" className="btn-pixel menu-start-button" type="button">
               INICIAR PARTIDA
+            </button>
+            <button
+              id="btn-fullscreen-toggle"
+              className={`menu-fullscreen-button ${isFullscreen ? 'is-active' : ''}`}
+              type="button"
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'Salir de pantalla completa (Esc)' : 'Activar modo pantalla completa para mayor inmersión'}
+              aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Activar pantalla completa'}
+            >
+              <span className="fullscreen-icon">{isFullscreen ? '🗗' : '⛶'}</span>
+              <span>{isFullscreen ? 'SALIR DE PANTALLA COMPLETA' : 'PANTALLA COMPLETA'}</span>
             </button>
             <div className="menu-hint">
               <span>TECLADO</span><strong>WASD / ↑↓←→</strong><span>· BOMBA</span><strong>ESPACIO</strong>

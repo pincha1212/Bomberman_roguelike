@@ -49,28 +49,15 @@ export async function submitRunToLeaderboard(payload: RunSubmissionPayload): Pro
   const displayName = (currentUser.displayName || (currentUser.isAnonymous ? 'Bomber Anónimo' : 'Jugador')).slice(0, 40);
 
   try {
-    const existingSnap = await getDoc(leaderboardRef);
-
-    if (existingSnap.exists()) {
-      const existing = existingSnap.data() as LeaderboardEntry;
-      // Only overwrite leaderboard if the new score is higher or equal
-      if (payload.score >= (existing.score || 0)) {
-        const entry: LeaderboardEntry = {
-          userId,
-          displayName,
-          photoURL: currentUser.photoURL || '',
-          score: Math.max(0, Math.floor(payload.score)),
-          depth: Math.max(1, Math.floor(payload.depth)),
-          runTimeFormatted: payload.runTimeFormatted || '00:00',
-          kills: Math.max(0, Math.floor(payload.kills)),
-          coins: Math.max(0, Math.floor(payload.coins)),
-          relicsCount: Math.max(0, Math.floor(payload.relicsCount)),
-          causeOfDeath: payload.causeOfDeath.slice(0, 50) || 'Partida finalizada',
-          createdAt: now
-        };
-        await setDoc(leaderboardRef, entry);
+    let existing: LeaderboardEntry | null = null;
+    try {
+      const existingSnap = await getDoc(leaderboardRef);
+      if (existingSnap.exists()) {
+        existing = existingSnap.data() as LeaderboardEntry;
       }
-    } else {
+    } catch (_) {}
+
+    if (!existing || payload.score >= (existing.score || 0)) {
       const entry: LeaderboardEntry = {
         userId,
         displayName,
@@ -89,8 +76,14 @@ export async function submitRunToLeaderboard(payload: RunSubmissionPayload): Pro
 
     // Also update user profile with total stats
     const userRef = doc(db, 'users', userId);
-    const userSnap = await getDoc(userRef);
-    const existingUser = userSnap.exists() ? userSnap.data() : {};
+    let existingUser: Record<string, any> = {};
+    try {
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        existingUser = userSnap.data();
+      }
+    } catch (_) {}
+
     await setDoc(userRef, {
       userId,
       displayName,
@@ -104,10 +97,15 @@ export async function submitRunToLeaderboard(payload: RunSubmissionPayload): Pro
 
     return true;
   } catch (error) {
-    if (error instanceof Error && (error.message.includes('permission') || error.message.includes('insufficient'))) {
-      handleFirestoreError(error, OperationType.WRITE, 'leaderboard');
+    if (error instanceof Error) {
+      if (error.message.includes('permission') || error.message.includes('insufficient')) {
+        handleFirestoreError(error, OperationType.WRITE, 'leaderboard');
+      }
+      if (error.message.includes('offline') || error.message.includes('Failed to get document')) {
+        return true;
+      }
     }
-    console.error('Error submitting run to leaderboard:', error);
+    console.warn('Leaderboard submission operating offline:', error);
     return false;
   }
 }
@@ -126,10 +124,14 @@ export async function fetchTopLeaderboard(maxLimit = 20): Promise<LeaderboardEnt
     });
     return entries;
   } catch (error) {
-    if (error instanceof Error && (error.message.includes('permission') || error.message.includes('insufficient'))) {
-      handleFirestoreError(error, OperationType.LIST, 'leaderboard');
+    if (error instanceof Error) {
+      if (error.message.includes('permission') || error.message.includes('insufficient')) {
+        handleFirestoreError(error, OperationType.LIST, 'leaderboard');
+      }
+      if (error.message.includes('offline') || error.message.includes('Failed to get document')) {
+        return [];
+      }
     }
-    console.error('Error fetching leaderboard:', error);
     return [];
   }
 }

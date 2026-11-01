@@ -362,5 +362,10 @@ if (typeof window !== 'undefined') {
     onPause: () => audioController.onPause(),
     onResume: () => audioController.onResume(),
     onGameOver: () => audioController.onGameOver(),
+    vibrate: (pattern?: number | number[]) => {
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        try { navigator.vibrate(pattern || 35); } catch (_) {}
+      }
+    },
   };
 }

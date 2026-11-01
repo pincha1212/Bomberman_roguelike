@@ -1,6 +1,35 @@
-# Bomberman Roguelike — v6.44.0 (React + TypeScript + Vite)
+# Bomberman Roguelike — v6.48.0 (React + TypeScript + Vite)
 
 A procedural Bomberman roguelike rewritten as a modern React application.
+
+### Versión v6.48.0 — Auditoría Integral de Poderes, Favores de Santuario e IA Ofensiva de Echo (Bomba Póstuma y Lanzamiento)
+- **Auditoría y Activación de Reliquias y Bonificaciones Silenciosas**:
+  - `salvage_hook` (Gancho de Salvamento): Otorga +1 moneda adicional cada vez que se destruye un bloque destructible, con cálculo de multiplicador activo en el motor de juego.
+  - `bounty_seal` (Sello de Recompensa): Otorga +2 monedas adicionales garantizadas por cada enemigo derrotado.
+  - `greedy_spark` (Chispa Codiciosa): Aumenta un +20% las monedas obtenidas en recompensas y cofres.
+  - `blast_capacitor` y `quick_wick`: Ahora reducen efectivamente el temporizador de la mecha (`fuseMs`) en `placeBomb()`, haciendo las bombas más reactivas en combate.
+  - `last_stand` (Último Aliento): Al avanzar de sala con salud crítica (1 HP), recupera automáticamente 1 punto de vida con aviso visual emergente.
+  - `ember_core` (Núcleo Ígneo): Suma +25 puntos adicionales en cada detonación de bomba.
+- **Cumplimiento Real del Favor de Santuario (`SHRINE`)**:
+  - Al acceder a una sala de tipo Santuario (`✚`), el sistema ahora cumple efectivamente su descripción concediendo +1 de salud (respetando la vida máxima o expandiéndola si está al tope) y recargando el Escudo (`hasShield = true`) con aviso flotante y feedback sonoro.
+- **Corrección de la IA de Bomba de Death Echo / Espectro**:
+  - **Fin de la Retención Indefinida**: Se ajustó el tiempo de carga a un máximo de 2.8s (en lugar de 10s) con umbral mínimo de 600ms. Si el Echo se acerca al jugador (distancia <= 3 baldosas) o se encuentra alineado en rango visual, suelta inmediatamente la bomba (`DROP`) o la lanza (`THROW`) con determinación táctica para emboscar al jugador.
+  - **Bomba Póstuma / Martirio (`dropDeathMartyrBomb`)**: Si el Echo es abatido mientras sostenía una bomba o incluso con las manos vacías, suelta infaliblemente una bomba armada póstuma con mecha rápida (1.2s - 1.3s) en su celda o en la baldosa contigua disponible, cumpliendo la amenaza letal tras su derrota.
+
+### Versión v6.47.0 — Manejo Seguro de Caché Offline en Autenticación y Perfil
+- **Blindaje Offline en `syncUserProfile` (`src/firebase/authService.ts`)**: Se encapsularon las lecturas remotas `getDoc(userRef)` dentro de bloques `try/catch` tolerantes a fallos. Si el cliente está desconectado o el servidor de base de datos no es accesible de inmediato, el sistema utiliza el perfil local sin arrojar `FirebaseError: Failed to get document because the client is offline`.
+- **Manejo Seguro en `subscribeToAuth`**: Se reemplazó el callback de rechazo `syncUserProfile(user).catch(console.error)` por captura silenciosa controlada, evitando alertas de error en la consola del navegador durante el inicio de sesión automático.
+- **Tolerancia a Modo Offline en `submitRunToLeaderboard` y `fetchTopLeaderboard` (`src/firebase/leaderboardService.ts`)**: Las consultas y escrituras a la tabla de clasificación ahora operan con respaldo local seguro ante cualquier intermitencia de red.
+
+### Versión v6.46.0 — Desacoplamiento de Inicialización y Supresión de Ruido en Firestore
+- **Desacoplamiento de Carga Inicial**: Eliminación del sondeo síncrono `testConnection()` en el ciclo de vida de arranque (`App.tsx`). Las consultas a Firestore se ejecutan exclusivamente bajo demanda cuando el usuario interactúa con la pestaña de clasificación o guarda una partida, evitando llamadas de red prematuras mientras el motor del juego carga.
+- **Supresión Total de Logs Internos (`setLogLevel('silent')`)**: Silenciamiento completo de las alertas internas del SDK `@firebase/firestore` relativas al backend offline o reintentos del servicio de tokens mientras las credenciales de Cloud se encuentran en proceso de propagación.
+- **Garantía de Operatividad Offline y Local**: El juego local, menú de pausa, audio procedural y partidas funcionan al 100% de manera inmediata, independientemente del estado de red o latencia de autenticación.
+
+### Versión v6.45.0 — Sincronización y Tolerancia Robusta de Tokens Firestore
+- **Aprovisionamiento y Despliegue RPC (`fax.ProvisionFirebase` y `fax.DeployRules`)**: Sincronización completa del proyecto Firebase (`citric-partition-qsmzh`) y base de datos `ai-studio-bombermanrogueli-1709919d-888a-4b89-be9a-9c5d158f7b63`, asegurando la disponibilidad de la API de tokens (`securetoken.googleapis.com`) y reglas de seguridad.
+- **Sondeo Resiliente de Conexión (`src/firebase/config.ts`)**: Se sustituyó `getDocFromServer` en `testConnection()` por un sondeo con `getDoc` asíncrono y límite de espera (timeout), permitiendo que el cliente de Firestore gestione el estado de conexión sin generar excepciones no controladas de cliente offline.
+- **Silenciamiento de Reintentos Internos de Red**: Configuración de `setLogLevel('error')` en el SDK de Firestore para suprimir avisos repetitivos de conexión en consola mientras se completa la propagación del token de autenticación.
 
 ### Versión v6.44.0 — Panel de Configuración de Audio en el Menú de Pausa
 - **Panel de Audio Integrado en Pausa**: Nuevo panel retro arcade dentro de la pantalla de pausa (`#pause-screen`) que permite regular de forma independiente el volumen de música (BGM) y el de efectos sonoros (SFX).

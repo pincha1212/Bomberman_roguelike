@@ -27,7 +27,25 @@ function initAudio(){
     if(audioCtx) return;
     try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { audioCtx = null; }
 }
+function triggerHaptic(type) {
+    if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return;
+    try {
+        if (type === 'bomb' || type === 'bombReady') {
+            navigator.vibrate(35);
+        } else if (type === 'hurt' || type === 'damageHit') {
+            navigator.vibrate([80, 40, 80]);
+        } else if (type === 'death') {
+            navigator.vibrate([150, 50, 200]);
+        } else if (type === 'boom') {
+            navigator.vibrate(50);
+        } else if (type === 'pickup') {
+            navigator.vibrate(20);
+        }
+    } catch(e) {}
+}
+
 function sfx(type){
+    triggerHaptic(type);
     if(!audioCtx) {
         if (window.BOMBER_AUDIO) audioCtx = window.BOMBER_AUDIO.getAudioContext();
         if(!audioCtx) return;
@@ -433,7 +451,7 @@ const UI = {};
             [POWERUPS.BOMB_ICE]: Object.freeze({ id:POWERUPS.BOMB_ICE, label:'BOMBA HIELO', icon:'❄️', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Hace que las próximas bombas sean de hielo.' }),
             [POWERUPS.BOMB_ELECTRIC]: Object.freeze({ id:POWERUPS.BOMB_ELECTRIC, label:'BOMBA ELÉCTRICA', icon:'⚡', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Hace que las próximas bombas sean eléctricas.' }),
             [POWERUPS.BOMB_TOXIC]: Object.freeze({ id:POWERUPS.BOMB_TOXIC, label:'BOMBA TÓXICA', icon:'☣', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Deja una nube venenosa que daña a los enemigos que permanecen en ella.' }),
-            [POWERUPS.BOMB_GRAVITY]: Object.freeze({ id:POWERUPS.BOMB_GRAVITY, label:'BOMBA GRAVITATORIA', icon:'🌀', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Crea un vórtice que atrae a los enemigos cercanos hacia el origen, incluso fuera de la línea de explosión.' }),
+            [POWERUPS.BOMB_GRAVITY]: Object.freeze({ id:POWERUPS.BOMB_GRAVITY, label:'BOMBA GRAVITATORIA', icon:'🌀', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Crea un vórtice que atrae a los enemigos al centro de la bomba y los deja noqueados por 3.5s para colocarles otra bomba.' }),
             [POWERUPS.BOMB_FRAGMENT]: Object.freeze({ id:POWERUPS.BOMB_FRAGMENT, label:'BOMBA DE FRAGMENTACIÓN', icon:'💥', rarity:'ELEMENTAL', category:'BOMBAS', desc:'Extiende la explosión en cuatro brazos diagonales. Bloques y esquinas cerradas detienen los fragmentos.' }),
             [POWERUPS.BOMB_PIERCE]: Object.freeze({ id:POWERUPS.BOMB_PIERCE, label:'BOMBA PERFORANTE', icon:'➤', rarity:'ELEMENTAL', category:'BOMBAS', desc:'La explosión atraviesa hasta dos bloques destructibles por dirección. Los muros sólidos la detienen.' })
         });
@@ -497,9 +515,9 @@ const UI = {};
         window.getPowerupDropPoolV67=getPowerupDropPoolV67;
 
         const ENEMY_TYPES = Object.freeze({
-            RASTRERO: Object.freeze({ name: 'Rastrero', color: '#ef4444', speed: 1.4, canFly: false }),
-            VOLADOR: Object.freeze({ name: 'Volador', color: '#3b82f6', speed: 1.1, canFly: true }),
-            ESPECIAL: Object.freeze({ name: 'Especial', color: '#22c55e', speed: 2.2, canFly: false })
+            RASTRERO: Object.freeze({ name: 'Rastrero', color: '#ef4444', speed: 1.15, canFly: false }),
+            VOLADOR: Object.freeze({ name: 'Volador', color: '#3b82f6', speed: 0.95, canFly: true }),
+            ESPECIAL: Object.freeze({ name: 'Especial', color: '#22c55e', speed: 1.75, canFly: false })
         });
 
         // v3.24: perfiles de comportamiento separados del tipo visual/fisico.
@@ -693,6 +711,11 @@ const UI = {};
             bombRange: 1,
             health: 3,
             maxHealth: 5,
+            dashEnergy: 100,
+            maxDashEnergy: 100,
+            isDashing: false,
+            dashTimerMs: 0,
+            dashGhostTrails: [],
             firstRelicFlags: { bomb: false, range: false, health: false },
             hasShield: false,
             godModeEnabled: false,
@@ -2085,15 +2108,15 @@ const ROGUELIKE_RELICS_CANONICAL_V613 = [
     { id:'ember_core_rogue', icon:'🔥', name:'NÚCLEO DE BRASA', rarity:'COMMON', category:'FIRE', roguelikeOnly:true, tags:['combustion'], bonuses:{ range:1 }, desc:'+1 rango de bomba.', apply:()=>{ clampPlayerCapacitiesV67(); if(typeof rogueV327ApplyDerivedBonuses==='function') rogueV327ApplyDerivedBonuses(); } },
     { id:'double_charge', icon:'💣', name:'DOBLE CARGA', rarity:'COMMON', category:'BOMB', roguelikeOnly:true, tags:['demolition'], bonuses:{ bombs:1 }, desc:'+1 bomba máxima.', apply:()=>{ clampPlayerCapacitiesV67(); if(typeof rogueV327ApplyDerivedBonuses==='function') rogueV327ApplyDerivedBonuses(); } },
     { id:'hot_boots', icon:'👟', name:'BOTAS CALIENTES', rarity:'COMMON', category:'SPEED', roguelikeOnly:true, tags:['mobility'], bonuses:{ speed:0.35 }, desc:'+0.35 velocidad.', apply:()=>{ clampPlayerCapacitiesV67(); if(typeof rogueV327ApplyDerivedBonuses==='function') rogueV327ApplyDerivedBonuses(); } },
-    { id:'salvage_hook', icon:'🪝', name:'GANCHO CHATARRERO', rarity:'COMMON', category:'ECONOMY', roguelikeOnly:true, tags:['economy'], bonuses:{ coinBlock:1 }, desc:'+1 moneda por bloque destruido.', apply:()=>{} },
-    { id:'bounty_seal', icon:'¢', name:'SELLO DE COBRO', rarity:'COMMON', category:'ECONOMY', roguelikeOnly:true, tags:['economy','combat'], bonuses:{ coinEnemy:2 }, desc:'+2 monedas por enemigo eliminado.', apply:()=>{} },
+    { id:'salvage_hook', icon:'🪝', name:'GANCHO CHATARRERO', rarity:'COMMON', category:'ECONOMY', roguelikeOnly:true, tags:['economy'], bonuses:{ coinBlock:1 }, desc:'+1 moneda por bloque destruido.', apply:()=>{ gameState.salvageHookActive = true; gameState.coinBonus = (gameState.coinBonus || 0) + 0.10; } },
+    { id:'bounty_seal', icon:'¢', name:'SELLO DE COBRO', rarity:'COMMON', category:'ECONOMY', roguelikeOnly:true, tags:['economy','combat'], bonuses:{ coinEnemy:2 }, desc:'+2 monedas por enemigo eliminado.', apply:()=>{ gameState.bountySealActive = true; gameState.killScoreMult = (gameState.killScoreMult || 1) + 0.25; } },
     { id:'iron_heart', icon:'♥', name:'CORAZÓN DE HIERRO', rarity:'UNCOMMON', category:'DEFENSE', roguelikeOnly:true, tags:['survival'], bonuses:{ maxHealth:1 }, desc:'+1 vida máxima.', apply:()=>{ clampPlayerCapacitiesV67(); if(typeof rogueV327ApplyDerivedBonuses==='function') rogueV327ApplyDerivedBonuses(); } },
-    { id:'blast_capacitor', icon:'⚡', name:'CAPACITOR DE ESTALLIDO', rarity:'UNCOMMON', category:'BOMB', roguelikeOnly:true, tags:['combustion','demolition'], bonuses:{ range:1, fuseMs:-200 }, desc:'+1 rango y mecha 200 ms más corta.', apply:()=>{ clampPlayerCapacitiesV67(); if(typeof rogueV327ApplyDerivedBonuses==='function') rogueV327ApplyDerivedBonuses(); } },
-    { id:'quick_wick', icon:'⏱', name:'MECHA CORTA', rarity:'UNCOMMON', category:'BOMB', roguelikeOnly:true, tags:['demolition','mobility'], bonuses:{ fuseMs:-350 }, desc:'Mecha 350 ms más corta.', apply:()=>{} },
-    { id:'greedy_spark', icon:'✦', name:'CHISPA CODICIOSA', rarity:'UNCOMMON', category:'ECONOMY', roguelikeOnly:true, tags:['economy'], bonuses:{ coinMultiplier:0.20 }, desc:'+20% a todas las monedas ganadas.', apply:()=>{} },
+    { id:'blast_capacitor', icon:'⚡', name:'CAPACITOR DE ESTALLIDO', rarity:'UNCOMMON', category:'BOMB', roguelikeOnly:true, tags:['combustion','demolition'], bonuses:{ range:1, fuseMs:-200 }, desc:'+1 rango y mecha 200 ms más corta.', apply:()=>{ if(gameState.relicMods) gameState.relicMods.bombFuseMultiplier = (gameState.relicMods.bombFuseMultiplier || 1) * 0.90; clampPlayerCapacitiesV67(); if(typeof rogueV327ApplyDerivedBonuses==='function') rogueV327ApplyDerivedBonuses(); } },
+    { id:'quick_wick', icon:'⏱', name:'MECHA CORTA', rarity:'UNCOMMON', category:'BOMB', roguelikeOnly:true, tags:['demolition','mobility'], bonuses:{ fuseMs:-350 }, desc:'Mecha 350 ms más corta.', apply:()=>{ if(gameState.relicMods) gameState.relicMods.bombFuseMultiplier = (gameState.relicMods.bombFuseMultiplier || 1) * 0.82; } },
+    { id:'greedy_spark', icon:'✦', name:'CHISPA CODICIOSA', rarity:'UNCOMMON', category:'ECONOMY', roguelikeOnly:true, tags:['economy'], bonuses:{ coinMultiplier:0.20 }, desc:'+20% a todas las monedas ganadas.', apply:()=>{ gameState.coinBonus = (gameState.coinBonus || 0) + 0.20; } },
     { id:'glass_fuse', icon:'◆', name:'MECHA DE VIDRIO', rarity:'RARE', category:'RISK', roguelikeOnly:true, tags:['combustion','risk'], bonuses:{ range:2, maxHealth:-1 }, desc:'+2 rango, -1 vida máxima.', apply:()=>{ clampPlayerCapacitiesV67(); if(typeof rogueV327ApplyDerivedBonuses==='function') rogueV327ApplyDerivedBonuses(); } },
     { id:'redline', icon:'↯', name:'LÍNEA ROJA', rarity:'RARE', category:'RISK', roguelikeOnly:true, tags:['mobility','risk'], bonuses:{ speed:0.6, maxHealth:-1 }, desc:'+0.6 velocidad, -1 vida máxima.', apply:()=>{ clampPlayerCapacitiesV67(); if(typeof rogueV327ApplyDerivedBonuses==='function') rogueV327ApplyDerivedBonuses(); } },
-    { id:'last_stand', icon:'🛡', name:'ÚLTIMA RESERVA', rarity:'RARE', category:'DEFENSE', roguelikeOnly:true, tags:['survival','risk'], bonuses:{ roomHeal:1 }, desc:'Recuperás 1 vida al entrar a cada sala.', apply:()=>{} }
+    { id:'last_stand', icon:'🛡', name:'ÚLTIMA RESERVA', rarity:'RARE', category:'DEFENSE', roguelikeOnly:true, tags:['survival','risk'], bonuses:{ roomHeal:1 }, desc:'Recuperás 1 vida al entrar a cada sala.', apply:()=>{ gameState.lastStandActive = true; if(player && player.health < player.maxHealth) { player.health = Math.min(player.maxHealth, player.health + 1); updateUI(); } } }
 ];
 
 ROGUELIKE_RELICS_CANONICAL_V613.forEach(relic => applyRelicCategoryMetadata(relic));
@@ -2169,9 +2192,27 @@ if (!gameState.relicMods) resetRelicModifiers();
         };
         setupBombInput();
 
+        const setupDashInput = () => {
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyX' || e.code === 'KeyC' || e.code === 'KeyK') {
+                    if (!gameState.isPlaying || gameState.paused) return;
+                    e.preventDefault();
+                    if (e.repeat) return;
+                    if (typeof globalThis.performPlayerDashV651 === 'function') {
+                        globalThis.performPlayerDashV651();
+                    }
+                }
+            });
+        };
+        setupDashInput();
 
 
-// v6.31.4 — Controles táctiles invisibles: izquierda mueve; derecha toca/ mantiene.
+
+// v6.31.4 — Controles táctiles invisibles con soporte de gestos:
+// Movimiento en mitad izquierda. Acciones en mitad derecha:
+// - Toque simple: bomba
+// - Mantener: agarrar / lanzar
+// - Doble toque o clic y desliz (swipe): Dash / Esquiva rápida
 (function setupInvisibleTouchControlsV6314() {
     const moveZone = document.getElementById('mobile-gesture-zone');
     const actionZone = document.getElementById('mobile-action-zone');
@@ -2182,6 +2223,8 @@ if (!gameState.relicMods) resetRelicModifiers();
     const actionPointers = new Map();
     const threshold = 22;
     const longPressMs = 360;
+    let lastActionTapAt = 0;
+    let lastMoveTapAt = 0;
 
     function canControl() {
         return !!(gameState?.isPlaying && !gameState.paused && !document.hidden);
@@ -2249,9 +2292,16 @@ if (!gameState.relicMods) resetRelicModifiers();
     moveZone.addEventListener('pointerdown', e => {
         if (!isTouchLayout() || !canControl()) return;
         e.preventDefault();
-        movePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+        movePointers.set(e.pointerId, {
+            x: e.clientX,
+            y: e.clientY,
+            startX: e.clientX,
+            startY: e.clientY,
+            startTime: performance.now()
+        });
         try { moveZone.setPointerCapture(e.pointerId); } catch (_) {}
     }, {passive:false});
+
     moveZone.addEventListener('pointermove', e => {
         const point = movePointers.get(e.pointerId);
         if (!point) return;
@@ -2266,9 +2316,24 @@ if (!gameState.relicMods) resetRelicModifiers();
         point.y = e.clientY;
         move(dir);
     }, {passive:false});
+
     const releaseMove = e => {
-        if (!movePointers.has(e.pointerId)) return;
+        const point = movePointers.get(e.pointerId);
+        if (!point) return;
         e.preventDefault?.();
+        const now = performance.now();
+        const dist = Math.hypot(e.clientX - (point.startX ?? point.x), e.clientY - (point.startY ?? point.y));
+        // Doble toque en zona izquierda también activa Dash
+        if (dist < 18 && (now - (point.startTime || 0)) < 300) {
+            if (now - lastMoveTapAt < 340) {
+                lastMoveTapAt = 0;
+                if (typeof globalThis.performPlayerDashV651 === 'function') {
+                    globalThis.performPlayerDashV651();
+                }
+            } else {
+                lastMoveTapAt = now;
+            }
+        }
         clearMove(e.pointerId);
     };
     moveZone.addEventListener('pointerup', releaseMove, {passive:false});
@@ -2279,15 +2344,37 @@ if (!gameState.relicMods) resetRelicModifiers();
         if (!isTouchLayout() || !canControl()) return;
         e.preventDefault();
         if (actionPointers.has(e.pointerId)) return;
-        const state = {startedAt:performance.now(), longTriggered:false, timer:null};
+        const state = {
+            startX: e.clientX,
+            startY: e.clientY,
+            startedAt: performance.now(),
+            longTriggered: false,
+            dashTriggered: false,
+            timer: null
+        };
         state.timer = window.setTimeout(() => {
             const current = actionPointers.get(e.pointerId);
-            if (!current || !canControl()) return;
+            if (!current || !canControl() || current.dashTriggered) return;
             current.longTriggered = true;
             performLongPress();
         }, longPressMs);
         actionPointers.set(e.pointerId, state);
         try { actionZone.setPointerCapture(e.pointerId); } catch (_) {}
+    }, {passive:false});
+
+    actionZone.addEventListener('pointermove', e => {
+        const state = actionPointers.get(e.pointerId);
+        if (!state || state.dashTriggered || state.longTriggered) return;
+        const dx = e.clientX - state.startX;
+        const dy = e.clientY - state.startY;
+        // Clic y desliz (swipe táctil de > 26px): activa Dash en la dirección del desliz
+        if (Math.hypot(dx, dy) >= 26) {
+            state.dashTriggered = true;
+            if (state.timer) window.clearTimeout(state.timer);
+            if (typeof globalThis.performPlayerDashV651 === 'function') {
+                globalThis.performPlayerDashV651({ dx, dy });
+            }
+        }
     }, {passive:false});
 
     const releaseAction = e => {
@@ -2296,14 +2383,25 @@ if (!gameState.relicMods) resetRelicModifiers();
         e.preventDefault?.();
         if (state.timer) window.clearTimeout(state.timer);
         actionPointers.delete(e.pointerId);
-        // A release before the threshold is a short tap: place one bomb.
-        if (!state.longTriggered && canControl()) performShortTap();
+
+        // Si ya activó Dash por desliz o acción larga, no colocar bomba
+        if (state.dashTriggered || state.longTriggered) return;
+
+        // Doble toque (dos toques rápidos en < 320ms) activa Dash en dirección actual
+        const now = performance.now();
+        if (now - lastActionTapAt < 320) {
+            lastActionTapAt = 0;
+            if (typeof globalThis.performPlayerDashV651 === 'function') {
+                globalThis.performPlayerDashV651();
+            }
+        } else {
+            lastActionTapAt = now;
+            if (canControl()) performShortTap();
+        }
     };
     actionZone.addEventListener('pointerup', releaseAction, {passive:false});
     actionZone.addEventListener('pointercancel', e => cancelAction(e.pointerId), {passive:false});
     actionZone.addEventListener('lostpointercapture', e => {
-        // Pointer capture may be lost after a normal pointerup; only clean up
-        // a still-pending action to avoid converting a long press into a tap.
         cancelAction(e.pointerId);
     });
     actionZone.addEventListener('contextmenu', e => e.preventDefault());
@@ -3119,6 +3217,8 @@ if (!gameState.relicMods) resetRelicModifiers();
             if (typeof materialResetV60 === 'function') materialResetV60();
             player.bombsPlaced = 0;
             gameState.explosions = [];
+            gameState.bombBlastVisualsV6308 = [];
+            if (typeof resetBombBlastVisualsV6308 === 'function') resetBombBlastVisualsV6308();
             gameState.enemies = [];
             gameState.items = [];
             gameState.particles = [];
@@ -3151,6 +3251,27 @@ if (!gameState.relicMods) resetRelicModifiers();
                 spawnEnemies();
             }
             gameState.__roomTypeOverrideV626 = null;
+
+            // Efecto de Santuario (Shrine): +1 vida y escudo al entrar
+            if (gameState.roomType?.id === 'SHRINE' && typeof player !== 'undefined' && player) {
+                if (player.health < player.maxHealth) {
+                    player.health = Math.min(player.maxHealth, player.health + 1);
+                }
+                player.hasShield = true;
+                if (typeof addFloatingText === 'function') {
+                    addFloatingText('✚ SANTUARIO: +1 ❤️ Y ESCUDO', player.x, player.y, '#67e8f9');
+                }
+            }
+
+            // Curación de sala por reliquias (Última Reserva / last_stand)
+            const hasLastStand = gameState.lastStandActive || (gameState.relics || []).some(r => r.id === 'last_stand');
+            if (hasLastStand && typeof player !== 'undefined' && player && player.health < player.maxHealth) {
+                player.health = Math.min(player.maxHealth, player.health + 1);
+                if (typeof addFloatingText === 'function') {
+                    addFloatingText('+1 ❤️ ÚLTIMA RESERVA', player.x, player.y, '#4ade80');
+                }
+            }
+
             updateRoguePresentation();
             updateUI();
         }
@@ -3806,7 +3927,8 @@ function placeBomb(reason='manual'){
     if (!materialMods.canPlace) return false;
 
     const baseFuse = gameState.roomType.id === 'CURSED' ? BOMB_HANDLING.cursedFuse : BOMB_HANDLING.normalFuse;
-    const fuseTotal = Math.max(700, Math.round(baseFuse * (typeof getBombFuseMultiplier === 'function' ? getBombFuseMultiplier() : 1) * materialMods.fuseMultiplier));
+    const relicFuseReduction = typeof rogueV327GetRelicBonuses === 'function' ? Math.max(0, -rogueV327GetRelicBonuses().fuseMs) : 0;
+    const fuseTotal = Math.max(650, Math.round(baseFuse * (typeof getBombFuseMultiplier === 'function' ? getBombFuseMultiplier() : 1) * materialMods.fuseMultiplier) - relicFuseReduction);
     const bomb = {
         id: `bomb-${gameState.animFrame}-${Math.random().toString(36).slice(2,7)}`,
         owner: 'player',
@@ -4784,12 +4906,31 @@ function gridIsNearTileCenter(entity, radius = GRID_COLLISION_V312.centerSnapRad
         const state = getState();
         const tile = getEntityTile(entity);
         if (!state || !tile) return false;
-        const gx = tile.x, gy = tile.y;
+        let gx = tile.x, gy = tile.y;
         if (gx < 0 || gy < 0 || gx >= state.gridWidth || gy >= state.gridHeight) return false;
         const types = global.BOMBER_ENGINE?.getWorldTypes?.() || global.TYPES || {};
-        if (state.grid?.[gy]?.[gx] === types.WALL || state.grid?.[gy]?.[gx] === types.BLOCK) return false;
         const other = typeof global.getBombAtTile === 'function' ? global.getBombAtTile(gx, gy) : null;
-        if (other && other !== bomb) return false;
+        if (state.grid?.[gy]?.[gx] === types.WALL || state.grid?.[gy]?.[gx] === types.BLOCK || (other && other !== bomb)) {
+            if (reason === 'death') {
+                const candidates = [
+                    { x: gx + 1, y: gy }, { x: gx - 1, y: gy },
+                    { x: gx, y: gy + 1 }, { x: gx, y: gy - 1 }
+                ];
+                const found = candidates.find(c =>
+                    c.x >= 0 && c.y >= 0 && c.x < state.gridWidth && c.y < state.gridHeight &&
+                    state.grid?.[c.y]?.[c.x] !== types.WALL && state.grid?.[c.y]?.[c.x] !== types.BLOCK &&
+                    (!global.getBombAtTile || !global.getBombAtTile(c.x, c.y))
+                );
+                if (found) {
+                    gx = found.x;
+                    gy = found.y;
+                } else {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
 
         bomb.x = gx;
         bomb.y = gy;
@@ -4799,7 +4940,7 @@ function gridIsNearTileCenter(entity, radius = GRID_COLLISION_V312.centerSnapRad
         bomb.worldY = (gy + 0.5) * tileSize();
         bomb.carriedBy = null;
         bomb.carriedTimer = Math.max(0, Number(bomb.carriedTimer) || 0);
-        bomb.timer = bomb.carriedTimer;
+        bomb.timer = reason === 'death' ? Math.min(Math.max(800, Number(bomb.carriedTimer) || 1200), 1400) : bomb.carriedTimer;
         bomb.carriedTimer = 0;
         bomb.pendingDetonation = bomb.timer <= 0;
         bomb.state = global.BOMB_V4_STATES.ARMED;
@@ -6002,15 +6143,9 @@ function enemyDangerV312(x, y, e = null) {
 
 function rebuildEnemyDangerV312() {
     const danger = new Set();
-    for (const bomb of gameState.bombs) {
-        if (!bomb) continue;
-        danger.add(enemyTileKeyV312(bomb.x, bomb.y));
-        if (typeof calculateBombBlastCells === 'function') {
-            for (const cell of calculateBombBlastCells(bomb)) {
-                danger.add(enemyTileKeyV312(cell.x, cell.y));
-            }
-        }
-    }
+    // v6.49.0: Los enemigos no son psíquicos y no huyen ante bombas que colocas;
+    // perciben la bomba como un obstáculo o pared normal en su camino y continúan
+    // su patrullaje o avance. Solo las explosiones ya detonadas representan peligro inmediato.
     for (const exp of gameState.explosions) {
         if (exp) danger.add(enemyTileKeyV312(exp.x, exp.y));
     }
@@ -6214,6 +6349,7 @@ function enemyPhysicalDirectionChoicesV312(e, avoidDanger = false) {
 }
 
 function updateEnemyIntentV312(e, index, dt) {
+    if (Number(e.stunTimer) > 0) return;
     const ai = ensureEnemyMotionStateV312(e, index);
     ai.decisionTimer -= dt;
     ai.visionTimer -= dt;
@@ -6383,9 +6519,21 @@ function getEnemyMovementSpeedV610(e) {
 }
 
 function moveEnemyV312(e, dt) {
+    const safeDt = Math.max(0, Number(dt) || 0);
+
+    // v6.49.0: Enemigo Noqueado / Aturdido (Bomba Gravitatoria u otros efectos)
+    if (Number(e.stunTimer) > 0) {
+        e.stunTimer = Math.max(0, Number(e.stunTimer) - safeDt);
+        e.isStunned = e.stunTimer > 0;
+        e.vx = 0;
+        e.vy = 0;
+        e._tileMoveActive = false;
+        return;
+    }
+    e.isStunned = false;
+
     const ai = e.ai;
     const speed = getEnemyMovementSpeedV610(e);
-    const safeDt = Math.max(0, Number(dt) || 0);
 
     if (!e._tileMoveInitialized) {
         const tile = enemyTileV312(e);
@@ -7163,6 +7311,7 @@ function enemyChooseDirectionAtIntersectionV312(e) {
             updatePlayerInvulnerability(dt);
 
             updateRoomTimerV627(dt);
+            if (typeof updateMapCollapseV650 === 'function') updateMapCollapseV650(dt);
             updateHazards(dt);
             if (typeof materialUpdateV60 === 'function') materialUpdateV60(dt);
             if (typeof updateBiomeLiquidPlayerEffectsV631 === 'function') updateBiomeLiquidPlayerEffectsV631(dt);
@@ -7174,6 +7323,7 @@ function enemyChooseDirectionAtIntersectionV312(e) {
             }
 
             // V3.4: movimiento asistido cardinal. Nunca se combinan X e Y.
+            if (typeof updatePlayerDashV651 === 'function') updatePlayerDashV651(dt);
             updatePlayerMovement(dt);
             if (typeof playerFSMUpdate === 'function') playerFSMUpdate(dt);
 
@@ -7237,13 +7387,53 @@ function enemyChooseDirectionAtIntersectionV312(e) {
                         gameState.enemies.splice(j, 1);
                         const fireScoreMult = gameState.fireScoreMult || 1;
                         const killScore = Math.round(100 * gameState.killScoreMult * fireScoreMult * (e.elite ? 1.25 : 1));
-                        const killCoins = Math.max(2, Math.round((2 + Math.random() * 3) * (1 + gameState.coinBonus) * gameState.roomType.coinMult));
+                        const bountyBonus = (gameState.bountySealActive || (gameState.relics || []).some(r => r.id === 'bounty_seal')) ? 2 : 0;
+                        const killCoins = Math.max(2, Math.round((2 + Math.random() * 3 + bountyBonus) * (1 + (gameState.coinBonus || 0)) * (gameState.roomType?.coinMult || 1)));
                         gameState.score += killScore;
                         gameState.coins += killCoins;
                         gameState.totalKills++;
                         if (typeof gameplayPowerupOnEnemyDefeatedV676 === 'function') gameplayPowerupOnEnemyDefeatedV676(e);
                         addFloatingText(`+${killScore}  +${killCoins}¢`, e.x, e.y, e.elite ? '#fb7185' : '#38bdf8');
                         if (typeof tryUnlockExitCurrentRoom === 'function') tryUnlockExitCurrentRoom();
+
+                        // v6.49.0: Recompensas y botín al derrotar enemigos
+                        if (Math.random() < (e.elite ? 0.75 : 0.35)) {
+                            const pool = typeof getPowerupDropPoolV67 === 'function' ? getPowerupDropPoolV67() : [POWERUPS.SPEED_UP, POWERUPS.HEALTH_UP, POWERUPS.SHIELD_UP];
+                            const dropTileX = Math.max(0, Math.min(gameState.gridWidth - 1, Math.floor(e.x / TILE_SIZE)));
+                            const dropTileY = Math.max(0, Math.min(gameState.gridHeight - 1, Math.floor(e.y / TILE_SIZE)));
+                            if (!gameState.items) gameState.items = [];
+                            if (!gameState.items.some(it => it.x === dropTileX && it.y === dropTileY)) {
+                                gameState.items.push({
+                                    x: dropTileX,
+                                    y: dropTileY,
+                                    type: pool[Math.floor(Math.random() * pool.length)],
+                                    spawnFrame: gameState.animFrame || 0
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // v6.49.0: Destrucción de objetos si una explosión pasa por encima
+                // Agrega dificultad e impide acumular mejoras infinitas, y permite al jugador limpiar poderes no deseados
+                if (Array.isArray(gameState.items)) {
+                    for (let k = gameState.items.length - 1; k >= 0; k--) {
+                        const it = gameState.items[k];
+                        const itRect = {
+                            left: it.x * TILE_SIZE + 4,
+                            right: (it.x + 1) * TILE_SIZE - 4,
+                            top: it.y * TILE_SIZE + 4,
+                            bottom: (it.y + 1) * TILE_SIZE - 4
+                        };
+                        if (explosionOverlapsRect(itRect, exp, 4)) {
+                            if (it.spawnFrame && Math.abs((gameState.animFrame || 0) - it.spawnFrame) < 12) {
+                                continue;
+                            }
+                            addParticles((it.x + 0.5) * TILE_SIZE, (it.y + 0.5) * TILE_SIZE, 'particleBlock', 12);
+                            addFloatingText('🔥 ¡OBJETO DESTRUIDO!', (it.x + 0.5) * TILE_SIZE, (it.y + 0.25) * TILE_SIZE, '#f43f5e');
+                            if (typeof sfx === 'function') sfx('destroy');
+                            gameState.items.splice(k, 1);
+                        }
                     }
                 }
 
@@ -7268,9 +7458,8 @@ function enemyChooseDirectionAtIntersectionV312(e) {
                     bottom: e.y + e.height * 0.3
                 };
                 if (checkOverlap(pHurtbox, eHitbox)) {
-                    if (e.type?.contactDamage === 0) {
-                        // Winter obstacles are not attackers: their gameplay role is to
-                        // occupy space and force route calculation under slippery movement.
+                    if (e.type?.contactDamage === 0 || Number(e.stunTimer) > 0) {
+                        // Enemigos noqueados / aturdidos o sin daño de contacto no lastiman al jugador
                         continue;
                     }
                     takeDamage('enemy', e.x, e.y);
@@ -9472,6 +9661,7 @@ function draw() {
             drawHazards();
             // v6.30.0: campos temporales de habilidades RASTRERO, dibujados en el Canvas único.
             if (typeof drawRastreroAbilityEffectsV630 === 'function') drawRastreroAbilityEffectsV630(ctx);
+            if (typeof drawMapCollapseV650 === 'function') drawMapCollapseV650(ctx);
 
             // Draw Items / Powerups
             for(let i=0;i<gameState.items.length;i++){
@@ -9507,6 +9697,18 @@ function draw() {
 
             // Draw Boss
             drawBoss();
+
+            // Draw Player Dash Ghost Trails
+            if (Array.isArray(player.dashGhostTrails) && player.dashGhostTrails.length > 0) {
+                for (let i = player.dashGhostTrails.length - 1; i >= 0; i--) {
+                    const gt = player.dashGhostTrails[i];
+                    if (!gt) continue;
+                    ctx.save();
+                    ctx.globalAlpha = Math.max(0, Math.min(0.65, (gt.alpha || 0.5) * Math.max(0, gt.time / 260)));
+                    drawBombermanSprite(gt.x, gt.y, { ...player, dir: gt.dir }, { ghost: true });
+                    ctx.restore();
+                }
+            }
 
             // Draw Player Bomberman
             if (!player.isInvincible || Math.floor(gameState.animFrame / 4) % 2 === 0) {
@@ -9591,6 +9793,52 @@ function draw() {
             ctx.fillText('🚪', x + 10, y + 32);
         }
 
+        function getEntityLiquidStatusV650(entity) {
+            if (!entity || typeof gameState === 'undefined') return null;
+            if (entity.type?.canFly || entity.speciesIdV626?.includes('flying') || entity.speciesIdV626?.includes('bird') || entity.speciesIdV626?.includes('bat') || entity.speciesIdV626?.includes('drone') || entity.speciesIdV626?.includes('gull') || entity.speciesIdV626?.includes('demon')) {
+                return null;
+            }
+            const size = Number(globalThis.TILE_SIZE || 48);
+            let gx, gy;
+            if (Number.isFinite(entity.width) && entity.__gridAnchor !== 'center') {
+                gx = Math.floor((Number(entity.x) + Number(entity.width) / 2) / size);
+                gy = Math.floor((Number(entity.y) + Number(entity.height) / 2) / size);
+            } else {
+                gx = Math.floor(Number(entity.x) / size);
+                gy = Math.floor(Number(entity.y) / size);
+            }
+            if (!Number.isInteger(gx) || !Number.isInteger(gy)) return null;
+
+            if (typeof hasLiquidTileV631 === 'function' && hasLiquidTileV631(gx, gy)) {
+                const kind = typeof getLiquidKindV631 === 'function' ? getLiquidKindV631() : null;
+                const id = kind?.id || 'water';
+                let color = '#38bdf8';
+                if (id === 'lava') color = '#f97316';
+                else if (id === 'toxic') color = '#84cc16';
+                else if (id === 'mud') color = '#8a5a3b';
+                else if (id === 'glacial-water') color = '#6cb8d9';
+                return { isLiquid: true, liquidId: id, color };
+            }
+
+            if (Array.isArray(gameState.materialResiduesV60)) {
+                const key = `${gx},${gy}`;
+                const residue = gameState.materialResiduesV60.find(r => r?.key === key || (r?.x === gx && r?.y === gy));
+                if (residue) {
+                    const t = residue.type;
+                    if (t === 'acid') return { isLiquid: true, liquidId: 'toxic', color: '#a3e635' };
+                    if (t === 'water' || t === 'electric_water') return { isLiquid: true, liquidId: 'water', color: '#38bdf8' };
+                    if (t === 'oil' || t === 'burning_oil') return { isLiquid: true, liquidId: 'oil', color: '#f97316' };
+                }
+            }
+
+            if (typeof runtime !== 'undefined' && runtime?.acid && typeof effectAt === 'function' && effectAt(runtime.acid, gx, gy)) {
+                return { isLiquid: true, liquidId: 'toxic', color: '#a3e635' };
+            }
+
+            return null;
+        }
+        globalThis.getEntityLiquidStatusV650 = getEntityLiquidStatusV650;
+
         function drawBombermanSprite(x, y, actor = player, options = {}) {
             ctx.save();
 
@@ -9611,13 +9859,17 @@ function draw() {
             const plantingAnimation = !isGhost && fsmState === 'PONIENDO_BOMBA';
             const deadAnimation = !isGhost && fsmState === 'MUERTO';
 
+            // Efecto de hundimiento visual en líquido (lava, agua, veneno, barro, etc.)
+            const liquidStatus = getEntityLiquidStatusV650(actor);
+            const sinkY = liquidStatus ? 6 : 0;
+
             // v5.7: el render solo consume la FSM; no cambia gameplay ni estado.
             let bounce = plantingAnimation
                 ? Math.sin(gameState.animFrame * 0.24) * 1.5
                 : Math.sin(walkCycle * 4) * (walkingAnimation ? 3 : 1);
             if (isGhost && !walkingAnimation) bounce = Math.sin(Number(actor.visualTime || 0) * 0.003) * 0.8;
             const recoil = !isGhost && typeof getPlayerRenderRecoil === 'function' ? getPlayerRenderRecoil() : { x: 0, y: 0 };
-            let px = x + recoil.x, py = y + bounce + recoil.y;
+            let px = x + recoil.x, py = y + bounce + recoil.y + sinkY;
 
             if (deadAnimation) ctx.globalAlpha = 0.65;
 
@@ -9721,6 +9973,22 @@ function draw() {
                 ctx.beginPath(); ctx.ellipse(px + actorWidth - 8, rightFootY, 5, 4, 0, 0, Math.PI*2); ctx.fill();
             }
 
+            // Ondulación visual de inmersión en superficie líquida
+            if (liquidStatus) {
+                const feetX = px + actorWidth / 2;
+                const feetY = py + actorHeight - 3;
+                const pulse = Math.sin(gameState.animFrame * 0.22) * 1.5;
+                ctx.fillStyle = liquidStatus.color;
+                ctx.globalAlpha = 0.65;
+                ctx.beginPath();
+                ctx.ellipse(feetX, feetY, actorWidth * 0.48 + pulse, 5, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1;
+                ctx.globalAlpha = 0.35;
+                ctx.stroke();
+            }
+
             ctx.restore();
         }
 
@@ -9734,12 +10002,17 @@ function draw() {
             const skinShade = enemySkin?.shade || e.type.color;
             const skinAccent = enemySkin?.accent || themeColorV46('enemyEye', '#ffffff');
             const skinMotif = enemySkin?.motif || 'classic';
+
+            // Hundimiento en líquido (lava, agua, veneno, barro)
+            const liquidStatus = getEntityLiquidStatusV650(e);
+            const sinkY = (liquidStatus && !e.type?.canFly) ? 6 : 0;
+
             if (e.elite) {
                 ctx.strokeStyle = gameState.roomType.color;
                 ctx.globalAlpha = inheritedAlpha * (0.45 + Math.sin(gameState.animFrame * 0.15) * 0.1);
                 ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.arc(e.x, e.y, TILE_SIZE * 0.48, 0, Math.PI * 2);
+                ctx.arc(e.x, e.y + sinkY, TILE_SIZE * 0.48, 0, Math.PI * 2);
                 ctx.stroke();
                 ctx.globalAlpha = inheritedAlpha;
             }
@@ -9748,7 +10021,7 @@ function draw() {
             // Sombra
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('enemyShadow') : 'rgba(0,0,0,0.4)';
             ctx.beginPath();
-            ctx.ellipse(e.x, e.y + e.height/2, e.width/2, 4, 0, 0, Math.PI*2);
+            ctx.ellipse(e.x, e.y + e.height/2 + sinkY, e.width/2, 4, 0, 0, Math.PI*2);
             ctx.fill();
 
             // Cuerpo base; la skin solo cambia la representación visual.
@@ -9764,12 +10037,27 @@ function draw() {
                 ctx.lineTo(e.x - e.width/2, e.y + e.height/2 + floaty);
                 ctx.fill();
             } else {
-                ctx.arc(e.x, e.y + floaty, e.width/2, 0, Math.PI*2);
+                ctx.arc(e.x, e.y + floaty + sinkY, e.width/2, 0, Math.PI*2);
                 ctx.fill();
             }
 
+            // Ondulación de sumergimiento si está en superficie líquida
+            if (liquidStatus && !e.type?.canFly) {
+                ctx.fillStyle = liquidStatus.color;
+                ctx.globalAlpha = inheritedAlpha * 0.65;
+                const pulse = Math.sin((gameState.animFrame + e.x) * 0.22) * 1.5;
+                ctx.beginPath();
+                ctx.ellipse(e.x, e.y + e.height / 2 + sinkY - 2, e.width * 0.48 + pulse, 5, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1;
+                ctx.globalAlpha = inheritedAlpha * 0.35;
+                ctx.stroke();
+                ctx.globalAlpha = inheritedAlpha;
+            }
+
             // Motivo de bioma: accesorio ligero, procedural y barato.
-            const motifY = e.y + floaty;
+            const motifY = e.y + floaty + sinkY;
             ctx.fillStyle = skinAccent;
             ctx.strokeStyle = skinShade;
             ctx.lineWidth = 2;
@@ -10506,17 +10794,68 @@ function feedbackPoolClearExplosionResidue(x, y, radius = TILE_SIZE * 1.1) {
     }
 }
 
-function feedbackPoolExplosion(x, y, color = null, scale = 1) {
+function spawnBombExplosionParticles(x, y, element = 'normal', count = 14) {
+    if (typeof x !== 'number' || typeof y !== 'number') return;
+    const elemKey = String(element || 'normal').toLowerCase();
+    
+    // Paleta elemental de partículas según el tipo de bomba
+    const palettes = {
+        fire:     { primary: '#f97316', secondary: '#fef08a' },
+        ice:      { primary: '#38bdf8', secondary: '#e0f2fe' },
+        electric: { primary: '#facc15', secondary: '#67e8f9' },
+        toxic:    { primary: '#84cc16', secondary: '#d9f99d' },
+        gravity:  { primary: '#a855f7', secondary: '#f5d0fe' },
+        fragment: { primary: '#fb7185', secondary: '#ffe4e6' },
+        pierce:   { primary: '#fbbf24', secondary: '#fef3c7' },
+        normal:   { primary: '#fb923c', secondary: '#fde68a' }
+    };
+    const colors = palettes[elemKey] || palettes.normal;
+    
+    // 1. Chispas direccionales en el motor de efectos
+    if (typeof feedbackPoolExplosionSparks === 'function') {
+        feedbackPoolExplosionSparks(x, y, colors.secondary, Math.round(count * 0.7));
+    }
+    
+    // 2. Partículas diseminadas en el pool
+    if (typeof feedbackPoolSpawnParticles === 'function') {
+        feedbackPoolSpawnParticles(x, y, colors.primary, Math.round(count * 0.8), 1.1);
+    }
+    
+    // 3. Anillo de onda expansiva
+    if (typeof feedbackPoolSpawnRing === 'function') {
+        feedbackPoolSpawnRing(x, y, colors.primary, 1.2);
+    }
+
+    // 4. Integrar al array gameState.particles del motor principal
+    if (typeof gameState !== 'undefined' && Array.isArray(gameState.particles)) {
+        const particleCount = Math.min(count, 16);
+        for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 1.5 + Math.random() * 3.5;
+            gameState.particles.push({
+                x, y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                color: i % 2 === 0 ? colors.primary : colors.secondary,
+                size: 2 + Math.random() * 3,
+                alpha: 1,
+                life: 18 + Math.random() * 14,
+                maxLife: 32
+            });
+        }
+        if (gameState.particles.length > 100) {
+            gameState.particles.splice(0, gameState.particles.length - 100);
+        }
+    }
+}
+
+function feedbackPoolExplosion(x, y, color = null, scale = 1, element = 'normal') {
     color = color || (typeof themeColorV46 === 'function' ? themeColorV46('particleFire', '#fb923c') : '#fb923c');
     feedbackPool.explosionCount += 1;
 
-    // La llama continua es la única silueta. Los residuos circulares antiguos
-    // se limpian desde la autoridad de efectos, para cada bomba detonada.
-    // No generar anillos circulares ni partículas radiales alrededor de la bomba.
+    spawnBombExplosionParticles(x, y, element, Math.round(14 * scale));
+
     feedbackPoolFlash(typeof deviceQualityV45FeedbackFlash === 'function' ? deviceQualityV45FeedbackFlash(0.18 * scale) : 0.18 * scale, FEEDBACK_POOL_CONFIG.explosionFlashMs);
-    // El desplazamiento de cámara secundario prolongaba la sacudida. La explosión
-    // usa únicamente triggerScreenShake, acotado a 50–100 ms por el sistema de efectos.
-    // El sonido lo reproduce bomb-explosion:sound en 35-bomb-events.js.
 }
 
 // v6.32.2: efectos visuales específicos al recoger power-ups.
@@ -10810,8 +11149,14 @@ function feedbackPoolWrap() {
         feedbackPool.originalExplodeBomb = explodeBomb;
         window.explodeBomb = function explodeBombV326(indexOrBomb, ...rest) {
             const point = feedbackPoolCaptureBombPosition(indexOrBomb);
+            let elem = 'normal';
+            if (indexOrBomb && typeof indexOrBomb === 'object' && indexOrBomb.elementV612) {
+                elem = indexOrBomb.elementV612;
+            } else if (typeof indexOrBomb === 'number' && typeof gameState !== 'undefined' && Array.isArray(gameState.bombs) && gameState.bombs[indexOrBomb]?.elementV612) {
+                elem = gameState.bombs[indexOrBomb].elementV612;
+            }
             const result = feedbackPool.originalExplodeBomb(indexOrBomb, ...rest);
-            if (point) feedbackPoolExplosion(point.x, point.y, null, 1);
+            if (point) feedbackPoolExplosion(point.x, point.y, null, 1, elem);
             return result;
         };
     }
@@ -10842,6 +11187,7 @@ window.FEEDBACK_POOL_CONFIG = FEEDBACK_POOL_CONFIG;
 window.feedbackPool = feedbackPool;
 window.feedbackPoolImpact = feedbackPoolImpact;
 window.feedbackPoolExplosion = feedbackPoolExplosion;
+window.spawnBombExplosionParticles = spawnBombExplosionParticles;
 window.feedbackPoolExplosionSparks = feedbackPoolExplosionSparks;
 window.feedbackPoolClearExplosionResidue = feedbackPoolClearExplosionResidue;
 window.feedbackPoolDamage = feedbackPoolDamage;
@@ -10912,6 +11258,11 @@ function resetPlayerRuntimeState() {
     player.hazardSlowTimer = 0;
     player.hazardSlowFactor = 1;
     player.hazardSlowType = '';
+    player.defeated = false;
+    player.isDashing = false;
+    player.dashEnergy = 100;
+    player.dashTimerMs = 0;
+    player.dashGhostTrails = [];
     if (typeof resetEntityCapabilitiesV681 === 'function') resetEntityCapabilitiesV681(player);
     if (typeof playerFSMReset === 'function') playerFSMReset('runtime-reset');
 }
@@ -10927,6 +11278,10 @@ function resetWorldRuntimeState() {
     gameState.grid = [];
     gameState.bombs = [];
     gameState.explosions = [];
+    gameState.bombBlastVisualsV6308 = [];
+    if (typeof resetBombBlastVisualsV6308 === 'function') resetBombBlastVisualsV6308();
+    if (typeof bombEffectResetV64 === 'function') bombEffectResetV64();
+    if (typeof initMapCollapseV650 === 'function') initMapCollapseV650();
     gameState.enemies = [];
     gameState.items = [];
     gameState.particles = [];
@@ -11293,6 +11648,10 @@ function gameLoop(timestamp) {
             if (bombFill) bombFill.style.width = `${player.maxBombs > 0 ? (bombAvailable / player.maxBombs) * 100 : 0}%`;
             UI['ui-range'].innerText = player.bombRange;
             UI['ui-speed'].innerText = (player.speed - 2).toFixed(1);
+            if (UI['ui-dash-status']) {
+                const dashPct = Math.min(100, Math.max(0, Math.floor(player.dashEnergy ?? 100)));
+                UI['ui-dash-status'].textContent = dashPct >= 35 ? `${dashPct}%` : `REC... ${dashPct}%`;
+            }
             UI['ui-coins'].innerText = gameState.coins;
             const totalRelics = Array.isArray(gameState.relics) ? gameState.relics.length : 0;
             UI['ui-relics'].innerText = totalRelics;
@@ -11331,10 +11690,10 @@ function gameLoop(timestamp) {
         }
 
         function startGame() {
-            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('start-screen')?.classList.add('hidden');
             document.getElementById('main-menu')?.classList.add('run-active');
-            document.getElementById('game-over-screen').classList.add('hidden');
-            document.getElementById('level-complete-screen').classList.add('hidden');
+            document.getElementById('game-over-screen')?.classList.add('hidden');
+            document.getElementById('level-complete-screen')?.classList.add('hidden');
             document.getElementById('pause-screen')?.classList.add('hidden');
 
             // V3.15: una nueva run pasa por un reinicio centralizado para evitar
@@ -11571,9 +11930,48 @@ function gameLoop(timestamp) {
             document.getElementById('game-over-screen')?.classList.remove('hidden');
         }
 
-        document.getElementById('btn-start').addEventListener('click', () => { initAudio(); audioCtx?.resume(); sfx('click'); startGame(); });
-        document.getElementById('btn-restart').addEventListener('click', () => { initAudio(); audioCtx?.resume(); sfx('click'); startGame(); });
+        function resetAllGameDataAndRestartV653() {
+            try {
+                localStorage.removeItem('bombermanRogueRun');
+                localStorage.removeItem('bombermanBestDepth');
+                localStorage.removeItem('bombermanBestScore');
+                localStorage.removeItem('bombermanRunSaveV55');
+                localStorage.removeItem('bombermanDeathEchoesV63');
+                localStorage.removeItem('bombermanSelectedThemeV46');
+            } catch (_) {}
+            if (typeof clearRunSaveV55 === 'function') clearRunSaveV55();
+            if (typeof resetBombBlastVisualsV6308 === 'function') resetBombBlastVisualsV6308();
+            if (typeof bombEffectResetV64 === 'function') bombEffectResetV64();
+            if (typeof initMapCollapseV650 === 'function') initMapCollapseV650();
+            beginNewRun();
+            gameState.level = 1;
+            gameState.score = 0;
+            gameState.coins = 0;
+            initLevel();
+            gameState.isPlaying = true;
+            gameState.paused = false;
+            gameState.lastTime = performance.now();
+            document.getElementById('start-screen')?.classList.add('hidden');
+            document.getElementById('main-menu')?.classList.add('run-active');
+            document.getElementById('game-over-screen')?.classList.add('hidden');
+            document.getElementById('pause-screen')?.classList.add('hidden');
+            updateRoguePresentation();
+            updateUI(true);
+            scheduleGameLoopV632();
+            if (typeof addFloatingText === 'function') {
+                addFloatingText('REINICIO TOTAL · NUEVA PARTIDA', (player.x || 60), (player.y || 60), '#38bdf8');
+            }
+        }
+
+        window.resetAllGameDataAndRestartV653 = resetAllGameDataAndRestartV653;
+        window.BOMBER_ENGINE = window.BOMBER_ENGINE || {};
+        window.BOMBER_ENGINE.resetAllGameDataAndRestart = resetAllGameDataAndRestartV653;
+
+        document.getElementById('btn-start')?.addEventListener('click', () => { initAudio(); audioCtx?.resume(); sfx('click'); startGame(); });
+        document.getElementById('btn-restart')?.addEventListener('click', () => { initAudio(); audioCtx?.resume(); sfx('click'); startGame(); });
         document.getElementById('btn-resume')?.addEventListener('click', togglePause);
+        document.getElementById('btn-hard-reset-death')?.addEventListener('click', () => { initAudio(); audioCtx?.resume(); sfx('click'); resetAllGameDataAndRestartV653(); });
+        document.getElementById('btn-hard-reset-pause')?.addEventListener('click', () => { initAudio(); audioCtx?.resume(); sfx('click'); resetAllGameDataAndRestartV653(); });
 
         // Initial setup
         gameState.runNumber = Number(localStorage.getItem('bombermanRogueRun') || 0);
@@ -12504,7 +12902,7 @@ function rogueV327Random() {
 
 function rogueV327GetRelic(id) {
     const canonical = Array.isArray(RELICS) ? RELICS : [];
-    return canonical.find(relic => relic.id === id && relic.roguelikeOnly) || null;
+    return canonical.find(relic => relic.id === id) || null;
 }
 
 function rogueV327GetPlan(id) {
@@ -14206,6 +14604,7 @@ window.rogueV327IsBossExamV626 = rogueV327IsBossExamV626;
     function install() {
         const resume = global.document?.getElementById?.('btn-resume-run');
         if (!resume) return false;
+        if (!resume.dataset) resume.dataset = {};
         if (!resume.dataset.bound) {
             resume.dataset.bound = '1';
             resume.addEventListener('click', () => {
@@ -14821,19 +15220,51 @@ window.rogueV327IsBossExamV626 = rogueV327IsBossExamV626;
         throw new Error('v5.9: Event Bus no disponible para BOMBA_EXPLOTO');
     }
 
-    // Contrato completo del evento. El listener elemental se registra desde
-    // 38-bomb-effects.js; no debe contarse como duplicado ni omitirse del audit.
+    // Contrato completo del evento con partículas visuales y metadatos de rastrero.
     const LISTENER_KEYS = Object.freeze({
         SOUND: 'bomb-explosion:sound',
         BLOCKS: 'bomb-explosion:destroy-blocks',
-        EFFECTS: 'bomb-explosion:effects'
+        PARTICLES: 'bomb-explosion:particles',
+        EFFECTS: 'bomb-explosion:effects',
+        RASTRERO_META: 'rastrero-abilities-v630:blast-meta'
     });
 
-    const BASE_LISTENER_KEYS = Object.freeze([LISTENER_KEYS.SOUND, LISTENER_KEYS.BLOCKS]);
+    const BASE_LISTENER_KEYS = Object.freeze([
+        LISTENER_KEYS.SOUND,
+        LISTENER_KEYS.BLOCKS,
+        LISTENER_KEYS.PARTICLES
+    ]);
 
     function handleBombExplosionSound(payload) {
         if (!payload?.bomb) return;
         sfx('boom');
+    }
+
+    function handleBombExplosionParticles(payload) {
+        if (!payload?.bomb) return;
+        const bomb = payload.bomb;
+        const elem = bomb.elementV612 || 'normal';
+        const colorKey = elem === 'fire' || elem === 'heat' || elem === 'normal'
+            ? 'particleFire'
+            : elem === 'cold' || elem === 'frost'
+                ? '#38bdf8'
+                : elem === 'shock'
+                    ? '#facc15'
+                    : elem === 'toxin'
+                        ? '#a3e635'
+                        : 'particleFire';
+        const bx = (Number(bomb.x) + 0.5) * Number(global.TILE_SIZE || 48);
+        const by = (Number(bomb.y) + 0.5) * Number(global.TILE_SIZE || 48);
+        if (typeof global.addParticles === 'function') {
+            global.addParticles(bx, by, colorKey, 14);
+            if (Array.isArray(payload.cells)) {
+                for (const cell of payload.cells) {
+                    const cx = (Number(cell.x) + 0.5) * Number(global.TILE_SIZE || 48);
+                    const cy = (Number(cell.y) + 0.5) * Number(global.TILE_SIZE || 48);
+                    global.addParticles(cx, cy, colorKey, 5);
+                }
+            }
+        }
     }
 
     function handleBombExplosionBlockDestruction(payload) {
@@ -14858,12 +15289,13 @@ window.rogueV327IsBossExamV626 = rogueV327IsBossExamV626;
             gameState.score += 10;
             gameState.blocksBroken++;
 
+            const salvageBonus = (gameState.salvageHookActive || (gameState.relics || []).some(r => r.id === 'salvage_hook')) ? 1 : 0;
             const coins = Math.max(
                 1,
                 Math.round(
-                    (1 + Math.random() * 2) *
-                    (1 + gameState.coinBonus) *
-                    gameState.roomType.coinMult
+                    (1 + Math.random() * 2 + salvageBonus) *
+                    (1 + (gameState.coinBonus || 0)) *
+                    (gameState.roomType?.coinMult || 1)
                 )
             );
             gameState.coins += coins;
@@ -14923,7 +15355,8 @@ window.rogueV327IsBossExamV626 = rogueV327IsBossExamV626;
 
         const soundOff = bus.on(EVENT, handleBombExplosionSound, { key: LISTENER_KEYS.SOUND });
         const blocksOff = bus.on(EVENT, handleBombExplosionBlockDestruction, { key: LISTENER_KEYS.BLOCKS });
-        const subscriptions = Object.freeze({ soundOff, blocksOff });
+        const particlesOff = bus.on(EVENT, handleBombExplosionParticles, { key: LISTENER_KEYS.PARTICLES });
+        const subscriptions = Object.freeze({ soundOff, blocksOff, particlesOff });
 
         global.__BOMB_EXPLOSION_LISTENERS_V59__ = Object.freeze({ subscriptions });
         return subscriptions;
@@ -15542,9 +15975,9 @@ window.rogueV327IsBossExamV626 = rogueV327IsBossExamV626;
         wallPauseMs: 900,
         blockedRetryMs: 300,
         bombCooldownMs: 3600,
-        carryTimeoutMs: 10000,
-        minimumCarryMs: 4200,
-        carryReplanMs: 850,
+        carryTimeoutMs: 2800,
+        minimumCarryMs: 600,
+        carryReplanMs: 600,
         dangerFuseMs: 950,
         escapeThinkMs: 180,
         bombSpatialRange: 2,
@@ -16071,72 +16504,60 @@ window.rogueV327IsBossExamV626 = rogueV327IsBossExamV626;
 
         if (carried) {
             const tile = tileFromEntity(ghost);
+            const target = playerTile();
+            const distToPlayer = Math.abs(tile.x - target.x) + Math.abs(tile.y - target.y);
+            const aligned = tile.x === target.x || tile.y === target.y;
+
             const destination = ghost.carryPlan?.targetTile || null;
             const reachedDestination = destination && tile.x === destination.x && tile.y === destination.y;
-            const timedOut = ghost.carryTimer <= 0;
+            const timedOut = (ghost.carryTimer <= 0) || (num(ghost.carryElapsedMs, 0) >= ECHO_AI.carryTimeoutMs);
             if (ghost.interactionTimer > 0) return true;
-            if (!reachedDestination && !timedOut) return true;
 
-            // No suelta la bomba en cuanto llega al primer destino. La transporta
-            // durante varios segundos y reevalúa otra posición mientras todavía
-            // tenga tiempo; esto usa sólo el tablero actual, sin memoria del jugador.
-            if (reachedDestination && !timedOut && num(ghost.carryElapsedMs, 0) < ECHO_AI.minimumCarryMs) {
-                if (ghost.carryReplanTimerMs <= 0) {
-                    const nextPlan = chooseBombCarryPlan(ghost);
-                    if (nextPlan) {
-                        ghost.carryPlan = nextPlan;
-                    } else {
-                        // Sin una colocación táctica válida, continúa moviéndose
-                        // con la bomba y volverá a evaluarlo al vencer el tiempo.
+            // Oportunidad de ataque: soltar la bomba si está cerca del jugador (distancia <= 3),
+            // si está alineado en rango de tiro, o si llegó a destino / venció el tiempo de carga
+            const attackOpportunity = distToPlayer <= 3 || (aligned && distToPlayer <= 5 && visibleToPlayer(ghost));
+            const shouldRelease = attackOpportunity || reachedDestination || timedOut;
+
+            if (shouldRelease) {
+                // 1. Lanzamiento (THROW) si tiene la capacidad y está alineado
+                if (hasAbility(ghost, 'THROW') && visibleToPlayer(ghost) && aligned && typeof global.throwCarriedBombV683 === 'function') {
+                    ghost.dir = tile.x === target.x
+                        ? (target.y < tile.y ? 'up' : 'down')
+                        : (target.x < tile.x ? 'left' : 'right');
+                    ghost.lastDirection = ghost.dir;
+                    if (global.throwCarriedBombV683(ghost)) {
+                        ghost.carryTimer = 0;
                         ghost.carryPlan = null;
+                        ghost.mode = 'ESCAPE';
+                        ghost.interactionTimer = 450;
                         ghost.aiTargetTile = null;
+                        return true;
                     }
-                    ghost.carryReplanTimerMs = ECHO_AI.carryReplanMs;
                 }
-                return true;
-            }
 
-            const target = playerTile();
-            const aligned = tile.x === target.x || tile.y === target.y;
-            if (reachedDestination && hasAbility(ghost, 'THROW') && visibleToPlayer(ghost) && aligned && typeof global.throwCarriedBombV683 === 'function') {
-                ghost.dir = tile.x === target.x
-                    ? (target.y < tile.y ? 'up' : 'down')
-                    : (target.x < tile.x ? 'left' : 'right');
-                ghost.lastDirection = ghost.dir;
-                if (global.throwCarriedBombV683(ghost)) {
+                // 2. Soltar la bomba (DROP) en el suelo para amenazar al jugador y huir
+                const kickPlan = reachedDestination && !timedOut && hasAbility(ghost, 'KICK')
+                    ? ghost.carryPlan?.kickPlan
+                    : null;
+                if (typeof global.releaseCarriedBombV682 === 'function' && global.releaseCarriedBombV682(ghost, 'drop')) {
                     ghost.carryTimer = 0;
                     ghost.carryPlan = null;
-                    ghost.mode = 'ESCAPE';
-                    ghost.interactionTimer = 650;
                     ghost.aiTargetTile = null;
+                    if (kickPlan) {
+                        ghost.kickPlan = {
+                            bombRef:carried,
+                            approachTile:{ x:kickPlan.approachTile.x, y:kickPlan.approachTile.y },
+                            direction:{ x:kickPlan.direction.x, y:kickPlan.direction.y, dir:kickPlan.direction.dir }
+                        };
+                        ghost.mode = 'KICK_ALIGN';
+                        ghost.interactionTimer = 0;
+                    } else {
+                        ghost.mode = 'ESCAPE';
+                        ghost.interactionTimer = 280;
+                    }
                     return true;
                 }
             }
-
-            // Si llegó al sector elegido, conserva una posible maniobra de patada.
-            // Si se agotó el tiempo, deja la bomba donde está y abandona la maniobra.
-            const kickPlan = reachedDestination && !timedOut && hasAbility(ghost, 'KICK')
-                ? ghost.carryPlan?.kickPlan
-                : null;
-            if (typeof global.releaseCarriedBombV682 === 'function' && global.releaseCarriedBombV682(ghost, 'drop')) {
-                ghost.carryTimer = 0;
-                ghost.carryPlan = null;
-                ghost.aiTargetTile = null;
-                if (kickPlan) {
-                    ghost.kickPlan = {
-                        bombRef:carried,
-                        approachTile:{ x:kickPlan.approachTile.x, y:kickPlan.approachTile.y },
-                        direction:{ x:kickPlan.direction.x, y:kickPlan.direction.y, dir:kickPlan.direction.dir }
-                    };
-                    ghost.mode = 'KICK_ALIGN';
-                    ghost.interactionTimer = 0;
-                } else {
-                    ghost.mode = 'PATROL';
-                    ghost.interactionTimer = 240;
-                }
-                return true;
-            }
-            return true;
         }
 
         if (ghost.interactionTimer > 0) return false;
@@ -16492,10 +16913,75 @@ window.rogueV327IsBossExamV626 = rogueV327IsBossExamV626;
         return ghost;
     }
 
+    function dropDeathMartyrBomb(ghost, gx, gy) {
+        try {
+            const range = Math.max(1, Math.min(3, Math.floor(num(ghost.bombRange, 2))));
+            const martyrBomb = {
+                id: `echo_death_bomb_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                owner: 'echo',
+                x: gx,
+                y: gy,
+                gridX: gx,
+                gridY: gy,
+                worldX: (gx + 0.5) * TILE_SIZE,
+                worldY: (gy + 0.5) * TILE_SIZE,
+                range: range,
+                timer: 1300,
+                fuseTotal: 1300,
+                warnBucket: 4,
+                scalePulse: 1.25,
+                playerPassThrough: true,
+                justArmed: true,
+                placedAtFrame: gameState.animFrame || 0,
+                placementReason: 'death_martyr',
+                state: global.BOMB_V4_STATES?.ARMED || 'armed',
+                motionState: 'idle',
+                releasedFromDeathV682: true,
+                countsTowardPlayerCapacity: false,
+                elementV612: 'normal'
+            };
+            if (!gameState.bombs) gameState.bombs = [];
+            gameState.bombs.push(martyrBomb);
+            if (typeof sfx === 'function') sfx('bomb');
+            if (typeof addFloatingText === 'function') {
+                addFloatingText('¡BOMBA AL CAER!', (gx + 0.5) * TILE_SIZE, (gy + 0.5) * TILE_SIZE, '#f43f5e');
+            }
+        } catch (_) {}
+    }
+
     function releaseCarriedBombOnDeath(ghost) {
-        if (typeof global.getCarriedBombForEntityV682 !== 'function' || typeof global.releaseCarriedBombV682 !== 'function') return;
-        const carried = global.getCarriedBombForEntityV682(ghost);
-        if (carried) global.releaseCarriedBombV682(ghost, 'death');
+        if (!ghost) return;
+        const carried = typeof global.getCarriedBombForEntityV682 === 'function'
+            ? global.getCarriedBombForEntityV682(ghost)
+            : null;
+
+        if (carried && typeof global.releaseCarriedBombV682 === 'function') {
+            global.releaseCarriedBombV682(ghost, 'death');
+            carried.timer = Math.min(carried.timer || 1200, 1200);
+            carried.fuseTotal = Math.min(carried.fuseTotal || 1200, 1200);
+            return;
+        }
+
+        // Si no tenía bomba alzada al morir, suelta su bomba póstuma / martirio para matar al jugador
+        const tile = tileFromEntity(ghost);
+        if (tile) {
+            const candidateTiles = [
+                { x: tile.x, y: tile.y },
+                { x: tile.x + 1, y: tile.y },
+                { x: tile.x - 1, y: tile.y },
+                { x: tile.x, y: tile.y + 1 },
+                { x: tile.x, y: tile.y - 1 }
+            ];
+            const types = global.BOMBER_ENGINE?.getWorldTypes?.() || global.TYPES || {};
+            for (const cand of candidateTiles) {
+                if (cand.x >= 0 && cand.y >= 0 && cand.x < gameState.gridWidth && cand.y < gameState.gridHeight) {
+                    if (gameState.grid?.[cand.y]?.[cand.x] !== types.WALL && gameState.grid?.[cand.y]?.[cand.x] !== types.BLOCK && !bombAt(cand.x, cand.y)) {
+                        dropDeathMartyrBomb(ghost, cand.x, cand.y);
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     function recoverEchoItems(ghost) {
@@ -20262,6 +20748,645 @@ window.rogueV327IsBossExamV626 = rogueV327IsBossExamV626;
 })(window);
 
 ;
+// === js/49-map-collapse.js ===
+// Bomberman Roguelike v6.50.0 — Biome-themed Map Shrinking & Falling Monolith System
+(function installMapCollapseV650(global) {
+    'use strict';
+
+    function isBossRoom() {
+        if (typeof global.isBossRoomV626 === 'function') return global.isBossRoomV626();
+        return global.gameState?.roomType?.id === 'BOSS';
+    }
+
+    function initMapCollapseV650() {
+        if (typeof gameState === 'undefined') return;
+        const boss = isBossRoom();
+        // Mayor tiempo de gracia inicial antes de comenzar el colapso (65s normal, 85s boss)
+        const initialDelayMs = boss ? 85000 : 65000;
+        const gridW = Number(gameState.gridWidth || 15);
+        const gridH = Number(gameState.gridHeight || 15);
+        const centerGX = Math.floor(gridW / 2);
+        const centerGY = Math.floor(gridH / 2);
+        // Zona central de al menos 5x5 bloques (radio 2 respecto al centro: [center-2, center+2])
+        // Esta zona central NUNCA se tapará con pilares.
+        const safeRadius = 2;
+        const maxRings = Math.max(1, Math.min(centerGX - safeRadius - 1, centerGY - safeRadius - 1));
+
+        gameState.mapCollapseV650 = {
+            active: false,
+            elapsedMs: 0,
+            timeToCollapseMs: initialDelayMs,
+            ringIndex: 1,
+            ringIntervalMs: 16000,
+            ringTimerMs: 0,
+            pendingRingQueue: [],
+            stepTimerMs: 0,
+            stepIntervalMs: 220,
+            fallingBlocks: [],
+            announced5s: false,
+            maxRings
+        };
+    }
+
+    function buildRingTilesV650(ringIndex) {
+        if (typeof gameState === 'undefined' || !gameState.grid) return [];
+        const w = Number(gameState.gridWidth || 15);
+        const h = Number(gameState.gridHeight || 15);
+        const r = Math.max(1, Number(ringIndex) || 1);
+        const centerGX = Math.floor(w / 2);
+        const centerGY = Math.floor(h / 2);
+        const safeMinX = centerGX - 2;
+        const safeMaxX = centerGX + 2;
+        const safeMinY = centerGY - 2;
+        const safeMaxY = centerGY + 2;
+
+        const minX = r, maxX = w - 1 - r;
+        const minY = r, maxY = h - 1 - r;
+
+        // Si el anillo invade o toca la zona central segura de 5x5, detener el colapso.
+        if (minX >= safeMinX || minY >= safeMinY || maxX <= safeMaxX || maxY <= safeMaxY) {
+            return [];
+        }
+
+        const tiles = [];
+        for (let x = minX; x <= maxX; x++) tiles.push({ x, y: minY });
+        for (let y = minY + 1; y <= maxY; y++) tiles.push({ x: maxX, y });
+        for (let x = maxX - 1; x >= minX; x--) tiles.push({ x, y: maxY });
+        for (let y = maxY - 1; y > minY; y--) tiles.push({ x: minX, y });
+
+        const types = global.TYPES || {};
+        return tiles.filter(t => {
+            // NUNCA incluir casillas de la zona central segura de 5x5
+            if (t.x >= safeMinX && t.x <= safeMaxX && t.y >= safeMinY && t.y <= safeMaxY) return false;
+            return gameState.grid?.[t.y]?.[t.x] !== types.WALL;
+        });
+    }
+
+    function safelyRelocatePlayerInwardV650(p, fromGX, fromGY) {
+        if (!p || typeof gameState === 'undefined' || !gameState.grid) return;
+
+        const w = Number(gameState.gridWidth || 15);
+        const h = Number(gameState.gridHeight || 15);
+        const size = Number(global.TILE_SIZE || 48);
+        const types = global.TYPES || { WALL: 1, BRICK: 2, FLOOR: 0 };
+        const centerGX = Math.floor(w / 2);
+        const centerGY = Math.floor(h / 2);
+
+        // Zona central segura protegida de 5x5 bloques
+        const safeMinX = Math.max(1, centerGX - 2);
+        const safeMaxX = Math.min(w - 2, centerGX + 2);
+        const safeMinY = Math.max(1, centerGY - 2);
+        const safeMaxY = Math.min(h - 2, centerGY + 2);
+
+        // Recolectar casillas candidatas dentro de la zona central segura garantizada
+        const candidates = [];
+        const falling = gameState.mapCollapseV650?.fallingBlocks || [];
+
+        for (let y = safeMinY; y <= safeMaxY; y++) {
+            for (let x = safeMinX; x <= safeMaxX; x++) {
+                const cell = gameState.grid[y]?.[x];
+                if (cell === types.WALL) continue; // Saltar pilares de acero permanentes
+
+                // Saltar casillas con bloques en caída activa
+                if (falling.some(b => b && b.gx === x && b.gy === y)) continue;
+
+                const distToCenter = Math.hypot(centerGX - x, centerGY - y);
+                const isBrick = (cell === types.BRICK);
+                const score = distToCenter + (isBrick ? 2.5 : 0);
+
+                candidates.push({ x, y, score, isBrick, distToCenter });
+            }
+        }
+
+        // Si no hay candidatos libres, forzar la casilla central (centerGX, centerGY)
+        let best = candidates.length
+            ? candidates.sort((a, b) => a.score - b.score)[0]
+            : { x: centerGX, y: centerGY, isBrick: false };
+
+        // Asegurar que la casilla de destino sea suelo transitable
+        if (gameState.grid[best.y]) {
+            gameState.grid[best.y][best.x] = types.FLOOR || 0;
+            gameState.gridRevision = (gameState.gridRevision || 0) + 1;
+            if (typeof global.addParticles === 'function') {
+                const cx = (best.x + 0.5) * size;
+                const cy = (best.y + 0.5) * size;
+                global.addParticles(cx, cy, 'particleBlock', 8);
+            }
+        }
+
+        // Abrir pasillo en las casillas adyacentes para que el jugador nunca quede encerrado
+        const cardinalNeighbors = [
+            { x: best.x + 1, y: best.y },
+            { x: best.x - 1, y: best.y },
+            { x: best.x, y: best.y + 1 },
+            { x: best.x, y: best.y - 1 }
+        ];
+        for (const n of cardinalNeighbors) {
+            if (n.x >= safeMinX && n.x <= safeMaxX && n.y >= safeMinY && n.y <= safeMaxY) {
+                if (gameState.grid[n.y] && gameState.grid[n.y][n.x] === types.BRICK) {
+                    gameState.grid[n.y][n.x] = types.FLOOR || 0;
+                }
+            }
+        }
+
+        // Reposicionar al jugador y resetear completamente el motor de navegación por tiles
+        if (typeof global.gridSnapEntityToTile === 'function') {
+            global.gridSnapEntityToTile(p, best.x, best.y, 'player');
+        } else {
+            p.x = best.x * size + (size - (p.width || 32)) / 2;
+            p.y = best.y * size + (size - (p.height || 32)) / 2;
+        }
+
+        if (typeof global.gridResetTileMove === 'function') {
+            global.gridResetTileMove(p, true);
+        } else {
+            p._tileMoveActive = false;
+            p._tileMoveInitialized = true;
+        }
+
+        p.vx = 0;
+        p.vy = 0;
+        p.isMoving = false;
+        if (gameState.touchControls) {
+            gameState.touchControls.queuedX = 0;
+            gameState.touchControls.queuedY = 0;
+        }
+
+        const pCenterX = p.x + (p.width || 32) / 2;
+        const pCenterY = p.y + (p.height || 32) / 2;
+
+        if (typeof global.addFloatingText === 'function') {
+            global.addFloatingText('¡ZONA SEGURA 5x5! 🛡️', pCenterX, pCenterY - 14, '#38bdf8');
+        }
+        if (typeof global.sfx === 'function') global.sfx('pickup');
+        if (typeof global.triggerHaptic === 'function') global.triggerHaptic('pickup');
+        if (typeof global.addParticles === 'function') {
+            global.addParticles(pCenterX, pCenterY, 'particleShield', 12);
+        }
+    }
+
+    function spawnFallingCollapseBlockV650(gx, gy) {
+        if (typeof gameState === 'undefined' || !gameState.mapCollapseV650) return;
+        const w = Number(gameState.gridWidth || 15);
+        const h = Number(gameState.gridHeight || 15);
+        const centerGX = Math.floor(w / 2);
+        const centerGY = Math.floor(h / 2);
+
+        // Guardrail absoluto: la zona central 5x5 NUNCA recibe pilares de colapso
+        if (gx >= centerGX - 2 && gx <= centerGX + 2 && gy >= centerGY - 2 && gy <= centerGY + 2) {
+            return;
+        }
+
+        const biomeId = String(gameState.biomeOverrideV49 || gameState.biomeV49?.id || 'classic');
+        gameState.mapCollapseV650.fallingBlocks.push({
+            gx,
+            gy,
+            elapsedMs: 0,
+            durationMs: 650,
+            progress: 0,
+            currentOffsetY: -220,
+            landed: false,
+            biomeId
+        });
+
+        // Relocalizar al jugador inmediatamente si el bloque está cayendo directo sobre él
+        const p = global.player;
+        if (p) {
+            const size = Number(global.TILE_SIZE || 48);
+            const pTileX = Math.floor((p.x + (p.width || 32) / 2) / size);
+            const pTileY = Math.floor((p.y + (p.height || 32) / 2) / size);
+            if (pTileX === gx && pTileY === gy) {
+                safelyRelocatePlayerInwardV650(p, gx, gy);
+            }
+        }
+    }
+
+    function onCollapseBlockLandedV650(block) {
+        if (!block || typeof gameState === 'undefined' || !gameState.grid) return;
+        const gx = block.gx, gy = block.gy;
+        const types = global.TYPES || { WALL: 1 };
+        const size = Number(global.TILE_SIZE || 48);
+        const cx = (gx + 0.5) * size;
+        const cy = (gy + 0.5) * size;
+
+        // 1. Convert tile to solid wall
+        if (gameState.grid[gy] && Number.isInteger(gx)) {
+            gameState.grid[gy][gx] = types.WALL;
+            gameState.gridRevision = (gameState.gridRevision || 0) + 1;
+            if (typeof global.invalidateRenderCacheV317 === 'function') global.invalidateRenderCacheV317();
+        }
+
+        // 2. Audio, haptics, shake
+        if (typeof global.sfx === 'function') global.sfx('boom');
+        if (typeof global.triggerScreenShake === 'function') global.triggerScreenShake(5, 180);
+        if (typeof global.triggerHaptic === 'function') global.triggerHaptic('boom');
+        if (typeof global.addParticles === 'function') global.addParticles(cx, cy, 'particleBlock', 12);
+
+        // 3. Destroy items on tile
+        if (Array.isArray(gameState.items)) {
+            for (let i = gameState.items.length - 1; i >= 0; i--) {
+                const item = gameState.items[i];
+                if (item && item.x === gx && item.y === gy) gameState.items.splice(i, 1);
+            }
+        }
+
+        // 4. Detonate or crush bombs on tile
+        if (Array.isArray(gameState.bombs)) {
+            for (let i = gameState.bombs.length - 1; i >= 0; i--) {
+                const b = gameState.bombs[i];
+                if (b && b.x === gx && b.y === gy) b.pendingDetonation = true;
+            }
+        }
+
+        // 5. Player Check & Safe Inward Relocation (NO DAMAGE)
+        const p = global.player;
+        if (p) {
+            const pTileX = Math.floor((p.x + (p.width || 32) / 2) / size);
+            const pTileY = Math.floor((p.y + (p.height || 32) / 2) / size);
+            const isPlayerOnTile = (pTileX === gx && pTileY === gy);
+            const isPlayerBlocked = typeof global.gridCanOccupy === 'function' && !global.gridCanOccupy(p, p.x, p.y);
+
+            if (isPlayerOnTile || isPlayerBlocked) {
+                safelyRelocatePlayerInwardV650(p, gx, gy);
+            }
+        }
+
+        // 6. Enemy Crush
+        if (Array.isArray(gameState.enemies)) {
+            for (let i = gameState.enemies.length - 1; i >= 0; i--) {
+                const e = gameState.enemies[i];
+                if (!e || e.defeated) continue;
+                const et = typeof global.gridCurrentTile === 'function' ? global.gridCurrentTile(e, 'enemy') : { x: Math.floor(e.x / size), y: Math.floor(e.y / size) };
+                if (et.x === gx && et.y === gy) {
+                    if (typeof global.addFloatingText === 'function') global.addFloatingText('¡APLASTADO!', e.x, e.y, '#f87171');
+                    if (typeof global.enemyOnDefeatedV630 === 'function') global.enemyOnDefeatedV630(e, { cause: 'crush' });
+                    if (typeof global.triggerEnemyDefeatFeedback === 'function') global.triggerEnemyDefeatFeedback(e);
+                    gameState.enemies.splice(i, 1);
+                    gameState.score += 100;
+                    if (typeof global.tryUnlockExitCurrentRoom === 'function') global.tryUnlockExitCurrentRoom();
+                }
+            }
+        }
+
+        // 7. Boss Crush
+        if (gameState.boss && !gameState.boss.defeated) {
+            const b = gameState.boss;
+            const bt = { x: Math.floor(b.x / size), y: Math.floor(b.y / size) };
+            if (Math.abs(bt.x - gx) <= 1 && Math.abs(bt.y - gy) <= 1) {
+                if (typeof global.damageBoss === 'function') global.damageBoss(2);
+                if (typeof global.addFloatingText === 'function') global.addFloatingText('¡COLAPSO SOBRE JEFE! -2', b.x, b.y - 12, '#fbbf24');
+            }
+        }
+
+        // 8. Death Echo Crush ("Bueno death echo, también. Si le cae un pilar, chao, muerto.")
+        const echo = typeof global.getActiveDeathEchoV61 === 'function' ? global.getActiveDeathEchoV61() : gameState.deathEchoV61;
+        if (echo && !echo.defeated) {
+            const echoTileX = Math.floor(echo.x / size);
+            const echoTileY = Math.floor(echo.y / size);
+            if (echoTileX === gx && echoTileY === gy) {
+                if (typeof global.damageDeathEchoByEffectV63 === 'function') {
+                    global.damageDeathEchoByEffectV63(999, 'crush');
+                } else {
+                    echo.health = 0;
+                    echo.defeated = true;
+                    gameState.deathEchoV61 = null;
+                }
+                if (typeof global.addFloatingText === 'function') global.addFloatingText('¡ECO APLASTADO! 💀', cx, cy - 14, '#f87171');
+                if (typeof global.addParticles === 'function') global.addParticles(cx, cy, 'particleDanger', 20);
+                if (typeof global.sfx === 'function') global.sfx('death');
+            }
+        }
+    }
+
+    function updateMapCollapseV650(dt) {
+        if (typeof gameState === 'undefined' || !gameState.isPlaying || gameState.paused) return;
+        if (!gameState.mapCollapseV650) initMapCollapseV650();
+        const c = gameState.mapCollapseV650;
+        const delta = Math.max(0, Number(dt) || 0);
+
+        c.elapsedMs += delta;
+
+        // UI Threat Timer Update
+        const uiThreat = global.document?.getElementById('ui-threat');
+
+        if (!c.active) {
+            const remainSec = Math.max(0, Math.ceil((c.timeToCollapseMs - c.elapsedMs) / 1000));
+            if (uiThreat) uiThreat.textContent = remainSec <= 10 ? `⚠️ COLAPSO: ${remainSec}s` : `COLAPSO: ${remainSec}s`;
+
+            if (c.elapsedMs >= c.timeToCollapseMs) {
+                c.active = true;
+                c.ringTimerMs = c.ringIntervalMs;
+                if (typeof global.addFloatingText === 'function' && global.player) {
+                    global.addFloatingText('⚠️ ¡COLAPSO DEL MAPA EN CURSO!', global.player.x + global.player.width / 2, global.player.y - 12, '#f87171');
+                }
+                if (typeof global.sfx === 'function') global.sfx('alarm');
+                if (typeof global.triggerScreenShake === 'function') global.triggerScreenShake(8, 300);
+            } else if (c.elapsedMs >= c.timeToCollapseMs - 5000 && !c.announced5s) {
+                c.announced5s = true;
+                if (typeof global.addFloatingText === 'function' && global.player) {
+                    global.addFloatingText('⚠️ COLAPSO INMINENTE EN 5s!', global.player.x + global.player.width / 2, global.player.y - 12, '#fbbf24');
+                }
+                if (typeof global.sfx === 'function') global.sfx('click');
+            }
+            return;
+        }
+
+        if (c.ringIndex > c.maxRings && !c.pendingRingQueue.length && !c.fallingBlocks.length) {
+            if (uiThreat) uiThreat.textContent = '🛡️ ZONA CENTRAL SEGURA (5x5)';
+        } else if (uiThreat) {
+            uiThreat.textContent = `💥 ANILLO ${c.ringIndex} COLAPSANDO`;
+        }
+
+        c.ringTimerMs += delta;
+        if (c.ringTimerMs >= c.ringIntervalMs && c.ringIndex <= c.maxRings && !c.pendingRingQueue.length) {
+            c.ringTimerMs = 0;
+            const ringTiles = buildRingTilesV650(c.ringIndex);
+            if (ringTiles.length) {
+                c.pendingRingQueue = ringTiles;
+                if (typeof global.addFloatingText === 'function' && global.player) {
+                    global.addFloatingText(`⚠️ ACHICANDO ANILLO ${c.ringIndex}`, global.player.x + global.player.width / 2, global.player.y - 12, '#ef4444');
+                }
+                if (typeof global.sfx === 'function') global.sfx('trap');
+                if (typeof global.triggerScreenShake === 'function') global.triggerScreenShake(5, 200);
+                c.ringIndex++;
+            }
+        }
+
+        if (c.pendingRingQueue.length) {
+            c.stepTimerMs += delta;
+            if (c.stepTimerMs >= c.stepIntervalMs) {
+                c.stepTimerMs = 0;
+                const tile = c.pendingRingQueue.shift();
+                if (tile) spawnFallingCollapseBlockV650(tile.x, tile.y);
+            }
+        }
+
+        for (let i = c.fallingBlocks.length - 1; i >= 0; i--) {
+            const b = c.fallingBlocks[i];
+            if (!b) { c.fallingBlocks.splice(i, 1); continue; }
+            b.elapsedMs += delta;
+            b.progress = Math.min(1, b.elapsedMs / b.durationMs);
+            b.currentOffsetY = -220 * Math.pow(1 - b.progress, 2);
+
+            if (b.progress >= 1 && !b.landed) {
+                b.landed = true;
+                onCollapseBlockLandedV650(b);
+                c.fallingBlocks.splice(i, 1);
+            }
+        }
+    }
+
+    function getBiomeBlockStyleV650(biomeId) {
+        const styles = {
+            inferno:    { body: '#7f1d1d', border: '#ef4444', accent: '#f97316', label: 'LAVA' },
+            winter:     { body: '#0284c7', border: '#7dd3fc', accent: '#bae6fd', label: 'HIELO' },
+            underground:{ body: '#44403c', border: '#a8a29e', accent: '#d6d3d1', label: 'ROCA' },
+            clouds:     { body: '#d97706', border: '#facc15', accent: '#fef08a', label: 'CELESTE' },
+            sky:        { body: '#2563eb', border: '#60a5fa', accent: '#93c5fd', label: 'CELESTE' },
+            beach:      { body: '#0284c7', border: '#38bdf8', accent: '#67e8f9', label: 'CORAL' },
+            space:      { body: '#581c87', border: '#c084fc', accent: '#e9d5ff', label: 'POD' },
+            mountains:  { body: '#334155', border: '#94a3b8', accent: '#cbd5e1', label: 'GRANITO' }
+        };
+        return styles[biomeId] || { body: '#334155', border: '#94a3b8', accent: '#cbd5e1', label: 'MURO' };
+    }
+
+    function drawMapCollapseV650(ctx) {
+        if (typeof gameState === 'undefined' || !gameState.mapCollapseV650 || !ctx) return;
+        const c = gameState.mapCollapseV650;
+        if (!c.fallingBlocks.length) return;
+
+        const size = Number(global.TILE_SIZE || 48);
+        const frame = Number(gameState.animFrame || 0);
+
+        ctx.save();
+        for (const b of c.fallingBlocks) {
+            const x = b.gx * size;
+            const y = b.gy * size;
+            const style = getBiomeBlockStyleV650(b.biomeId);
+
+            // 1. Target Reticle Warning on Ground
+            if (b.progress < 1) {
+                const pulse = 0.5 + Math.sin(frame * 0.35 + b.gx + b.gy) * 0.25;
+                ctx.fillStyle = `rgba(239, 68, 68, ${0.35 * pulse})`;
+                ctx.fillRect(x + 2, y + 2, size - 4, size - 4);
+
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
+                ctx.strokeRect(x + 3, y + 3, size - 6, size - 6);
+                ctx.setLineDash([]);
+
+                ctx.fillStyle = '#fef08a';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('⚠️', x + size / 2, y + size / 2);
+            }
+
+            // 2. Falling Monolith Block
+            const blockY = y + b.currentOffsetY;
+            const shadowScale = 0.3 + b.progress * 0.7;
+
+            // Ground Shadow
+            ctx.fillStyle = `rgba(0, 0, 0, ${0.45 * b.progress})`;
+            ctx.beginPath();
+            ctx.ellipse(x + size / 2, y + size * 0.85, (size * 0.4) * shadowScale, (size * 0.15) * shadowScale, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Block Body
+            ctx.fillStyle = style.body;
+            ctx.fillRect(x + 3, blockY + 3, size - 6, size - 6);
+
+            // Block Bevel / Border
+            ctx.strokeStyle = style.border;
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(x + 3, blockY + 3, size - 6, size - 6);
+
+            // Top Highlight / Emblem
+            ctx.fillStyle = style.accent;
+            ctx.fillRect(x + size * 0.3, blockY + size * 0.3, size * 0.4, size * 0.4);
+        }
+        ctx.restore();
+    }
+
+    function installMapCollapseHookV650() {
+        if (typeof global.initLevel !== 'function') return;
+        const originalInitLevel = global.initLevel;
+        global.initLevel = function initLevelWithCollapseV650(...args) {
+            const res = originalInitLevel.apply(this, args);
+            initMapCollapseV650();
+            return res;
+        };
+        initMapCollapseV650();
+    }
+
+    global.initMapCollapseV650 = initMapCollapseV650;
+    global.updateMapCollapseV650 = updateMapCollapseV650;
+    global.drawMapCollapseV650 = drawMapCollapseV650;
+
+    if (global.document?.readyState === 'loading') global.document.addEventListener('DOMContentLoaded', installMapCollapseHookV650, { once: true });
+    else installMapCollapseHookV650();
+})(window);
+
+// === js/50-dash-system.js ===
+// Bomberman Roguelike v6.51.0 — Player Dash / Quick Dodge System
+(function installDashSystemV651(global) {
+    'use strict';
+
+    function performPlayerDashV651(dirOverride = null) {
+        if (typeof gameState === 'undefined' || !gameState.isPlaying || gameState.paused) return false;
+        const p = global.player || window.player;
+        if (!p || p.defeated || p.isDashing) return false;
+
+        // Verify energy (costs 35% of max 100 energy)
+        p.dashEnergy = Math.min(100, Math.max(0, Number(p.dashEnergy ?? 100)));
+        const energyCost = 35;
+        if (p.dashEnergy < energyCost) {
+            if (typeof global.addFloatingText === 'function') {
+                global.addFloatingText('⚡ RECARGANDO DASH...', p.x + (p.width || 32) / 2, p.y - 12, '#facc15');
+            }
+            if (typeof global.sfx === 'function') global.sfx('click');
+            return false;
+        }
+
+        // Determine dash direction vector (from swipe override, keyboard, touch input, or player facing direction)
+        let dx = 0, dy = 0;
+        if (dirOverride && (dirOverride.dx || dirOverride.dy)) {
+            dx = dirOverride.dx;
+            dy = dirOverride.dy;
+        } else {
+            const keys = gameState.keys || {};
+            if (keys.ArrowLeft || keys.KeyA) dx = -1;
+            else if (keys.ArrowRight || keys.KeyD) dx = 1;
+            if (keys.ArrowUp || keys.KeyW) dy = -1;
+            else if (keys.ArrowDown || keys.KeyS) dy = 1;
+
+            if (!dx && !dy && gameState.touchControls) {
+                dx = Number(gameState.touchControls.x || gameState.touchControls.queuedX || 0);
+                dy = Number(gameState.touchControls.y || gameState.touchControls.queuedY || 0);
+            }
+
+            if (!dx && !dy) {
+                if (p.dir === 'left') dx = -1;
+                else if (p.dir === 'right') dx = 1;
+                else if (p.dir === 'up') dy = -1;
+                else if (p.dir === 'down') dy = 1;
+                else dy = 1;
+            }
+        }
+
+        const len = Math.hypot(dx, dy) || 1;
+        const normX = dx / len;
+        const normY = dy / len;
+
+        // Update player facing direction
+        if (Math.abs(normX) > Math.abs(normY)) {
+            p.dir = normX < 0 ? 'left' : 'right';
+        } else {
+            p.dir = normY < 0 ? 'up' : 'down';
+        }
+
+        // Consume energy & set dash parameters
+        p.dashEnergy -= energyCost;
+        p.isDashing = true;
+        p.dashTimerMs = 180;
+        p.isInvincible = true;
+        p.invincibleTimer = Math.max(p.invincibleTimer || 0, 0.28); // Invulnerability frames
+
+        // Reset any active tile interpolation so dash is instant and doesn't conflict
+        if (typeof global.gridResetTileMove === 'function') {
+            global.gridResetTileMove(p, true);
+        }
+
+        // Calculate maximum safe step distance without colliding with walls, bricks, or bombs
+        const size = Number(global.TILE_SIZE || 48);
+        const maxDashDist = size * 2.2;
+        const stepSize = 3;
+        let actualDist = 0;
+
+        for (let d = stepSize; d <= maxDashDist; d += stepSize) {
+            const testX = p.x + normX * d;
+            const testY = p.y + normY * d;
+            if (typeof global.gridCanOccupy === 'function' && !global.gridCanOccupy(p, testX, testY)) {
+                break;
+            }
+            actualDist = d;
+        }
+
+        // Displace player safely
+        const startX = p.x;
+        const startY = p.y;
+        p.x += normX * actualDist;
+        p.y += normY * actualDist;
+        p.vx = 0;
+        p.vy = 0;
+
+        // Store ghost trail snapshots along dash trajectory
+        p.dashGhostTrails = Array.isArray(p.dashGhostTrails) ? p.dashGhostTrails : [];
+        for (let i = 1; i <= 3; i++) {
+            const ratio = i / 3;
+            p.dashGhostTrails.push({
+                x: startX + (p.x - startX) * ratio,
+                y: startY + (p.y - startY) * ratio,
+                alpha: 0.65 - i * 0.12,
+                dir: p.dir,
+                time: 260
+            });
+        }
+
+        // FX: floating text, haptic feedback, sfx, and screen shake
+        const pCX = p.x + (p.width || 32) / 2;
+        const pCY = p.y + (p.height || 32) / 2;
+
+        if (typeof global.addFloatingText === 'function') {
+            global.addFloatingText('⚡ DASH!', pCX, pCY - 16, '#38bdf8');
+        }
+        if (typeof global.sfx === 'function') global.sfx('pickup');
+        if (typeof global.triggerHaptic === 'function') global.triggerHaptic('pickup');
+        if (typeof global.triggerScreenShake === 'function') global.triggerScreenShake(3, 100);
+        if (typeof global.addParticles === 'function') {
+            global.addParticles(pCX, pCY, 'particleShield', 10);
+            global.addParticles(pCX, pCY, 'particleEnemy', 6);
+        }
+
+        // Call browser vibration API
+        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+            try { navigator.vibrate([15, 30, 15]); } catch (_) {}
+        }
+
+        return true;
+    }
+
+    function updatePlayerDashV651(dt) {
+        if (typeof gameState === 'undefined' || !gameState.isPlaying) return;
+        const p = global.player || window.player;
+        if (!p) return;
+
+        const deltaSec = (Number(dt) || 0) / 1000;
+        // Recharge ~45% energy per second (full 100% in ~2.2s)
+        p.dashEnergy = Math.min(100, (Number(p.dashEnergy) || 0) + deltaSec * 45);
+
+        if (p.isDashing) {
+            p.dashTimerMs = Math.max(0, (Number(p.dashTimerMs) || 0) - (Number(dt) || 0));
+            if (p.dashTimerMs <= 0) p.isDashing = false;
+        }
+
+        // Update ghost trail lifetimes
+        if (Array.isArray(p.dashGhostTrails) && p.dashGhostTrails.length > 0) {
+            for (let i = p.dashGhostTrails.length - 1; i >= 0; i--) {
+                const gt = p.dashGhostTrails[i];
+                if (!gt) continue;
+                gt.time -= (Number(dt) || 0);
+                if (gt.time <= 0) p.dashGhostTrails.splice(i, 1);
+            }
+        }
+    }
+
+    global.performPlayerDashV651 = performPlayerDashV651;
+    global.updatePlayerDashV651 = updatePlayerDashV651;
+})(window);
+
+;
 // === js/47-ui-visibility.js ===
 // v6.31.2 — Visibilidad del sidebar y de los controles táctiles.
 (() => {
@@ -20390,7 +21515,7 @@ window.rogueV327IsBossExamV626 = rogueV327IsBossExamV626;
         if (!canvas) {
             problems.push('No se encontró el elemento canvas#gameCanvas en index.html.');
         } else {
-            if (!(canvas instanceof global.HTMLCanvasElement)) {
+            if (typeof global.HTMLCanvasElement === 'function' && !(canvas instanceof global.HTMLCanvasElement)) {
                 problems.push('#gameCanvas existe, pero no es un elemento <canvas>.');
             } else {
                 try {

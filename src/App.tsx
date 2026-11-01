@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import './css/main.css';
 import { initGameEngine } from './engine/gameEngine';
-import { testConnection } from './firebase/config';
 import { subscribeToAuth, loginWithGoogle } from './firebase/authService';
 import { submitRunToLeaderboard, RunSubmissionPayload } from './firebase/leaderboardService';
 import { AuthBar } from './components/AuthBar';
@@ -96,7 +95,6 @@ export const App: React.FC = () => {
   useEffect(() => {
     document.body.className = 'game-body v4-theme';
     initGameEngine();
-    testConnection().catch(console.error);
 
     const unsubscribeAuth = subscribeToAuth((user) => {
       setCurrentUser(user);
@@ -157,7 +155,7 @@ export const App: React.FC = () => {
           <div className="menu-rail-top">
             <span className="menu-kicker">BOMBERMAN ROGUELIKE</span>
             <div className="menu-rail-badge-group">
-              <span className="menu-version">v6.44.0</span>
+              <span className="menu-version">v6.53.0</span>
               <button
                 type="button"
                 className="btn-rail-fullscreen"
@@ -217,6 +215,7 @@ export const App: React.FC = () => {
                   <div className="flex gap-1.5 flex-wrap">
                     <div className="stat-badge text-red-400">❤️ <span id="ui-health">3</span></div>
                     <div className="stat-badge text-cyan-300 hidden" id="ui-shield-badge">🛡️ <span id="ui-shield">SI</span></div>
+                    <div id="ui-dash-badge" className="stat-badge text-cyan-300">⚡ DASH <span id="ui-dash-status">100%</span></div>
                     <div id="ui-score-badge" className="stat-badge text-yellow-300">⭐ <span id="ui-score">0</span></div>
                     <div id="ui-coins-badge" className="stat-badge text-amber-300">¢ <span id="ui-coins">0</span></div>
                   </div>
@@ -313,7 +312,10 @@ export const App: React.FC = () => {
                   <div className="death-section-label">VERBOS DESCUBIERTOS</div>
                   <div id="go-verb-list" className="death-verb-list"></div>
                 </div>
-                <button id="btn-restart" className="btn-pixel death-restart">NUEVA PARTIDA</button>
+                <div className="flex flex-col sm:flex-row gap-2 w-full mt-3">
+                  <button id="btn-restart" className="btn-pixel death-restart flex-1">NUEVA PARTIDA</button>
+                  <button id="btn-hard-reset-death" className="btn-pixel death-restart bg-rose-950/80 border-rose-500 text-rose-300 text-xs px-3 hover:bg-rose-900" title="Borra todo el progreso acumulado y recomienza una partida completamente limpia">BORRAR Y VOLVER DE CERO</button>
+                </div>
               </div>
 
               {/* Reward screen */}
@@ -389,7 +391,10 @@ export const App: React.FC = () => {
                   </div>
                 </div>
 
-                <button id="btn-resume" className="btn-pixel">CONTINUAR</button>
+                <div className="flex flex-col gap-2 w-full mt-3">
+                  <button id="btn-resume" className="btn-pixel">CONTINUAR</button>
+                  <button id="btn-hard-reset-pause" className="btn-pixel text-xs bg-rose-950/70 border-rose-600 text-rose-300 hover:bg-rose-900" title="Reinicia todo el estado y comienza una partida completamente limpia">REINICIAR TODO DE CERO</button>
+                </div>
               </div>
             </section>
           </div>
@@ -550,7 +555,7 @@ export const App: React.FC = () => {
               <span>{isFullscreen ? 'SALIR DE PANTALLA COMPLETA' : 'PANTALLA COMPLETA'}</span>
             </button>
             <div className="menu-hint">
-              <span>TECLADO</span><strong>WASD / ↑↓←→</strong><span>· BOMBA</span><strong>ESPACIO</strong>
+              <span>TECLADO</span><strong>WASD / ↑↓←→</strong><span>· BOMBA</span><strong>ESPACIO</strong><span>· DASH</span><strong>SHIFT / X (o doble toque / desliz táctil)</strong>
             </div>
           </div>
           <div className="menu-footer">
@@ -564,8 +569,8 @@ export const App: React.FC = () => {
       </main>
 
       <div id="mobile-controls" aria-label="Controles táctiles invisibles">
-        <div id="mobile-gesture-zone" aria-label="Movimiento: deslizar en cualquier dirección en la mitad izquierda"></div>
-        <div id="mobile-action-zone" aria-label="Acciones: toque corto para colocar una bomba; mantener pulsado para agarrar o lanzar"></div>
+        <div id="mobile-gesture-zone" aria-label="Movimiento: deslizar en cualquier dirección en la mitad izquierda (doble toque para dash)"></div>
+        <div id="mobile-action-zone" aria-label="Acciones: toque corto = bomba; mantener = agarrar/lanzar; doble toque o desliz rápido = dash"></div>
       </div>
     </div>
   );

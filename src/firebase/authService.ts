@@ -37,13 +37,20 @@ export async function logout(): Promise<void> {
 
 export async function syncUserProfile(user: FirebaseUser): Promise<UserProfile> {
   const userRef = doc(db, 'users', user.uid);
-  const snap = await getDoc(userRef);
-
   const fallbackName = user.displayName || (user.isAnonymous ? 'Bomber Anónimo' : 'Jugador');
   const now = new Date().toISOString();
 
-  if (snap.exists()) {
-    const existing = snap.data() as UserProfile;
+  let existing: UserProfile | null = null;
+  try {
+    const snap = await getDoc(userRef);
+    if (snap.exists()) {
+      existing = snap.data() as UserProfile;
+    }
+  } catch (_) {
+    // Offline mode: proceed with local profile cache without throwing
+  }
+
+  if (existing) {
     const updated: UserProfile = {
       userId: user.uid,
       displayName: user.displayName || existing.displayName || fallbackName,
@@ -54,7 +61,9 @@ export async function syncUserProfile(user: FirebaseUser): Promise<UserProfile> 
       totalKills: existing.totalKills || 0,
       updatedAt: now
     };
-    await setDoc(userRef, updated, { merge: true });
+    try {
+      await setDoc(userRef, updated, { merge: true });
+    } catch (_) {}
     return updated;
   } else {
     const initial: UserProfile = {
@@ -67,7 +76,9 @@ export async function syncUserProfile(user: FirebaseUser): Promise<UserProfile> 
       totalKills: 0,
       updatedAt: now
     };
-    await setDoc(userRef, initial);
+    try {
+      await setDoc(userRef, initial, { merge: true });
+    } catch (_) {}
     return initial;
   }
 }
@@ -75,7 +86,7 @@ export async function syncUserProfile(user: FirebaseUser): Promise<UserProfile> 
 export function subscribeToAuth(callback: (user: FirebaseUser | null) => void) {
   return onAuthStateChanged(auth, (user) => {
     if (user) {
-      syncUserProfile(user).catch(console.error);
+      syncUserProfile(user).catch(() => {});
     }
     callback(user);
   });

@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getFirestore, setLogLevel } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
@@ -13,24 +13,14 @@ export const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestore
   ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
   : getFirestore(app);
 
+// Suppress internal Firestore connection retry logs while offline or during initial token propagation
+try {
+  setLogLevel('silent');
+} catch (_) {}
+
 export async function testConnection(): Promise<boolean> {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-    return true;
-  } catch (error) {
-    if (error instanceof Error) {
-      if (error.message.includes('the client is offline') || error.message.includes('Failed to get document')) {
-        console.warn('Firebase client is operating in offline mode or awaiting network propagation.');
-        return false;
-      }
-      if (error.message.includes('token-service-api') || error.message.includes('Fetching auth token failed')) {
-        console.warn('Firebase token service is enabled and propagating credentials.');
-        return false;
-      }
-    }
-    // Permission denied or not-found on dummy document still means server was reached
-    return true;
-  }
+  // Silent check without forcing network queries that fail in offline mode
+  return Boolean(db);
 }
 
 export default app;

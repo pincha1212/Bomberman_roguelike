@@ -515,9 +515,9 @@ const UI = {};
         window.getPowerupDropPoolV67=getPowerupDropPoolV67;
 
         const ENEMY_TYPES = Object.freeze({
-            RASTRERO: Object.freeze({ name: 'Rastrero', color: '#ef4444', speed: 1.15, canFly: false }),
-            VOLADOR: Object.freeze({ name: 'Volador', color: '#3b82f6', speed: 0.95, canFly: true }),
-            ESPECIAL: Object.freeze({ name: 'Especial', color: '#22c55e', speed: 1.75, canFly: false })
+            RASTRERO: Object.freeze({ name: 'Rastrero', color: '#ef4444', speed: 0.80, canFly: false }),
+            VOLADOR: Object.freeze({ name: 'Volador', color: '#3b82f6', speed: 0.65, canFly: true }),
+            ESPECIAL: Object.freeze({ name: 'Especial', color: '#22c55e', speed: 1.10, canFly: false })
         });
 
         // v3.24: perfiles de comportamiento separados del tipo visual/fisico.
@@ -526,27 +526,27 @@ const UI = {};
             CHASER: Object.freeze({
                 id: 'chaser', label: 'Perseguidor', distanceWeight: 2.85, distanceLookaheadWeight: 0.72,
                 sameDirectionBonus: 3.0, reversePenalty: 22, branchPreference: 0.25, recentPenalty: 1.4,
-                loopPenalty: 1.5, turnCommitMs: 220, speedMultiplier: 1.00
+                loopPenalty: 1.5, turnCommitMs: 220, speedMultiplier: 0.95
             }),
             PATROLLER: Object.freeze({
                 id: 'patroller', label: 'Patrullero', distanceWeight: 1.25, distanceLookaheadWeight: 0.42,
                 sameDirectionBonus: 4.4, reversePenalty: 27, branchPreference: 1.5, recentPenalty: 3.0,
-                loopPenalty: 5.0, turnCommitMs: 320, speedMultiplier: 0.95
+                loopPenalty: 5.0, turnCommitMs: 320, speedMultiplier: 0.90
             }),
             EVASIVE: Object.freeze({
                 id: 'evasive', label: 'Evasivo', distanceWeight: 1.4, distanceLookaheadWeight: 0.5,
                 sameDirectionBonus: 2.2, reversePenalty: 10, branchPreference: 0.75, recentPenalty: 2.0,
-                loopPenalty: 2.4, turnCommitMs: 190, speedMultiplier: 0.98, fleeRadius: 5
+                loopPenalty: 2.4, turnCommitMs: 190, speedMultiplier: 0.95, fleeRadius: 5
             }),
             AGGRESSIVE: Object.freeze({
                 id: 'aggressive', label: 'Agresivo', distanceWeight: 3.35, distanceLookaheadWeight: 0.9,
                 sameDirectionBonus: 1.8, reversePenalty: 8, branchPreference: 0.15, recentPenalty: 0.9,
-                loopPenalty: 0.8, turnCommitMs: 145, speedMultiplier: 1.08
+                loopPenalty: 0.8, turnCommitMs: 145, speedMultiplier: 1.02
             }),
             FLYER: Object.freeze({
                 id: 'flyer', label: 'Volador', distanceWeight: 3.05, distanceLookaheadWeight: 0.78,
                 sameDirectionBonus: 2.5, reversePenalty: 14, branchPreference: 0.35, recentPenalty: 1.0,
-                loopPenalty: 1.0, turnCommitMs: 180, speedMultiplier: 0.98,
+                loopPenalty: 1.0, turnCommitMs: 180, speedMultiplier: 0.92,
                 aerial: true
             })
         });
@@ -3184,10 +3184,15 @@ if (!gameState.relicMods) resetRelicModifiers();
         }
 
         function setExitStateV613(open = false) {
-            const pos = gameState.exitPos;
-            if (!pos || !gameState.grid?.[pos.y]) return false;
-            const current = gameState.grid[pos.y][pos.x];
-            if (current === TYPES.BLOCK && open) return false;
+            let pos = gameState.exitPos;
+            if (!pos) {
+                if (open) return tryUnlockExitCurrentRoom();
+                return false;
+            }
+            if (!gameState.grid?.[pos.y]) return false;
+            if (open && gameState.grid[pos.y][pos.x] === TYPES.BLOCK) {
+                gameState.grid[pos.y][pos.x] = TYPES.EMPTY;
+            }
             gameState.grid[pos.y][pos.x] = open ? TYPES.EXIT_OPEN : TYPES.EXIT_LOCKED;
             gameState.exitUnlocked = !!open;
             gameState.gridRevision = (gameState.gridRevision || 0) + 1;
@@ -3196,13 +3201,84 @@ if (!gameState.relicMods) resetRelicModifiers();
         }
 
         function tryUnlockExitCurrentRoom() {
-            if (!gameState?.exitPos || gameState.roomType?.id === 'BOSS') return false;
-            if (gameState.exitUnlocked) return true;
+            if (gameState.roomType?.id === 'BOSS') return false;
             if (Array.isArray(gameState.enemies) && gameState.enemies.length > 0) return false;
-            const pos = gameState.exitPos;
-            const tile = gameState.grid?.[pos.y]?.[pos.x];
-            if (tile === TYPES.BLOCK) return false;
-            return setExitStateV613(true);
+            if (gameState.exitUnlocked && gameState.exitPos && gameState.grid?.[gameState.exitPos.y]?.[gameState.exitPos.x] === TYPES.EXIT_OPEN) {
+                return true;
+            }
+
+            const w = Number(gameState.gridWidth || 15);
+            const h = Number(gameState.gridHeight || 15);
+            const midX = Math.floor(w / 2);
+            const midY = Math.floor(h / 2);
+
+            let pos = gameState.exitPos;
+            let needsRelocation = false;
+
+            // 1. Validar si la posición de salida actual es transitable o si quedó bloqueada/aplastada
+            if (!pos || !gameState.grid?.[pos.y] || pos.x < 1 || pos.x >= w - 1 || pos.y < 1 || pos.y >= h - 1) {
+                needsRelocation = true;
+            } else {
+                const currentTile = gameState.grid[pos.y][pos.x];
+                // Si fue aplastada por una pared o pilar de colapso
+                if (currentTile === TYPES.WALL) {
+                    needsRelocation = true;
+                } else if (currentTile === TYPES.BLOCK) {
+                    // Si la salida estaba oculta bajo un bloque destructible, lo desintegramos automáticamente
+                    gameState.grid[pos.y][pos.x] = TYPES.EMPTY;
+                    gameState.gridRevision = (gameState.gridRevision || 0) + 1;
+                    if (typeof invalidateRenderCacheV317 === 'function') invalidateRenderCacheV317();
+                    if (typeof addFloatingText === 'function') {
+                        addFloatingText('🚪 ¡SALA DESPEJADA! SALIDA REVELADA', (pos.x + 0.5) * TILE_SIZE, (pos.y + 0.5) * TILE_SIZE, '#facc15');
+                    }
+                    if (typeof addParticles === 'function') {
+                        addParticles((pos.x + 0.5) * TILE_SIZE, (pos.y + 0.5) * TILE_SIZE, 'particleLoot', 16);
+                    }
+                }
+            }
+
+            // 2. Si la salida original está tapada por pilares de colapso o no existe, abrimos un portal de rescate en el centro seguro (5x5)
+            if (needsRelocation) {
+                let candidateX = midX;
+                let candidateY = midY;
+                let found = false;
+
+                for (let r = 0; r <= 3 && !found; r++) {
+                    for (let dy = -r; dy <= r && !found; dy++) {
+                        for (let dx = -r; dx <= r && !found; dx++) {
+                            const cx = midX + dx;
+                            const cy = midY + dy;
+                            if (cx >= 1 && cx < w - 1 && cy >= 1 && cy < h - 1) {
+                                const t = gameState.grid?.[cy]?.[cx];
+                                if (t === TYPES.EMPTY || t === TYPES.EXIT_LOCKED || t === TYPES.EXIT_OPEN || t === TYPES.BLOCK) {
+                                    candidateX = cx;
+                                    candidateY = cy;
+                                    found = true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                pos = { x: candidateX, y: candidateY };
+                gameState.exitPos = pos;
+                gameState.grid[pos.y][pos.x] = TYPES.EMPTY;
+                if (typeof addFloatingText === 'function') {
+                    addFloatingText('🚪 PORTAL DE RESCATE CENTRAL ABIERTO', (pos.x + 0.5) * TILE_SIZE, (pos.y + 0.5) * TILE_SIZE, '#38bdf8');
+                }
+                if (typeof addParticles === 'function') {
+                    addParticles((pos.x + 0.5) * TILE_SIZE, (pos.y + 0.5) * TILE_SIZE, 'particleShield', 20);
+                }
+            }
+
+            // 3. Abrir la salida de manera concluyente
+            gameState.grid[pos.y][pos.x] = TYPES.EXIT_OPEN;
+            gameState.exitUnlocked = true;
+            gameState.gridRevision = (gameState.gridRevision || 0) + 1;
+            if (typeof invalidateRenderCacheV317 === 'function') invalidateRenderCacheV317();
+            if (typeof sfx === 'function') sfx('pickup');
+            if (typeof triggerHaptic === 'function') triggerHaptic('pickup');
+            return true;
         }
 
         function initLevel() {
@@ -7530,6 +7606,11 @@ function enemyChooseDirectionAtIntersectionV312(e) {
 
             updateUI();
 
+            // Remaster v6.54: Verificación activa de salida para garantizar que nunca quede bloqueada
+            if (!gameState.exitUnlocked && Array.isArray(gameState.enemies) && gameState.enemies.length === 0 && gameState.roomType?.id !== 'BOSS') {
+                if (typeof tryUnlockExitCurrentRoom === 'function') tryUnlockExitCurrentRoom();
+            }
+
             // Exit Check
             let pgx = Math.floor((player.x + player.width/2) / TILE_SIZE);
             let pgy = Math.floor((player.y + player.height/2) / TILE_SIZE);
@@ -11263,6 +11344,13 @@ function resetPlayerRuntimeState() {
     player.dashEnergy = 100;
     player.dashTimerMs = 0;
     player.dashGhostTrails = [];
+    player.bombElementV612 = 'normal';
+    player.effectIds = [];
+    if (typeof setPlayerBombElementV612 === 'function') setPlayerBombElementV612('normal');
+    try {
+        const elemBadge = document.getElementById('ui-bomb-element');
+        if (elemBadge) elemBadge.textContent = 'NORMAL';
+    } catch (_) {}
     if (typeof resetEntityCapabilitiesV681 === 'function') resetEntityCapabilitiesV681(player);
     if (typeof playerFSMReset === 'function') playerFSMReset('runtime-reset');
 }
@@ -11401,6 +11489,13 @@ function finishRun(source = 'unknown') {
         if (Array.isArray(gameState.relics)) gameState.relics = [];
         if (window.ROGUELIKE_V327?.appliedBonus) window.ROGUELIKE_V327.appliedBonus = { bombs: 0, range: 0, speed: 0, maxHealth: 0 };
         if (typeof resetRelicModifiers === 'function') resetRelicModifiers();
+        player.bombElementV612 = 'normal';
+        player.effectIds = [];
+        if (typeof setPlayerBombElementV612 === 'function') setPlayerBombElementV612('normal');
+        try {
+            const elemBadge = document.getElementById('ui-bomb-element');
+            if (elemBadge) elemBadge.textContent = 'NORMAL';
+        } catch (_) {}
     }
 
     gameState.isPlaying = false;
@@ -20761,8 +20856,8 @@ window.rogueV327IsBossExamV626 = rogueV327IsBossExamV626;
     function initMapCollapseV650() {
         if (typeof gameState === 'undefined') return;
         const boss = isBossRoom();
-        // Mayor tiempo de gracia inicial antes de comenzar el colapso (65s normal, 85s boss)
-        const initialDelayMs = boss ? 85000 : 65000;
+        // Mayor tiempo de gracia inicial antes de comenzar el colapso (105s normal, 135s boss)
+        const initialDelayMs = boss ? 135000 : 105000;
         const gridW = Number(gameState.gridWidth || 15);
         const gridH = Number(gameState.gridHeight || 15);
         const centerGX = Math.floor(gridW / 2);
@@ -20777,7 +20872,7 @@ window.rogueV327IsBossExamV626 = rogueV327IsBossExamV626;
             elapsedMs: 0,
             timeToCollapseMs: initialDelayMs,
             ringIndex: 1,
-            ringIntervalMs: 16000,
+            ringIntervalMs: 20000,
             ringTimerMs: 0,
             pendingRingQueue: [],
             stepTimerMs: 0,

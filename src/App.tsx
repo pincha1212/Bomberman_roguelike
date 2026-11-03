@@ -155,7 +155,7 @@ export const App: React.FC = () => {
           <div className="menu-rail-top">
             <span className="menu-kicker">BOMBERMAN ROGUELIKE</span>
             <div className="menu-rail-badge-group">
-              <span className="menu-version">v6.53.0</span>
+              <span className="menu-version">v6.54.0</span>
               <button
                 type="button"
                 className="btn-rail-fullscreen"

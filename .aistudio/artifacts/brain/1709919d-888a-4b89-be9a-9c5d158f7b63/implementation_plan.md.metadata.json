@@ -1,0 +1,6 @@
+{
+  "summary": "Plan de implementación actualizado para v6.54.0 que incluye el reseteo estricto del elemento de bomba (eliminando veneno/fuego/hielo al morir y volviendo a normal), junto al escalamiento de canvas para tablets, sistema infalible de apertura de salida, reducción de velocidad enemiga y persistencia en Cloud SQL.",
+  "updatedAt": "2026-11-03T01:31:49.072552591Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

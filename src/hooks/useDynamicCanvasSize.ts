@@ -91,18 +91,12 @@ export function useDynamicCanvasSize(options: UseDynamicCanvasSizeOptions = {}):
       }
     }
 
-    // Descontamos márgenes de seguridad para controles y bordes del dispositivo
-    const effectivePadding = isTouch ? Math.max(6, padding) : padding * 1.5;
+    // Descontamos márgenes mínimos de seguridad para controles y bordes del dispositivo
+    const effectivePadding = isTouch ? 4 : 8;
     let targetW = Math.max(minSize, availW - effectivePadding * 2);
     let targetH = Math.max(minSize, availH - effectivePadding * 2);
 
-    // En dispositivos móviles y tablets en vertical (portrait), consideramos el panel inferior/superior
-    if (orientation === 'portrait' && isTouch) {
-      // Dejamos margen para no desbordar verticalmente
-      targetH = Math.min(targetH, vh - 60);
-    }
-
-    // Si Bomberman requiere cuadrícula 1:1, calculamos el cuadrado máximo posible
+    // En tablets y móviles aprovechamos el máximo espacio cuadrado disponible
     if (maintainAspectRatio) {
       const maxSquare = Math.floor(Math.min(targetW, targetH));
       targetW = maxSquare;

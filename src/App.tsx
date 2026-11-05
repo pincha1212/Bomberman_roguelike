@@ -13,7 +13,7 @@ export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [activeTab, setActiveTab] = useState<'play' | 'leaderboard'>('play');
   const [lastFinishedRun, setLastFinishedRun] = useState<RunSubmissionPayload | null>(null);
-  const [submittedStatus, setSubmittedStatus] = useState<boolean>(false);
+  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'sending' | 'saved' | 'pending'>('idle');
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   // Niveles de volumen de música y efectos sonoros (persisten en localStorage)
@@ -118,14 +118,12 @@ export const App: React.FC = () => {
       };
 
       setLastFinishedRun(payload);
-      setSubmittedStatus(false);
+      setSubmissionStatus('sending');
 
       // If user is already authenticated, submit immediately
       submitRunToLeaderboard(payload).then((success) => {
-        if (success) {
-          setSubmittedStatus(true);
-        }
-      });
+        setSubmissionStatus(success ? 'saved' : 'pending');
+      }).catch(() => setSubmissionStatus('pending'));
     };
 
     window.addEventListener('bomberman_run_finished', handleRunFinished);
@@ -137,14 +135,29 @@ export const App: React.FC = () => {
   }, []);
 
   const handleGameOverLoginAndSubmit = async () => {
+    setSubmissionStatus('sending');
     try {
       const user = await loginWithGoogle();
       if (user && lastFinishedRun) {
         const success = await submitRunToLeaderboard(lastFinishedRun);
-        setSubmittedStatus(success);
+        setSubmissionStatus(success ? 'saved' : 'pending');
+      } else {
+        setSubmissionStatus('pending');
       }
     } catch (err) {
       console.error('Login & submit error:', err);
+      setSubmissionStatus('pending');
+    }
+  };
+
+  const handleRetryRunSubmission = async () => {
+    if (!lastFinishedRun || !currentUser) return;
+    setSubmissionStatus('sending');
+    try {
+      const success = await submitRunToLeaderboard(lastFinishedRun);
+      setSubmissionStatus(success ? 'saved' : 'pending');
+    } catch (_) {
+      setSubmissionStatus('pending');
     }
   };
 
@@ -155,7 +168,7 @@ export const App: React.FC = () => {
           <div className="menu-rail-top">
             <span className="menu-kicker">BOMBERMAN · ARCADE</span>
             <div className="menu-rail-badge-group">
-              <span className="menu-version">v7.0.0</span>
+              <span className="menu-version">v7.1.0</span>
               <button
                 type="button"
                 className="btn-rail-fullscreen"
@@ -280,10 +293,24 @@ export const App: React.FC = () => {
                     <span>CLASIFICACIÓN GLOBAL</span>
                   </div>
                   {currentUser ? (
-                    <div className="goc-status">
-                      {submittedStatus
-                        ? `✓ PUNTUACIÓN REGISTRADA PARA ${currentUser.displayName || 'VOS'}`
-                        : 'SINCRONIZANDO CON EL RANKING GLOBAL...'}
+                    <div className="goc-status" role="status" aria-live="polite">
+                      <span>
+                        {submissionStatus === 'saved'
+                          ? `✓ PUNTUACIÓN REGISTRADA PARA ${currentUser.displayName || 'VOS'}`
+                          : submissionStatus === 'sending'
+                            ? 'SINCRONIZANDO CON EL RANKING GLOBAL...'
+                            : 'NO SE PUDO REGISTRAR. REVISÁ LA CONEXIÓN Y REINTENTÁ.'}
+                      </span>
+                      {submissionStatus !== 'saved' && (
+                        <button
+                          className="goc-retry-button"
+                          type="button"
+                          onClick={handleRetryRunSubmission}
+                          disabled={submissionStatus === 'sending'}
+                        >
+                          {submissionStatus === 'sending' ? 'ENVIANDO…' : 'REINTENTAR ENVÍO'}
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <>

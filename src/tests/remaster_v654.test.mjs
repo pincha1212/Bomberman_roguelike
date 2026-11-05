@@ -2,14 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-test('Bomberman Remaster v7.0.0 Verification Suite', async (t) => {
+test('Bomberman Remaster v7.1.0 Verification Suite', async (t) => {
   const engineSource = fs.readFileSync('./src/engine/gameEngine.js', 'utf-8');
   const appSource = fs.readFileSync('./src/App.tsx', 'utf-8');
   const pkgSource = JSON.parse(fs.readFileSync('./package.json', 'utf-8'));
 
-  await t.test('Version 7.0.0 consistency across manifests and UI', () => {
-    assert.equal(pkgSource.version, '7.0.0', 'package.json version must be 7.0.0');
-    assert.ok(appSource.includes('v7.0.0'), 'App.tsx must feature v7.0.0 badge');
+  await t.test('Version 7.1.0 consistency across manifests and UI', () => {
+    assert.equal(pkgSource.version, '7.1.0', 'package.json version must be 7.1.0');
+    assert.ok(appSource.includes('v7.1.0'), 'App.tsx must feature v7.1.0 badge');
   });
 
   await t.test('Elemental bomb resets to classic normal on player death', () => {

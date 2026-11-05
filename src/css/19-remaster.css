@@ -452,6 +452,28 @@ body.v4-theme::after {
   background: rgba(13,15,29,.94);
   color: var(--rm-cyan);
 }
+.v4-theme .goc-status {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  line-height: 1.7;
+}
+.v4-theme .goc-retry-button {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid rgba(104,228,239,.32);
+  border-radius: 10px;
+  background: rgba(104,228,239,.08);
+  color: var(--rm-cyan);
+  font: 800 .62rem Inter, ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: .08em;
+  cursor: pointer;
+}
+.v4-theme .goc-retry-button:hover:not(:disabled) {
+  border-color: rgba(104,228,239,.68);
+  background: rgba(104,228,239,.14);
+}
+.v4-theme .goc-retry-button:disabled { opacity: .55; cursor: progress; }
 
 @keyframes rmSpark {
   0%, 100% { opacity: .58; transform: scale(.85) rotate(-12deg); }

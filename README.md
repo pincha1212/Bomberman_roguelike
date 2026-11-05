@@ -1,4 +1,4 @@
-# Bomberman Roguelike — Remaster v7.0.0 (React + TypeScript + Vite)
+# Bomberman Roguelike — v7.1.0 (React + TypeScript + Vite)
 
 Un roguelike de acción con laberintos procedurales, reliquias, bombas elementales y jefes. Esta edición remasterizada renueva la interfaz, mejora la lectura en pantallas pequeñas y separa las herramientas de desarrollo de la versión pública.
 
@@ -18,6 +18,11 @@ Controles: movete con WASD o las flechas, colocá bombas con Espacio y usá Dash
 - Nueva identidad visual para el menú, los indicadores de partida y las pantallas de pausa y recompensa.
 - Menú más claro y cómodo en escritorio, tablet y móvil; controles y niveles de calidad explicados en pantalla.
 - God Mode queda limitado a builds de desarrollo.
+
+## Versión 7.1.0
+
+- El estado del envío al ranking ahora distingue entre sincronización, éxito y error.
+- Si una partida no se puede enviar, podés reintentar desde la pantalla de resultados.
 
 ## Historial de versiones anteriores
 

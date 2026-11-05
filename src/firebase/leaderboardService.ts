@@ -102,10 +102,10 @@ export async function submitRunToLeaderboard(payload: RunSubmissionPayload): Pro
         handleFirestoreError(error, OperationType.WRITE, 'leaderboard');
       }
       if (error.message.includes('offline') || error.message.includes('Failed to get document')) {
-        return true;
+        return false;
       }
     }
-    console.warn('Leaderboard submission operating offline:', error);
+    console.warn('Leaderboard submission did not complete:', error);
     return false;
   }
 }

@@ -153,9 +153,9 @@ export const App: React.FC = () => {
       <main id="main-menu" className="main-menu" aria-label="Menú principal">
         <aside className="menu-rail menu-rail-left" aria-label="Resumen de la aventura">
           <div className="menu-rail-top">
-            <span className="menu-kicker">BOMBERMAN ROGUELIKE</span>
+            <span className="menu-kicker">BOMBERMAN · ARCADE</span>
             <div className="menu-rail-badge-group">
-              <span className="menu-version">v6.54.0</span>
+              <span className="menu-version">v7.0.0</span>
               <button
                 type="button"
                 className="btn-rail-fullscreen"
@@ -169,24 +169,24 @@ export const App: React.FC = () => {
           </div>
           <div className="menu-rail-content">
             <div className="menu-mark">💣</div>
-            <h2 className="menu-rail-title pixel-font">ROGUELIKE</h2>
-            <p className="menu-rail-subtitle">MINICOMPETENCIA & CLASIFICACIÓN</p>
-            <p className="menu-rail-copy">Entrá, rompé el mapa, aprovechá cada apertura y superá a otros jugadores en el ranking mundial.</p>
+            <h2 className="menu-rail-title pixel-font">UNA BOMBA.<br />UN MAPA NUEVO.</h2>
+            <p className="menu-rail-subtitle">ROGUELIKE · ACCIÓN · SUPERVIVENCIA</p>
+            <p className="menu-rail-copy">Cada explosión abre una ruta. Encontrá reliquias, dominá nuevos biomas y bajá un piso más.</p>
             <div className="menu-feature-list">
               <div className="menu-feature">
                 <span>01</span>
-                <strong>PODIO GLOBAL</strong>
-                <small>Competí por la mejor profundidad y puntaje.</small>
+                <strong>LABERINTOS VIVOS</strong>
+                <small>Cada partida genera un recorrido distinto.</small>
               </div>
               <div className="menu-feature">
                 <span>02</span>
-                <strong>PERFIL Y AUTENTICACIÓN</strong>
-                <small>Guardá tu récord seguro con Google.</small>
+                <strong>RELIQUIAS ÚNICAS</strong>
+                <small>Combiná mejoras y bombas elementales.</small>
               </div>
               <div className="menu-feature">
                 <span>03</span>
-                <strong>PROCEDURAL & LOOT</strong>
-                <small>Reliquias, bombas elementales y jefes.</small>
+                <strong>BIOMAS Y JEFES</strong>
+                <small>Sobreviví al colapso y llegá más lejos.</small>
               </div>
             </div>
           </div>
@@ -441,7 +441,7 @@ export const App: React.FC = () => {
               <p className="biome-switch-note">Podés cambiar de bioma en cualquier momento de la partida.</p>
             </section>
 
-            <section className="dev-tools-card" aria-label="Herramientas de desarrollo">
+            {import.meta.env.DEV && <section className="dev-tools-card" aria-label="Herramientas de desarrollo">
               <div className="dev-tools-head">
                 <div>
                   <span className="dev-tools-kicker">DESARROLLO</span>
@@ -453,7 +453,7 @@ export const App: React.FC = () => {
                 ACTIVAR GOD MODE
               </button>
               <p className="dev-tools-note">Invulnerabilidad total: no consume vida, escudo ni reliquias.</p>
-            </section>
+            </section>}
 
             <section className="info-card" aria-label="Reliquias activas">
               <div className="info-card-title">RELIQUIAS ACTIVAS <span id="ui-relic-count-label">0</span></div>
@@ -467,20 +467,38 @@ export const App: React.FC = () => {
         <aside id="start-screen" className="menu-panel" aria-label="Iniciar partida">
           <div className="menu-panel-glow"></div>
           <div className="menu-panel-head">
-            <span className="menu-kicker">NUEVA PARTIDA</span>
-            <span className="menu-status-dot"><span></span> READY</span>
+            <span className="menu-kicker">TU PRÓXIMA AVENTURA</span>
+            <span className="menu-status-dot"><span></span> LISTO</span>
           </div>
 
           {/* Autenticación & Perfil del Jugador */}
           <AuthBar currentUser={currentUser} />
 
           {/* Selector de Pestañas: Partida vs Clasificación */}
-          <div className="menu-tab-nav" role="tablist">
+          <div
+            className="menu-tab-nav"
+            role="tablist"
+            aria-label="Secciones del menú"
+            onKeyDown={(event) => {
+              if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+              event.preventDefault();
+              const nextTab = event.key === 'Home'
+                ? 'play'
+                : event.key === 'End'
+                  ? 'leaderboard'
+                  : activeTab === 'play' ? 'leaderboard' : 'play';
+              setActiveTab(nextTab);
+              document.getElementById(nextTab === 'play' ? 'tab-play' : 'tab-leaderboard')?.focus();
+            }}
+          >
             <button
               type="button"
               role="tab"
               aria-selected={activeTab === 'play'}
               className={`menu-tab-btn ${activeTab === 'play' ? 'is-active' : ''}`}
+              id="tab-play"
+              aria-controls="menu-tab-panel"
+              tabIndex={activeTab === 'play' ? 0 : -1}
               onClick={() => setActiveTab('play')}
             >
               💣 JUGAR
@@ -490,31 +508,34 @@ export const App: React.FC = () => {
               role="tab"
               aria-selected={activeTab === 'leaderboard'}
               className={`menu-tab-btn ${activeTab === 'leaderboard' ? 'is-active' : ''}`}
+              id="tab-leaderboard"
+              aria-controls="menu-tab-panel"
+              tabIndex={activeTab === 'leaderboard' ? 0 : -1}
               onClick={() => setActiveTab('leaderboard')}
             >
-              🏆 CLASIFICACIÓN
+              🏆 RANKING
             </button>
           </div>
 
           {activeTab === 'leaderboard' ? (
-            <div className="leaderboard-tab-content">
+            <div id="menu-tab-panel" className="leaderboard-tab-content" role="tabpanel" aria-labelledby="tab-leaderboard" tabIndex={0}>
               <LeaderboardView currentUser={currentUser} />
             </div>
           ) : (
-            <>
-              <div className="menu-hero-icon">💣💥</div>
+            <div id="menu-tab-panel" className="menu-play-panel" role="tabpanel" aria-labelledby="tab-play" tabIndex={0}>
+              <div className="menu-hero-icon" aria-hidden="true"><span>💣</span><i>✦</i></div>
               <h1 className="menu-title pixel-font">BOMBERMAN</h1>
-              <h2 className="menu-subtitle pixel-font">ROGUELIKE // PARTIDAS</h2>
+              <h2 className="menu-subtitle pixel-font">ROGUELIKE · CADA RUN ES DISTINTA</h2>
               <div className="menu-rules">
-                <div><b>PARTIDAS</b><span>Cada partida genera una progresión distinta.</span></div>
-                <div><b>LOOT</b><span>Monedas, powerups y reliquias para construir tu partida.</span></div>
-                <div><b>PODIO</b><span>Superá a otros jugadores y conquistá la cima mundial.</span></div>
+                <div><b>01 / EXPLORÁ</b><span>Leé el mapa y abrí tu propio camino.</span></div>
+                <div><b>02 / MEJORÁ</b><span>Elegí reliquias para cambiar tu estrategia.</span></div>
+                <div><b>03 / DESCENDÉ</b><span>Vencés al jefe, sobrevivís y seguís.</span></div>
               </div>
               <section className="quality-selector" aria-label="Calidad gráfica">
                 <div className="quality-selector-head">
                   <div>
-                    <span className="quality-selector-kicker">CONFIGURACIÓN</span>
-                    <strong>DETALLES GRÁFICOS</strong>
+                    <span className="quality-selector-kicker">A TU MEDIDA</span>
+                    <strong>CALIDAD VISUAL</strong>
                   </div>
                   <span id="quality-selected-summary" className="quality-selected-summary">
                     DETALLES MEDIOS · Gama media
@@ -522,18 +543,18 @@ export const App: React.FC = () => {
                 </div>
                 <div className="quality-options" role="radiogroup" aria-label="Nivel de detalles">
                   <button className="quality-option" type="button" data-quality-option="low" role="radio" aria-checked="false">
-                    <strong>BAJO</strong><span>Gama baja</span>
+                    <strong>AHORRO</strong><span>Más rendimiento</span>
                   </button>
                   <button className="quality-option" type="button" data-quality-option="medium" role="radio" aria-checked="false">
-                    <strong>MEDIO</strong><span>Gama media</span>
+                    <strong>BALANCE</strong><span>Recomendado</span>
                   </button>
                   <button className="quality-option" type="button" data-quality-option="high" role="radio" aria-checked="false">
-                    <strong>MÁXIMO</strong><span>Gama alta</span>
+                    <strong>ÉPICO</strong><span>Todos los efectos</span>
                   </button>
                 </div>
-                <p className="quality-selector-note">Elegí el nivel antes de comenzar la partida.</p>
+                <p className="quality-selector-note">Podés cambiarlo antes de empezar cada run.</p>
               </section>
-            </>
+            </div>
           )}
 
           <div className="menu-actions">
@@ -541,7 +562,7 @@ export const App: React.FC = () => {
               CONTINUAR PARTIDA
             </button>
             <button id="btn-start" className="btn-pixel menu-start-button" type="button">
-              INICIAR PARTIDA
+              EMPEZAR RUN <span aria-hidden="true">↗</span>
             </button>
             <button
               id="btn-fullscreen-toggle"
@@ -554,16 +575,17 @@ export const App: React.FC = () => {
               <span className="fullscreen-icon">{isFullscreen ? '🗗' : '⛶'}</span>
               <span>{isFullscreen ? 'SALIR DE PANTALLA COMPLETA' : 'PANTALLA COMPLETA'}</span>
             </button>
-            <div className="menu-hint">
-              <span>TECLADO</span><strong>WASD / ↑↓←→</strong><span>· BOMBA</span><strong>ESPACIO</strong><span>· DASH</span><strong>SHIFT / X (o doble toque / desliz táctil)</strong>
+              <div className="menu-hint" aria-label="Controles: moverse con WASD o flechas; colocar bomba con espacio; dash con Shift o X">
+              <span>MOVER</span><strong>WASD / FLECHAS</strong><span>BOMBA</span><strong>ESPACIO</strong><span>DASH</span><strong>SHIFT / X</strong>
+              <small className="menu-hint-touch">TÁCTIL · DESLIZÁ PARA MOVERTE · TOCÁ PARA BOMBA · DOBLE TOQUE PARA DASH</small>
             </div>
           </div>
           <div className="menu-footer">
-            <span>PROCEDURAL COMBAT</span>
+              <span>MAPAS PROCEDURALES</span>
             <span>•</span>
-            <span>ADAPTIVE MOTION</span>
+              <span>BIOMAS + JEFES</span>
             <span>•</span>
-            <span>MÁS PROFUNDA CADA PARTIDA</span>
+              <span>UNA RUN MÁS</span>
           </div>
         </aside>
       </main>

@@ -19281,6 +19281,7 @@ window.rogueV327IsBossExamV626 = rogueV327IsBossExamV626;
 (function installGodModeV6303(global){
     'use strict';
 
+    const isDevelopmentBuild = import.meta.env.DEV === true;
     const state = { enabled: false };
 
     function getPlayer(){ return global.BOMBER_ENGINE?.getPlayer?.() || global.player || null; }
@@ -19324,6 +19325,11 @@ window.rogueV327IsBossExamV626 = rogueV327IsBossExamV626;
     }
 
     function setGodModeV616(enabled){
+        if (!isDevelopmentBuild) {
+            state.enabled = false;
+            syncRuntimeFlags(false);
+            return false;
+        }
         state.enabled = !!enabled;
         renderGodModeButton();
         if (typeof global.sfx === 'function') global.sfx('click');

@@ -9979,6 +9979,31 @@ function draw() {
                 ctx.stroke();
             }
 
+            // Atlas pixel-art 32x32: cuatro fotogramas por dirección.
+            // Si el PNG aún está cargando, conserva el render vectorial de respaldo.
+            if (!window.__bombermanSpriteSheetsV72) {
+                const basePath = (import.meta.env.BASE_URL || './').replace(/\/?$/, '/');
+                const playerSheet = new Image();
+                const echoSheet = new Image();
+                playerSheet.src = `${basePath}assets/sprites/bomberman-walk-32.png`;
+                echoSheet.src = `${basePath}assets/sprites/death-echo-walk-32.png`;
+                window.__bombermanSpriteSheetsV72 = { player: playerSheet, echo: echoSheet };
+            }
+            const spriteSheet = isGhost
+                ? window.__bombermanSpriteSheetsV72.echo
+                : window.__bombermanSpriteSheetsV72.player;
+            if (spriteSheet?.complete && spriteSheet.naturalWidth >= 128 && spriteSheet.naturalHeight >= 128) {
+                const directionRow = { down: 0, left: 1, right: 2, up: 3 }[actorDir] ?? 0;
+                const spriteFrame = walkingAnimation ? Math.floor(gameState.animFrame / 7) % 4 : 0;
+                const previousSmoothing = ctx.imageSmoothingEnabled;
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(
+                    spriteSheet,
+                    spriteFrame * 32, directionRow * 32, 32, 32,
+                    px, py, actorWidth, actorHeight
+                );
+                ctx.imageSmoothingEnabled = previousSmoothing;
+            } else {
             // Traje (Azul)
             ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerSuit') : '#2563eb';
             ctx.fillRect(px + 6, py + 12, actorWidth - 12, actorHeight - 16);
@@ -10054,6 +10079,7 @@ function draw() {
                 ctx.beginPath(); ctx.ellipse(px + actorWidth - 8, rightFootY, 5, 4, 0, 0, Math.PI*2); ctx.fill();
             }
 
+            }
             // Ondulación visual de inmersión en superficie líquida
             if (liquidStatus) {
                 const feetX = px + actorWidth / 2;

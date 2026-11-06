@@ -9979,105 +9979,109 @@ function draw() {
                 ctx.stroke();
             }
 
-            // Atlas pixel-art 32x32: cuatro fotogramas por dirección.
-            // Si el PNG aún está cargando, conserva el render vectorial de respaldo.
-            if (!window.__bombermanSpriteSheetsV72) {
+            // Atlas pixel-art 48x48 con silueta redondeada y cuatro poses por dirección.
+            // El dibujo vectorial anterior queda de respaldo mientras se cargan los PNG.
+            if (!window.__bombermanSpriteSheetsV721) {
                 const basePath = (import.meta.env.BASE_URL || './').replace(/\/?$/, '/');
                 const playerSheet = new Image();
                 const echoSheet = new Image();
-                playerSheet.src = `${basePath}assets/sprites/bomberman-walk-32.png`;
-                echoSheet.src = `${basePath}assets/sprites/death-echo-walk-32.png`;
-                window.__bombermanSpriteSheetsV72 = { player: playerSheet, echo: echoSheet };
+                playerSheet.src = `${basePath}assets/sprites/bomberman-walk-48.png`;
+                echoSheet.src = `${basePath}assets/sprites/death-echo-walk-48.png`;
+                window.__bombermanSpriteSheetsV721 = { player: playerSheet, echo: echoSheet };
             }
             const spriteSheet = isGhost
-                ? window.__bombermanSpriteSheetsV72.echo
-                : window.__bombermanSpriteSheetsV72.player;
-            if (spriteSheet?.complete && spriteSheet.naturalWidth >= 128 && spriteSheet.naturalHeight >= 128) {
+                ? window.__bombermanSpriteSheetsV721.echo
+                : window.__bombermanSpriteSheetsV721.player;
+            if (spriteSheet?.complete && spriteSheet.naturalWidth >= 192 && spriteSheet.naturalHeight >= 192) {
                 const directionRow = { down: 0, left: 1, right: 2, up: 3 }[actorDir] ?? 0;
                 const spriteFrame = walkingAnimation ? Math.floor(gameState.animFrame / 7) % 4 : 0;
                 const previousSmoothing = ctx.imageSmoothingEnabled;
+                const spriteSize = 48;
+                const spriteX = px + (actorWidth - spriteSize) / 2;
+                const spriteY = py + (actorHeight - spriteSize) / 2;
                 ctx.imageSmoothingEnabled = false;
                 ctx.drawImage(
                     spriteSheet,
-                    spriteFrame * 32, directionRow * 32, 32, 32,
-                    px, py, actorWidth, actorHeight
+                    spriteFrame * spriteSize, directionRow * spriteSize, spriteSize, spriteSize,
+                    spriteX, spriteY, spriteSize, spriteSize
                 );
                 ctx.imageSmoothingEnabled = previousSmoothing;
             } else {
-            // Traje (Azul)
-            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerSuit') : '#2563eb';
-            ctx.fillRect(px + 6, py + 12, actorWidth - 12, actorHeight - 16);
-            
-            // Cinturón
-            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerDark') : '#0f172a';
-            ctx.fillRect(px + 6, py + 22, actorWidth - 12, 4);
-            // Hebilla
-            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerBuckle') : '#facc15';
-            if (actorDir === 'down') {
-                ctx.fillRect(px + actorWidth/2 - 4, py + 21, 8, 6);
-            } else if (actorDir === 'left') {
-                ctx.fillRect(px + 4, py + 21, 4, 6);
-            } else if (actorDir === 'right') {
-                ctx.fillRect(px + actorWidth - 8, py + 21, 4, 6);
-            }
-
-            // Casco (Blanco)
-            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerHelmet') : '#f8fafc';
-            ctx.beginPath();
-            ctx.arc(px + actorWidth/2, py + 10, 14, 0, Math.PI*2);
-            ctx.fill();
-
-            // Rostro Direccional
-            if (actorDir === 'down') {
-                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerFace') : '#ffedd5';
-                ctx.fillRect(px + actorWidth/2 - 9, py + 4, 18, 11);
+                // Traje (Azul)
+                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerSuit') : '#2563eb';
+                ctx.fillRect(px + 6, py + 12, actorWidth - 12, actorHeight - 16);
+                
+                // Cinturón
                 ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerDark') : '#0f172a';
-                ctx.fillRect(px + actorWidth/2 - 5, py + 7, 3, 6);
-                ctx.fillRect(px + actorWidth/2 + 2, py + 7, 3, 6);
-            } else if (actorDir === 'left') {
-                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerFace') : '#ffedd5';
-                ctx.fillRect(px + actorWidth/2 - 12, py + 4, 14, 11);
-                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerDark') : '#0f172a';
-                ctx.fillRect(px + actorWidth/2 - 7, py + 7, 3, 6);
-            } else if (actorDir === 'right') {
-                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerFace') : '#ffedd5';
-                ctx.fillRect(px + actorWidth/2 - 2, py + 4, 14, 11);
-                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerDark') : '#0f172a';
-                ctx.fillRect(px + actorWidth/2 + 4, py + 7, 3, 6);
-            }
+                ctx.fillRect(px + 6, py + 22, actorWidth - 12, 4);
+                // Hebilla
+                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerBuckle') : '#facc15';
+                if (actorDir === 'down') {
+                    ctx.fillRect(px + actorWidth/2 - 4, py + 21, 8, 6);
+                } else if (actorDir === 'left') {
+                    ctx.fillRect(px + 4, py + 21, 4, 6);
+                } else if (actorDir === 'right') {
+                    ctx.fillRect(px + actorWidth - 8, py + 21, 4, 6);
+                }
 
-            // Antena
-            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerMetal') : '#94a3b8'; 
-            ctx.fillRect(px + actorWidth/2 - 2, py - 6, 4, 4);
-            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerAccent') : '#ec4899'; 
-            ctx.beginPath();
-            ctx.arc(px + actorWidth/2, py - 8, 5, 0, Math.PI*2);
-            ctx.fill();
+                // Casco (Blanco)
+                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerHelmet') : '#f8fafc';
+                ctx.beginPath();
+                ctx.arc(px + actorWidth/2, py + 10, 14, 0, Math.PI*2);
+                ctx.fill();
 
-            // Guantes
-            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerAccent') : '#ec4899';
-            if (actorDir !== 'right') { 
-                ctx.beginPath(); ctx.arc(px + 2, py + 18, 5, 0, Math.PI*2); ctx.fill();
-            }
-            if (actorDir !== 'left') { 
-                ctx.beginPath(); ctx.arc(px + actorWidth - 2, py + 18, 5, 0, Math.PI*2); ctx.fill();
-            }
+                // Rostro Direccional
+                if (actorDir === 'down') {
+                    ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerFace') : '#ffedd5';
+                    ctx.fillRect(px + actorWidth/2 - 9, py + 4, 18, 11);
+                    ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerDark') : '#0f172a';
+                    ctx.fillRect(px + actorWidth/2 - 5, py + 7, 3, 6);
+                    ctx.fillRect(px + actorWidth/2 + 2, py + 7, 3, 6);
+                } else if (actorDir === 'left') {
+                    ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerFace') : '#ffedd5';
+                    ctx.fillRect(px + actorWidth/2 - 12, py + 4, 14, 11);
+                    ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerDark') : '#0f172a';
+                    ctx.fillRect(px + actorWidth/2 - 7, py + 7, 3, 6);
+                } else if (actorDir === 'right') {
+                    ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerFace') : '#ffedd5';
+                    ctx.fillRect(px + actorWidth/2 - 2, py + 4, 14, 11);
+                    ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerDark') : '#0f172a';
+                    ctx.fillRect(px + actorWidth/2 + 4, py + 7, 3, 6);
+                }
 
-            // Pies (Zapatos Rojos) animando
-            ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerBoot') : '#dc2626';
-            let leftFootY = py + actorHeight - 4 + (walkingAnimation && Math.floor(walkCycle*4)%2===0 ? -4 : 0);
-            let rightFootY = py + actorHeight - 4 + (walkingAnimation && Math.floor(walkCycle*4)%2===1 ? -4 : 0);
-            
-            if (actorDir === 'right') {
-                ctx.beginPath(); ctx.ellipse(px + actorWidth/2 - 2, leftFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.ellipse(px + actorWidth/2 + 6, rightFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
-            } else if (actorDir === 'left') {
-                ctx.beginPath(); ctx.ellipse(px + actorWidth/2 - 6, leftFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.ellipse(px + actorWidth/2 + 2, rightFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
-            } else {
-                ctx.beginPath(); ctx.ellipse(px + 8, leftFootY, 5, 4, 0, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.ellipse(px + actorWidth - 8, rightFootY, 5, 4, 0, 0, Math.PI*2); ctx.fill();
-            }
+                // Antena
+                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerMetal') : '#94a3b8'; 
+                ctx.fillRect(px + actorWidth/2 - 2, py - 6, 4, 4);
+                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerAccent') : '#ec4899'; 
+                ctx.beginPath();
+                ctx.arc(px + actorWidth/2, py - 8, 5, 0, Math.PI*2);
+                ctx.fill();
+
+                // Guantes
+                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerAccent') : '#ec4899';
+                if (actorDir !== 'right') { 
+                    ctx.beginPath(); ctx.arc(px + 2, py + 18, 5, 0, Math.PI*2); ctx.fill();
+                }
+                if (actorDir !== 'left') { 
+                    ctx.beginPath(); ctx.arc(px + actorWidth - 2, py + 18, 5, 0, Math.PI*2); ctx.fill();
+                }
+
+                // Pies (Zapatos Rojos) animando
+                ctx.fillStyle = typeof themeColorV46 === 'function' ? themeColorV46('playerBoot') : '#dc2626';
+                let leftFootY = py + actorHeight - 4 + (walkingAnimation && Math.floor(walkCycle*4)%2===0 ? -4 : 0);
+                let rightFootY = py + actorHeight - 4 + (walkingAnimation && Math.floor(walkCycle*4)%2===1 ? -4 : 0);
+                
+                if (actorDir === 'right') {
+                    ctx.beginPath(); ctx.ellipse(px + actorWidth/2 - 2, leftFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.ellipse(px + actorWidth/2 + 6, rightFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
+                } else if (actorDir === 'left') {
+                    ctx.beginPath(); ctx.ellipse(px + actorWidth/2 - 6, leftFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.ellipse(px + actorWidth/2 + 2, rightFootY, 6, 4, 0, 0, Math.PI*2); ctx.fill();
+                } else {
+                    ctx.beginPath(); ctx.ellipse(px + 8, leftFootY, 5, 4, 0, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.ellipse(px + actorWidth - 8, rightFootY, 5, 4, 0, 0, Math.PI*2); ctx.fill();
+                }
+
 
             }
             // Ondulación visual de inmersión en superficie líquida
